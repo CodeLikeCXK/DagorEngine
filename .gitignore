@@ -15,3 +15,4 @@
 *.dshl.log
 ShaderLog-*
 /devtools/
+/samples/outerSpace/
