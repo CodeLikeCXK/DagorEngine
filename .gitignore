@@ -14,3 +14,4 @@
 *.das.inl
 *.dshl.log
 ShaderLog-*
+/devtools/
