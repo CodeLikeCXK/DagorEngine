@@ -1,5 +1,5 @@
 if ! $(PhysEngine) && ! $(PhysName) {
-  PhysName = Jolt ;
+  PhysName = Bullet ;
   echo \ \ \ both PhysEngine and PhysName not set, using default: PhysName \= $(PhysName) \; ;
 }
 if $(PhysEngine) && $(PhysName) && $(PhysEngine) != $(PhysName) { exit both PhysEngine=$(PhysEngine) and PhysName=$(PhysName) defined and differ! ; }
