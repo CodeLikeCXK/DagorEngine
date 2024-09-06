@@ -157,7 +157,7 @@ enum
 
 static bool enable_taa_override = false;
 static bool use_snapdragon_super_resolution = true;
-static float snapdragon_super_resolution_scale = 0.5f;
+static float snapdragon_super_resolution_scale = 0.7f;
 
 static void init_webui(const DataBlock *debug_block)
 {
@@ -1008,6 +1008,8 @@ public:
     bool renderTaa = taa.get() || enable_taa_override;
     // logwarn("[hmatthew] renderTaa = %s", renderTaa ? "TRUE" : "FALSE");
 
+    snapdragon_super_resolution_scale = gi_panel.resolution_scale / 100.f;
+
     Driver3dPerspective p;
     d3d::getpersp(p);
 
@@ -1044,8 +1046,11 @@ public:
     }
 
 
+
     d3d::set_render_target(frame.getTex2D(), 0);
     render();
+ 
+
     if (gi_panel.update_ssgi && gi_panel.gi_mode == SSGI) // && gi_panel.onscreen_mode == RESULT
     {
       d3d::set_render_target();
@@ -1754,6 +1759,8 @@ protected:
       DECLARE_BOOL_CHECKBOX(gi_panel, gtao, false),
       DECLARE_BOOL_CHECKBOX(gi_panel, ssr, true),
       DECLARE_BOOL_CHECKBOX(gi_panel, per_pixel_trace, false),
+      //add slider for snapdragon super samplling
+      DECLARE_INT_SLIDER(gi_panel, resolution_scale, 20,100,70),
       DECLARE_INT_COMBOBOX(gi_panel, onscreen_mode, RESULT, RESULT, LIGHTING, DIFFUSE_LIGHTING, DIRECT_LIGHTING, INDIRECT_LIGHTING),
       DECLARE_INT_COMBOBOX(gi_panel, gi_mode, SSGI, ENVI_PROBE, SSGI),
       DECLARE_INT_SLIDER(gi_panel, lightmap_size, 32, 4096, 256),
@@ -2031,8 +2038,9 @@ protected:
     bool ssao = true, gtao = true, ssr = true;
     bool update_ssgi, update_scene = true;
     bool per_pixel_trace = false;
+    int resolution_scale = 70;
     int onscreen_mode = RESULT;
-    int gi_mode = ENVI_PROBE;
+    int gi_mode = SSGI;
     int voxel_dimensions_y = 16;
     int voxel_dimensions_xz = 64;
     int voxel_iterations = 1;
@@ -2369,7 +2377,8 @@ void game_demo_init()
 
   debug("[DEMO] registering factories");
   d3d::driver_command(DRV3D_COMMAND_ENABLE_MT, NULL, NULL, NULL);
-  ::enable_tex_mgr_mt(true, 1024);
+  //enlarge enable_tex_mgr_mt from 1024 to 4096
+  ::enable_tex_mgr_mt(true, 4096);
   ::set_gameres_sys_ver(2);
   ::register_dynmodel_gameres_factory();
   ::register_geom_node_tree_gameres_factory();
