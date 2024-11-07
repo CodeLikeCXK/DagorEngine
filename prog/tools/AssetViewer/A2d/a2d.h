@@ -1,9 +1,10 @@
+// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include "../av_plugin.h"
 #include <EditorCore/ec_interface.h>
 #include <de3_objEntity.h>
-#include <propPanel2/c_control_event_handler.h>
+#include <propPanel/c_control_event_handler.h>
 #include <anim/dag_simpleNodeAnim.h>
 #include <math/dag_geomTree.h>
 #include <EASTL/map.h>
@@ -12,12 +13,8 @@
 
 class SimpleString;
 class ILodController;
-namespace AnimV20
-{
-class AnimV20;
-}
 
-class A2dPlugin : public IGenEditorPlugin, public ControlEventHandler
+class A2dPlugin : public IGenEditorPlugin, public PropPanel::ControlEventHandler
 {
 public:
   struct AnimNode
@@ -90,8 +87,8 @@ public:
   virtual void onLoadLibrary() override {}
 
   virtual bool handleMouseLBPress(IGenViewportWnd *wnd, int x, int y, bool inside, int buttons, int key_modif) override;
-  virtual void onClick(int pcb_id, PropertyContainerControlBase *panel) override;
-  virtual void onChange(int pid, PropertyContainerControlBase *panel) override;
+  virtual void onClick(int pcb_id, PropPanel::ContainerPropertyControl *panel) override;
+  virtual void onChange(int pid, PropPanel::ContainerPropertyControl *panel) override;
   virtual bool getSelectionBox(BBox3 &box) const override;
 
   virtual void actObjects(float dt) override;
@@ -102,6 +99,6 @@ public:
 
   virtual bool supportAssetType(const DagorAsset &asset) const override;
 
-  virtual void fillPropPanel(PropertyContainerControlBase &panel) override;
+  virtual void fillPropPanel(PropPanel::ContainerPropertyControl &panel) override;
   virtual void postFillPropPanel() override {}
 };

@@ -63,7 +63,11 @@ struct dtObstacleOrientedBox
 	float angle;
 };
 
-static const int DT_MAX_TOUCHED_TILES = 64;
+#if _TARGET_PC
+static const int DT_MAX_TOUCHED_TILES = 128;
+#else
+static const int DT_MAX_TOUCHED_TILES = 8;
+#endif
 struct dtTileCacheObstacle
 {
 	union

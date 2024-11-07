@@ -1,7 +1,6 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
-// (for conditions of use see prog/license.txt)
+// Copyright (C) Gaijin Games KFT.  All rights reserved.
 //
 #pragma once
 
@@ -15,11 +14,7 @@ struct AnimKeyPoint3;
 struct AnimKeyQuat;
 struct AnimKeyReal;
 
-template <class KEY>
 struct AnimChan;
-typedef AnimChan<AnimKeyPoint3> AnimChanPoint3;
-typedef AnimChan<AnimKeyQuat> AnimChanQuat;
-typedef AnimChan<AnimKeyReal> AnimChanReal;
 struct AnimKeyLabel;
 
 // shareable animation (a2d)
@@ -50,6 +45,7 @@ class AnimBlendCtrl_RandomSwitcher;
 class AnimBlendCtrl_Hub;
 class AnimBlendCtrl_Blender;
 class AnimBlendCtrl_BinaryIndirectSwitch;
+class AnimBlendCtrl_SetMotionMatchingTag;
 
 // post-blend controllers
 class AnimPostBlendCtrl;

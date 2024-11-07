@@ -1,15 +1,12 @@
+// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include "break_point.h"
 #include "device_state.h"
 
-namespace drv3d_dx12
+namespace drv3d_dx12::debug::null
 {
-namespace debug
-{
-namespace null
-{
-class DeviceContextState : public call_stack::ExecutionContextDataStore, public debug::call_stack::Reporter
+class DeviceContextState : public break_point::Controller
 {
 public:
   void debugBeginCommandBuffer(DeviceState &, D3DDevice *, ID3D12GraphicsCommandList *) {}
@@ -37,15 +34,15 @@ public:
   {}
 
   void debugDrawIndirect(DeviceState &, D3DGraphicsCommandList *, const PipelineStageStateBase &, const PipelineStageStateBase &,
-    BasePipeline &, PipelineVariant &, BufferResourceReferenceAndOffset)
+    BasePipeline &, PipelineVariant &, const BufferResourceReferenceAndOffset &)
   {}
 
   void debugDrawIndexedIndirect(DeviceState &, D3DGraphicsCommandList *, const PipelineStageStateBase &,
-    const PipelineStageStateBase &, BasePipeline &, PipelineVariant &, BufferResourceReferenceAndOffset)
+    const PipelineStageStateBase &, BasePipeline &, PipelineVariant &, const BufferResourceReferenceAndOffset &)
   {}
 
   void debugDispatchIndirect(DeviceState &, D3DGraphicsCommandList *, const PipelineStageStateBase &, ComputePipeline &,
-    BufferResourceReferenceAndOffset)
+    const BufferResourceReferenceAndOffset &)
   {}
 
   void debugDispatch(DeviceState &, D3DGraphicsCommandList *, const PipelineStageStateBase &, ComputePipeline &, uint32_t, uint32_t,
@@ -57,14 +54,12 @@ public:
   {}
 
   void debugDispatchMeshIndirect(DeviceState &, D3DGraphicsCommandList *, const PipelineStageStateBase &,
-    const PipelineStageStateBase &, BasePipeline &, PipelineVariant &, BufferResourceReferenceAndOffset,
-    BufferResourceReferenceAndOffset, uint32_t)
+    const PipelineStageStateBase &, BasePipeline &, PipelineVariant &, const BufferResourceReferenceAndOffset &,
+    const BufferResourceReferenceAndOffset &, uint32_t)
   {}
 
   void debugBlit(DeviceState &, D3DGraphicsCommandList *) {}
 
   void debugOnDeviceRemoved(DeviceState &, D3DDevice *, HRESULT) {}
 };
-} // namespace null
-} // namespace debug
-} // namespace drv3d_dx12
+} // namespace drv3d_dx12::debug::null

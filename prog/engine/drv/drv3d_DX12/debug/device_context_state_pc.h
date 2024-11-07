@@ -1,13 +1,10 @@
+// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include "break_point.h"
 #include "device_state.h"
 
-namespace drv3d_dx12
-{
-namespace debug
-{
-namespace pc
+namespace drv3d_dx12::debug::pc
 {
 class DeviceContextState : public break_point::Controller
 {
@@ -22,7 +19,10 @@ public:
   void debugEventEnd(DeviceState &dds, ID3D12GraphicsCommandList *cmd) { dds.endSection(cmd); }
   void debugMarkerSet(DeviceState &dds, ID3D12GraphicsCommandList *cmd, eastl::string_view name) { dds.marker(cmd, name); }
 
-  void debugFrameCaptureBegin(DeviceState &dds, ID3D12CommandQueue *, uint32_t, eastl::span<const wchar_t>) { dds.beginCapture(); }
+  void debugFrameCaptureBegin(DeviceState &dds, ID3D12CommandQueue *, uint32_t, eastl::span<const wchar_t> name)
+  {
+    dds.beginCapture(name.data());
+  }
   void debugFrameCaptureEnd(DeviceState &dds, ID3D12CommandQueue *) { dds.endCapture(); }
   void debugFrameCaptureQueueNextFrames(DeviceState &dds, ID3D12CommandQueue *, uint32_t, eastl::span<const wchar_t> filename,
     int frame_count)
@@ -44,17 +44,19 @@ public:
       first_instance, topology);
   }
   void debugDrawIndirect(DeviceState &dds, D3DGraphicsCommandList *cmd, const PipelineStageStateBase &vs,
-    const PipelineStageStateBase &ps, BasePipeline &pipeline_base, PipelineVariant &pipeline, BufferResourceReferenceAndOffset buffer)
+    const PipelineStageStateBase &ps, BasePipeline &pipeline_base, PipelineVariant &pipeline,
+    const BufferResourceReferenceAndOffset &buffer)
   {
     dds.drawIndirect(getCommandData(), cmd, vs, ps, pipeline_base, pipeline, buffer);
   }
   void debugDrawIndexedIndirect(DeviceState &dds, D3DGraphicsCommandList *cmd, const PipelineStageStateBase &vs,
-    const PipelineStageStateBase &ps, BasePipeline &pipeline_base, PipelineVariant &pipeline, BufferResourceReferenceAndOffset buffer)
+    const PipelineStageStateBase &ps, BasePipeline &pipeline_base, PipelineVariant &pipeline,
+    const BufferResourceReferenceAndOffset &buffer)
   {
     dds.drawIndexedIndirect(getCommandData(), cmd, vs, ps, pipeline_base, pipeline, buffer);
   }
   void debugDispatchIndirect(DeviceState &dds, D3DGraphicsCommandList *cmd, const PipelineStageStateBase &state,
-    ComputePipeline &pipeline, BufferResourceReferenceAndOffset buffer)
+    ComputePipeline &pipeline, const BufferResourceReferenceAndOffset &buffer)
   {
     dds.dispatchIndirect(getCommandData(), cmd, state, pipeline, buffer);
   }
@@ -71,8 +73,8 @@ public:
   }
 
   void debugDispatchMeshIndirect(DeviceState &dds, D3DGraphicsCommandList *cmd, const PipelineStageStateBase &vs,
-    const PipelineStageStateBase &ps, BasePipeline &pipeline_base, PipelineVariant &pipeline, BufferResourceReferenceAndOffset args,
-    BufferResourceReferenceAndOffset count, uint32_t max_count)
+    const PipelineStageStateBase &ps, BasePipeline &pipeline_base, PipelineVariant &pipeline,
+    const BufferResourceReferenceAndOffset &args, const BufferResourceReferenceAndOffset &count, uint32_t max_count)
   {
     dds.dispatchMeshIndirect(getCommandData(), cmd, vs, ps, pipeline_base, pipeline, args, count, max_count);
   }
@@ -81,6 +83,4 @@ public:
 
   void debugOnDeviceRemoved(DeviceState &dds, D3DDevice *device, HRESULT remove_reason) { dds.onDeviceRemoved(device, remove_reason); }
 };
-} // namespace pc
-} // namespace debug
-} // namespace drv3d_dx12
+} // namespace drv3d_dx12::debug::pc

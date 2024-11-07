@@ -23,9 +23,12 @@ local currencySymbols = {
 
 local langsByPluralFormsCount = [
   /* 0 */ [],
-  /* 1 */ [ "Chinese", "Japanese", "Vietnamese", "Korean", "TChinese", "HChinese" ],
+  /* 1 */ [ "Chinese", "Japanese", "Vietnamese", "Korean", "TChinese", "HChinese", "Thai", "Indonesian" ],
   /* 2 */ [ "English", "French", "Italian", "German", "Spanish", "Turkish", "Portuguese", "Hungarian", "Georgian", "Greek" ],
   /* 3 */ [ "Russian", "Polish", "Czech", "Ukrainian", "Serbian", "Belarusian", "Romanian", "Croatian" ],
+  /* 4 */ [],
+  /* 5 */ [],
+  /* 6 */ [ "Arabic" ],
 ]
 
 local totalRowsChecked = 0
@@ -122,7 +125,7 @@ function readTextFileTo2DCharArray(fileName) {
     local lineIdx = 0
     local line = lines[lineIdx]
     for (local i = 0; i < content.len(); i++) {
-      line.append(format("%c", content.readn('c')))
+      line.append(format("%c", content.readn('b')))
       local lineLen = line.len()
       if (line?[lineLen - 2] == "\r" && line?[lineLen - 1] == "\n") {
         lines.append([])
@@ -223,7 +226,7 @@ function writeCsvFile(rows, filePath) {
         return txt.len() != 0 && !reIsFieldNumeric.match(txt) ? $"\"{txt}\"" : ""
       })), "\r\n")
     foreach (char in line)
-      fp.writen(char, 'c')
+      fp.writen(char, 'b')
   }
   fp.close()
 }

@@ -1,3 +1,4 @@
+// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <debug/dag_log.h>
@@ -112,7 +113,7 @@ class CommandListTrace : public CommandListTraceBase
 
     static constexpr D3D12_AUTO_BREADCRUMB_OP OpCode = D3D12_AUTO_BREADCRUMB_OP_BEGINEVENT;
 
-    void report(call_stack::Reporter &, CompletionStatus status) const { logdbg("DX12: %s <%s>", prefix(status), path); }
+    void report(call_stack::Reporter &, CompletionStatus status) const { logdbg("DX12: %s BeginEvent <%s>", prefix(status), path); }
   };
 
   struct EndEventTrace : EventTraceBase
@@ -121,7 +122,7 @@ class CommandListTrace : public CommandListTraceBase
 
     static constexpr D3D12_AUTO_BREADCRUMB_OP OpCode = D3D12_AUTO_BREADCRUMB_OP_ENDEVENT;
 
-    void report(call_stack::Reporter &, CompletionStatus status) const { logdbg("DX12: %s <%s>", prefix(status), path); }
+    void report(call_stack::Reporter &, CompletionStatus status) const { logdbg("DX12: %s EndEvent <%s>", prefix(status), path); }
   };
 
   struct MarkerTrace : EventTraceBase
@@ -350,7 +351,7 @@ class CommandListTrace : public CommandListTraceBase
     eastl::variant<NullTrace, BeginEventTrace, EndEventTrace, MarkerTrace, DrawTrace, DrawIndexedTrace, DrawIndirectTrace,
       DrawIndexedIndirectTrace, DispatchIndirectTrace, DispatchTrace, DispatchMeshTrace, DispatchMeshIndirectTrace, BlitTrace>;
 
-  eastl::vector<AnyTraceEvent> traces;
+  dag::Vector<AnyTraceEvent> traces;
 
   static bool isTracedOp(D3D12_AUTO_BREADCRUMB_OP op)
   {
@@ -501,17 +502,19 @@ public:
       otd, debug_info, vs, ps, &pipeline_base, &pipeline, count, instance_count, index_start, first_instance, topology, vertex_base});
   }
   void drawIndirect(const OperationTraceData &otd, const call_stack::CommandData &debug_info, const PipelineStageStateBase &vs,
-    const PipelineStageStateBase &ps, BasePipeline &pipeline_base, PipelineVariant &pipeline, BufferResourceReferenceAndOffset buffer)
+    const PipelineStageStateBase &ps, BasePipeline &pipeline_base, PipelineVariant &pipeline,
+    const BufferResourceReferenceAndOffset &buffer)
   {
     traces.emplace_back(DrawIndirectTrace{otd, debug_info, buffer, vs, ps, &pipeline_base, &pipeline});
   }
   void drawIndexedIndirect(const OperationTraceData &otd, const call_stack::CommandData &debug_info, const PipelineStageStateBase &vs,
-    const PipelineStageStateBase &ps, BasePipeline &pipeline_base, PipelineVariant &pipeline, BufferResourceReferenceAndOffset buffer)
+    const PipelineStageStateBase &ps, BasePipeline &pipeline_base, PipelineVariant &pipeline,
+    const BufferResourceReferenceAndOffset &buffer)
   {
     traces.emplace_back(DrawIndexedIndirectTrace{otd, debug_info, buffer, vs, ps, &pipeline_base, &pipeline});
   }
   void dispatchIndirect(const OperationTraceData &otd, const call_stack::CommandData &debug_info, const PipelineStageStateBase &state,
-    ComputePipeline &pipeline, BufferResourceReferenceAndOffset buffer)
+    ComputePipeline &pipeline, const BufferResourceReferenceAndOffset &buffer)
   {
     traces.emplace_back(DispatchIndirectTrace{otd, debug_info, buffer, state, &pipeline});
   }
@@ -526,8 +529,8 @@ public:
     traces.emplace_back(DispatchMeshTrace{otd, debug_info, vs, ps, &pipeline_base, &pipeline, x, y, z});
   }
   void dispatchMeshIndirect(const OperationTraceData &otd, const call_stack::CommandData &debug_info, const PipelineStageStateBase &vs,
-    const PipelineStageStateBase &ps, BasePipeline &pipeline_base, PipelineVariant &pipeline, BufferResourceReferenceAndOffset args,
-    BufferResourceReferenceAndOffset count, uint32_t max_count)
+    const PipelineStageStateBase &ps, BasePipeline &pipeline_base, PipelineVariant &pipeline,
+    const BufferResourceReferenceAndOffset &args, const BufferResourceReferenceAndOffset &count, uint32_t max_count)
   {
     traces.emplace_back(DispatchMeshIndirectTrace{otd, debug_info, args, count, vs, ps, &pipeline_base, &pipeline, max_count});
   }
