@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -13,7 +14,7 @@
 #include <math/dag_TMatrix.h>
 #include <math/dag_Point4.h>
 #include <generic/dag_tab.h>
-#include <util/dag_multicastEvent.h>
+
 
 class CollisionResource;
 class Point3;
@@ -22,15 +23,15 @@ struct RiGenVisibility;
 class Occlusion;
 class OcclusionMap;
 class IGenLoad;
-class RenderableInstanceLodsResource;
-class ShaderMaterial;
 
-inline float MIN_SETTINGS_RENDINST_DIST_MUL = 0.5f;
-inline float MAX_SETTINGS_RENDINST_DIST_MUL = 3.0f;
-inline float MIN_EFFECTIVE_RENDINST_DIST_MUL = 0.1f;
-inline float MAX_EFFECTIVE_RENDINST_DIST_MUL = 3.0f;
+inline constexpr float MIN_SETTINGS_RENDINST_DIST_MUL = 0.5f;
+inline constexpr float MAX_SETTINGS_RENDINST_DIST_MUL = 3.0f;
+inline constexpr float MIN_EFFECTIVE_RENDINST_DIST_MUL = 0.1f;
+inline constexpr float MAX_EFFECTIVE_RENDINST_DIST_MUL = 3.0f;
 
-#define RI_COLLISION_RES_SUFFIX "_collision"
+// use additional data as hashVal only when in Tools (De3X, AV2)
+#define RIGEN_PERINST_ADD_DATA_FOR_TOOLS (_TARGET_PC && !_TARGET_STATIC_LIB)
+#define RI_COLLISION_RES_SUFFIX          "_collision"
 
 namespace rendinst
 {
@@ -49,8 +50,6 @@ extern void (*sweep_rendinst_cb)(const RendInstDesc &);
 
 extern void (*shadow_invalidate_cb)(const BBox3 &box);
 extern BBox3 (*get_shadows_bbox_cb)();
-extern void (*shader_material_validation_cb)(ShaderMaterial *mat, const char *res_name);
-extern void (*on_vsm_invalidate)();
 
 void register_land_gameres_factory();
 
@@ -68,7 +67,6 @@ void termRIGen();
 void setPoiRadius(float poi_radius);
 
 void clearRIGen();
-void clearRIGenDestrData();
 
 void setRiGenResMatId(uint32_t res_idx, int matId);
 void setRiGenResHp(uint32_t res_idx, float hp);
@@ -93,10 +91,10 @@ void updateRiDestrFxIds(FxTypeByNameCallback get_fx_type_by_name);
 
 void precomputeRIGenCellsAndPregenerateRIExtra();
 
-const DataBlock *getRIGenExtraConfig();
 const DataBlock *registerRIGenExtraConfig(const DataBlock *persist_props);
 void addRIGenExtraSubst(const char *ri_res_name);
 
+const bbox3f &getMovedDebrisBbox();
 void walkRIGenResourceNames(res_walk_cb cb);
 bool hasRiLayer(int res_idx, LayerFlag layer);
 
@@ -134,10 +132,11 @@ extern void iterateOcclusionData(RIOcclusionData &od, const mat44f *&mat, const 
                                                                                                                    // array
 extern void prepareOcclusionData(mat44f_cref globtm, vec4f vpos, RIOcclusionData &, int max_ri_to_add, bool walls);
 
-void updateRIGen(float dt, bbox3f *movedDebrisBbox = nullptr);
+void updateRIGen(uint32_t curFrame, float dt);
 
 void setTextureMinMipWidth(int textureSize, int impostorSize, float textureSizeMul, float impostorSizeMul);
 
+void setDirFromSun(const Point3 &d); // used for shadows
 float getDefaultImpostorsDistAddMul();
 float getDefaultDistAddMul();
 
@@ -156,13 +155,8 @@ void setDistMul(float distMul, float distOfs, bool force_impostors_and_mul = fal
   float impostors_far_dist_additional_mul = 1.f); // 0.2353, 0.0824 will remap 0.5 .. 2.2 to 0.2 .. 0.6
 void setImpostorsDistAddMul(float impostors_dist_additional_mul);
 void setImpostorsFarDistAddMul(float impostors_far_dist_additional_mul);
-void setImpostorsMinRange(float impostors_min_range);
 void updateSettingsDistMul();
 void updateSettingsDistMul(float v);
-void updateMinSettingsDistMul(float v);
-void updateMinEffectiveRendinstDistMul(float v);
-void updateMaxSettingsDistMul(float v);
-void updateMaxEffectiveRendinstDistMul(float v);
 float getSettingsDistMul();
 void updateMinCullSettingsDistMul(float v);
 void updateRIExtraMulScale();

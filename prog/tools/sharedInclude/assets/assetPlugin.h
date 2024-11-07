@@ -1,6 +1,7 @@
 //
 // Dagor Tech 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -50,7 +51,7 @@ typedef void(__stdcall *dabuild_plugin_install_dds_helper_t)(
 #endif
 
 #if DAGOR_DBGLEVEL > 1
-#define DAGOR_DLL "-dbg" DAGOR_OS_DLL_SUFFIX
+#define DAGOR_DLL "-dbg" DAGOR_PC_OS_DLL_SUFFIX
 #else
-#define DAGOR_DLL "-dev" DAGOR_OS_DLL_SUFFIX
+#define DAGOR_DLL "-dev" DAGOR_PC_OS_DLL_SUFFIX
 #endif

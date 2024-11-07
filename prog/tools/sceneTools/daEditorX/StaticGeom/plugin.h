@@ -1,5 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __GAIJIN_DAGORED_SG_PLUGIN_H__
+#define __GAIJIN_DAGORED_SG_PLUGIN_H__
 #pragma once
+
 
 #include <oldEditor/de_interface.h>
 #include <oldEditor/de_clipping.h>
@@ -24,7 +26,7 @@ class StaticGeometryPlugin : public IGenEditorPlugin,
                              public IRenderingService,
                              public IFileChangedNotify,
                              public ILightingChangeClient,
-                             public PropPanel::ControlEventHandler
+                             public ControlEventHandler
 {
 public:
   StaticGeometryPlugin();
@@ -115,7 +117,7 @@ public:
   virtual void onFileChanged(int file_name_id);
 
   // ControlEventHandler
-  virtual void onClick(int pcb_id, PropPanel::ContainerPropertyControl *panel);
+  virtual void onClick(int pcb_id, PropPanel2 *panel);
 
 protected:
   GeomObject *geom;
@@ -139,3 +141,6 @@ private:
   String getImportDagPath() const;
   void importDag();
 };
+
+
+#endif

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <render/fx/lightning.h>
 #include <perfMon/dag_statDrv.h>
 #include <ioSys/dag_dataBlock.h>

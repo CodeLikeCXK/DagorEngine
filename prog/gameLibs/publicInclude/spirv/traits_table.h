@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -910,7 +911,7 @@ struct TypeTraits<Decoration>
       struct BuiltInTag
       {
         BuiltIn first;
-      } BuiltInData;
+      } BuiltIn;
       struct UniformIdTag
       {
         IdScope execution;
@@ -1186,7 +1187,7 @@ struct TypeTraits<Decoration>
       };
       case Decoration::BuiltIn:
       {
-        result.data.BuiltInData.first = TypeTraits<BuiltIn>::read(from, to, cds, error);
+        result.data.BuiltIn.first = TypeTraits<BuiltIn>::read(from, to, cds, error);
         if (error)
           return {};
         break;

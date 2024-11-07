@@ -1,7 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <3d/tql.h>
-#include <drv/3d/dag_tex3d.h>
+#include <3d/dag_tex3d.h>
 #include <math/dag_adjpow2.h>
 
 // #define TRACE debug  // trace resource manager's DDSx loads

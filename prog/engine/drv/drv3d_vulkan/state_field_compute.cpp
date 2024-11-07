@@ -1,15 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "pipeline.h"
+#include "device.h"
 #include "state_field_compute.h"
-#include "globals.h"
-#include "dummy_resources.h"
-#include "pipeline/manager.h"
-#include "compute_state.h"
-#include "execution_state.h"
-#include "device_context.h"
-#include "backend.h"
-#include "execution_context.h"
 
 namespace drv3d_vulkan
 {
@@ -33,11 +24,11 @@ void StateFieldComputeProgram::applyTo(FrontComputeStateStorage &, ExecutionStat
     // that was deleted right before draw
     // trace back and fix this at caller site
     // but do not crash and use debug program as fallback
-    D3D_ERROR("vulkan: trying to use invalid compute program\n%s", target.getExecutionContext().getCurrentCmdCaller());
+    logerr("vulkan: trying to use invalid compute program\n%s", target.getExecutionContext().getCurrentCmdCaller());
     return;
   }
 
-  auto *pipe = &Globals::pipelines.get<ComputePipeline>(handle);
+  auto *pipe = &get_device().pipeMan.get<ComputePipeline>(handle);
   target.set<StateFieldComputePipeline, ComputePipeline *, BackComputeState>(pipe);
   target.set<StateFieldComputeLayout, ComputePipelineLayout *, BackComputeState>(pipe->getLayout());
 }
@@ -82,8 +73,8 @@ void StateFieldComputePipeline::dumpLog(const BackComputeStateStorage &) const
 template <>
 void StateFieldComputeLayout::applyTo(BackComputeStateStorage &, ExecutionContext &target) const
 {
-  Backend::bindless.bindSets(target, VK_PIPELINE_BIND_POINT_COMPUTE, ptr->handle);
-  Backend::State::exec.getResBinds(STAGE_CS).invalidateState();
+  target.back.contextState.bindlessManagerBackend.bindSets(target, VK_PIPELINE_BIND_POINT_COMPUTE, ptr->handle);
+  target.back.executionState.getResBinds(STAGE_CS).invalidateState();
 }
 
 template <>
@@ -96,13 +87,14 @@ template <>
 void StateFieldComputeFlush::applyTo(BackComputeStateStorage &state, ExecutionContext &target) const
 {
   ComputePipeline *ptr = state.pipeline.ptr;
+  ContextState &ctxState = target.back.contextState;
   auto &regRef = ptr->getLayout()->registers.cs();
   VulkanPipelineLayoutHandle layoutHandle = ptr->getLayout()->handle;
 
-  target.trackStageResAccessesNonParallel(regRef.header, ExtendedShaderStage::CS);
+  target.trackStageResAccessesNonParallel(regRef.header, STAGE_CS);
 
-  Backend::State::exec.getResBinds(STAGE_CS).apply(target.vkDev, Globals::dummyResources.getTable(), Backend::gpuJob->index, regRef,
-    ExtendedShaderStage::CS,
+  target.back.executionState.getResBinds(STAGE_CS).apply(target.vkDev, target.device.getDummyResourceTable(), ctxState.frame->index,
+    regRef, target, STAGE_CS,
     [&target, layoutHandle](VulkanDescriptorSetHandle set, const uint32_t *offsets, uint32_t offset_count) //
     {
       VULKAN_LOG_CALL(target.vkDev.vkCmdBindDescriptorSets(target.frameCore, VK_PIPELINE_BIND_POINT_COMPUTE, layoutHandle,
@@ -110,10 +102,7 @@ void StateFieldComputeFlush::applyTo(BackComputeStateStorage &state, ExecutionCo
         offset_count, offsets));
     });
 
-  if (Globals::cfg.debugLevel > 0)
-    ptr->setNameForDescriptorSet(regRef.getSetForNaming(), spirv::compute::REGISTERS_SET_INDEX);
-
-  Backend::sync.completeNeeded(target.frameCore, target.vkDev);
+  target.back.syncTrack.completeNeeded(target.frameCore, target.vkDev);
 }
 
 template <>

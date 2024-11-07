@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <gamePhys/phys/dynamicPhysModel.h>
 #include <gamePhys/props/atmosphere.h>
 #include <gamePhys/collision/collisionInfo.h>

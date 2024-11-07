@@ -1,23 +1,22 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __GAIJIN_DAGORED_SHGV_PANEL_H__
+#define __GAIJIN_DAGORED_SHGV_PANEL_H__
 #pragma once
+
 
 #include "environmentPlugin.h"
 
-#include <propPanel/control/container.h>
+#include <propPanel2/c_panel_base.h>
 
-namespace PropPanel
-{
-class PanelWindowPropertyControl;
-}
+class CPanelWindow;
 
 
-class EnvironmentPlugin::ShaderGlobVarsPanel : public PropPanel::ControlEventHandler
+class EnvironmentPlugin::ShaderGlobVarsPanel : public ControlEventHandler
 {
 public:
   ShaderGlobVarsPanel(EnvironmentPlugin &plugin, void *hwnd);
   ~ShaderGlobVarsPanel();
 
-  PropPanel::PanelWindowPropertyControl *getPanel()
+  CPanelWindow *getPanel()
   {
     G_ASSERT(propPanel);
     return propPanel;
@@ -30,11 +29,13 @@ private:
   void getSchemeBlk(DataBlock &blk);
 
   // ControlEventHandler
-  virtual void onChange(int pcb_id, PropPanel::ContainerPropertyControl *panel);
+  virtual void onChange(int pcb_id, PropPanel2 *panel);
 
-  PropPanel::PanelWindowPropertyControl *propPanel;
+  CPanelWindow *propPanel;
   EnvironmentPlugin &plugin;
-  PropPanel::PropPanelScheme *scheme;
+  PropPanelScheme *scheme;
 
   DataBlock *pluginShgvBlk;
 };
+
+#endif

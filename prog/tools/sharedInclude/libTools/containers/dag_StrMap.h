@@ -1,5 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __GAIJIN_DAG_STRMAP__
+#define __GAIJIN_DAG_STRMAP__
 #pragma once
+
 
 #include "dag_DynMap.h"
 
@@ -36,3 +38,6 @@ public:
   StriMap(IMemAlloc *mem) : DynMap<String, TVal, StriCompare>(mem) {}
   StriMap(const StriMap &from) : DynMap<String, TVal, StriCompare>(from) {}
 };
+
+
+#endif //__GAIJIN_DAG_STRMAP__

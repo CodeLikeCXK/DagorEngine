@@ -2,13 +2,13 @@
 #define Y_CO_CG_SPACE_HLSL_INCLUDED 1
 
 // Converts from RGB space to YCoCg space
-half3 PackToYCoCg(half3 c)
+float3 PackToYCoCg(float3 c)
 {
-  half Co = c.r - c.b;
-  half t = c.b + Co * 0.5h;
-  half Cg = c.g - t;
-  half Y = t + Cg * 0.5h;
-  return half3(Y, Co, Cg);
+  float Co = c.r - c.b;
+  float t = c.b + Co * 0.5;
+  float Cg = c.g - t;
+  float Y = t + Cg * 0.5;
+  return float3(Y, Co, Cg);
 }
 
 void PackToYCoCg(float4 R, float4 G, float4 B, out float4 Y, out float4 Co, out float4 Cg)
@@ -19,19 +19,19 @@ void PackToYCoCg(float4 R, float4 G, float4 B, out float4 Y, out float4 Co, out 
   Y = t + Cg * 0.5;
 }
 
-half4 PackToYCoCgAlpha(half4 c)
+float4 PackToYCoCgAlpha(float4 c)
 {
-  return half4(PackToYCoCg(c.rgb), c.a);
+  return float4(PackToYCoCg(c.rgb), c.a);
 }
 
 // Converts from YCoCg space to RGB space
-half3 UnpackFromYCoCg(half3 c)
+float3 UnpackFromYCoCg(float3 c)
 {
-  half t = c.x - c.z * 0.5h;
-  half G = c.z + t;
-  half B = t - c.y * 0.5h;
-  half R = c.y + B;
-  return half3(R, G, B);
+  float t = c.x - c.z * 0.5;
+  float G = c.z + t;
+  float B = t - c.y * 0.5;
+  float R = c.y + B;
+  return float3(R, G, B);
 }
 
 void UnpackFromYCoCg(float4 Y, float4 Co, float4 Cg, out float4 R, out float4 G, out float4 B)

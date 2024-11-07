@@ -9,8 +9,8 @@
 
 static integer c__1 = 1;
 
-/* Subroutine */ int is01r_c(real *x, real *f, real *df, int *nx, real *sm,
-         real *y, real *c__, real *rab, int *ierr)
+/* Subroutine */ int is01r_c(real *x, real *f, real *df, integer *nx, real *sm,
+         real *y, real *c__, real *rab, integer *ierr)
 {
     /* Initialized data */
 

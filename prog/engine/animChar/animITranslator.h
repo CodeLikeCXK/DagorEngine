@@ -1,4 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright 2023 by Gaijin Games KFT, All rights reserved.
+#ifndef _GAIJIN_ANIM_ITRANSLATOR_H
+#define _GAIJIN_ANIM_ITRANSLATOR_H
 #pragma once
 
 #include <anim/dag_animDecl.h>
@@ -28,3 +30,5 @@ public:
 };
 
 } // end of namespace AnimV20
+
+#endif

@@ -1,20 +1,9 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "pipeline.h"
+#include "device.h"
 #include "state_field_graphics.h"
 #include <cstring>
 #include <validation.h>
 #include "texture.h"
-#include "globals.h"
-#include "dummy_resources.h"
-#include "pipeline/manager.h"
-#include "pipeline_cache.h"
-#include "backend.h"
-#include "execution_pod_state.h"
-#include "execution_context.h"
-#include "vk_to_string.h"
-#include "frontend.h"
-#include "device_context.h"
 
 namespace drv3d_vulkan
 {
@@ -92,7 +81,9 @@ void StateFieldGraphicsPolygonLine::transit(FrontGraphicsStateStorage &, DeviceC
 template <>
 void StateFieldGraphicsRenderState::applyTo(FrontGraphicsStateStorage &, ExecutionState &target) const
 {
-  DriverRenderState driverRS = Backend::renderStateSystem.get(data);
+  // TODO: add shortcut to backend
+  ContextBackend &back = get_device().getContext().getBackend();
+  DriverRenderState driverRS = back.contextState.renderStateSystem.get(data);
   target.get<BackGraphicsState, BackGraphicsState>().pipelineState.renderState = driverRS;
   target.set<StateFieldGraphicsDynamicRenderStateIndex, LinearStorageIndex, BackGraphicsState>(driverRS.dynamicIdx);
   target.set<StateFieldGraphicsPipeline, StateFieldGraphicsPipeline::Invalidate, BackGraphicsState>(1);
@@ -154,16 +145,7 @@ void StateFieldGraphicsConditionalRenderingScopeOpener::applyTo(BackGraphicsStat
   {
     G_ASSERT(state.inPass.data == InPassStateFieldType::NORMAL_PASS);
 
-#if VK_EXT_conditional_rendering
-    VkDeviceSize bufOffset = data.buffer.bufOffset(data.offset);
-    target.verifyResident(data.buffer.buffer);
-    Backend::sync.addBufferAccess({VK_PIPELINE_STAGE_CONDITIONAL_RENDERING_BIT_EXT, VK_ACCESS_CONDITIONAL_RENDERING_READ_BIT_EXT},
-      data.buffer.buffer, {bufOffset, sizeof(uint32_t)});
-
-    VkConditionalRenderingBeginInfoEXT crbi = //
-      {VK_STRUCTURE_TYPE_CONDITIONAL_RENDERING_BEGIN_INFO_EXT, nullptr, data.buffer.getHandle(), bufOffset, 0};
-    VULKAN_LOG_CALL(target.vkDev.vkCmdBeginConditionalRenderingEXT(target.frameCore, &crbi));
-#endif
+    target.beginConditionalRender(data.buffer, data.offset);
   }
 }
 
@@ -176,7 +158,7 @@ void StateFieldGraphicsConditionalRenderingScopeCloser::applyTo(BackScopeStateSt
 
   bool scopeWillOpen = askingForOpener && stageWillPerformOpener;
   if (eastl::exchange(shouldClose, scopeWillOpen))
-    VULKAN_LOG_CALL(target.vkDev.vkCmdEndConditionalRenderingEXT(target.frameCore));
+    target.endConditionalRender();
 }
 
 template <>
@@ -188,17 +170,11 @@ void StateFieldGraphicsNativeRenderPassScopeCloser::dumpLog(const BackScopeState
 template <>
 void StateFieldGraphicsNativeRenderPassScopeCloser::applyTo(BackScopeStateStorage &, ExecutionContext &target)
 {
-  if (Globals::cfg.bits.fatalOnNRPSplit &&
-      (shouldClose && stage != ActiveExecutionStage::GRAPHICS &&
-        (Backend::State::pipe.getRO<StateFieldRenderPassSubpassIdx, uint32_t, FrontGraphicsState, FrontRenderPassState>()) !=
-          StateFieldRenderPassSubpassIdx::InvalidSubpass))
-  {
-    // this is application error most of cases, check caller code and logic and fix it
-    // stack of fatal should point to operation that was executed and command caller to application code
-    DAG_FATAL(
-      "application interrupted native render pass via non draw operation. move non draw operation outside of render pass! context: %s",
-      target.getCurrentCmdCaller());
-  }
+  G_ASSERTF(
+    !(shouldClose && stage != ActiveExecutionStage::GRAPHICS &&
+      (target.back.pipelineState.getRO<StateFieldRenderPassSubpassIdx, uint32_t, FrontGraphicsState, FrontRenderPassState>()) !=
+        StateFieldRenderPassSubpassIdx::InvalidSubpass),
+    "native rp interrupted by non-graphics stage transit, caller %s", target.getCurrentCmdCaller());
 
   // we should close on next field apply if follow up code will open scope
   bool askingForOpener = data;
@@ -266,13 +242,13 @@ void StateFieldGraphicsConditionalRenderingScopeCloser::dumpLog(const BackScopeS
 template <>
 void StateFieldGraphicsProgram::applyTo(FrontGraphicsStateStorage &, ExecutionState &target) const
 {
-  ShaderProgramDatabase &spdb = Globals::shaderProgramDatabase;
+  ShaderProgramDatabase &spdb = get_shader_program_database();
   if (handle != ProgramID::Null())
   {
     InputLayoutID layoutID = spdb.getGraphicsProgInputLayout(handle);
     if (layoutID != InputLayoutID::Null())
     {
-      VariatedGraphicsPipeline &newPipeline = Globals::pipelines.get<VariatedGraphicsPipeline>(handle);
+      VariatedGraphicsPipeline &newPipeline = get_device().pipeMan.get<VariatedGraphicsPipeline>(handle);
       target.get<BackGraphicsState, BackGraphicsState>().pipelineState.inputLayout = layoutID;
       target.set<StateFieldGraphicsBasePipeline, VariatedGraphicsPipeline *, BackGraphicsState>(&newPipeline);
       target.set<StateFieldGraphicsPipelineLayout, GraphicsPipelineLayout *, BackGraphicsState>(newPipeline.getLayout());
@@ -331,16 +307,15 @@ void StateFieldGraphicsRenderPassScopeOpener::applyTo(BackGraphicsStateStorage &
       target.nextNativeSubpass();
     else
     {
-      if (Globals::cfg.bits.fatalOnNRPSplit && state.inPass.data != InPassStateFieldType::NONE)
-        DAG_FATAL("vulkan: can't start new pass without closing old");
+      G_ASSERTF(state.inPass.data == InPassStateFieldType::NONE, "vulkan: can't start new pass without closing old");
       target.beginNativePass();
     }
     return;
   }
-  if (Globals::cfg.bits.fatalOnNRPSplit && state.inPass.data != InPassStateFieldType::NONE)
-    DAG_FATAL("vulkan: can't start new pass without closing old");
+  G_ASSERTF(state.inPass.data == InPassStateFieldType::NONE, "vulkan: can't start new pass without closing old");
 
-  VulkanDevice &vkDev = Globals::VK::dev;
+  Device &drvDev = get_device();
+  VulkanDevice &vkDev = get_device().getVkDevice();
 
   RenderPassClass *nextRenderPassClass = state.rpClass.ptr;
   FramebufferState &fbState = target.getFramebufferState();
@@ -351,7 +326,7 @@ void StateFieldGraphicsRenderPassScopeOpener::applyTo(BackGraphicsStateStorage &
 
   if (!nextRenderPassClass)
   {
-    nextRenderPassClass = Globals::passes.getPassClass(passClassIdent);
+    nextRenderPassClass = drvDev.passMan.getPassClass(passClassIdent);
     state.framebuffer.handle = VulkanNullHandle();
   }
 
@@ -413,7 +388,7 @@ void StateFieldGraphicsBasePipeline::applyTo(BackGraphicsStateStorage &state, Ex
     {
       if (header.inputAttachmentIndex[i] == spirv::INVALID_INPUT_ATTACHMENT_INDEX)
         continue;
-      state.nativeRenderPass.ptr->bindInputAttachments(target, Backend::State::exec.getResBinds(STAGE_PS),
+      state.nativeRenderPass.ptr->bindInputAttachments(target, target.back.executionState.getResBinds(STAGE_PS),
         header.inputAttachmentIndex[i], header.registerIndex[i], ptr);
       --iaCnt;
     }
@@ -450,18 +425,20 @@ void StateFieldGraphicsPipeline::applyTo(BackGraphicsStateStorage &state, Execut
     return;
   }
 
-  VulkanDevice &vkDev = Globals::VK::dev;
+  Device &drvDev = get_device();
+  VulkanDevice &vkDev = get_device().getVkDevice();
+  ContextState &ctx = target.back.contextState;
 
   // can be rebinded if non nullptr
   if (!ptr)
   {
-    GraphicsPipelineVariantDescription varDsc = {Backend::State::exec.get<BackGraphicsState, BackGraphicsState>().pipelineState,
+    GraphicsPipelineVariantDescription varDsc = {target.getGraphicsPipelineState(),
       state.rpClass.ptr ? state.rpClass.ptr->getIdentifier() : RenderPassClass::Identifier(),
       state.nativeRenderPass.ptr ? state.nativeRenderPass.ptr->getHash() : 0,
       state.nativeRenderPass.ptr ? state.nativeRenderPass.ptr->getCurrentSubpass() : 0, state.primTopo.data};
 
-    VariatedGraphicsPipeline::CompilationContext compCtx = {vkDev, Backend::renderStateSystem, Globals::pipeCache.getHandle(),
-      state.nativeRenderPass.ptr, Backend::State::pod.asyncPipelineCompileFeedbackPtr, Backend::State::pod.nonDrawCompile};
+    VariatedGraphicsPipeline::CompilationContext compCtx = {
+      vkDev, drvDev.passMan, ctx.renderStateSystem, drvDev.getPipeCache(), state.nativeRenderPass.ptr};
 
     ptr = state.basePipeline.ptr->getVariant(compCtx, varDsc);
   }
@@ -493,9 +470,9 @@ void StateFieldGraphicsPipelineLayout::applyTo(BackGraphicsStateStorage &state, 
     return;
   }
 
-  Backend::bindless.bindSets(target, VK_PIPELINE_BIND_POINT_GRAPHICS, ptr->handle);
-  Backend::State::exec.getResBinds(STAGE_VS).invalidateState();
-  Backend::State::exec.getResBinds(STAGE_PS).invalidateState();
+  target.back.contextState.bindlessManagerBackend.bindSets(target, VK_PIPELINE_BIND_POINT_GRAPHICS, ptr->handle);
+  target.back.executionState.getResBinds(STAGE_VS).invalidateState();
+  target.back.executionState.getResBinds(STAGE_PS).invalidateState();
 }
 
 template <>
@@ -704,9 +681,9 @@ void StateFieldGraphicsStencilMask::dumpLog(const BackDynamicGraphicsStateStorag
 }
 
 template <>
-void StateFieldGraphicsDynamicRenderStateIndex::applyTo(BackGraphicsStateStorage &state, ExecutionContext &) const
+void StateFieldGraphicsDynamicRenderStateIndex::applyTo(BackGraphicsStateStorage &state, ExecutionContext &target) const
 {
-  auto dynamicStateDesc = Backend::renderStateSystem.getDynamic(data);
+  auto dynamicStateDesc = target.back.contextState.renderStateSystem.getDynamic(data);
 
   // FIXME: restore dyn mask feature
   // GraphicsPipelineDynamicStateMask dynamicStateMask(0);
@@ -767,8 +744,7 @@ void StateFieldGraphicsIndexBuffer::applyTo(BackGraphicsStateStorage &, Executio
   if (!data.buffer)
     return;
 
-  target.verifyResident(data.buffer);
-  Backend::sync.addBufferAccess({VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, VK_ACCESS_INDEX_READ_BIT}, data.buffer,
+  target.back.syncTrack.addBufferAccess({VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, VK_ACCESS_INDEX_READ_BIT}, data.buffer,
     {data.bufOffset(0), data.visibleDataSize});
   VULKAN_LOG_CALL(target.vkDev.vkCmdBindIndexBuffer(target.frameCore, data.getHandle(), data.bufOffset(0), indexType));
 }
@@ -810,7 +786,7 @@ void StateFieldGraphicsIndexBuffer::applyTo(FrontGraphicsStateStorage &, Executi
 VkViewport viewport_state_to_vk_viewport(ViewportState data)
 {
   VkViewport vp;
-  VulkanDevice &vkDev = Globals::VK::dev;
+  VulkanDevice &vkDev = get_device().getVkDevice();
 #if VK_AMD_negative_viewport_height
   if (vkDev.hasExtension<NegativeViewportHeightAMD>())
   {
@@ -837,13 +813,13 @@ VkViewport viewport_state_to_vk_viewport(ViewportState data)
 void StateFieldGraphicsViewport::set(const RestoreFromFramebuffer &)
 {
   // this approach is bad, consider removing it when getter for viewport is no longer supported in d3d::
-  PipelineState &pipeState = Frontend::State::pipe;
+  PipelineState &pipeState = get_device().getContext().getFrontend().pipelineState;
   Driver3dRenderTarget &rt = pipeState.get<FrontFramebufferState, FrontFramebufferState, FrontGraphicsState>().asDriverRT();
 
   data.rect2D.offset.x = 0;
   data.rect2D.offset.y = 0;
 
-  data.rect2D.extent = Globals::swapchain.getMode().extent;
+  data.rect2D.extent = get_device().swapchain.getMode().extent;
 
   if (!rt.isBackBufferColor())
   {
@@ -983,7 +959,7 @@ void StateFieldGraphicsVertexBuffersBindArray::applyTo(BackGraphicsStateStorage 
   {
     // by default no allowance to have empty slots in bind-vector (bubble)
     if ((i & 1) == 0)
-      D3D_ERROR("vulkan: vb binding filtered due empty slot %u (mask %u)", cnt + 1, countMask);
+      logerr("vulkan: vb binding filtered due empty slot %u (mask %u)", cnt + 1, countMask);
     else
       ++cnt;
   }
@@ -993,8 +969,7 @@ void StateFieldGraphicsVertexBuffersBindArray::applyTo(BackGraphicsStateStorage 
     //    G_ASSERTF(offsets[i] >= resPtrs[i]->bufOffsetLoc(0),
     //      "vulkan: old discard index is referenced/invalid offset (zero offset %u specified %u) for vb[%u] %p:%s",
     //      resPtrs[i]->bufOffsetLoc(0), offsets[i], i, resPtrs[i], resPtrs[i]->getDebugName());
-    target.verifyResident(resPtrs[i]);
-    Backend::sync.addBufferAccess({VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT}, resPtrs[i],
+    target.back.syncTrack.addBufferAccess({VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT}, resPtrs[i],
       {offsets[i], resPtrs[i]->getBlockSize() - (offsets[i] % resPtrs[i]->getBlockSize())});
   }
 
@@ -1049,8 +1024,8 @@ void StateFieldGraphicsPrimitiveTopology::applyTo(BackGraphicsStateStorage &stat
 
   if (!validate_primitive_topology(actual, hasGS, hasTesselation))
   {
-    D3D_ERROR("Invalid primitive topology %s for draw call encountered. Geometry stage active %s, "
-              "Tessellation stage active %s. Caller: %s",
+    logerr("Invalid primitive topology %s for draw call encountered. Geometry stage active %s, "
+           "Tessellation stage active %s. Caller: %s",
       formatPrimitiveTopology(actual), hasGS ? "yes" : "no", hasTesselation ? "yes" : "no", ctx.getCurrentCmdCaller());
   }
 #else
@@ -1068,9 +1043,7 @@ void StateFieldGraphicsPrimitiveTopology::dumpLog(const BackGraphicsStateStorage
 void StateFieldGraphicsFlush::syncTLayoutsToRenderPass(BackGraphicsStateStorage &state, ExecutionContext &target) const
 {
   if (state.inPass.data == InPassStateFieldType::NONE && !state.nativeRenderPass.ptr)
-    target.ensureStateForDepthAttachment(state.viewport.data.rect2D);
-  else if (state.nativeRenderPass.ptr)
-    target.ensureStateForNativeRPDepthAttachment();
+    target.ensureStateForDepthAttachment();
 }
 
 void StateFieldGraphicsFlush::applyDescriptors(BackGraphicsStateStorage &state, ExecutionContext &target) const
@@ -1081,11 +1054,11 @@ void StateFieldGraphicsFlush::applyDescriptors(BackGraphicsStateStorage &state, 
   auto &regs = layout.registers;
 
   VulkanDevice &vkDev = target.vkDev;
-  const ResourceDummySet &dummyResTbl = Globals::dummyResources.getTable();
-  size_t frameIndex = Backend::gpuJob->index;
-  PipelineStageStateBase &vsResBinds = Backend::State::exec.getResBinds(STAGE_VS);
+  const ResourceDummySet &dummyResTbl = target.device.getDummyResourceTable();
+  size_t frameIndex = target.back.contextState.frame->index;
+  PipelineStageStateBase &vsResBinds = target.back.executionState.getResBinds(STAGE_VS);
 
-  vsResBinds.apply(vkDev, dummyResTbl, frameIndex, regs.vs(), ExtendedShaderStage::VS,
+  vsResBinds.apply(vkDev, dummyResTbl, frameIndex, regs.vs(), target, STAGE_VS,
     [&target, layoutHandle](VulkanDescriptorSetHandle set, const uint32_t *offsets, uint32_t offset_count) //
     {
       VULKAN_LOG_CALL(target.vkDev.vkCmdBindDescriptorSets(target.frameCore, VK_PIPELINE_BIND_POINT_GRAPHICS, layoutHandle,
@@ -1093,7 +1066,7 @@ void StateFieldGraphicsFlush::applyDescriptors(BackGraphicsStateStorage &state, 
         offset_count, offsets));
     });
 
-  Backend::State::exec.getResBinds(STAGE_PS).apply(vkDev, dummyResTbl, frameIndex, regs.fs(), ExtendedShaderStage::PS,
+  target.back.executionState.getResBinds(STAGE_PS).apply(vkDev, dummyResTbl, frameIndex, regs.fs(), target, STAGE_PS,
     [&target, layoutHandle](VulkanDescriptorSetHandle set, const uint32_t *offsets, uint32_t offset_count) //
     {
       VULKAN_LOG_CALL(target.vkDev.vkCmdBindDescriptorSets(target.frameCore, VK_PIPELINE_BIND_POINT_GRAPHICS, layoutHandle,
@@ -1103,7 +1076,7 @@ void StateFieldGraphicsFlush::applyDescriptors(BackGraphicsStateStorage &state, 
 
   if (layout.hasGS())
   {
-    vsResBinds.applyNoDiff(vkDev, dummyResTbl, frameIndex, regs.gs(), ExtendedShaderStage::GS,
+    vsResBinds.applyNoDiff(vkDev, dummyResTbl, frameIndex, regs.gs(), target, STAGE_VS,
       [&target, layoutHandle](VulkanDescriptorSetHandle set, const uint32_t *offsets, uint32_t offset_count) //
       {
         VULKAN_LOG_CALL(target.vkDev.vkCmdBindDescriptorSets(target.frameCore, VK_PIPELINE_BIND_POINT_GRAPHICS, layoutHandle,
@@ -1114,7 +1087,7 @@ void StateFieldGraphicsFlush::applyDescriptors(BackGraphicsStateStorage &state, 
 
   if (layout.hasTC())
   {
-    vsResBinds.applyNoDiff(vkDev, dummyResTbl, frameIndex, regs.tc(), ExtendedShaderStage::TC,
+    vsResBinds.applyNoDiff(vkDev, dummyResTbl, frameIndex, regs.tc(), target, STAGE_VS,
       [&target, layoutHandle](VulkanDescriptorSetHandle set, const uint32_t *offsets, uint32_t offset_count) //
       {
         VULKAN_LOG_CALL(target.vkDev.vkCmdBindDescriptorSets(target.frameCore, VK_PIPELINE_BIND_POINT_GRAPHICS, layoutHandle,
@@ -1125,25 +1098,13 @@ void StateFieldGraphicsFlush::applyDescriptors(BackGraphicsStateStorage &state, 
 
   if (layout.hasTE())
   {
-    vsResBinds.applyNoDiff(vkDev, dummyResTbl, frameIndex, regs.te(), ExtendedShaderStage::TE,
+    vsResBinds.applyNoDiff(vkDev, dummyResTbl, frameIndex, regs.te(), target, STAGE_VS,
       [&target, layoutHandle](VulkanDescriptorSetHandle set, const uint32_t *offsets, uint32_t offset_count) //
       {
         VULKAN_LOG_CALL(target.vkDev.vkCmdBindDescriptorSets(target.frameCore, VK_PIPELINE_BIND_POINT_GRAPHICS, layoutHandle,
           ShaderStageTraits<VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT>::register_index + PipelineBindlessConfig::bindlessSetCount, 1,
           ary(&set), offset_count, offsets));
       });
-  }
-
-  if (Globals::cfg.debugLevel > 0)
-  {
-    ptr->setNameForDescriptorSet(regs.vs().getSetForNaming(), spirv::graphics::vertex::REGISTERS_SET_INDEX);
-    ptr->setNameForDescriptorSet(regs.fs().getSetForNaming(), spirv::graphics::fragment::REGISTERS_SET_INDEX);
-    if (layout.hasGS())
-      ptr->setNameForDescriptorSet(regs.gs().getSetForNaming(), spirv::graphics::geometry::REGISTERS_SET_INDEX);
-    if (layout.hasTC())
-      ptr->setNameForDescriptorSet(regs.tc().getSetForNaming(), spirv::graphics::control::REGISTERS_SET_INDEX);
-    if (layout.hasTE())
-      ptr->setNameForDescriptorSet(regs.te().getSetForNaming(), spirv::graphics::evaluation::REGISTERS_SET_INDEX);
   }
 }
 
@@ -1153,14 +1114,14 @@ void StateFieldGraphicsFlush::applyBarriers(BackGraphicsStateStorage &state, Exe
   GraphicsPipelineLayout &layout = *ptr->getLayout();
   auto &regs = layout.registers;
 
-  target.trackStageResAccesses(regs.vs().header, ExtendedShaderStage::VS);
-  target.trackStageResAccesses(regs.fs().header, ExtendedShaderStage::PS);
+  target.trackStageResAccesses(regs.vs().header, STAGE_VS);
+  target.trackStageResAccesses(regs.fs().header, STAGE_PS);
   if (layout.hasGS())
-    target.trackStageResAccesses(regs.gs().header, ExtendedShaderStage::GS);
+    target.trackStageResAccesses(regs.gs().header, STAGE_VS);
   if (layout.hasTC())
-    target.trackStageResAccesses(regs.tc().header, ExtendedShaderStage::TC);
+    target.trackStageResAccesses(regs.tc().header, STAGE_VS);
   if (layout.hasTE())
-    target.trackStageResAccesses(regs.te().header, ExtendedShaderStage::TE);
+    target.trackStageResAccesses(regs.te().header, STAGE_VS);
 }
 
 template <>

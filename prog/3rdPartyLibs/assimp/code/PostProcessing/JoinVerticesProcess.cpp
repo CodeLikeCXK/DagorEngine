@@ -235,8 +235,7 @@ template<>
 struct eastl::hash<Vertex> {
     size_t operator()(Vertex const& v) const noexcept {
         size_t seed = 0;
-        // hash_combine(seed, v.position.x, v.position.y, v.position.z); // it's original, but hash<float> is just cast float to size_t
-        hash_combine(seed, v.position.x * 10000.f ,v.position.y * 10000.f, v.position.z * 10000.f); // dagor patch
+        hash_combine(seed, v.position.x ,v.position.y,v.position.z);
         return seed;
     }
 };

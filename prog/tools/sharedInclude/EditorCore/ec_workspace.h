@@ -1,5 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __GAIJIN_EDITORCORE_WORKSPACE__
+#define __GAIJIN_EDITORCORE_WORKSPACE__
 #pragma once
+
 
 #include <generic/dag_tab.h>
 #include <libTools/containers/dag_StrMap.h>
@@ -126,3 +128,6 @@ private:
 
   bool loadFromBlk(DataBlock &blk, bool *app_path_set = NULL);
 };
+
+
+#endif //__GAIJIN_EDITORCORE_WORKSPACE__

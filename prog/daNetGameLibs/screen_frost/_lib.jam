@@ -1,4 +1,0 @@
-if $(HaveRenderer) = yes {
-  gamePulls += framework_screen_frost_pull daNetGameLibs_screen_frost_DAS_pull_AOT ;
-  UseProgLibs += daNetGameLibs/screen_frost ;
-}

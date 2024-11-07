@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -24,5 +25,5 @@ void warmup_shaders(const Tab<const char *> &graphics_shader_names, const Tab<co
   const WarmupParams &params, const bool is_loading_thread);
 
 void warmup_shaders_from_settings(const bool is_loading_thread);
-void warmup_shaders_from_settings(const WarmupParams &params, const bool is_loading_thread, const bool backgroundWarmup);
+void warmup_shaders_from_settings(const WarmupParams &params, const bool is_loading_thread);
 } // namespace shadercache

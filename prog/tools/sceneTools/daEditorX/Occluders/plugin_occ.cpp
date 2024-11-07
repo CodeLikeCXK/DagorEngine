@@ -1,22 +1,18 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "plugin_occ.h"
 #include "occluder.h"
 #include <de3_interface.h>
 #include <scene/dag_occlusionMap.h>
 #include <3d/dag_render.h>
 #include <render/dag_cur_view.h>
-#include <EditorCore/ec_IEditorCore.h>
+#include <dllPluginCore/core.h>
 #include <libTools/util/makeBindump.h>
 #include <ioSys/dag_dataBlock.h>
 #include <math/dag_plane3.h>
 
-#include <propPanel/control/container.h>
-#include <propPanel/commonWindow/dialogWindow.h>
-#include <propPanel/control/menu.h>
+#include <propPanel2/c_panel_base.h>
+#include <propPanel2/comWnd/dialog_window.h>
 #include <oldEditor/de_cm.h>
 
-using editorcore_extapi::dagRender;
 
 // commands
 enum
@@ -46,10 +42,10 @@ occplugin::Plugin::~Plugin() { self = NULL; }
 //==============================================================================
 bool occplugin::Plugin::begin(int toolbar_id, unsigned menu_id)
 {
-  PropPanel::IMenu *mainMenu = DAGORED2->getMainMenu();
+  IMenu *mainMenu = DAGORED2->getWndManager()->getMainMenu();
   mainMenu->addItem(menu_id, CM_SET_VIS_DIST, "Implicit occluders visibility...");
 
-  PropPanel::ContainerPropertyControl *toolbar = DAGORED2->getCustomPanel(toolbar_id);
+  PropertyContainerControlBase *toolbar = DAGORED2->getCustomPanel(toolbar_id);
   G_ASSERT(toolbar);
   objEd.initUi(toolbar_id);
 
@@ -179,14 +175,13 @@ bool occplugin::Plugin::onPluginMenuClick(unsigned id)
 {
   if (id == CM_SET_VIS_DIST)
   {
-    PropPanel::DialogWindow *dlg =
-      DAGORED2->createDialog(hdpi::_pxScaled(300), hdpi::_pxScaled(130), "Set visibility for implicit occluders");
-    PropPanel::ContainerPropertyControl &panel = *dlg->getPanel();
+    CDialogWindow *dlg = DAGORED2->createDialog(hdpi::_pxScaled(300), hdpi::_pxScaled(130), "Set visibility for implicit occluders");
+    PropPanel2 &panel = *dlg->getPanel();
     panel.createCheckBox(1, "Show implicit occluders", renderExternalOccluders);
     panel.createEditFloat(2, "Implicit occluders visibility range", renderExternalOccludersDist);
 
     int ret = dlg->showDialog();
-    if (ret == PropPanel::DIALOG_ID_OK)
+    if (ret == DIALOG_ID_OK)
     {
       renderExternalOccluders = panel.getBool(1);
       renderExternalOccludersDist = panel.getFloat(2);
@@ -199,15 +194,7 @@ bool occplugin::Plugin::onPluginMenuClick(unsigned id)
   return false;
 }
 
-void occplugin::Plugin::handleViewportAcceleratorCommand(unsigned id) { objEd.onClick(id, nullptr); }
-
-void occplugin::Plugin::registerMenuAccelerators()
-{
-  IWndManager &wndManager = *DAGORED2->getWndManager();
-  objEd.registerViewportAccelerators(wndManager);
-}
-
-void occplugin::Plugin::fillExportPanel(PropPanel::ContainerPropertyControl &params)
+void occplugin::Plugin::fillExportPanel(PropPanel2 &params)
 {
   params.createStatic(0, "Get occluders from:");
 
@@ -233,7 +220,7 @@ void occplugin::Plugin::fillExportPanel(PropPanel::ContainerPropertyControl &par
   params.setBoolValue(true);
 }
 
-bool occplugin::Plugin::validateBuild(int target, ILogWriter &rep, PropPanel::ContainerPropertyControl *params)
+bool occplugin::Plugin::validateBuild(int target, ILogWriter &rep, PropPanel2 *params)
 {
   if (!params)
     return true;
@@ -359,7 +346,7 @@ static void cvt_face_le2be(Face *data, int cnt)
   }
 }
 
-bool occplugin::Plugin::buildAndWrite(BinDumpSaveCB &cwr, const ITextureNumerator &tn, PropPanel::ContainerPropertyControl *pp)
+bool occplugin::Plugin::buildAndWrite(BinDumpSaveCB &cwr, const ITextureNumerator &tn, PropPanel2 *pp)
 {
   if (!occlBoxes.size() && !occlQuads.size())
   {

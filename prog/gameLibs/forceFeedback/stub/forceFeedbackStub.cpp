@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <forceFeedback/forceFeedback.h>
 
 namespace force_feedback

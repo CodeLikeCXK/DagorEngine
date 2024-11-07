@@ -1,5 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __GAIJIN_GEOM_RESOURCES__
+#define __GAIJIN_GEOM_RESOURCES__
 #pragma once
+
 
 #include <libTools/staticGeom/iStaticGeomResourcesService.h>
 
@@ -50,3 +52,6 @@ private:
 
   void deleteResource(ResTab *res_tab);
 };
+
+
+#endif //__GAIJIN_GEOM_RESOURCES__

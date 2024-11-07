@@ -1,8 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <supp/dag_android_native_app_glue.h>
 #include <osApiWrappers/dag_progGlobals.h>
-#include <drv/hid/dag_hiCreate.h>
+#include <humanInput/dag_hiCreate.h>
 
 namespace android
 {

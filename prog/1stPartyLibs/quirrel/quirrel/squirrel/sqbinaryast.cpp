@@ -96,7 +96,7 @@ public:
 
   void visitBaseExpr(BaseExpr *base) override;
 
-  void visitRootTableAccessExpr(RootTableAccessExpr *expr) override;
+  void visitRootExpr(RootExpr *expr) override;
 
   void visitLiteralExpr(LiteralExpr *lit) override;
 
@@ -106,7 +106,7 @@ public:
 
   void visitGetFieldExpr(GetFieldExpr *expr) override;
 
-  void visitGetSlotExpr(GetSlotExpr *expr) override;
+  void visitGetTableExpr(GetTableExpr *expr) override;
 
   void visitBinExpr(BinExpr *expr) override;
 
@@ -126,10 +126,10 @@ public:
 void SQASTWritingVisitor::writeNodeHeader(const Node *n) {
   stream->writeInt32(n->op() + OP_DELTA);
 
-  stream->writeInt32(n->lineStart());
-  stream->writeInt32(n->columnStart());
-  stream->writeInt32(n->lineEnd());
-  stream->writeInt32(n->columnEnd());
+  stream->writeSQInteger(n->lineStart());
+  stream->writeSQInteger(n->columnStart());
+  stream->writeSQInteger(n->lineEnd());
+  stream->writeSQInteger(n->columnEnd());
 }
 
 void SQASTWritingVisitor::writeNull() {
@@ -189,7 +189,7 @@ void SQASTWritingVisitor::visitBaseExpr(BaseExpr *expr) {
   writeNodeHeader(expr);
 }
 
-void SQASTWritingVisitor::visitRootTableAccessExpr(RootTableAccessExpr *expr) {
+void SQASTWritingVisitor::visitRootExpr(RootExpr *expr) {
   writeNodeHeader(expr);
 }
 
@@ -202,11 +202,11 @@ void SQASTWritingVisitor::visitGetFieldExpr(GetFieldExpr *gf) {
   writeNodeHeader(gf);
   gf->receiver()->visit(this);
   stream->writeInt8(gf->isNullable());
-  stream->writeInt8(gf->isTypeMethod());
+  stream->writeInt8(gf->isBuiltInGet());
   writeString(gf->fieldName());
 }
 
-void SQASTWritingVisitor::visitGetSlotExpr(GetSlotExpr *ge) {
+void SQASTWritingVisitor::visitGetTableExpr(GetTableExpr *ge) {
   writeNodeHeader(ge);
   ge->receiver()->visit(this);
   stream->writeInt8(ge->isNullable());
@@ -216,7 +216,7 @@ void SQASTWritingVisitor::visitGetSlotExpr(GetSlotExpr *ge) {
 void SQASTWritingVisitor::visitIncExpr(IncExpr *expr) {
   writeNodeHeader(expr);
   stream->writeInt32(expr->form());
-  stream->writeInt32(expr->diff());
+  stream->writeSQInteger(expr->diff());
   expr->argument()->visit(this);
 }
 
@@ -264,8 +264,8 @@ void SQASTWritingVisitor::visitExprStatement(ExprStatement *estmt) {
 
 void SQASTWritingVisitor::visitDirectiveStatement(DirectiveStmt *stmt) {
   writeNodeHeader(stmt);
-  stream->writeUInt32(stmt->setFlags);
-  stream->writeUInt32(stmt->clearFlags);
+  stream->writeSQInteger(stmt->setFlags);
+  stream->writeSQInteger(stmt->clearFlags);
   stream->writeInt8(stmt->applyToDefault);
 }
 
@@ -291,6 +291,7 @@ void SQASTWritingVisitor::visitConstDecl(ConstDecl *decl) {
 void SQASTWritingVisitor::visitFunctionDecl(FunctionDecl *f) {
   writeNodeHeader(f);
 
+  stream->writeInt32(f->context());
   writeString(f->name());
 
   stream->writeUInt64(f->parameters().size());
@@ -347,6 +348,7 @@ void SQASTWritingVisitor::visitTableDecl(TableDecl *table) {
 
 void SQASTWritingVisitor::visitClassDecl(ClassDecl *klass) {
   visitTableDecl(klass);
+  stream->writeInt32(klass->context());
 
   writeNullable(klass->classKey());
   writeNullable(klass->classBase());
@@ -575,7 +577,7 @@ void SQASTReader::error(const char *fmt, ...) {
     vsnprintf(buffer, sizeof buffer, fmt, vl);
     va_end(vl);
 
-    _ss(vm)->_compilererrorhandler(vm, SEV_ERROR, buffer, "BinaryAST", -1, -1, nullptr);
+    _ss(vm)->_compilererrorhandler(vm, buffer, "BinaryAST", -1, -1, nullptr);
   }
   longjmp(_errorjmp, 1);
 }
@@ -699,8 +701,8 @@ VarDecl *SQASTReader::readNonNullVar() {
 
 RootBlock *SQASTReader::readRoot() {
   int32_t op = stream->readInt32();
-  int32_t line = stream->readInt32();
-  int32_t column = stream->readInt32();
+  SQInteger line = stream->readSQInteger();
+  SQInteger column = stream->readSQInteger();
 
   RootBlock *root = (RootBlock *)readBlock(true);
   assert(root->isRoot());
@@ -711,10 +713,10 @@ RootBlock *SQASTReader::readRoot() {
 Node *SQASTReader::readNullable() {
   int32_t op = stream->readInt32();
   if (op) {
-    int32_t lineS = stream->readInt32();
-    int32_t columnS = stream->readInt32();
-    int32_t lineE = stream->readInt32();
-    int32_t columnE = stream->readInt32();
+    SQInteger lineS = stream->readSQInteger();
+    SQInteger columnS = stream->readSQInteger();
+    SQInteger lineE = stream->readSQInteger();
+    SQInteger columnE = stream->readSQInteger();
 
     Node *n = readNode((enum TreeOp)(op - op_delta));
 
@@ -731,7 +733,7 @@ Node *SQASTReader::readNullable() {
 }
 
 Block *SQASTReader::readBlock(bool isRoot) {
-  int32_t lineEnd = stream->readInt32();
+  SQInteger lineEnd = stream->readSQInteger();
   size_t size = stream->readUInt64();
 
   Block *b = isRoot? newNode<RootBlock>(astArena) : newNode<Block>(astArena, false);
@@ -920,13 +922,13 @@ BaseExpr *SQASTReader::readBaseExpr() {
   return newNode<BaseExpr>();
 }
 
-RootTableAccessExpr *SQASTReader::readRootTableAccessExpr() {
-  return newNode<RootTableAccessExpr>();
+RootExpr *SQASTReader::readRootExpr() {
+  return newNode<RootExpr>();
 }
 
 IncExpr *SQASTReader::readIncExpr() {
-  int32_t form = stream->readInt32();
-  int32_t diff = stream->readInt32();
+  int form = stream->readInt32();
+  SQInteger diff = stream->readSQInteger();
   Expr *arg = readExpression();
 
   return newNode<IncExpr>(arg, diff, (enum IncForm)form);
@@ -987,20 +989,20 @@ GetFieldExpr *SQASTReader::readGetFieldExpr() {
   Expr *receiver = readExpression();
 
   bool nullable = (bool)stream->readInt8();
-  bool isTypeMethod = (bool)stream->readInt8();
+  bool builtIn = (bool)stream->readInt8();
   const SQChar *s = readString();
 
-  return newNode<GetFieldExpr>(receiver, s, nullable, isTypeMethod);
+  return newNode<GetFieldExpr>(receiver, s, nullable, builtIn);
 }
 
-GetSlotExpr *SQASTReader::readGetSlotExpr() {
+GetTableExpr *SQASTReader::readGetTableExpr() {
   Expr *receiver = readExpression();
 
   bool nullable = (bool)stream->readInt8();
 
   Expr *key = readExpression();
 
-  return newNode<GetSlotExpr>(receiver, key, nullable);
+  return newNode<GetTableExpr>(receiver, key, nullable);
 }
 
 ValueDecl *SQASTReader::readValueDecl(bool isVar) {
@@ -1066,11 +1068,15 @@ ClassDecl *SQASTReader::readClassDecl() {
 
   readTableBody(klass);
 
+  int32_t ctx = stream->readInt32();
+
   Expr *key = readNullableExpression();
   Expr *base = readNullableExpression();
 
   klass->setClassKey(key);
   klass->setClassBase(base);
+
+  klass->setContext((enum DeclarationContext)ctx);
 
   return klass;
 }
@@ -1107,6 +1113,7 @@ DestructuringDecl *SQASTReader::readDestructuringDecl() {
 }
 
 FunctionDecl *SQASTReader::readFunctionDecl(bool isCtor) {
+  int32_t ctx = stream->readInt32();
   const SQChar *name = readString();
 
   FunctionDecl *f = isCtor ? newNode<ConstructorDecl>(astArena, name) : newNode<FunctionDecl>(astArena, name);
@@ -1136,6 +1143,7 @@ FunctionDecl *SQASTReader::readFunctionDecl(bool isCtor) {
   f->setLambda((bool)stream->readInt8());
 
   f->setSourceName(readString());
+  f->setContext((enum DeclarationContext)ctx);
 
   if (f->isVararg()) {
     f->parameters().back()->setVararg();
@@ -1147,8 +1155,8 @@ FunctionDecl *SQASTReader::readFunctionDecl(bool isCtor) {
 DirectiveStmt *SQASTReader::readDirectiveStmt() {
   DirectiveStmt *d = newNode<DirectiveStmt>();
 
-  d->setFlags = stream->readUInt32();
-  d->clearFlags = stream->readUInt32();
+  d->setFlags = stream->readSQInteger();
+  d->clearFlags = stream->readSQInteger();
   d->applyToDefault = stream->readInt8();
 
   return d;
@@ -1200,6 +1208,7 @@ Node *SQASTReader::readNode(enum TreeOp op) {
   case TO_ADD:
   case TO_SUB:
   case TO_NEWSLOT:
+  case TO_INEXPR_ASSIGN:
   case TO_PLUSEQ:
   case TO_MINUSEQ:
   case TO_MULEQ:
@@ -1217,12 +1226,12 @@ Node *SQASTReader::readNode(enum TreeOp op) {
     return readUnaryExpr(op);
   case TO_LITERAL: return readLiteral();
   case TO_BASE: return readBaseExpr();
-  case TO_ROOT_TABLE_ACCESS: return readRootTableAccessExpr();
+  case TO_ROOT: return readRootExpr();
   case TO_INC: return readIncExpr();
   case TO_DECL_EXPR: return readDeclExpr();
   case TO_ARRAYEXPR: return readArrayExpr();
   case TO_GETFIELD: return readGetFieldExpr();
-  case TO_GETSLOT: return readGetSlotExpr();
+  case TO_GETTABLE: return readGetTableExpr();
   case TO_CALL: return readCallExpr();
   case TO_TERNARY: return readTernaryExpr();
   // case TO_EXPR_MARK:

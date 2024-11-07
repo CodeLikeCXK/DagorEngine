@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "bhvInspectPicker.h"
 #include "behaviorHelpers.h"
 
@@ -12,7 +10,7 @@
 #include "inputStack.h"
 #include "scriptUtil.h"
 
-#include <drv/hid/dag_hiKeyboard.h>
+#include <humanInput/dag_hiKeyboard.h>
 #include <startup/dag_inpDevClsDrv.h>
 
 

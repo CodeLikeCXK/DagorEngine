@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <ioSys/dag_genIo.h>
 #include <ioSys/dag_memIo.h>
 #include "daGpuProfiler.h"
@@ -104,20 +102,18 @@ void response_finish(IGenSave &cb)
 {
   // send finish
   send_data(cb, DataResponse::NullFrame, nullptr, 0);
-  cb.flush();
 }
 
 void response_heartbeat(IGenSave &cb)
 {
   // send finish
   send_data(cb, DataResponse::Heartbeat, nullptr, 0);
-  cb.flush();
 }
 
-void response_handshake(IGenSave &cb, uint16_t compression)
+void response_handshake(IGenSave &cb)
 {
   DynamicMemGeneralSaveCB stream(tmpmem_ptr(), 512); // we could avoid mem allocation. but it happens like once per frame
-  stream.writeInt(0 | (compression << 16));          // todo: status
+  stream.writeInt(0);                                // todo: status
   write_string(stream, get_current_platform_name());
   write_string(stream, get_current_host_name());
   send_data(cb, DataResponse::Handshake, stream);
@@ -137,7 +133,6 @@ void response_live_frames(IGenSave &cb, uint32_t available, const uint64_t *time
     float fr = float(double(*times) * ticksToMsec);
     cb.write(&fr, sizeof(fr));
   }
-  cb.flush();
 }
 
 void response_plugins(IGenSave &cb, const hash_map<string, bool> &plugins)
@@ -156,7 +151,6 @@ void response_plugins(IGenSave &cb, const hash_map<string, bool> &plugins)
     cb.write(p.first.data(), p.first.length());
     cb.writeIntP<1>(p.second ? 1 : 0);
   }
-  cb.flush();
 }
 
 void write_modules(IGenSave &symbolsStream, SymbolsCache &symbols)
@@ -279,7 +273,7 @@ void save_dump(IGenSave &cb, const Dump &dump, const ProfilerDescriptions &descr
       {
         boardStream.writeInt64(ti->threadId);
         boardStream.writeInt(pid);
-        write_short_string(boardStream, descriptions.getName(ti->description));
+        write_short_string(boardStream, descriptions.get(ti->description));
         boardStream.writeInt(1);                                    // maxDepth
         boardStream.writeInt(0);                                    // priority
         boardStream.writeInt(frameTi == ti ? ThreadMask::Main : 0); // mask
@@ -289,7 +283,7 @@ void save_dump(IGenSave &cb, const Dump &dump, const ProfilerDescriptions &descr
       {
         boardStream.writeInt64(-1);
         boardStream.writeInt(pid);
-        write_short_string(boardStream, descriptions.getName(descriptions.gpu()));
+        write_short_string(boardStream, descriptions.get(descriptions.gpu()));
         boardStream.writeInt(1);               // maxDepth
         boardStream.writeInt(0);               // priority
         boardStream.writeInt(ThreadMask::GPU); // mask
@@ -655,28 +649,9 @@ void save_dump(IGenSave &cb, const Dump &dump, const ProfilerDescriptions &descr
       write_modules(symbolsStream, symbols);
       write_symbols(symbolsStream, symbolsSet, symbols);
     }
-
-    send_data(cb, DataResponse::CallstackDescriptionBoard, symbolsStream);
-
-    DynamicMemGeneralSaveCB &uniqueEventStream = newStream(stream);
-    {
-      uniqueEventStream.writeInt(dump.board);
-      dump.uniqueEvents.forEach([&](auto i) {
-        uniqueEventStream.writeInt64(i->totalOccurencies);
-        uniqueEventStream.writeInt64(i->minTicks);
-        uniqueEventStream.writeInt64(i->maxTicks);
-        uniqueEventStream.writeInt64(i->totalTicks);
-        write_vlq_uint(uniqueEventStream, i->desc);
-        write_vlq_uint(uniqueEventStream,
-          dump.uniqueEventsFrames > i->startFrame ? uint32_t(dump.uniqueEventsFrames - i->startFrame) : 0);
-      });
-      uniqueEventStream.writeInt64(~uint64_t(0));
-    }
-    send_data(cb, DataResponse::UniqueEventsBoard, uniqueEventStream);
-
     // remove lock
+    send_data(cb, DataResponse::CallstackDescriptionBoard, symbolsStream);
   }
-  cb.flush();
 }
 
 }; // namespace da_profiler

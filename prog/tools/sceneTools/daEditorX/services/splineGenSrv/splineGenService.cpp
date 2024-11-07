@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <de3_splineGenSrv.h>
 #include <de3_entityPool.h>
 #include <de3_randomSeed.h>
@@ -527,7 +525,6 @@ public:
 
   void setSweepMask(const EditableHugeBitmask *bm, float ox, float oz, float scale) override
   {
-    objgenerator::splgenExcl.bm = nullptr;
     if (!bm)
     {
       objgenerator::splgenExcl.clear();
@@ -582,7 +579,7 @@ void init_spline_gen_mgr_service()
 {
   if (!IDaEditor3Engine::get().checkVersion())
   {
-    DEBUG_CTX("Incorrect version!");
+    debug_ctx("Incorrect version!");
     return;
   }
 

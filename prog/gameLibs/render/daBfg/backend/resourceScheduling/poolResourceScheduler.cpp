@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "poolResourceScheduler.h"
 
 #include <perfMon/dag_statDrv.h>
@@ -199,10 +197,10 @@ ManagedTexView PoolResourceScheduler::getTexture(int frame, intermediate::Resour
 
   ManagedTexView texView;
 
-#define USE(RES_TYPE)                                                                                                       \
-  case RES_TYPE:                                                                                                            \
-    texView = ResourceCollection<RES_TYPE>::current()[resIdxInCollection];                                                  \
-    texView->setResName(cachedIntermediateResourceNames[res_idx].c_str(), cachedIntermediateResourceNames[res_idx].size()); \
+#define USE(RES_TYPE)                                                      \
+  case RES_TYPE:                                                           \
+    texView = ResourceCollection<RES_TYPE>::current()[resIdxInCollection]; \
+    texView->setResName(cachedIntermediateResourceNames[res_idx].c_str()); \
     return texView;
 
   switch (resourceTypes[res_idx])
@@ -225,10 +223,10 @@ ManagedBufView PoolResourceScheduler::getBuffer(int frame, intermediate::Resourc
 
   ManagedBufView bufView;
 
-#define USE(RES_TYPE)                                                                                                       \
-  case RES_TYPE:                                                                                                            \
-    bufView = ResourceCollection<RES_TYPE>::current()[resIdxInCollection];                                                  \
-    bufView->setResName(cachedIntermediateResourceNames[res_idx].c_str(), cachedIntermediateResourceNames[res_idx].size()); \
+#define USE(RES_TYPE)                                                      \
+  case RES_TYPE:                                                           \
+    bufView = ResourceCollection<RES_TYPE>::current()[resIdxInCollection]; \
+    bufView->setResName(cachedIntermediateResourceNames[res_idx].c_str()); \
     return bufView;
 
   switch (resourceTypes[res_idx])
@@ -353,7 +351,7 @@ ResourceScheduler::DestroyedHeapSet PoolResourceScheduler::allocateHeaps(const H
 }
 
 void PoolResourceScheduler::placeResource(int frame, intermediate::ResourceIndex res_idx, HeapIndex heap_idx,
-  const ResourceDescription &desc, uint32_t offset, const ResourceAllocationProperties &, const DynamicResolution &)
+  const ResourceDescription &desc, uint32_t offset, const ResourceAllocationProperties &)
 {
   resourceIndexInCollection[frame][res_idx] = heapStartOffsets[heap_idx] + offset;
 

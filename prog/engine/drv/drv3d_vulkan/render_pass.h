@@ -1,14 +1,9 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
-
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
 #include <generic/dag_staticTab.h>
 #include <EASTL/vector.h>
-#include <EASTL/unique_ptr.h>
-
 #include "driver.h"
 #include "vulkan_device.h"
-#include "image_view_state.h"
 
 namespace drv3d_vulkan
 {
@@ -35,7 +30,6 @@ public:
     };
 
     FormatStore colorFormats[Driver3dRenderTarget::MAX_SIMRT];
-    uint8_t depthSamples;
     FormatStore depthStencilFormat;
     union
     {
@@ -51,22 +45,8 @@ public:
 
     Identifier() { clear(); }
 
-    bool hasColorTarget(int idx) const { return (colorTargetMask & (1 << idx)) > 0; }
     bool hasRoDepth() const { return depthState == RO_DEPTH; }
     bool hasDepth() const { return depthState != NO_DEPTH; }
-    bool hasMsaaAttachments() const
-    {
-      if (hasDepth() && depthSamples > 1)
-        return true;
-      if (!colorTargetMask)
-        return false;
-      for (int i = 0; i < Driver3dRenderTarget::MAX_SIMRT; ++i)
-      {
-        if ((colorTargetMask & (1 << i)) && colorSamples[i] > 1)
-          return true;
-      }
-      return false;
-    }
 
     void clear()
     {
@@ -75,7 +55,6 @@ public:
       depthStencilFormat = FormatStore{};
       colorTargetMask = 0;
       depthState = NO_DEPTH;
-      depthSamples = UCHAR_MAX;
       for (auto &&cs : colorSamples)
         cs = UCHAR_MAX;
     }
@@ -84,8 +63,7 @@ public:
     {
       return l.colorTargetMask == r.colorTargetMask && l.depthState == r.depthState &&
              eastl::equal(eastl::begin(l.colorFormats), eastl::end(l.colorFormats), eastl::begin(r.colorFormats)) &&
-             l.depthStencilFormat == r.depthStencilFormat && l.colorSamplesPacked == r.colorSamplesPacked &&
-             l.depthSamples == r.depthSamples;
+             l.depthStencilFormat == r.depthStencilFormat && l.colorSamplesPacked == r.colorSamplesPacked;
     }
     friend bool operator!=(const Identifier &l, const Identifier &r) { return !(l == r); }
 
@@ -208,7 +186,7 @@ public:
   const Identifier &getIdentifier() const { return identifier; }
   VulkanRenderPassHandle getPass(VulkanDevice &device, int clear_mask);
   VulkanFramebufferHandle getFrameBuffer(VulkanDevice &device, const FramebufferDescription &info);
-  uint32_t getAttachmentsLoadMask(int clear_mask) const;
+  bool verifyPass(int clear_mask);
   RenderPassClass(const Identifier &id);
   void unloadAll(VulkanDevice &device);
   void unloadWith(VulkanDevice &device, VulkanImageViewHandle view);

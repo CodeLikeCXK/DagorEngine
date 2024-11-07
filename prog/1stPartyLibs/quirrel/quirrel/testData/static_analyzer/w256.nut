@@ -2,7 +2,7 @@
 
 const C = 1
 
-function bar() {}
+let function bar() {}
 let tt = {
   "1foo" : function bar1() {}, // FP 1, not id
   "_foo2" : function bar2() {}, // EXPECTED 1

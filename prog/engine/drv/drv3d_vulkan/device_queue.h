@@ -1,15 +1,9 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
-
-#include <osApiWrappers/dag_critSec.h>
 
 #include "vulkan_device.h"
 
 namespace drv3d_vulkan
 {
-
-struct FrameInfo;
-
 enum class DeviceQueueType
 {
   GRAPHICS,
@@ -27,14 +21,8 @@ class DeviceQueue
   uint32_t index = -1;
   uint32_t timestampBits = 0;
 
-  StaticTab<VulkanSemaphoreHandle, GPU_TIMELINE_HISTORY_SIZE> submitSemaphores;
-  StaticTab<VkPipelineStageFlags, GPU_TIMELINE_HISTORY_SIZE> submitSemaphoresLocation;
-
-  void clearSubmitSemaphores()
-  {
-    submitSemaphores.clear();
-    submitSemaphoresLocation.clear();
-  }
+  Tab<VulkanSemaphoreHandle> submitSemaphores;
+  Tab<VkPipelineStageFlags> submitSemaphoresLocation;
 
 public:
   struct TrimmedSubmitInfo
@@ -50,6 +38,7 @@ public:
     uint32_t swapchainCount;
     const VkSwapchainKHR *pSwapchains;
     const uint32_t *pImageIndices;
+    bool enableSwappy;
   };
 
   DeviceQueue() = delete;
@@ -71,10 +60,27 @@ public:
 
   inline uint32_t getIndex() const { return index; }
 
-  void consumeWaitSemaphores(FrameInfo &gpu_frame);
-  VkResult present(VulkanDevice &device, FrameInfo &gpu_frame, const TrimmedPresentInfo &presentInfo);
-  void submit(VulkanDevice &device, FrameInfo &gpu_frame, const TrimmedSubmitInfo &trimmed_info,
-    VulkanFenceHandle fence = VulkanFenceHandle());
+  VkResult present(VulkanDevice &device, const TrimmedPresentInfo &presentInfo);
+
+  inline void submit(VulkanDevice &device, const TrimmedSubmitInfo &trimmed_info, VulkanFenceHandle fence = VulkanFenceHandle())
+  {
+    WinAutoLock lock{mutex};
+
+    VkSubmitInfo si = {};
+    si.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    si.pWaitSemaphores = ary(submitSemaphores.data());
+    si.waitSemaphoreCount = submitSemaphores.size();
+    si.pWaitDstStageMask = submitSemaphoresLocation.data();
+
+    si.pCommandBuffers = trimmed_info.pCommandBuffers;
+    si.commandBufferCount = trimmed_info.commandBufferCount;
+    si.pSignalSemaphores = trimmed_info.pSignalSemaphores;
+    si.signalSemaphoreCount = trimmed_info.signalSemaphoreCount;
+
+    VULKAN_EXIT_ON_FAIL(device.vkQueueSubmit(handle, 1, &si, fence));
+    clear_and_shrink(submitSemaphores);
+    clear_and_shrink(submitSemaphoresLocation);
+  }
 
   inline VulkanQueueHandle getHandle() const { return handle; }
 

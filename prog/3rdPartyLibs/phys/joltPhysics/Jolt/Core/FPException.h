@@ -10,14 +10,7 @@ JPH_NAMESPACE_BEGIN
 
 #ifdef JPH_FLOATING_POINT_EXCEPTIONS_ENABLED
 
-#if defined(JPH_CPU_WASM)
-
-// Not supported
-class FPExceptionsEnable { };
-class FPExceptionDisableInvalid { };
-class FPExceptionDisableDivByZero { };
-
-#elif defined(JPH_USE_SSE)
+#if defined(JPH_USE_SSE)
 
 /// Enable floating point divide by zero exception and exceptions on invalid numbers
 class FPExceptionsEnable : public FPControlWord<0, _MM_MASK_DIV_ZERO | _MM_MASK_INVALID> { };
@@ -55,6 +48,13 @@ class FPExceptionDisableInvalid : public FPControlWord<0, FP_IOE> { };
 
 /// Disable division by zero floating point exceptions
 class FPExceptionDisableDivByZero : public FPControlWord<0, FP_DZE> { };
+
+#elif defined(JPH_CPU_WASM)
+
+// Not supported
+class FPExceptionsEnable { };
+class FPExceptionDisableInvalid { };
+class FPExceptionDisableDivByZero { };
 
 #else
 

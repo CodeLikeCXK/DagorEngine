@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <ecs/core/entityManager.h>
 #include <ecs/anim/anim.h>
 #include <ecs/phys/collRes.h>
@@ -134,7 +132,7 @@ inline void ragdoll_start_es_event_handler(const ParallelUpdateFrameDelayed &inf
       if (currentImpulse.lengthSq() > sqr(projectile_impulse__maxSingleImpulse))
         currentImpulse *= safediv(projectile_impulse__maxSingleImpulse, currentImpulse.length());
       ragdoll.applyImpulse(t.second.nodeId, t.second.pos, currentImpulse);
-      impulse += t.second.impulse;
+      impulse += currentImpulse;
     }
     projectile_impulse.data.clear();
     impulse *= projectile_impulse__cinematicArtistrySpeedMult;

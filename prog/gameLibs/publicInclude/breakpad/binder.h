@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -98,8 +99,6 @@ struct Configuration
   eastl::string locale = "en-US";
   eastl::string environment;
   eastl::string productTitle;
-  eastl::string d3dDriver = "<Unknown>";
-  eastl::string gpuVendor = "<Unknown>";
 
   // XXX: hooks might be called in a compromised context.
   hook_type hook = nullptr;               // Called after dump generation
@@ -129,7 +128,6 @@ void set_user_id(uint64_t uid);
 void set_locale(const char *locale_code);
 void set_product_title(const char *product_name);
 void set_environment(const char *env);
-void set_d3d_driver_data(const char *driver, const char *vendor);
 
 bool is_enabled();
 

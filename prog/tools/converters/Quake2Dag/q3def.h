@@ -1,5 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-#pragma once
+#ifndef Q3DEF_H
+
+#define Q3DEF_H
 
 // ############################################################################
 // ##                                                                        ##
@@ -214,3 +215,5 @@ private:
 };
 
 typedef std::vector<QuakeFace> QuakeFaceVector;
+
+#endif

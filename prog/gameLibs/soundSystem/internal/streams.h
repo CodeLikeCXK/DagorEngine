@@ -1,4 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef _DAGOR_GAMELIB_SOUNDSYSTEM_STREAMSINTERNAL_H_
+#define _DAGOR_GAMELIB_SOUNDSYSTEM_STREAMSINTERNAL_H_
 #pragma once
 
 #include <EASTL/functional.h>
@@ -27,3 +28,5 @@ void debug_get_info(uint32_t &num_handles, uint32_t &to_release_count);
 void debug_enum(eastl::function<void(const char *info, const Point3 &pos, bool is_3d)> f);
 } // namespace streams
 } // namespace sndsys
+
+#endif

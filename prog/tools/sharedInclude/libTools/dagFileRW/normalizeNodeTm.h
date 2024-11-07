@@ -1,4 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+
+#ifndef __DAGOR_NORMALIZE_NODE_TM_H
+#define __DAGOR_NORMALIZE_NODE_TM_H
 #pragma once
 
 #include <libTools/dagFileRW/dagFileNode.h>
@@ -44,3 +46,6 @@ static void normalizeNodeTreeTm(Node &n, const TMatrix &parent_scale_tm, bool ne
   for (int i = 0; i < n.child.size(); ++i)
     normalizeNodeTreeTm(*n.child[i], finalScaleTm, need_transform_mesh);
 }
+
+
+#endif

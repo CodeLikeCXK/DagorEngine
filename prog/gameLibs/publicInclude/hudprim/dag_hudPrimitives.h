@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -146,7 +147,8 @@ struct HudShader : StdGuiRender::GuiShader
   virtual void cleanup();
 
   virtual void setStates(const float viewport[5], const StdGuiRender::GuiState &guiState, const StdGuiRender::ExtState *extState,
-    bool viewport_changed, bool guistate_changed, bool extstate_changed, int targetW, int targetH);
+    bool viewport_changed, bool guistate_changed, bool extstate_changed, ShaderMaterial *mat, ShaderElement *elem, int targetW,
+    int targetH);
 };
 
 class HudPrimitives

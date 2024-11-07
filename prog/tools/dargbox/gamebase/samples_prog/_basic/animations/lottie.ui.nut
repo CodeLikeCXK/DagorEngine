@@ -9,8 +9,8 @@ let iconWidgetDef = {
   vplace = ALIGN_CENTER
 }
 
-let playPause = mkWatched(persist, "playPause", true)
-let cachedPictures = mkWatched(persist, "cachedPictures", {})
+let playPause = persist("playPause", @() Watched(true)) //or model
+let cachedPictures = persist("cachedPictures", @() Watched({}))
 
 function getPicture(source) {
   local pic = cachedPictures.value?[source]

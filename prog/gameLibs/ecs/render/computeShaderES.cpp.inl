@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <ecs/render/compute_shader.h>
 #include <daECS/core/componentTypes.h>
 

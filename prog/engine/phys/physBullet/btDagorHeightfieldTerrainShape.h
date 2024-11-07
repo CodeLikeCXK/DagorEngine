@@ -14,6 +14,9 @@ software in a product, an acknowledgment in the product documentation would be a
 3. This notice may not be removed or altered from any source distribution.
 */
 
+#ifndef DAGOR_HEIGHTFIELD_TERRAIN_SHAPE_H
+#define DAGOR_HEIGHTFIELD_TERRAIN_SHAPE_H
+
 #pragma once
 
 #include <util/dag_stdint.h>
@@ -90,3 +93,5 @@ protected:
   int originalHeight;
   LandMeshHolesManager *holes;
 };
+
+#endif // HEIGHTFIELD_TERRAIN_SHAPE_H

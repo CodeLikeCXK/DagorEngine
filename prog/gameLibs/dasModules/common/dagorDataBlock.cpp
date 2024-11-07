@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <dasModules/dasModulesCommon.h>
 #include <dasModules/dasDataBlock.h>
 #include <dasModules/aotDagorMath.h>
@@ -15,7 +13,7 @@ DAS_BASE_BIND_ENUM(dblk::ReadFlag, DataBlockReadFlag, ROBUST, BINARY_ONLY, RESTO
 
 static bool dblk_load(DataBlock &b, const char *fn, dblk::ReadFlag flg) { return dblk::load(b, fn, flg); }
 
-struct DataBlockAnnotation : das::ManagedStructureAnnotation<DataBlock, true, true>
+struct DataBlockAnnotation : das::ManagedStructureAnnotation<DataBlock, false>
 {
   DataBlockAnnotation(das::ModuleLibrary &ml) : ManagedStructureAnnotation("DataBlock", ml)
   {
@@ -32,7 +30,7 @@ struct DataBlockAnnotation : das::ManagedStructureAnnotation<DataBlock, true, tr
     DataBlock *blk = (DataBlock *)obj;
 
     DynamicMemGeneralSaveCB cwr(framemem_ptr(), 0, 2 << 10);
-    blk->saveToTextStream(cwr);
+    blk->saveToTextStreamCompact(cwr);
     cwr.writeInt(0);
     unsigned char *data = cwr.data();
     walker.String(*(char **)&data);
@@ -58,18 +56,11 @@ static char dagorDataBlock_das[] =
 
 void datablock_debug_print_datablock(const char *name, const DataBlock &blk) { ::debug_print_datablock(name, &blk); }
 
-const char *datablock_to_string(const DataBlock &blk, das::Context *context, das::LineInfoArg *at)
+const char *datablock_to_string(const DataBlock &blk, das::Context *context)
 {
   DynamicMemGeneralSaveCB cwr(framemem_ptr(), 0, 2 << 10);
   blk.saveToTextStream(cwr);
-  return context->allocateString((const char *)cwr.data(), cwr.size(), at);
-}
-
-const char *datablock_to_compact_string(const DataBlock &blk, das::Context *context, das::LineInfoArg *at)
-{
-  DynamicMemGeneralSaveCB cwr(framemem_ptr(), 0, 2 << 10);
-  blk.saveToTextStreamCompact(cwr);
-  return context->allocateString((const char *)cwr.data(), cwr.size(), at);
+  return context->stringHeap->allocateString((const char *)cwr.data(), cwr.size());
 }
 
 const DataBlock &datablock_get_empty() { return DataBlock::emptyBlock; }
@@ -147,11 +138,11 @@ public:
     das::addExtern<DAS_BIND_FUN(dblk_load)>(*this, lib, "datablock_load", das::SideEffects::modifyArgumentAndExternal, "dblk::load");
 
     BLK_MEMBER_CONST(getBlock, "datablock_get_block", das::SideEffects::none, const DataBlock *(DataBlock::*)(uint32_t) const)
-    BLK_MEMBER(getBlock, "datablock_get_block", das::SideEffects::none, DataBlock * (DataBlock::*)(uint32_t))
-    BLK_MEMBER(getBlockByName, "datablock_get_block_by_name", das::SideEffects::none, DataBlock * (DataBlock::*)(const char *))
+    BLK_MEMBER_CONST(getBlock, "datablock_get_block", das::SideEffects::none, DataBlock * (DataBlock::*)(uint32_t))
+    BLK_MEMBER_CONST(getBlockByName, "datablock_get_block_by_name", das::SideEffects::none, DataBlock * (DataBlock::*)(const char *))
     BLK_MEMBER_CONST(getBlockByName, "datablock_get_block_by_name", das::SideEffects::none,
       const DataBlock *(DataBlock::*)(const char *) const)
-    BLK_MEMBER(getBlockByNameId, "datablock_get_block_by_name_id", das::SideEffects::none, DataBlock * (DataBlock::*)(int))
+    BLK_MEMBER_CONST(getBlockByNameId, "datablock_get_block_by_name_id", das::SideEffects::none, DataBlock * (DataBlock::*)(int))
     BLK_MEMBER_CONST(getBlockByNameId, "datablock_get_block_by_name_id", das::SideEffects::none,
       const DataBlock *(DataBlock::*)(int) const)
     BLK_MEMBER_CONST(getBlockByNameEx, "datablock_get_block_by_name_ex", das::SideEffects::none,
@@ -169,8 +160,6 @@ public:
     BLK_MEMBER(blockExists, "datablock_block_exists", das::SideEffects::none, bool(DataBlock::*)(const char *) const)
     BLK_MEMBER(addBlock, "datablock_add_block", das::SideEffects::modifyArgument, DataBlock * (DataBlock::*)(const char *))
     BLK_MEMBER(addNewBlock, "datablock_add_new_block", das::SideEffects::modifyArgument, DataBlock * (DataBlock::*)(const char *))
-    BLK_MEMBER(addNewBlock, "datablock_add_new_block", das::SideEffects::modifyArgument,
-      DataBlock * (DataBlock::*)(const DataBlock *, const char *))
     BLK_MEMBER(getParamName, "datablock_get_param_name", das::SideEffects::none, const char *(DataBlock::*)(uint32_t) const)
 
 
@@ -220,12 +209,8 @@ public:
     BLK_MEMBER(setTm, "set", das::SideEffects::modifyArgument, int(DataBlock::*)(const char *, const TMatrix &))
 
 
-    BLK_MEMBER(swapParams, "datablock_swap_params", das::SideEffects::modifyArgument, bool(DataBlock::*)(uint32_t, uint32_t))
     BLK_MEMBER(removeParam, "datablock_remove_param", das::SideEffects::modifyArgument, bool(DataBlock::*)(const char *))
-    BLK_MEMBER(removeParam, "datablock_remove_param", das::SideEffects::modifyArgument, bool(DataBlock::*)(uint32_t))
-    BLK_MEMBER(swapBlocks, "datablock_swap_blocks", das::SideEffects::modifyArgument, bool(DataBlock::*)(uint32_t, uint32_t))
     BLK_MEMBER(removeBlock, "datablock_remove_block", das::SideEffects::modifyArgument, bool(DataBlock::*)(const char *))
-    BLK_MEMBER(removeBlock, "datablock_remove_block", das::SideEffects::modifyArgument, bool(DataBlock::*)(uint32_t))
     BLK_MEMBER(setParamsFrom, "datablock_set_params_from", das::SideEffects::modifyArgument, void(DataBlock::*)(const DataBlock *))
     BLK_MEMBER(changeBlockName, "datablock_change_block_name", das::SideEffects::modifyArgument, void(DataBlock::*)(const char *))
     BLK_MEMBER(loadText, "datablock_load_text", das::SideEffects::modifyArgument, bool(DataBlock::*)(const char *, int, const char *))
@@ -239,9 +224,6 @@ public:
     das::addExtern<DAS_BIND_FUN(datablock_to_string)>(*this, lib, "string", das::SideEffects::none,
       "bind_dascript::datablock_to_string");
 
-    das::addExtern<DAS_BIND_FUN(datablock_to_compact_string)>(*this, lib, "compact_string", das::SideEffects::none,
-      "bind_dascript::datablock_to_compact_string");
-
     das::addExternTempRef<DAS_BIND_FUN(datablock_get_empty)>(*this, lib, "datablock_get_empty", das::SideEffects::accessExternal,
       "bind_dascript::datablock_get_empty");
 
@@ -252,7 +234,6 @@ public:
     CLASS_MEMBER(getParamName, "datablock_getParamName", das::SideEffects::none)
     CLASS_MEMBER(getParamType, "datablock_getParamType", das::SideEffects::none)
     CLASS_MEMBER(saveToTextFile, "datablock_save_to_text_file", das::SideEffects::modifyExternal)
-    CLASS_MEMBER(saveToTextFileCompact, "datablock_save_to_text_file_compact", das::SideEffects::modifyExternal)
 
 
 #undef BIND_BLK

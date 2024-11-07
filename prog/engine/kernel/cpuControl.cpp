@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #if _TARGET_PC
 #include <float.h>
 #if _TARGET_PC_LINUX
@@ -50,7 +48,7 @@ void do_update_float_exceptions_unsafe()
     _clear87();
     _control87(_MCW_EM, _MCW_EM);
   }
-#elif _TARGET_PC_LINUX && !defined(__e2k__)
+#elif _TARGET_PC_LINUX
   if (g_should_throw_float_exceptions)
   {
     fesetenv(FE_DFL_ENV);

@@ -1,4 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __CFGREADER_H
+#define __CFGREADER_H
 #pragma once
 
 #include <string>
@@ -103,3 +104,5 @@ public:
   int GetParamMode(std::string owner, std::string param);
   StringVector GetParamData(std::string owner, std::string param);
 };
+
+#endif // __CFGREADER_H

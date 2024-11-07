@@ -48,18 +48,10 @@ static void script_err_print_func(HSQUIRRELVM /*v*/, const SQChar* s,...)
 }
 
 
-static void compile_error_handler(HSQUIRRELVM /*v*/, SQMessageSeverity sev, const SQChar *desc, const SQChar *source,
-                        SQInteger line, SQInteger column, const SQChar *extra_info)
+static void compile_error_handler(HSQUIRRELVM /*v*/, const SQChar *desc, const SQChar *source,
+                        SQInteger line, SQInteger column, const SQChar *)
 {
-  const SQChar *sevName = "error";
-  if (sev == SEV_HINT) sevName = "hint";
-  else if (sev == SEV_WARNING) sevName = "warning";
-  output += vaformat("Squirrel compile %s: %s (%d:%d): %s", sevName, source, int(line), int(column), desc);
-  if (extra_info)
-  {
-    output += "\n";
-    output += extra_info;
-  }
+  output += vaformat("Squirrel compile error %s (%d:%d): %s", source, int(line), int(column), desc);
 }
 
 
@@ -122,7 +114,7 @@ static std::string runScript(const std::string &source_text)
   moduleMgr->bindBaseLib(hBindings);
   moduleMgr->bindRequireApi(hBindings);
 
-  if (SQ_SUCCEEDED(sq_compile(vm, source_text.c_str(), source_text.length(), "console", true, &hBindings)))
+  if (SQ_SUCCEEDED(sq_compilebuffer(vm, source_text.c_str(), source_text.length(), "console", true, &hBindings)))
   {
     sq_pushnull(vm); //environment
 

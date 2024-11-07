@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "splineClassMgr.h"
 #include "flags.h"
 #include <de3_bitMaskMgr.h>
@@ -40,6 +38,7 @@ splineclass::AssetData::AssetData() : road(NULL), gen(NULL), genGeom(NULL), isCu
   addFuzzySweepHalfWidth = 0.0;
   sweep2Width = addFuzzySweep2HalfWidth = 0.0;
   navMeshStripeWidth = 0;
+  zeroOpacityDistAtEnds = 0;
 }
 splineclass::AssetData::~AssetData() { SharedSplineClassAssetData::clearAsset(*this); }
 
@@ -244,6 +243,7 @@ bool SharedSplineClassAssetData::loadAsset(const DataBlock &blk)
   sweep2Width = blk.getReal("sweep2Width", 0);
   addFuzzySweep2HalfWidth = blk.getReal("addFuzzySweep2HalfWidth", 0);
   navMeshStripeWidth = blk.getReal("navMeshStripeWidth", 0);
+  zeroOpacityDistAtEnds = blk.getReal("zeroOpacityDistAtEnds", 0);
   isCustomJumplink = blk.getBool("isCustomJumplink", isCustomJumplink);
   return ok;
 }
@@ -722,9 +722,6 @@ bool SharedSplineClassAssetData::loadLoftGeomData(splineclass::LoftGeomGenData &
       loft.minStep = b_loft.getReal("minStep", 3.f);
       loft.maxStep = b_loft.getReal("maxStep", 25.f);
       loft.curvatureStrength = b_loft.getReal("curvatureStrength", 15.f);
-      loft.marginAtStart = b_loft.getReal("marginAtStart", 0.f);
-      loft.marginAtEnd = b_loft.getReal("marginAtEnd", 0.f);
-      loft.zeroOpacityDistAtEnds = b_loft.getReal("zeroOpacityDistAtEnds", blk.getReal("zeroOpacityDistAtEnds", 0));
       loft.maxHerr = b_loft.getReal("maxHerr", 1.0f);
       loft.maxHillHerr = b_loft.getReal("maxHillHerr", loft.maxHerr);
 

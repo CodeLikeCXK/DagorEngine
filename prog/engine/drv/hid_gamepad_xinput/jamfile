@@ -1,3 +1,4 @@
+Platform ?= win32 ;
 Root    ?= ../../../.. ;
 Location = prog/engine/drv/hid_gamepad_xinput ;
 
@@ -15,7 +16,7 @@ Sources =
 
 if $(Platform) in xboxOne scarlett { Sources += gamepad_composite.cpp ; }
 
-if $(KernelLinkage) != dynamic { UseProgLibs = engine/baseUtil ; } # for watchdog
+if $(DriverLinkage) != dynamic { UseProgLibs = engine/baseUtil ; } # for watchdog
 
 AddIncludes = $(Root)/prog/engine/sharedInclude ;
 

@@ -39,8 +39,8 @@ shader water_foam_trail
   USE_MODULATED_FOAM()
   USE_WATER_FOAM_TRAIL()
 
-  INIT_HDR(ps)
-  USE_HDR(ps)
+  INIT_HDR_STCODE()
+  USE_HDR_PS()
 
   cull_mode = none;
   z_test = false;
@@ -235,8 +235,8 @@ shader water_foam_obstacle_apply
 
   USE_POSTFX_VERTEX_POSITIONS()
 
-  INIT_HDR(ps)
-  USE_HDR(ps)
+  INIT_HDR_STCODE()
+  USE_HDR_PS()
 
   hlsl(vs)
   {

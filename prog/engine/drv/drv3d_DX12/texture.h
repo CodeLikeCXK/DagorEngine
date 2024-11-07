@@ -1,11 +1,10 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <3d/tql.h>
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
 #include <generic/dag_smallTab.h>
 #include <generic/dag_bitset.h>
-#include <drv/shadersMetaData/dxil/compiled_shader_header.h>
+#include <dxil/compiled_shader_header.h>
 
 #include "device_memory_class.h"
 #include "host_device_shared_memory_region.h"
@@ -18,11 +17,18 @@ namespace drv3d_dx12
 {
 class BaseTex;
 class Image;
+struct D3DTextures
+{
+  Image *image = nullptr;
+  HostDeviceSharedMemoryRegion stagingMemory;
+  uint32_t memSize = 0;
+  uint32_t realMipLevels = 0;
+
+  void release(uint64_t progress);
+};
 
 void notify_delete(BaseTex *texture, const Bitset<dxil::MAX_T_REGISTERS> *srvs, const Bitset<dxil::MAX_U_REGISTERS> *uavs,
   Bitset<Driver3dRenderTarget::MAX_SIMRT> rtvs, bool dsv);
-void mark_texture_stages_dirty_no_lock(BaseTex *texture, const Bitset<dxil::MAX_T_REGISTERS> *srvs,
-  const Bitset<dxil::MAX_U_REGISTERS> *uavs, Bitset<Driver3dRenderTarget::MAX_SIMRT> rtvs, bool dsv);
 void dirty_srv_no_lock(BaseTex *texture, uint32_t stage, Bitset<dxil::MAX_T_REGISTERS> slots);
 void dirty_srv(BaseTex *texture, uint32_t stage, Bitset<dxil::MAX_T_REGISTERS> slots);
 void dirty_sampler(BaseTex *texture, uint32_t stage, Bitset<dxil::MAX_T_REGISTERS> slots);
@@ -40,13 +46,10 @@ public:
   bool isUav() const { return 0 != (cflg & TEXCF_UNORDERED); }
   bool isMultisampled() const { return 0 != (cflg & TEXCF_SAMPLECOUNT_MASK); }
 
-  bool isLocked() const { return lockFlags != 0; }
-  bool isLockedNoCopy() const { return (lockFlags & ~(TEX_COPIED | TEXLOCK_COPY_STAGING)) != 0; }
-
   void setResApiName(const char *name) const override;
 
   FormatStore getFormat() const;
-  Image *getDeviceImage() const { return image; }
+  Image *getDeviceImage() const { return tex.image; }
   ImageViewState getViewInfoUav(MipMapIndex mip, ArrayLayerIndex layer, bool as_uint) const;
   ImageViewState getViewInfoRenderTarget(MipMapIndex mip, ArrayLayerIndex layer, bool as_const) const;
   ImageViewState getViewInfo() const;
@@ -58,6 +61,7 @@ public:
 
   void notifySamplerChange();
   void notifySrvChange();
+  void notifyTextureReplaceFinish();
   void dirtyBoundSrvsNoLock();
   void dirtyBoundUavsNoLock();
   void dirtyBoundRtvsNoLock() { dirty_rendertarget_no_lock(this, getRtvBinding()); }
@@ -92,15 +96,25 @@ public:
   int restype() const override { return resType; }
   int ressize() const override;
   int getinfo(TextureInfo &ti, int level = 0) const override;
+  bool addDirtyRect(const RectInt &) override { return true; }
   int level_count() const override { return mipLevels; }
 
+  int texaddr(int a) override;
+  int texaddru(int a) override;
+  int texaddrv(int a) override;
+  int texaddrw(int a) override;
+  int texbordercolor(E3DCOLOR c) override;
+  int texfilter(int m) override;
+  int texmipmap(int m) override;
+  int texlod(float mipmaplod) override;
   int texmiplevel(int minlevel, int maxlevel) override;
+  int setAnisotropy(int level) override;
 
   int generateMips() override;
 
   bool setReloadCallback(IReloadData *_rld) override;
 
-  void reset();
+  void resetTex();
 
   void updateTexName();
 
@@ -130,10 +144,14 @@ public:
   static uint32_t update_flags_for_linear_layout(uint32_t cflags, FormatStore format);
   static DeviceMemoryClass get_memory_class(uint32_t cflags);
 
-  // similar to cmp exchange:
-  // If expected matches the current Image object it gets replace with replacement and true is returned
-  // Otherwise false is returned
-  bool swapTextureNoLock(Image *expected, Image *replacement);
+  D3DTextures tex;
+  FormatStore fmt;
+  uint32_t cflg = 0;
+  int resType = 0;
+
+  uint16_t width = 0;
+  uint16_t height = 0;
+  uint16_t depth = 0;
 
   SmallTab<uint8_t, MidmemAlloc> texCopy; //< ddsx::Header + ddsx data; sysCopyQualityId stored in hdr.hqPartLevel
 
@@ -148,20 +166,6 @@ public:
 
   eastl::unique_ptr<IReloadData, ReloadDataHandler> rld;
 
-  Image *image = nullptr;
-  HostDeviceSharedMemoryRegion stagingMemory;
-  uint32_t memSize = 0;
-  uint32_t realMipLevels = 0;
-
-  uint32_t cflg = 0;
-  const int resType = 0;
-
-  uint16_t width = 0;
-  uint16_t height = 0;
-  uint16_t depth = 0;
-
-  FormatStore fmt;
-
   SamplerState samplerState;
 
   struct ImageMem
@@ -175,48 +179,30 @@ public:
   static HostDeviceSharedMemoryRegion allocate_read_write_staging_memory(const Image *image,
     const SubresourceRange &subresource_range);
 
-  uint32_t getCreationFenceProgress() const { return creationFenceProgress; }
-
 private:
   bool isSrgbWriteAllowed() const { return (cflg & TEXCF_SRGBWRITE) != 0; }
   bool isSrgbReadAllowed() const { return (cflg & TEXCF_SRGBREAD) != 0; }
 
   void resolve(Image *dst);
 
-  void release();
-  void releaseMemory(uint64_t progress);
+  void releaseTex();
   void destroyObject();
+  void release() { releaseTex(); }
 
   void setTexName(const char *name);
 
-  bool isTexResEqual(BaseTexture *bt) const { return bt && ((BaseTex *)bt)->image == image; }
+  bool isTexResEqual(BaseTexture *bt) const { return bt && ((BaseTex *)bt)->tex.image == tex.image; }
 
 #if _TARGET_XBOX
   void lockimgXboxLinearLayout(void **pointer, int &stride, int level, int face, uint32_t flags);
 #endif
-  bool copyAllSubresourcesToStaging(void **pointer, uint32_t flags, uint32_t prev_flags);
+  bool copySubresourcesToStaging(void **pointer, int &stride, int level, uint32_t flags, uint32_t prev_flags);
   void unlockimgRes3d();
 
   bool waitAndResetProgress();
+  void freeStagingMemory();
   void fillLockedLevelInfo(int level, uint64_t offset);
   uint64_t prepareReadWriteStagingMemoryAndGetOffset(uint32_t flags);
-
-  SamplerState lastSamplerState; //-V730_NOINIT
-
-  D3D12_CPU_DESCRIPTOR_HANDLE sampler{0};
-
-  uint8_t mipLevels = 0;
-  uint8_t minMipLevel = 0;
-  uint8_t maxMipLevel = 0;
-
-  uint32_t lockedSubRes = 0;
-
-  uint32_t lockFlags = 0;
-  uint64_t waitProgress = 0;
-
-  uint64_t creationFenceProgress = 0;
-
-  ImageMem lockMsr;
 
   static constexpr float default_lodbias = 0.f;
   static constexpr int default_aniso = 1;
@@ -229,20 +215,23 @@ private:
   static constexpr uint32_t active_binding_is_array_cube_offset = 1 + active_binding_is_sample_stencil;
   static constexpr uint32_t unlock_image_is_upload_skipped = active_binding_is_array_cube_offset + 1;
   static constexpr uint32_t texture_state_bits_count = unlock_image_is_upload_skipped + 1;
-  Bitset<texture_state_bits_count> stateBitSet;
   Bitset<dxil::MAX_T_REGISTERS> srvBindingStages[STAGE_MAX_EXT];
   Bitset<dxil::MAX_U_REGISTERS> uavBindingStages[STAGE_MAX_EXT];
+  Bitset<texture_state_bits_count> stateBitSet;
 
-protected:
-  int texaddrImpl(int a) override;
-  int texaddruImpl(int a) override;
-  int texaddrvImpl(int a) override;
-  int texaddrwImpl(int a) override;
-  int texbordercolorImpl(E3DCOLOR c) override;
-  int texfilterImpl(int m) override;
-  int texmipmapImpl(int m) override;
-  int texlodImpl(float mipmaplod) override;
-  int setAnisotropyImpl(int level) override;
+  uint32_t lockFlags = 0;
+  uint64_t waitProgress = 0;
+
+  uint32_t lockedSubRes = 0;
+
+  SamplerState lastSamplerState; //-V730_NOINIT
+
+  ImageMem lockMsr;
+
+  D3D12_CPU_DESCRIPTOR_HANDLE sampler{0};
+  uint8_t mipLevels = 0;
+  uint8_t minMipLevel = 0;
+  uint8_t maxMipLevel = 0;
 };
 
 static inline BaseTex *getbasetex(BaseTexture *t) { return static_cast<BaseTex *>(t); }
@@ -253,12 +242,3 @@ inline BaseTex &cast_to_texture_base(BaseTexture &t) { return *getbasetex(&t); }
 typedef BaseTex TextureInterfaceBase;
 
 } // namespace drv3d_dx12
-
-#define DX12_UPLOAD_TO_IMAGE_AND_CHECK_DEST(CTX, DEBUG_INFO, IMAGE, ...)                                 \
-  do                                                                                                     \
-  {                                                                                                      \
-    if ((IMAGE)->getHandle() != nullptr)                                                                 \
-      (CTX).uploadToImage((IMAGE), __VA_ARGS__);                                                         \
-    else                                                                                                 \
-      D3D_ERROR("DX12: ctx.uploadToImage error: tex.image->getHandle() is equal to 0 (" DEBUG_INFO ")"); \
-  } while (false)

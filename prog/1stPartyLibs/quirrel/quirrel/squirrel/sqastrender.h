@@ -41,6 +41,7 @@ class RenderVisitor : public Visitor {
         case TO_RESUME: return "RESUME ";
         case TO_CLONE: return "CLONE ";
         case TO_DELETE: return "DELETE ";
+        case TO_INEXPR_ASSIGN: return " := ";
         case TO_NEWSLOT: return " <- ";
         case TO_PLUSEQ: return " += ";
         case TO_MINUSEQ: return " -= ";
@@ -122,7 +123,7 @@ public:
         expr->receiver()->visit(this);
         if (expr->isNullable()) _out->writeInt8('?');
         _out->writeChar('.');
-        if (expr->isTypeMethod()) _out->writeInt8('$');
+        if (expr->isBuiltInGet()) _out->writeInt8('$');
         _out->writeString(expr->fieldName());
     }
     virtual void visitSetFieldExpr(SetFieldExpr *expr) {
@@ -133,14 +134,14 @@ public:
         _out->writeString(" = ");
         expr->value()->visit(this);
     }
-    virtual void visitGetSlotExpr(GetSlotExpr *expr) {
+    virtual void visitGetTableExpr(GetTableExpr *expr) {
         expr->receiver()->visit(this);
         if (expr->isNullable()) _out->writeChar('?');
         _out->writeChar('[');
         expr->key()->visit(this);
         _out->writeChar(']');
     }
-    virtual void visitSetSlotExpr(SetSlotExpr *expr) {
+    virtual void visitSetTableExpr(SetTableExpr *expr) {
         expr->receiver()->visit(this);
         if (expr->isNullable()) _out->writeChar('?');
         _out->writeChar('[');
@@ -150,7 +151,7 @@ public:
         expr->value()->visit(this);
     }
     virtual void visitBaseExpr(BaseExpr *expr) { _out->writeString("base"); }
-    virtual void visitRootTableAccessExpr(RootTableAccessExpr *expr) { _out->writeString("::"); }
+    virtual void visitRootExpr(RootExpr *expr) { _out->writeString("::"); }
     virtual void visitLiteralExpr(LiteralExpr *expr) {
         switch (expr->kind())
         {

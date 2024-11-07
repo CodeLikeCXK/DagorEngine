@@ -1,6 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
-
 #include "vulkan_api.h"
 
 // meta type, represents VK_NULL_HANDLE

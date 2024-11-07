@@ -35,7 +35,7 @@ declare_struct("ModFxQuality", 1,
   { name="high_quality", type="bool", defVal=1 },
 ]);
 
-declare_struct("ModfxParams", 10,
+declare_struct("ModfxParams", 9,
 [
   { name="ref_slot", type="int", defVal=0 },
   { name="offset", type="Point3", defVal=Point3(0,0,0) },
@@ -54,7 +54,6 @@ declare_struct("ModfxParams", 10,
   { name="mod_velocity_drag", type="real", defVal=1 },
   { name="mod_velocity_drag_to_rad", type="real", defVal=1 },
   { name="mod_velocity_mass", type="real", defVal=1 },
-  { name="mod_velocity_wind_scale", type="real", defVal=1 },
 
   { name="mod_color", type="E3DCOLOR", defVal=Color4(255, 255, 255, 255) },
 

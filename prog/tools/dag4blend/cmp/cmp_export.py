@@ -22,10 +22,6 @@ EXISTING_NODE_TYPES = [
                         "gameobj",
                         ]
 
-PROPS_TO_SKIP = [
-                "type:t",
-                ]
-
 #functions
 def _tabs(i):
     cmp=bpy.data.texts['cmp']
@@ -116,7 +112,7 @@ def write_entities(cmp,node,tabs):
         else:
             name=get_node_name(ent)
         _tabs(tabs)
-        cmp.write('ent{ name:t="'+name.lower()+'";' + end)
+        cmp.write('ent{ name:t="'+name+'";' + end)
 
 def write_node(cmp,node,tabs):
     if node.type!='EMPTY':
@@ -134,13 +130,11 @@ def write_node(cmp,node,tabs):
         else:
             node_name=get_node_name(node)
             _tabs(tabs+1)
-            cmp.write(f'name:t="{node_name.lower()}"\n')
+            cmp.write(f'name:t="{node_name}"\n')
     DP=node.dagorprops
     props=list(DP.keys())
     randomized_tf=False
     for prop in props:
-        if prop in PROPS_TO_SKIP:
-            continue
         value=DP[prop]
         try:
             value=value.to_list()

@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <id/idIndexedMapping.h>
@@ -26,7 +25,6 @@ V &id_indexed_mapping_get(IdIndexedMapping<K, V> &map, K key)
 {
   return map.get(key);
 }
-
 
 template <class K, class V>
 struct typeFactory<IdIndexedMapping<K, V>>

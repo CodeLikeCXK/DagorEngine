@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <ioSys/dag_genIo.h>
 #include <math/dag_math3d.h>
 #include <generic/dag_qsort.h>

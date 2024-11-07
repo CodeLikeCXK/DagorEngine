@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -16,11 +17,6 @@
 #include <vector>
 #endif
 
-
-namespace SQCompilation
-{
-struct SqASTData;
-}
 
 namespace sqimportparser
 {
@@ -49,7 +45,6 @@ public:
   using string = Sqrat::string;
 
   typedef bool (*BeforeImportModuleCallback)(SqModules *sq_modules, const char *module_name);
-  typedef void (*SQOnCompileFileCb)(HSQUIRRELVM, const SQChar *);
 
   struct IFileSystemOverride
   {
@@ -64,6 +59,7 @@ public:
     Sqrat::Object exports;
     Sqrat::Object stateStorage;
     Sqrat::Array refHolder;
+    Sqrat::Object moduleThis; //< needed to add refcount
     string __name__;
   };
 
@@ -123,9 +119,8 @@ private:
   bool checkCircularReferences(const String &resolved_fn, const char *orig_fn);
   bool readFile(const String &resolved_fn, const char *requested_fn, Tab<char> &buf, String &out_err_msg);
   bool compileScript(dag::ConstSpan<char> buf, const String &resolved_fn, const char *orig_fn, const HSQOBJECT *bindings,
-    Sqrat::Object &script_closure, String &out_err_msg, SQCompilation::SqASTData **return_ast = nullptr);
-  bool compileScriptImpl(const dag::ConstSpan<char> &buf, const char *resolved_fn, const HSQOBJECT *bindings,
-    SQCompilation::SqASTData **return_ast = nullptr);
+    Sqrat::Object &script_closure, String &out_err_msg);
+  bool compileScriptImpl(const dag::ConstSpan<char> &buf, const char *resolved_fn, const HSQOBJECT *bindings);
   Sqrat::Table setupStateStorage(const char *resolved_fn);
   Module *findModule(const char *resolved_fn);
 
@@ -152,7 +147,7 @@ public:
 
   eastl::vector_map<eastl::string, Sqrat::Object> nativeModules;
 
-  static const char *__main__, *__fn__, *__analysis__;
+  static const char *__main__, *__fn__;
 
   struct
   {
@@ -165,7 +160,6 @@ public:
   void *up_data;
   void (*onAST_cb)(HSQUIRRELVM, SQCompilation::SqASTData *, void *);
   void (*onBytecode_cb)(HSQUIRRELVM, HSQOBJECT, void *);
-  SQOnCompileFileCb onCompileFile_cb = nullptr;
 
   // if this flag is false we won't try to open files from real file system if there are missing in vromfs.
   // this is to allow modding on PC and useAddonVromfs in dev build

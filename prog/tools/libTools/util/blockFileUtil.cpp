@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <libTools/util/blockFileUtil.h>
 #include <debug/dag_except.h>
 

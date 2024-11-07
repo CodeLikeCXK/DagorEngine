@@ -1,4 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __DAGOR_DAG_EXPORTER_H
+#define __DAGOR_DAG_EXPORTER_H
 #pragma once
 
 #include <generic/dag_tab.h>
@@ -36,3 +37,5 @@ private:
   static DagSaver dagSaver;
   static String location;
 };
+
+#endif //__DAGOR_DAG_EXPORTER_H

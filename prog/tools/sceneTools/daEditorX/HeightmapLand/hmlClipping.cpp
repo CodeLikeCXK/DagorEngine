@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <heightMapLand/dag_hmlTraceRay.h>
 #include <heightMapLand/dag_hmlGetHeight.h>
 #include "hmlPlugin.h"

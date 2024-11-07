@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include "common.h"
@@ -6,7 +5,7 @@
 #include "buffers.h"
 #include "shaders.h"
 #include "emitters.h"
-#include <drv/3d/dag_consts.h>
+#include <3d/dag_drv3dConsts.h>
 #include <3d/dag_resMgr.h>
 #include <EASTL/array.h>
 #include <EASTL/vector.h>
@@ -44,11 +43,7 @@ enum
   SYS_RENDER_BUF_TAKEN = 1 << 18,
 
   SYS_POS_VALID = 1 << 19,
-
-  SYS_SKIP_SCREEN_PROJ_CULL_DISCARD = 1 << 20,
-
-  SYS_SKIP_SIMULATION_ON_THIS_FRAME = 1 << 21,
-  SYS_ALLOW_SIMULATION_LODS = 1 << 22,
+  SYS_CUSTOM_DEPTH = 1 << 20,
 };
 
 struct SystemTemplate
@@ -57,7 +52,6 @@ struct SystemTemplate
   uint32_t refFlags;
   uint32_t qualityFlags;
   eastl::string name;
-  int gameResId;
 
   EmitterState emitterState;
   EmitterRandomizer emitterRandomizer;
@@ -90,7 +84,7 @@ struct SystemTemplate
   uint32_t renderTags;
   int renderSortDepth;
   eastl::vector<RenderShaderId> renderShaders;
-  eastl::array<eastl::vector<TextureDesc>, STAGE_MAX> resources;
+  eastl::array<eastl::vector<D3DRESID>, STAGE_MAX> resources;
 
   eastl::vector<SystemTemplate> subsystems;
 };

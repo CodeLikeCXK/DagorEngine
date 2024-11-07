@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -85,11 +86,7 @@ class PhysBody
 public:
   PhysBody(PhysWorld *w, float mass, const PhysCollision *coll, const TMatrix &tm = TMatrix::IDENT,
     const PhysBodyCreationData &s = {});
-  PhysBody(PhysBody &&) = default;
-  PhysBody(const PhysBody &) = delete;
   ~PhysBody();
-  PhysBody &operator=(PhysBody &&) = default;
-  PhysBody &operator=(const PhysBody &) = delete;
 
 
   // set/get world transform (uses motion state if available)
@@ -189,8 +186,6 @@ public:
 
   void *getUserData() const { return userPtr; }
   void setUserData(void *p) { userPtr = p; }
-
-  void drawDebugCollision(unsigned color, bool rand_children_colors) const;
 
   // Bullet-specific:
   PhysWorld *getPhysWorld() const { return world; }
@@ -537,8 +532,7 @@ public:
       cdata.posA = to_point3(isSwapped ? cp.m_localPointB : cp.m_localPointA);
       cdata.posB = to_point3(isSwapped ? cp.m_localPointA : cp.m_localPointB);
       c.visualDebugForSingleResult(pbA, pbB, cdata);
-      c.addSingleResult(cdata, (typename C::obj_user_data_t *)userPtrA, (typename C::obj_user_data_t *)userPtrB);
-      return 0.f;
+      return c.addSingleResult(cdata, (typename C::obj_user_data_t *)userPtrA, (typename C::obj_user_data_t *)userPtrB, nullptr);
     }
     bool needsCollision(btBroadphaseProxy *proxy0) const override final
     {

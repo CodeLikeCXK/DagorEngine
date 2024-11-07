@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -135,7 +136,7 @@ inline void component_to_blk_param(const char *paramName, const ecs::EntityCompo
       return;
     }
     default:
-      logerr("Unsupported component type %s <%d> for comp %s", g_entity_mgr->getComponentTypes().findTypeName(ctype), ctype,
+      G_ASSERTF(0, "Unsupported component type %s <%d> for comp %s", g_entity_mgr->getComponentTypes().findTypeName(ctype), ctype,
         paramName);
   }
 #undef PROC_COMP

@@ -17,7 +17,6 @@
 #include <math/dag_mathUtils.h>
 #include <ecs/scripts/sqEntity.h>
 #include <quirrel/sqEventBus/sqEventBus.h>
-#include <json/json.h>
 #include <rendInst/rendInstExtra.h>
 #include <rendInst/rendInstAccess.h>
 
@@ -130,7 +129,8 @@ void EntityObj::updateEntityPosition(bool)
         g_entity_mgr->sendEvent(eid, CmdTeleportEntity(getWtm(), true));
         EntityObjEditor::saveComponent(eid, "transform");
 
-        sqeventbus::send_event("entity_editor.onEntityMoved", Json::Value((ecs::entity_id_t)eid));
+        if (HSQUIRRELVM vm = sqeventbus::get_vm())
+          sqeventbus::send_event("entity_editor.onEntityMoved", Sqrat::Object(eid, vm));
       }
     }
     else
@@ -312,7 +312,8 @@ void EntityObj::onRemove(ObjectEditor *objEd)
   if (const ecs::Scene::EntityRecord *pRec = ecs::g_scenes->getActiveScene().findEntityRecord(eid))
     removedEntComps.reset(new ecs::ComponentsList(eastl::move(pRec->clist)));
   static_cast<EntityObjEditor *>(objEd)->destroyEntityDirect(eid);
-  sqeventbus::send_event("entity_editor.onEntityRemoved", Json::Value((ecs::entity_id_t)eid));
+  if (HSQUIRRELVM vm = sqeventbus::get_vm())
+    sqeventbus::send_event("entity_editor.onEntityRemoved", Sqrat::Object(eid, vm));
   eid = ecs::INVALID_ENTITY_ID;
   resetObjectFlags();
 }
@@ -339,7 +340,8 @@ void EntityObj::onAdd(ObjectEditor *objEd)
   removedEntData.reset();
   removedEntComps.reset();
 
-  sqeventbus::send_event("entity_editor.onEntityAdded", Json::Value((ecs::entity_id_t)eid));
+  if (HSQUIRRELVM vm = sqeventbus::get_vm())
+    sqeventbus::send_event("entity_editor.onEntityAdded", Sqrat::Object(eid, vm));
 }
 
 EditableObject *EntityObj::cloneObject() { return cloneObject(NULL); }

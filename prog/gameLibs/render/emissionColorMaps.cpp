@@ -1,10 +1,8 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <cstdint>
 
 #include <render/emissionColorMaps.h>
 
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
 #include <3d/dag_lockSbuffer.h>
 #include <math/dag_Point4.h>
 #include <math/dag_Point3.h>

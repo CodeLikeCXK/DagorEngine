@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <shaders/dag_shaderMeshTexLoadCtrl.h>
 
 IShaderMatVdataTexLoadCtrl *dagor_sm_tex_load_controller = NULL;

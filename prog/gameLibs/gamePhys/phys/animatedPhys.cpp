@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <gamePhys/phys/animatedPhys.h>
 #include <gamePhys/phys/physVars.h>
 #include <animChar/dag_animCharacter2.h>
@@ -15,7 +13,7 @@ inline void AnimatedPhys::addRemap(int animNid, int physNid, bool pullable)
   G_FAST_ASSERT((unsigned)physNid < remappedVars.size());
 #endif
   remappedVars[physNid] = int16_t(animNid);
-  if (DAGOR_UNLIKELY(pullable))
+  if (EASTL_UNLIKELY(pullable))
     pullBitmap.set(physNid, true);
 }
 
@@ -57,7 +55,7 @@ void AnimatedPhys::appendVar(const char *var_name, const AnimV20::AnimcharBaseCo
 void AnimatedPhys::update(AnimV20::AnimcharBaseComponent &anim_char, PhysVars &phys_vars)
 {
   AnimV20::IAnimStateHolder *animState = anim_char.getAnimState();
-  if (DAGOR_UNLIKELY(remappedVars.size() != phys_vars.getVarsCount()))
+  if (EASTL_UNLIKELY(remappedVars.size() != phys_vars.getVarsCount()))
     init(anim_char, phys_vars);
   if (pullBitmap.empty())
   {

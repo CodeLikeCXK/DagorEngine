@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "openXrErrorReporting.h"
 #include "debug/dag_log.h"
 #include "osApiWrappers/dag_messageBox.h"
@@ -46,7 +44,7 @@ bool report_xr_result(XrInstance oxr_instance, XrResult result, const char *call
 {
   bool xrResult = report_xr_result_base(oxr_instance, result, call, module, is_runtime_failure);
   bool hasRuntimeFailure = is_runtime_failure && *is_runtime_failure;
-  G_ASSERTF(xrResult || hasRuntimeFailure, "[XR][%s] %s failed with reason %d", module, call, result);
+  G_ASSERTF(xrResult || hasRuntimeFailure, "[XR][%s] %s failed", module, call);
   return xrResult;
 }
 

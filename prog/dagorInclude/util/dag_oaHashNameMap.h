@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -22,8 +23,8 @@ struct OAHashNameMap
   HashedKeyMap<hash_t, uint32_t> hashToStringId;
   SmallTab<uint32_t> strings;
   StringTableAllocator allocator;
-  bool noCollisions() const { return allocator.padding == 0; }
-  uint8_t &hasCollisions() { return allocator.padding; }
+  uint8_t noCollisions() const { return allocator.padding; }
+  uint8_t &noCollisions() { return allocator.padding; }
   uint32_t addString(const char *name, size_t name_len)
   {
     const uint32_t len = (uint32_t)name_len + 1; // term zero, or one symbol after len. todo: fixme, so we don't memcpy from it
@@ -78,7 +79,7 @@ struct OAHashNameMap
       it = hashToStringId.findOr(hash, -1);
       if (DAGOR_UNLIKELY(it != -1 && !string_equal(name, name_len, it)))
       {
-        hasCollisions() = 1;
+        noCollisions() = 0;
         it = -1;
       }
     }
@@ -294,4 +295,4 @@ static inline IterateStatus iterate_names_breakable(const NM &nm, CB cb /*(int i
 }
 
 
-#include <supp/dag_undef_KRNLIMP.h>
+#include <supp/dag_undef_COREIMP.h>

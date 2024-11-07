@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <recastTools/recastBuildCovers.h>
 #include <recastTools/recastTools.h>
 
@@ -906,7 +904,7 @@ struct CoversTracer
   State states[CACHE_SIZE + 1];
   int ncached;
 
-  CoversTracer(const rcCompactHeightfield *_chf, const rcHeightfield *_solid, float shoot_ht_stand, float shoot_ht_crouch, //-V730
+  CoversTracer(const rcCompactHeightfield *_chf, const rcHeightfield *_solid, float shoot_ht_stand, float shoot_ht_crouch,
     float shoot_ht_crawl, float expose_ht_stand, float expose_ht_crouch, float expose_ht_crawl, float crawl_body_length,
     float cover_max_dist, float shoot_min_dist, float shoot_near_dist, float ground_hole_ht, float good_shootable_sumdist,
     float max_sumdist_crawling, float max_sumdist_crouched)
@@ -1072,7 +1070,6 @@ struct CoversTracer
       case CoversTracer::COVER_FULL_WALL:
       case CoversTracer::COVER_FULL_STAND:
       case CoversTracer::COVER_FULL_CROUCH: return true;
-      default: break;
     }
     return false;
   }
@@ -1084,7 +1081,6 @@ struct CoversTracer
       case CoversTracer::COVER_CROUCH_TO_STAND:
       case CoversTracer::COVER_CRAWL_TO_CROUCH:
       case CoversTracer::COVER_CRAWL_TO_STAND: return cover_aim1.inRange(10, 0);
-      default: break;
     }
     return false;
   }
@@ -1414,8 +1410,6 @@ struct CoversTracer
       const rcSpan *solidSpan = nullptr;
       const auto &cell = chf->cells[px + pz * w];
       int nspan = (state.span != 0xFFFFFF) ? rcGetCon(chf->spans[state.span], dir) : RC_NOT_CONNECTED;
-      if (nspan != RC_NOT_CONNECTED && cell.index + nspan >= chf->spanCount) // Note: bug in recast?
-        nspan = RC_NOT_CONNECTED;
       int lastYH = lastY + lastH;
       int nY, nH;
 
@@ -2077,8 +2071,6 @@ static void build_covers_v2_reduce(Tab<covers::Cover> &out_covers, CoversArr &co
       out_covers.pop_back();
       --i;
     }
-
-  covers_arr.arr.clear(); // not valid anymore (.coverIdx indexes may be broken)
 }
 
 
@@ -2262,10 +2254,10 @@ static void build_covers_v2_join(Tab<covers::Cover> &out_covers, CoversArr &cove
         cover.groundRight = ptRight + newDirL * (-forwL * 0.5f + COVERS_WALL_OFFSET) + offsRightL;
 
         Point3 delta = cover.groundRight - cover.groundLeft;
+        delta.normalize();
         cover.dir.x = -delta.z;
         cover.dir.y = 0.0f;
         cover.dir.z = delta.x;
-        cover.dir.normalize();
 
         cover.hLeft = (minHeight + minHeightL) * 0.5f;
         cover.hRight = cover.hLeft;
@@ -2292,10 +2284,10 @@ static void build_covers_v2_join(Tab<covers::Cover> &out_covers, CoversArr &cove
         cover.groundRight = posR + newDirR * (forwR * 0.5f + COVERS_WALL_OFFSET) + offsRightR;
 
         Point3 delta = cover.groundRight - cover.groundLeft;
+        delta.normalize();
         cover.dir.x = -delta.z;
         cover.dir.y = 0.0f;
         cover.dir.z = delta.x;
-        cover.dir.normalize();
 
         cover.hLeft = (minHeight + minHeightR) * 0.5f;
         cover.hRight = cover.hLeft;
@@ -2311,26 +2303,11 @@ static void build_covers_v2_join(Tab<covers::Cover> &out_covers, CoversArr &cove
       coverPos.coverIdx = -1;
   }
 
-  idxs.clear();
-  idxs.resize(out_covers.size(), -1);
-  for (int posIdx = 0; posIdx < (int)covers_arr.arr.size(); ++posIdx)
-  {
-    auto &coverPos = covers_arr.arr[posIdx];
-    if (coverPos.removed || coverPos.coverIdx < 0)
-      continue;
-    idxs[coverPos.coverIdx] = posIdx;
-  }
-
   for (int i = 0; i < (int)out_covers.size(); ++i)
     if (out_covers[i].hLeft < 0.0f)
     {
-      const int lastPosIdx = idxs.back();
-      if (lastPosIdx >= 0)
-        covers_arr.arr[lastPosIdx].coverIdx = i;
-      idxs[i] = lastPosIdx;
       out_covers[i] = out_covers.back();
       out_covers.pop_back();
-      idxs.pop_back();
       --i;
     }
 

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <sceneBuilder/nsb_LightmappedScene.h>
 #include <ioSys/dag_fileIo.h>
 #include <util/dag_globDef.h>

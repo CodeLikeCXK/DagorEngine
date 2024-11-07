@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <stdio.h>
 #include <string.h>
 #include <soundSystem/soundSystem.h>
@@ -138,11 +136,7 @@ FMOD::Studio::Bus *get_bus(const char *bus_name)
   FMOD::Studio::Bus *bus = nullptr;
   FMOD_RESULT result = get_studio_system()->getBus(path.c_str(), &bus);
 
-  if (FMOD_OK != result)
-  {
-    logerr("Get BUS \"%s\" failed, fmod result is \"%s\"", path.c_str(), FMOD_ErrorString(result));
-    return nullptr;
-  }
+  G_ASSERTF_RETURN(FMOD_OK == result, nullptr, "Get BUS \"%s\" failed, fmod result is \"%s\"", path.c_str(), FMOD_ErrorString(result));
 
   return bus;
 }

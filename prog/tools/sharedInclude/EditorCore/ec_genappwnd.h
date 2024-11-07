@@ -1,4 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __GAIJIN_EDITORCORE_EC_GENAPPWND_H__
+#define __GAIJIN_EDITORCORE_EC_GENAPPWND_H__
 #pragma once
 
 #include <EditorCore/ec_decl.h>
@@ -16,16 +17,10 @@
 
 #include <math/dag_TMatrix.h>
 #include <math/integer/dag_IPoint2.h>
-#include <drv/3d/dag_resId.h>
+#include <3d/dag_resId.h>
 
 #include <coolConsole/coolConsole.h>
 
-#include <EASTL/unique_ptr.h>
-
-namespace PropPanel
-{
-class IMenu;
-}
 
 /// Editor's main window.
 /// In EditorCore based editors main window is usually derived from
@@ -162,17 +157,17 @@ protected:
   // helper routines
   virtual void init();
 
-  PropPanel::IMenu *getMainMenu();
+  IMenu *getMainMenu();
 
-  virtual void fillMenu(PropPanel::IMenu *menu);
-  virtual void updateMenu(PropPanel::IMenu *menu) {}
+  virtual void fillMenu(IMenu *menu);
+  virtual void updateMenu(IMenu *menu){};
 
-  virtual void addExitCommand(PropPanel::IMenu *menu);
+  virtual void addExitCommand(IMenu *menu);
 
   void onChangeFov();
   void onShowConsole();
 
-  void fillCommonToolbar(PropPanel::ContainerPropertyControl &tb);
+  void fillCommonToolbar(PropertyContainerControlBase &tb);
 
   // screenshot routine
   virtual String getScreenshotNameMask(bool cube) const = 0;
@@ -198,5 +193,7 @@ private:
   class FovDlg;
 
   EditorWorkspace mWSpace;
-  eastl::unique_ptr<PropPanel::IMenu> mainMenu;
 };
+
+
+#endif

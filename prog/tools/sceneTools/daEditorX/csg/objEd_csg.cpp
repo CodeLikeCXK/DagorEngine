@@ -1,27 +1,21 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "objEd_csg.h"
 #include "box_csg.h"
 #include "plugIn.h"
 
-#include <EditorCore/ec_IEditorCore.h>
+#include <dllPluginCore/core.h>
 #include <EditorCore/ec_ObjectCreator.h>
 #include <coolConsole/coolConsole.h>
 #include <oldEditor/de_cm.h>
 #include <de3_editorEvents.h>
 
-#include <drv/3d/dag_matricesAndPerspective.h>
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
 
 #include <winGuiWrapper/wgw_input.h>
 #include <winGuiWrapper/wgw_dialogs.h>
 
-#include <propPanel/commonWindow/dialogWindow.h>
+#include <propPanel2/comWnd/dialog_window.h>
 
 #include <debug/dag_debug.h>
-
-using editorcore_extapi::dagGeom;
-using editorcore_extapi::dagRender;
 
 enum
 {
@@ -42,9 +36,9 @@ ObjEd::ObjEd() : cloneMode(false), objCreator(NULL)
 ObjEd::~ObjEd() { dagRender->deleteDynRenderBuffer(ptDynBuf); }
 
 
-void ObjEd::fillToolBar(PropPanel::ContainerPropertyControl *toolbar)
+void ObjEd::fillToolBar(PropertyContainerControlBase *toolbar)
 {
-  PropPanel::ContainerPropertyControl *tb1 = toolbar->createToolbarPanel(0, "");
+  PropertyContainerControlBase *tb1 = toolbar->createToolbarPanel(0, "");
 
   addButton(tb1, CM_CREATE_OCCLUDER_BOX, "create_box", "Create box Occluder (1)", true);
 
@@ -52,11 +46,11 @@ void ObjEd::fillToolBar(PropPanel::ContainerPropertyControl *toolbar)
 
   ObjectEditor::fillToolBar(toolbar);
 
-  PropPanel::ContainerPropertyControl *tb2 = toolbar->createToolbarPanel(0, "");
+  PropertyContainerControlBase *tb2 = toolbar->createToolbarPanel(0, "");
 }
 
 
-void ObjEd::addButton(PropPanel::ContainerPropertyControl *tb, int id, const char *bmp_name, const char *hint, bool check)
+void ObjEd::addButton(PropertyContainerControlBase *tb, int id, const char *bmp_name, const char *hint, bool check)
 {
   if (id == CM_OBJED_DROP || id == CM_OBJED_MODE_SURF_MOVE)
     return;
@@ -316,7 +310,7 @@ void ObjEd::handleKeyPress(IGenViewportWnd *wnd, int vk, int modif)
 void ObjEd::handleKeyRelease(IGenViewportWnd *wnd, int vk, int modif) { ObjectEditor::handleKeyRelease(wnd, vk, modif); }
 
 
-void ObjEd::onClick(int pcb_id, PropPanel::ContainerPropertyControl *panel)
+void ObjEd::onClick(int pcb_id, PropPanel2 *panel)
 {
   switch (pcb_id)
   {

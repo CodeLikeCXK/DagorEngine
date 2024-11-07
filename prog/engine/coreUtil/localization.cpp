@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <supp/_platform.h>
 #include <util/dag_localization.h>
 #include <util/dag_oaHashNameMap.h>
@@ -131,8 +129,6 @@ public:
 
 #if DAGOR_DBGLEVEL > 0 || defined(DAGOR_FORCE_LOGS)
   static SimpleString lastFileNameForDebug;
-#else
-  constexpr static const char *lastFileNameForDebug = "n/a";
 #endif
 
   LocalizationTable() : table(inimem), tableFull(inimem), pluralFormFn(NULL) {}
@@ -741,7 +737,7 @@ public:
     for (int i = 0; i < lang_col.size(); i++)
     {
       lang_col[i] = getColForLang(buffer, len, fullLangList.getName(i));
-      G_ASSERT_LOG(lang_col[i] >= 0, "Language '%s' not found.", fullLangList.getName(i));
+      G_ASSERTF(lang_col[i] >= 0, "Language '%s' not found.", fullLangList.getName(i));
     }
     bool result = loadCsvV2Full(buffer, len, lang_col);
     memfree(buffer, tmpmem);
@@ -803,8 +799,7 @@ int LocalizationTable::getColForLang(char *buffer, int len, const char *lang)
 
   const char *p = ptr;
   int l = parseCsvString(p, NULL, true);
-  if (l >= MAX_KEY_LEN)
-    DAG_FATAL("CSV header is too long, make sure the CSV separator is semicolon");
+  G_ASSERT(l < MAX_KEY_LEN);
   (void)l;
   (void)p;
   l = parseCsvString(ptr, key_buffer, true);
@@ -816,8 +811,7 @@ int LocalizationTable::getColForLang(char *buffer, int len, const char *lang)
       ++ptr;
     p = ptr;
     l = parseCsvString(p, NULL, true);
-    if (l >= MAX_KEY_LEN)
-      DAG_FATAL("CSV header is too long, make sure the CSV separator is semicolon");
+    G_ASSERT(l < MAX_KEY_LEN);
     l = parseCsvString(ptr, key_buffer, true);
 
     if ((p = strchr(key_buffer, '<')) != NULL)
@@ -945,13 +939,6 @@ LocTextId get_localized_text_id(const char *key, bool ci)
     debug("[LANG] error: no key '%s' in localization table", key);
 #endif
   return nullptr;
-}
-
-LocTextId get_localized_text_id_silent(const char *key, bool ci)
-{
-  if (!key || !*key || !locTable)
-    return NULL;
-  return locTable->getTextId(key, ci);
 }
 
 LocTextId get_optional_localized_text_id(const char *key, bool ci)
@@ -1206,18 +1193,6 @@ static int romanian_plural(int num)
 }
 
 
-static int arabic_plural(int num)
-{
-  if (num >= 0 && num <= 2)
-    return num;
-  if ((num % 100) >= 3 && (num % 100) <= 10)
-    return 3;
-  if ((num % 100) >= 11)
-    return 4;
-  return 5;
-}
-
-
 static int null_plural(int) { return DEFAULT_PLURAL_FORM_INDEX; }
 
 // http://docs.translatehouse.org/projects/localization-guide/en/latest/l10n/pluralforms.html
@@ -1240,9 +1215,6 @@ static PluralFormFn get_plural_form_function_for_lang(const char *lang)
 
   if (strcmp(lang, "Romanian") == 0)
     return romanian_plural;
-
-  if (strcmp(lang, "Arabic") == 0)
-    return arabic_plural;
 
   return null_plural;
 }
@@ -1577,7 +1549,7 @@ const char *language_to_locale_code(const char *language)
   return "en-US";
 }
 
-static bool need_force_language()
+const char *get_current_language()
 {
 #if _TARGET_XBOX | _TARGET_C1 | _TARGET_C2 | _TARGET_C3
   bool const force_default_system_lang = true;
@@ -1585,11 +1557,6 @@ static bool need_force_language()
   bool const force_default_system_lang = false;
 #endif
 
-  return force_default_system_lang || is_default_lang_override_set();
-}
-
-const char *get_current_language()
-{
 #if _TARGET_PC | _TARGET_ANDROID | _TARGET_IOS
   bool const allow_custom_language = true;
 #else
@@ -1597,22 +1564,14 @@ const char *get_current_language()
 #endif
 
   const char *lang = ::get_default_lang();
-  if (!allow_custom_language || need_force_language())
-    return lang;
+  if (is_default_lang_override_set() || force_default_system_lang)
+  {
+    debug("settings language by override: %s", lang);
+    const_cast<DataBlock *>(::dgs_get_settings())->setStr("language", lang);
+  }
 
-  return ::dgs_get_settings()->getStr("language", lang);
-}
-
-const char *get_force_language()
-{
-  if (need_force_language())
-    return ::get_default_lang();
+  if (allow_custom_language)
+    return ::dgs_get_settings()->getStr("language", lang);
   else
-    return "";
-}
-
-void set_language_to_settings(const char *lang)
-{
-  debug("settings language by override: %s", lang);
-  const_cast<DataBlock *>(::dgs_get_settings())->setStr("language", lang);
+    return lang;
 }

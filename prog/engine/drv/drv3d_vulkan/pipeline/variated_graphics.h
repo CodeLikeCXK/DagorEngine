@@ -1,16 +1,15 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
-
 #include <generic/dag_tab.h>
 #include <generic/dag_staticTab.h>
 #include "descriptor_set.h"
 #include "render_pass.h"
 #include <EASTL/hash_map.h>
 #include <EASTL/map.h>
-#include "main_pipelines.h"
 
 namespace drv3d_vulkan
 {
+struct ContextBackend;
+class Device;
 class ProgramDatabase;
 
 class GraphicsPipelineVariationStorage
@@ -27,7 +26,7 @@ public:
   };
 
   ExtendedVariantDescription &get(const GraphicsPipelineVariantDescription &dsc, GraphicsPipelineVariantDescription::Hash hash,
-    RenderStateSystemBackend &rs_backend, RenderPassResource *native_rp);
+    RenderStateSystem::Backend &rs_backend, RenderPassResource *native_rp);
 
 private:
   typedef eastl::pair<GraphicsPipelineVariantDescription::Hash, Index> KeyIndexPair;
@@ -44,11 +43,10 @@ public:
   struct CompilationContext
   {
     VulkanDevice &dev;
-    RenderStateSystemBackend &rsBackend;
+    RenderPassManager &passMan;
+    RenderStateSystem::Backend &rsBackend;
     VulkanPipelineCacheHandle pipeCache;
     RenderPassResource *nativeRP;
-    uint32_t *asyncPipeFeedbackPtr;
-    bool nonDrawCompile;
   };
 
 private:
@@ -65,24 +63,6 @@ public:
     const GraphicsPipelineShaderSet<const ShaderModule *> &modules;
     GraphicsPipelineVariationStorage &varStorage;
     const LayoutType::CreationInfo &layout;
-    bool seenBefore;
-
-    typedef uint64_t Hash;
-
-    Hash hash()
-    {
-      uint64_t ret = FNV1Params<64>::offset_basis;
-
-      for (const ShaderModule *module : modules.list)
-      {
-        if (!module)
-          continue;
-        for (uint8_t iter : module->hash.value)
-          ret = fnv1a_step<64>(iter, ret);
-      }
-
-      return ret;
-    }
 
     CreationInfo() = delete;
   };
@@ -91,7 +71,7 @@ public:
   static constexpr int CLEANUP_DESTROY = 0;
 
   template <int Tag>
-  void onDelayedCleanupBackend()
+  void onDelayedCleanupBackend(drv3d_vulkan::ContextBackend &)
   {}
 
   template <int Tag>
@@ -104,7 +84,7 @@ public:
   const char *resTypeString() { return "VariatedGraphicsPipeline"; }
 
   VariatedGraphicsPipeline(VulkanDevice &, ProgramID inProg, VulkanPipelineCacheHandle, LayoutType *l, const CreationInfo &info) :
-    DebugAttachedPipeline(l), modules(info.modules), variations(info.varStorage), program(inProg), seenBefore(info.seenBefore)
+    DebugAttachedPipeline(l), modules(info.modules), variations(info.varStorage), program(inProg)
   {}
 
   GraphicsPipeline *getVariant(CompilationContext &comp_ctx, const GraphicsPipelineVariantDescription &dsc);
@@ -127,7 +107,6 @@ private:
   eastl::vector<eastl::pair<GraphicsPipelineVariantDescription::Hash, GraphicsPipeline *>> items;
   GraphicsPipelineVariationStorage &variations;
   ProgramID program;
-  bool seenBefore;
 };
 
 } // namespace drv3d_vulkan

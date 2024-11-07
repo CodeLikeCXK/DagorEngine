@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <daECS/core/template.h>
 #include <daECS/core/entityManager.h>
 #include <daECS/core/componentType.h>
@@ -385,7 +383,7 @@ bool Template::calcValidDependencies(const TemplatesData &db) const
     id, [&](uint32_t t) { return ret && !db.getTemplateRefById(t).canInstantiate(); }, // no sense to iterate over templates that can
                                                                                        // instantatiate, or if we already know that we
                                                                                        // can't
-    [&](uint32_t t) { checkTemplate(db.mgr->getDataComponents(), db, ret, *this, db.getTemplateRefById(t)); });
+    [&](uint32_t t) { checkTemplate(g_entity_mgr->getDataComponents(), db, ret, *this, db.getTemplateRefById(t)); });
 
   return ret;
 }
@@ -424,7 +422,7 @@ bool Template::reportInvalidDependencies(const TemplatesData &db) const
     id, [&](uint32_t t) { return ret && !db.getTemplateRefById(t).canInstantiate(); }, // no sense to iterate over templates that can
                                                                                        // instantatiate, or if we already know that we
                                                                                        // can't
-    [&](uint32_t t) { logMissing(db.mgr->getDataComponents(), db, db.getTemplateRefById(t)); });
+    [&](uint32_t t) { logMissing(g_entity_mgr->getDataComponents(), db, db.getTemplateRefById(t)); });
   return ret;
 }
 
@@ -450,7 +448,7 @@ TemplateDB::AddResult TemplateDB::addTemplateWithParents(Template &&templ, uint3
       return AR_DUP;
     if (!eastl::equal(templ.parents.begin(), templ.parents.end(), existingTempl->parents.begin()))
       return AR_DUP;
-    if (!existingTempl->isEqual(templ, mgr->getComponentTypes()))
+    if (!existingTempl->isEqual(templ))
       return AR_DUP;
     return AR_OK;
   }
@@ -480,7 +478,6 @@ TemplateDB::AddResult TemplateDB::addTemplate(Template &&templ, dag::ConstSpan<c
     templ.parents.clear();
   return addTemplateWithParents(eastl::move(templ), tag);
 }
-
 
 void TemplateRefs::emplace(Template &&t, Template::ParentsList &&parents)
 {
@@ -709,13 +706,13 @@ void TemplateRefs::finalize(uint32_t tag)
              str.replace(index, 1, "_");
           }
           auto u = ECS_HASH_SLOW(str.c_str()).hash;
-          if (mgr.getDataComponents().hasComponent(u) || getComponentName(u))
+          if (g_entity_mgr->getDataComponents().hasComponent(u) || getComponentName(u))
           {
             logerr("component %s intersects with %s", getComponentName(c.first), str.c_str());
           }
         }
 #endif
-      if (c.second.isNull() && mgr && !mgr->getDataComponents().hasComponent(c.first) && !getComponentType(c.first))
+      if (c.second.isNull() && g_entity_mgr && !g_entity_mgr->getDataComponents().hasComponent(c.first) && !getComponentType(c.first))
         logerr("template %s at %s has component %s that is not defined in code", t.getName(), t.getPath(), getComponentName(c.first));
     }
 #endif
@@ -978,7 +975,7 @@ bool TemplateDBInfo::hasComponentMetaInfo(const char *templ_name, const char *co
 }
 
 
-bool Template::isEqual(const Template &t, const ecs::ComponentTypes &types) const
+bool Template::isEqual(const Template &t) const
 {
   if (t.components.size() != components.size())
     return false;
@@ -997,7 +994,8 @@ bool Template::isEqual(const Template &t, const ecs::ComponentTypes &types) cons
         // we assume, that templates with shared components ARE same.
         // that is not always true, but we can't differentiate change in shared component made by Entity and difference in templates
         //  (and that is universally used pattern for all shared components, as deferred common initialization)
-        const bool isShared = (types.getTypeInfo(typeIdx).flags & COMPONENT_TYPE_CREATE_ON_TEMPL_INSTANTIATE);
+        const bool isShared =
+          (g_entity_mgr->getComponentTypes().getTypeInfo(typeIdx).flags & COMPONENT_TYPE_CREATE_ON_TEMPL_INSTANTIATE);
         return isShared;
       }))
     return false;

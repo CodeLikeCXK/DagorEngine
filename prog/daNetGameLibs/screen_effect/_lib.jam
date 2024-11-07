@@ -1,4 +1,0 @@
-if $(HaveRenderer) = yes {
-  gamePulls += framework_screen_effect_pull ;
-  UseProgLibs += daNetGameLibs/screen_effect ;
-}

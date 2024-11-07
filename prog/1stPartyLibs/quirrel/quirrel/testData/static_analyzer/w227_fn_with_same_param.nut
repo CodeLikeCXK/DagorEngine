@@ -1,3 +1,3 @@
 //expect:w227
 
-function txt(txt) {} //-declared-never-used
+let function txt(txt) {} //-declared-never-used

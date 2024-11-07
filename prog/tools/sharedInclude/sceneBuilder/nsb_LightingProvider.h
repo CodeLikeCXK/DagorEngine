@@ -1,5 +1,8 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright 2023 by Gaijin Games KFT, All rights reserved.
+#ifndef __GAIJIN_NSB_LIGHTINGPROVIDER_H__
+#define __GAIJIN_NSB_LIGHTINGPROVIDER_H__
 #pragma once
+
 
 #include <sceneBuilder/nsb_decl.h>
 #include <math/dag_color.h>
@@ -36,3 +39,6 @@ public:
   E3DCOLOR getVltmapColor(int /*index*/) const { return 0; }
 };
 }; // namespace StaticSceneBuilder
+
+
+#endif

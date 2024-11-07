@@ -1,6 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
-
 #include <vector>
 #include <cef_browser.h>
 

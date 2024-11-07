@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 typedef struct _D3D12_SHADER_INPUT_BIND_DESC

@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -39,12 +40,12 @@ struct ObjectPoolPolicyRandomAllocationAndFree
     void markAllAsFree() { freeMask.set(); }
     bool hasAnyAllocated() const
     {
-      // faster as !all, as all is implemented as count() == size()
+      // faster as !all, as all is implemented as size() == capacity()
       // NOTE: will be slower when block size is too large
       return (~freeMask).any();
     }
     bool isAllocated(size_t index) const { return !freeMask.test(index); }
-    size_t allocatedSlots() const { return BlockSize - freeMask.count(); }
+    size_t allocatedSlots() const { return BlockSize - freeMask.size(); }
   };
 };
 

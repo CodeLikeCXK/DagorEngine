@@ -1,1 +1,1 @@
-A.LO<=B.HI && A.HI>=B.LO
+returns true if inputs intersect

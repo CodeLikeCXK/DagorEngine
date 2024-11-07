@@ -1,8 +1,0 @@
-return {
-  request = @(...) null
-  requestEventBus = function(params, eventName, context=null) {
-    assert(type(eventName) == "string")
-    assert(type(params) == "table")
-    assert(type(context) == "table" || context==null)
-  }
-}

@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -52,7 +53,6 @@ public:
 
   bool checkBindPoseArr(RegionId region_id, dag::ConstSpan<TMatrix> target_bind_pose_arr) const;
 
-  void closeHeap() { bindposeAllocator.getHeap().buffer.close(); }
 
 protected:
   void resizeIncrement(size_t min_size_increment);

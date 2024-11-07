@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "scnExportPlugin.h"
 
 #include <oldEditor/de_util.h>
@@ -19,7 +17,7 @@
 #include <libTools/staticGeom/staticGeometryContainer.h>
 #include <libTools/csgFaceRemover/geomContainerRemover.h>
 
-#include <EditorCore/ec_IEditorCore.h>
+#include <dllPluginCore/core.h>
 
 #include <sceneBuilder/nsb_export_lt.h>
 #include <sceneBuilder/nsb_LightmappedScene.h>
@@ -28,16 +26,12 @@
 #include <de3_entityFilter.h>
 #include <de3_editorEvents.h>
 
-#include <propPanel/commonWindow/dialogWindow.h>
-#include <propPanel/control/menu.h>
 #include <sepGui/wndPublic.h>
 #include <winGuiWrapper/wgw_dialogs.h>
 
 #include <debug/dag_debug.h>
 #include <oldEditor/de_cm.h>
 #include <de3_huid.h>
-
-using editorcore_extapi::dagTools;
 
 enum
 {
@@ -71,7 +65,7 @@ ScnExportPlugin::~ScnExportPlugin()
 
 bool ScnExportPlugin::begin(int toolbar_id, unsigned menu_id)
 {
-  PropPanel::IMenu *mainMenu = DAGORED2->getMainMenu();
+  IMenu *mainMenu = DAGORED2->getWndManager()->getMainMenu();
   mainMenu->addItem(menu_id, CM_BUILD_SCN, "Compile scene geom for export(PC)...");
   return true;
 }
@@ -80,11 +74,10 @@ bool ScnExportPlugin::onPluginMenuClick(unsigned id)
 {
   if (id == CM_BUILD_SCN)
   {
-    PropPanel::DialogWindow *myDlg =
-      DAGORED2->createDialog(hdpi::_pxScaled(300), hdpi::_pxScaled(560), "Compile scene geom for export(PC)");
-    PropPanel::ContainerPropertyControl *myPanel = myDlg->getPanel();
+    CDialogWindow *myDlg = DAGORED2->createDialog(hdpi::_pxScaled(300), hdpi::_pxScaled(560), "Compile scene geom for export(PC)");
+    PropertyContainerControlBase *myPanel = myDlg->getPanel();
     fillExportPanel(*myPanel);
-    if (myDlg->showDialog() == PropPanel::DIALOG_ID_OK)
+    if (myDlg->showDialog() == DIALOG_ID_OK)
     {
       load_exp_shaders_for_target(_MAKE4C('PC'));
       if (!validateBuild(_MAKE4C('PC'), DAGORED2->getConsole(), myPanel))
@@ -109,7 +102,7 @@ void *ScnExportPlugin::queryInterfacePtr(unsigned huid)
   return NULL;
 }
 
-bool ScnExportPlugin::buildAndWrite(BinDumpSaveCB &cwr, const ITextureNumerator &tn, PropPanel::ContainerPropertyControl *panel)
+bool ScnExportPlugin::buildAndWrite(BinDumpSaveCB &cwr, const ITextureNumerator &tn, PropPanel2 *panel)
 {
   String prj;
   DAGORED2->getProjectFolderPath(prj);
@@ -126,7 +119,7 @@ bool ScnExportPlugin::buildAndWrite(BinDumpSaveCB &cwr, const ITextureNumerator 
 }
 
 
-void ScnExportPlugin::fillExportPanel(PropPanel::ContainerPropertyControl &params)
+void ScnExportPlugin::fillExportPanel(PropPanel2 &params)
 {
   params.createStatic(0, "Scene export members:");
 
@@ -144,7 +137,7 @@ void ScnExportPlugin::fillExportPanel(PropPanel::ContainerPropertyControl &param
   static bool falseBool = false;
   const int grPid = PID_SPLIT_GRP;
 
-  PropPanel::ContainerPropertyControl *maxGroup = params.createGroup(grPid, "Split");
+  PropertyContainerControlBase *maxGroup = params.createGroup(grPid, "Split");
   G_ASSERT(maxGroup);
 
   maxGroup->createCheckBox(PID_DO_COMBINE, "Combine", splitter.combineObjects);
@@ -164,7 +157,7 @@ void ScnExportPlugin::fillExportPanel(PropPanel::ContainerPropertyControl &param
 }
 
 
-bool ScnExportPlugin::validateBuild(int target, ILogWriter &rep, PropPanel::ContainerPropertyControl *panel)
+bool ScnExportPlugin::validateBuild(int target, ILogWriter &rep, PropPanel2 *panel)
 {
   disabledGamePlugins.reset();
 
@@ -287,8 +280,7 @@ bool ScnExportPlugin::exportLms(const char *fname, CoolConsole &con, Tab<int> &p
       bool landNode = false;
       for (int mi = 0; mi < cont->nodes[i]->mesh->mats.size(); ++mi)
       {
-        if (cont->nodes[i]->mesh->mats[mi] && strstr(cont->nodes[i]->mesh->mats[mi]->className.str(), "land_mesh") &&
-            !strstr(cont->nodes[i]->mesh->mats[mi]->className.str(), "land_mesh_clipmap"))
+        if (cont->nodes[i]->mesh->mats[mi] && strstr(cont->nodes[i]->mesh->mats[mi]->className.str(), "land_mesh"))
         {
           landNode = true;
           break;

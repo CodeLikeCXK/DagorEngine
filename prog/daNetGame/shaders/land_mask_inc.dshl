@@ -1,8 +1,0 @@
-macro LAND_MASK_TEXCOORD(stage)
-  hlsl {
-    #define HAS_LAND_MASK_TEXCOORD 0
-  }
-endmacro
-
-macro INIT_AND_USE_LAND_HEIGHT(stage)
-endmacro

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <shaders/dag_computeShaders.h>
 #include <osApiWrappers/dag_localConv.h>
 #include "shadersBinaryData.h"
@@ -8,7 +6,7 @@
 
 ComputeShaderElement *new_compute_shader(const char *shader_name, const bool optional)
 {
-  const shaderbindump::ShaderClass *sc = shBinDump().findShaderClass(shader_name);
+  const shaderbindump::ShaderClass *sc = shBinDump(true).findShaderClass(shader_name);
   if (!sc)
   {
     if (!optional)
@@ -82,7 +80,6 @@ bool ComputeShaderElement::dispatchThreads(int threads_x, int threads_y, int thr
 {
   return elem->dispatchComputeThreads(threads_x, threads_y, threads_z, gpu_pipeline, set_states);
 }
-uint32_t ComputeShaderElement::getWaveSize() const { return elem->getWaveSize(); }
 bool ComputeShaderElement::dispatch_indirect(Sbuffer *args, int ofs, GpuPipeline gpu_pipeline, bool set_states) const
 {
   return elem->dispatchComputeIndirect(args, ofs, gpu_pipeline, set_states);

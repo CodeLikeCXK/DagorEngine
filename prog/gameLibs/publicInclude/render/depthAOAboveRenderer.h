@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -11,7 +12,6 @@
 #include <vecmath/dag_vecMathDecl.h>
 #include <render/toroidalHelper.h>
 #include <shaders/dag_postFxRenderer.h>
-#include <shaders/dag_overrideStateId.h>
 #include <generic/dag_relocatableFixedVector.h>
 
 class DynamicShaderHelper;
@@ -128,8 +128,6 @@ public:
     G_ASSERT(cascade_no < cascadeDependantData.size());
     return cascadeDependantData[cascade_no].depthAroundDistance;
   }
-  float getTexelSize(int cascade_no = 0) const;
   void setVars();
   void setInvalidVars();
-  bool isValid() const;
 };

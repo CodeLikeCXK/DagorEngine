@@ -72,11 +72,8 @@ static void squirrel_error_function(HSQUIRRELVM, const SQChar *format, ...) {
     tout << "\n";
 }
 
-static void squirrel_compiler_error_function(HSQUIRRELVM,SQMessageSeverity sev,const SQChar * desc,const SQChar * source,SQInteger line,SQInteger column, const SQChar *) {
-    auto level = LogLevel::error;
-    if (sev == SEV_HINT) level = LogLevel::info;
-    else if (sev == SEV_WARNING) level = LogLevel::warning;
-    LOG tout(level);
+static void squirrel_compiler_error_function(HSQUIRRELVM,const SQChar * desc,const SQChar * source,SQInteger line,SQInteger column, const SQChar *) {
+    LOG tout(LogLevel::error);
     tout << "error: " << desc << " at " << source << "(" << int(line) << "," << int(column) << ")\n";
 }
 

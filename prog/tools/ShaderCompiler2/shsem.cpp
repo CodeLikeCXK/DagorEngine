@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "shCompiler.h"
 #include "shsem.h"
 #include "shLog.h"
@@ -8,8 +6,6 @@
 #include "globVar.h"
 #include "boolVar.h"
 #include "codeBlocks.h"
-#include "cppStcodeAssembly.h"
-#include "cppStcode.h"
 #include <shaders/shUtils.h>
 #include <shaders/shOpcodeFormat.h>
 #include <shaders/shOpcode.h>
@@ -19,7 +15,6 @@
 #include <osApiWrappers/dag_miscApi.h>
 #include <util/dag_fastIntList.h>
 #include <debug/dag_debug.h>
-#include <atomic>
 
 using namespace ShaderParser;
 
@@ -373,7 +368,7 @@ static void eval_optional_intervals_const(ShaderEvalCB &cb, bool compute)
 
 static bool is_compute(hlsl_compile_class &hlsl_compile)
 {
-  return dd_strnicmp(hlsl_compile.profile->text, "target_cs", 9) == 0 || dd_strnicmp(hlsl_compile.profile->text, "cs_", 3) == 0;
+  return dd_stricmp(hlsl_compile.profile->text, "target_cs") == 0 || dd_stricmp(hlsl_compile.profile->text, "cs_5_0") == 0;
 }
 
 void eval_shader(shader_decl &sh, ShaderEvalCB &cb)
@@ -476,7 +471,7 @@ static bool evalShaderVariant(shader_decl *sh, int dyn_index, ShaderSemCode *ssc
 
   // evaluate shader
   parser.get_lex_parser().begin_shader();
-  AssembleShaderEvalCB cb(*ssc, parser, *sclass, shname, variant, currentShaderOptions, allRefStaticVars);
+  AssembleShaderEvalCB cb(*ssc, parser, *sclass, shname, variant, currentShaderOptions, allRefStaticVars, true);
   try
   {
     eval_shader(*sh, cb);
@@ -657,7 +652,15 @@ static void add_shader(shader_decl *sh, ShaderSyntaxParser &parser, Terminal *sh
     }
     ~LocalSourceBlocks()
     {
-      shc::await_all_jobs();
+      if (shc::compileJobsCount > 1)
+      {
+        for (int i = 0; i < shc::compileJobsCount; i++)
+          cpujobs::reset_job_queue(shc::compileJobsMgrBase + i, true);
+        for (int i = 0; i < shc::compileJobsCount; i++)
+          while (cpujobs::is_job_manager_busy(shc::compileJobsMgrBase + i))
+            sleep_msec(10);
+        cpujobs::release_done_jobs();
+      }
       curVsCode = curHsCode = curDsCode = curGsCode = curPsCode = curCsCode = curMsCode = curAsCode = NULL;
     }
 
@@ -875,7 +878,17 @@ static void add_shader(shader_decl *sh, ShaderSyntaxParser &parser, Terminal *sh
           (ssc->flags & SC_STAGE_IDX_MASK), render_stage_idx);
 
       // synpoint for issued compile jobs
-      shc::await_all_jobs(&sh_process_errors);
+      if (shc::compileJobsCount > 1)
+      {
+        for (int i = 0; i < shc::compileJobsCount; i++)
+          while (cpujobs::is_job_manager_busy(shc::compileJobsMgrBase + i))
+          {
+            sleep_msec(1);
+            cpujobs::release_done_jobs();
+            sh_process_errors();
+          }
+        cpujobs::release_done_jobs();
+      }
       sh_process_errors();
       resolve_pending_shaders_from_cache();
 
@@ -891,7 +904,7 @@ static void add_shader(shader_decl *sh, ShaderSyntaxParser &parser, Terminal *sh
       if (j >= semcode.size())
       {
         j = semcode.size();
-        ShaderCode *sc = ssc->generateShaderCode(dynamicVariants, g_cppstcode);
+        ShaderCode *sc = ssc->generateShaderCode(dynamicVariants);
         semcode.push_back(eastl::move(ssc));
         sclass->code.push_back(sc);
         sclass->assumedIntervals.reserve(stVarCB.assumedIntervals.size());
@@ -1078,7 +1091,7 @@ void add_block(block_decl *bl, ShaderSyntaxParser &parser)
   G_VERIFY(ssc.createPasses(0));
 
   // evaluate shader
-  AssembleShaderEvalCB cb(ssc, parser, sclass, bl->name, variant, currentShaderOptions, nullType);
+  AssembleShaderEvalCB cb(ssc, parser, sclass, bl->name, variant, currentShaderOptions, nullType, false);
   cb.shBlockLev = level;
 
   curBlockStat.clear();
@@ -1103,20 +1116,14 @@ void add_block(block_decl *bl, ShaderSyntaxParser &parser)
 
   for (int i = 0; i < curBlockStat.size(); ++i)
     eval_block_stat(curBlockStat[i], cb);
-
-  cb.varMerger.mergeAllVars(&cb);
-
   int st_idx = stcode.size();
   append_items(stcode, cb.curpass->get_alt_curstcode(false).size(), cb.curpass->get_alt_curstcode(false).data());
   append_items(stcode, cb.curpass->get_alt_curstcode(true).size(), cb.curpass->get_alt_curstcode(true).data());
 
-  StcodeRoutine collectedScript = eastl::move(cb.curpass->get_alt_curcppcode(true));
-  collectedScript.merge(eastl::move(cb.curpass->get_alt_curcppcode(false)));
-
   cb.curpass->reset_code();
 
   ShaderStateBlock *blk =
-    new ShaderStateBlock(bl->name->text, level, cb.shConst, make_span(stcode), &collectedScript, cb.maxregsize, cb.supportsStaticCbuf);
+    new ShaderStateBlock(bl->name->text, level, cb.shConst, make_span(stcode), cb.maxregsize, cb.supportsStaticCbuf);
 
   if (!ShaderStateBlock::registerBlock(blk))
   {
@@ -1128,9 +1135,6 @@ void add_block(block_decl *bl, ShaderSyntaxParser &parser)
 
 void add_hlsl(hlsl_global_decl_class &sh, ShaderSyntaxParser &parser)
 {
-  if (!validate_hardcoded_regs_in_hlsl_block(sh.text))
-    return;
-
   uint32_t hlsl_types = HLSL_ALL;
   if (sh.ident)
   {

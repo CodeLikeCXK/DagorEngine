@@ -1,5 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __GAIJIN_NODETREEBUILDER_H__
+#define __GAIJIN_NODETREEBUILDER_H__
 #pragma once
+
 
 #include <math/dag_geomTree.h>
 
@@ -42,3 +44,5 @@ protected:
     NodeBuildData(int ci, int cn, int pi, int no) : childId(ci), childNum(cn), parentId(pi), nameOfs(no) {}
   };
 };
+
+#endif

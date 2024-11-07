@@ -1,4 +1,0 @@
-if $(HaveRenderer) = yes {
-  gamePulls += framework_heat_haze_pull ;
-  UseProgLibs += daNetGameLibs/heat_haze ;
-}

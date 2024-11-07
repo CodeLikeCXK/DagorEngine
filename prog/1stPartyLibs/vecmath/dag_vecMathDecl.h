@@ -1,6 +1,7 @@
 //
-// Dagor Engine 6.5 - 1st party libs
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Dagor Engine 6.5
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -171,9 +172,7 @@ typedef vec4f plane3f;
 namespace eastl
 {
   template <typename Count> inline void uninitialized_default_fill_n(vec4f* , Count){}
-#if !(defined(_M_ARM64) && defined(_MSC_VER) && !defined(__clang__))
   template <typename Count> inline void uninitialized_default_fill_n(vec4i* , Count){}
-#endif
   template <typename Count> inline void uninitialized_default_fill_n(bsph3f*, Count){}
   template <typename Count> inline void uninitialized_default_fill_n(mat33f*, Count){}
   template <typename Count> inline void uninitialized_default_fill_n(bbox3f*, Count){}

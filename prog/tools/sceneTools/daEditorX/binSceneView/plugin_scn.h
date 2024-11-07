@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <EditorCore/ec_interface.h>
@@ -15,7 +14,7 @@ class AcesScene;
 class BinSceneViewPlugin : public IGenEditorPlugin,
                            public IRenderingService,
                            public IPluginAutoSave,
-                           public PropPanel::ControlEventHandler,
+                           public ControlEventHandler,
                            public ILevelBinLoader,
                            public IEnvironmentSettings,
                            public IDagorEdCustomCollider
@@ -72,7 +71,7 @@ public:
   virtual void renderGeometry(Stage stage);
 
   // ControlEventHandler
-  virtual void onClick(int pcb_id, PropPanel::ContainerPropertyControl *panel);
+  virtual void onClick(int pcb_id, PropPanel2 *panel);
 
   // IPluginAutoSave
   virtual void autoSaveObjects(DataBlock &local_data);

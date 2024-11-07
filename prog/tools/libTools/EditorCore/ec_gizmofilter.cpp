@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <EditorCore/ec_gizmofilter.h>
 #include <EditorCore/captureCursor.h>
 
@@ -147,27 +145,8 @@ bool GizmoEventFilter::handleMouseMove(IGenViewportWnd *wnd, int x, int y, bool 
         if ((gcPos + movedDelta - mouseWorld) * mouseDir < 0)
           movedDelta = Point3(0, 0, 0);
 
-        const bool shouldSnapMove = wingw::is_key_pressed(wingw::V_CAPSLOCK) ? !grid.getMoveSnap() : grid.getMoveSnap();
-        if (shouldSnapMove)
-        {
-          Point3 movedToPos = gcPos + movedDelta;
-          Point3 fullySnappedPos = grid.snapToGrid(movedToPos);
-
-          if (key_modif & wingw::M_ALT)
-          {
-            const float step = grid.getInfiniteGridMajorSubdivisions();
-            fullySnappedPos = Point3(grid.snap(movedToPos.x, step), grid.snap(movedToPos.y, step), grid.snap(movedToPos.z, step));
-          }
-
-          if (gizmo.selected & AXIS_X)
-            movedToPos.x = fullySnappedPos.x;
-          if (gizmo.selected & AXIS_Y)
-            movedToPos.y = fullySnappedPos.y;
-          if (gizmo.selected & AXIS_Z)
-            movedToPos.z = fullySnappedPos.z;
-
-          movedDelta = movedToPos - gcPos;
-        }
+        if (grid.getMoveSnap())
+          movedDelta = grid.snapToGrid(gcPos + movedDelta) - gcPos;
 
         break;
       }
@@ -175,7 +154,6 @@ bool GizmoEventFilter::handleMouseMove(IGenViewportWnd *wnd, int x, int y, bool 
       case IEditorCoreEngine::MODE_MoveSurface: surfaceMove(wnd, x, y, index, gcPos, movedDelta); break;
 
       case IEditorCoreEngine::MODE_Scale:
-      {
         movedDelta = Point3(1, 1, 1);
         if (gizmo.selected & AXIS_X)
         {
@@ -227,16 +205,13 @@ bool GizmoEventFilter::handleMouseMove(IGenViewportWnd *wnd, int x, int y, bool 
           case AXIS_X | AXIS_Y | AXIS_Z: movedDelta.x = movedDelta.z = movedDelta.y; break;
         }
 
-        const bool shouldSnapScale = wingw::is_key_pressed(wingw::V_CAPSLOCK) ? !grid.getScaleSnap() : grid.getScaleSnap();
-        if (shouldSnapScale)
+        if (grid.getScaleSnap())
           movedDelta = grid.snapToScale(movedDelta);
 
         scale = movedDelta;
         break;
-      }
 
       case IEditorCoreEngine::MODE_Rotate:
-      {
         movedDelta = Point3(0, 0, 0);
         len2 = (delta + Point2(deltaX, deltaY)) * rotateDir / AXIS_LEN_PIX;
 
@@ -252,8 +227,7 @@ bool GizmoEventFilter::handleMouseMove(IGenViewportWnd *wnd, int x, int y, bool 
           movedDelta.z = len2;
 
         // snap correction (if presented)
-        const bool shouldSnapRotate = wingw::is_key_pressed(wingw::V_CAPSLOCK) ? !grid.getRotateSnap() : grid.getRotateSnap();
-        if (shouldSnapRotate)
+        if (grid.getRotateSnap())
           movedDelta = grid.snapToAngle(movedDelta);
 
         // wrap cursor
@@ -270,9 +244,6 @@ bool GizmoEventFilter::handleMouseMove(IGenViewportWnd *wnd, int x, int y, bool 
 
         if (y != p2)
           deltaY += y - p2;
-
-        break;
-      }
     }
 
     gizmo.client->changed(movedDelta);
@@ -1164,7 +1135,7 @@ void GizmoEventFilter::drawRotateGizmo(IGenViewportWnd *w, int vp_i, int sel)
     StdGuiRender::end_raw_layer();
     StdGuiRender::draw_strf_to(vp[vp_i].center.x - _pxS(80), vp[vp_i].center.y - AXIS_LEN_PIX - _pxS(40), "[%.2f, %.2f, %.2f]",
       RadToDeg(movedDelta.x), RadToDeg(movedDelta.y), RadToDeg(movedDelta.z));
-    StdGuiRender::reset_textures();
+    StdGuiRender::set_texture(BAD_TEXTUREID);
     StdGuiRender::start_raw_layer();
   }
 
@@ -1194,7 +1165,7 @@ void GizmoEventFilter::drawGizmo(IGenViewportWnd *w)
   if (!w->worldToClient(gizmo.client->getPt(), screen))
     return;
 
-  StdGuiRender::reset_textures();
+  StdGuiRender::set_texture(BAD_TEXTUREID);
   StdGuiRender::start_raw_layer();
   switch (gizmo.type)
   {

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <webui/httpserver.h>
 #include <colorPipette/colorPipette.h>
 #include <string.h>

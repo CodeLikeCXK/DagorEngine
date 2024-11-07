@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -30,8 +31,8 @@ public:
   using base_type::empty;
   using base_type::reserve;
   using base_type::shrink_to_fit;
-  using base_type::size;
 
+  uint32_t size() const { return uint32_t(base_type::size()); }
   iterator begin()
   {
     changeGen();
@@ -224,7 +225,7 @@ public:
 
   List(EntityManager *emgr = nullptr)
   {
-    if (DAGOR_UNLIKELY(componentTypeIndex == INVALID_COMPONENT_TYPE_INDEX)) // To consider: make INVALID_COMPONENT_TYPE_INDEX 0 for
+    if (EASTL_UNLIKELY(componentTypeIndex == INVALID_COMPONENT_TYPE_INDEX)) // To consider: make INVALID_COMPONENT_TYPE_INDEX 0 for
                                                                             // faster comparisions like these
       componentTypeIndex = find_component_type_index(ComponentTypeInfo<T>::type, emgr);
   }

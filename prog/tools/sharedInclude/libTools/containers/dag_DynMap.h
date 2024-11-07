@@ -1,5 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __GAIJIN_DAG_DYNMAP__
+#define __GAIJIN_DAG_DYNMAP__
 #pragma once
+
 
 #include <generic/dag_tab.h>
 #include <generic/dag_qsort.h>
@@ -208,3 +210,6 @@ protected:
     return false;
   }
 };
+
+
+#endif //__GAIJIN_DAG_DYNMAP__

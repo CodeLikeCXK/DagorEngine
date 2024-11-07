@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <eventLog/eventLog.h>
 
 #include <util/dag_baseDef.h>
@@ -9,10 +7,8 @@
 #include <osApiWrappers/dag_miscApi.h>
 #include <osApiWrappers/dag_sockets.h>
 #include <osApiWrappers/dag_stackHlp.h>
-#include <osApiWrappers/dag_atomic.h>
 #include <generic/dag_initOnDemand.h>
 #include <debug/dag_logSys.h>
-#include <asyncResolveAddr/asyncResolveAddr.h>
 
 #include <sysinfo.h>
 
@@ -21,7 +17,7 @@
 #include "dataHelpers.h"
 #include "httpRequest.h"
 
-#define debug(...) logmessage(_MAKE4C('EVLG'), __VA_ARGS__)
+#define LOGLEVEL_DEBUG _MAKE4C('EVLG')
 
 
 namespace event_log
@@ -88,7 +84,7 @@ static Configuration *config = NULL;
 static sockets::SocketAddr<OSAF_IPV4> udp_addr;
 static InitOnDemand<sockets::Socket, false> udp_socket;
 
-static volatile debug_log_callback_t orig_debug_log;
+static debug_log_callback_t orig_debug_log;
 static int netlog_handler(int lev_tag, const char *fmt, const void *arg, int anum, const char *ctx_file, int ctx_line)
 {
   if (lev_tag == _MAKE4C('nEvt'))
@@ -112,33 +108,9 @@ static int netlog_handler(int lev_tag, const char *fmt, const void *arg, int anu
       event_log::send_udp("assert", s.str(), s.length());
   }
 
-  if (const debug_log_callback_t cb = interlocked_relaxed_load_ptr(orig_debug_log))
-    cb(lev_tag, fmt, arg, anum, ctx_file, ctx_line);
-
+  if (orig_debug_log)
+    orig_debug_log(lev_tag, fmt, arg, anum, ctx_file, ctx_line);
   return 1;
-}
-
-static void on_resolved(const sockets::SocketAddr<OSAF_IPV4> &addr)
-{
-  if (!udp_socket)
-    return;
-
-  auto shutdownAndFailWithMsg = [](auto... args) {
-#if DAGOR_DBGLEVEL > 0
-    logerr(args...);
-#else
-    logwarn(args...);
-#endif
-    shutdown();
-  };
-
-  udp_addr = addr;
-
-  if (!udp_addr.isValid())
-  {
-    shutdownAndFailWithMsg("[network] Could not set UDP socket addr '%s:%d", config->host, config->udpPort);
-    return;
-  }
 }
 
 bool init(EventLogInitParams const &init_params)
@@ -174,16 +146,11 @@ bool init(EventLogInitParams const &init_params)
   RET_ON_SOCK_FAIL(udp_socket, "[network] Could not set UDP socket NONBLOCK");
 #undef RET_ON_SOCK_FAIL
 
-  if (init_params.use_connect_async)
-    sockets::resolve_socket_addr_async(config->host, config->udpPort, on_resolved);
-  else
-  {
-    udp_addr.setHost(config->host);
-    udp_addr.setPort(config->udpPort);
+  udp_addr.setHost(config->host);
+  udp_addr.setPort(config->udpPort);
 
-    if (!udp_addr.isValid())
-      return shutdownAndFailWithMsg("[network] Could not set UDP socket addr '%s:%d", config->host, config->udpPort);
-  }
+  if (!udp_addr.isValid())
+    return shutdownAndFailWithMsg("[network] Could not set UDP socket addr '%s:%d", config->host, config->udpPort);
 
   // Now set default metadata
   defaults::meta["platform"] = get_platform_string_id();
@@ -203,9 +170,8 @@ bool init(EventLogInitParams const &init_params)
   if (!id.empty())
     defaults::meta["system_id"] = id.c_str();
 
-  const debug_log_callback_t prevCb = debug_set_log_callback(netlog_handler);
-  interlocked_exchange_ptr(orig_debug_log, prevCb);
 
+  orig_debug_log = debug_set_log_callback(netlog_handler);
   return true;
 }
 
@@ -249,12 +215,6 @@ void send_udp(const char *type, const void *data, uint32_t size, Json::Value *me
 {
   if (!is_enabled())
     return;
-
-  if (!udp_addr.isValid())
-  {
-    logwarn("[network] UDP address is not resolved yet, skipping packet send");
-    return;
-  }
 
   Packet pkt(type, meta, data, size, defaults::meta);
   debug("[network] Event log send UDP packet %zu bytes to %s:%d", pkt.size(), config->host, config->udpPort);

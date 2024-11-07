@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "gzip.h"
 #include <ioSys/dag_zlibIo.h>
 

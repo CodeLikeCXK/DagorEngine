@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <ctype.h>
 #include <debug/dag_debug.h>
 #include <generic/dag_tab.h>
@@ -136,8 +134,8 @@ static SQInteger runtime_error_handler(HSQUIRRELVM v)
   return 0;
 }
 
-static void compile_error_handler(HSQUIRRELVM /*vm*/, SQMessageSeverity /*severity*/, const SQChar *desc, const SQChar * /*source*/,
-  SQInteger /*line*/, SQInteger /*column*/, const SQChar *)
+static void compile_error_handler(HSQUIRRELVM /*vm*/, const SQChar *desc, const SQChar * /*source*/, SQInteger /*line*/,
+  SQInteger /*column*/, const SQChar *)
 {
   sq_output.setStr(desc);
 }
@@ -471,7 +469,7 @@ void on_sqdebug_internal(int debugger_index, RequestInfo *params)
         sq_setcompilationoption(vm, CompilationOptions::CO_CLOSURE_HOISTING_OPT, false);
 
         HSQOBJECT hBindings = bindings.GetObject();
-        if (SQ_SUCCEEDED(sq_compile(vm, scriptSrc.c_str(), scriptSrc.length(), "interactive", true, &hBindings)))
+        if (SQ_SUCCEEDED(sq_compilebuffer(vm, scriptSrc.c_str(), scriptSrc.length(), "interactive", true, &hBindings)))
         {
           sq_setcompilationoption(vm, CompilationOptions::CO_CLOSURE_HOISTING_OPT, old);
           HSQOBJECT scriptClosure;
@@ -522,26 +520,21 @@ void on_sqdebug_internal(int debugger_index, RequestInfo *params)
     Tab<char> res;
     if (debugger.getSourceCoverage(params->params[1], res))
     {
-      String s(1024, "");
+      String s(512, "");
       int i = 1;
-
-      while (i < res.size())
+      int cnt = 0;
+      int state = 0;
+      while (i <= res.size())
       {
-        int prev = i;
-
-        for (int t = 0; t < 3; t++)
+        if (i < res.size() && (bool(state) == bool(res[i])))
+          cnt++;
+        else
         {
-          int cnt = 0;
-          while (i < res.size() && res[i] == t)
-          {
-            cnt++;
-            i++;
-          }
+          state = 1 - state;
           s.aprintf(64, "%d%%", cnt);
+          cnt = 1;
         }
-
-        if (i <= prev)
-          break;
+        i++;
       }
 
       if (!s.empty())

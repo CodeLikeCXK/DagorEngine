@@ -1,10 +1,7 @@
-if (__name__ == "__analysis__")
-  return
-
 //-file:declared-never-used
 
 
-function fn(x) {
+let function fn(x) {
     return ::y.cc ?? x ?? null
 }
 

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "prefabs.h"
 #include "pf_cm.h"
 
@@ -7,7 +5,7 @@
 // #include <libTools/staticGeom/staticGeometryContainer.h>
 
 #include <util/dag_bitArray.h>
-#include <propPanel/control/container.h>
+#include <propPanel2/c_panel_base.h>
 
 
 #define PP_COMPARE_PARAM(panel, pid, var, get, def) \
@@ -32,8 +30,8 @@
 
 // IPropPanelClient
 //==============================================================================
-void PrefabsPlugin::onChange(int pid, PropPanel::ContainerPropertyControl *panel) { nodeModif->onPPChange(*panel, pid); }
+void PrefabsPlugin::onChange(int pid, PropertyContainerControlBase *panel) { nodeModif->onPPChange(*panel, pid); }
 
 
 //==============================================================================
-void PrefabsPlugin::onClick(int pid, PropPanel::ContainerPropertyControl *panel) { nodeModif->onPPBtnPressed(*panel, pid); }
+void PrefabsPlugin::onClick(int pid, PropertyContainerControlBase *panel) { nodeModif->onPPBtnPressed(*panel, pid); }

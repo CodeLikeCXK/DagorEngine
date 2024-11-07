@@ -1,5 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-#pragma once
+#ifndef FILESTRUCTURE_H_
+#define FILESTRUCTURE_H_
 
 #include <string>
 
@@ -49,3 +49,5 @@ private:
   std::vector<If *> Scopes;
   bool PragmaOnce, AlreadyIncluded;
 };
+
+#endif

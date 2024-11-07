@@ -1,4 +1,5 @@
-from "%darg/ui_imports.nut" import *
+from "daRg" import *
+from "frp" import *
 
 let defStyling = {
   Bar = function(has_scroll) {

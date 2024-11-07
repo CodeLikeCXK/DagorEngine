@@ -1,6 +1,6 @@
 
 local z = 0
-function foo(x, y) {
+let function foo(x, y) {
     let ar = [function fff(a, b) {
         let c = class {
             x = 10

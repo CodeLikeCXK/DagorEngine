@@ -1,9 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "kbd_classdrv.h"
 #include "kbd_device.h"
-#include <drv/hid/dag_hiGlobals.h>
-#include <drv/hid/dag_hiCreate.h>
+#include <humanInput/dag_hiGlobals.h>
+#include <humanInput/dag_hiCreate.h>
 
 using namespace HumanInput;
 
@@ -85,5 +83,3 @@ void ScreenKeyboardClassDriver::refreshDeviceList()
   useDefClient(defClient);
   acquireDevices();
 }
-
-bool HumanInput::keyboard_has_ime_layout() { return false; }

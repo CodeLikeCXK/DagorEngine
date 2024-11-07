@@ -1,7 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <3d/dag_lowLatency.h>
-#include <drv/3d/dag_resetDevice.h>
+#include <3d/dag_drv3dReset.h>
 #include <3d/dag_nvLowLatency.h>
 #include <gui/dag_stdGuiRender.h>
 #include <3d/dag_profilerTracker.h>
@@ -28,7 +26,7 @@ static uint32_t last_queried_frame_id = 0;
 constexpr uint32_t SLOP_HISTORY_SIZE = 8;
 constexpr uint32_t SLOP_INCOMPLETE_FRAMES = 2;
 static uint32_t slop_histroy[SLOP_HISTORY_SIZE] = {0};
-static uint32_t current_frame = 0; // Non zero if inited
+static uint32_t current_frame = 0;
 static uint32_t current_render_frame = 0;
 static uint32_t frame_count = 0;
 // max_sleep = max_sleep_params_us.x * min_slop + max_sleep_params_us.y
@@ -43,7 +41,6 @@ static int flash_draw_start = 0;
 uint32_t lowlatency::start_frame()
 {
   current_frame++;
-  nvlowlatency::start_frame(current_frame);
   slop_histroy[current_frame % SLOP_HISTORY_SIZE] = 0;
   frame_count = ::min(SLOP_HISTORY_SIZE, current_frame);
   return current_frame;
@@ -61,12 +58,10 @@ void lowlatency::init()
 {
   debug("Low latency initialized");
   last_queried_frame_id = 0;
-  current_frame = 1;
+  current_frame = 0;
   current_render_frame = 0;
   frame_count = 0;
 }
-
-bool lowlatency::is_inited() { return current_frame != 0; }
 
 void lowlatency::close() { debug("Low latency closed"); }
 
@@ -77,8 +72,7 @@ lowlatency::LatencyMode lowlatency::get_from_blk()
   const DataBlock *video = ::dgs_get_settings()->getBlockByNameEx("video");
   constexpr int def = static_cast<lowlatency::LatencyModeFlag>(lowlatency::LATENCY_MODE_OFF);
   const int mode = video->getInt("latency", def);
-  const bool frameGenerationEnabled = video->getBool("dlssFrameGeneration", false);
-  return frameGenerationEnabled ? lowlatency::LatencyMode::LATENCY_MODE_NV_BOOST : static_cast<lowlatency::LatencyMode>(mode);
+  return static_cast<lowlatency::LatencyMode>(mode);
 }
 
 lowlatency::LatencyModeFlag lowlatency::get_supported_latency_modes()
@@ -147,8 +141,8 @@ void lowlatency::set_marker(uint32_t frame_id, LatencyMarkerType marker_type)
 {
   if (enable_log.get())
   {
-    const char *markerTypes[] = {"SIMULATION_START", "SIMULATION_END", "RENDERSUBMIT_START", "RENDERSUBMIT_END", "PRESENT_START",
-      "PRESENT_END", "INPUT_SAMPLE", "TRIGGER_FLASH"};
+    const char *markerTypes[] = {"SIMULATION_START", "SIMULATION_END", "RENDERRECORD_START", "RENDERRECORD_END", "RENDERSUBMIT_START",
+      "RENDERSUBMIT_END", "PRESENT_START", "PRESENT_END", "INPUT_SAMPLE", "TRIGGER_FLASH"};
     if (marker_type == LatencyMarkerType::SIMULATION_START)
       debug("[latency] --------- Starte sequence -------- %d", frame_id);
     debug("[latency] marker type: <%s>,  frameId: %d", markerTypes[static_cast<unsigned int>(marker_type)], frame_id);
@@ -167,7 +161,7 @@ void lowlatency::set_marker(uint32_t frame_id, LatencyMarkerType marker_type)
     render_start_stamp = ::ref_time_ticks();
   if (marker_type == LatencyMarkerType::PRESENT_START)
     present_start_stamp = ::ref_time_ticks();
-  if (flash_triggered)
+  if (flash_triggered && marker_type == LatencyMarkerType::INPUT_SAMPLE_FINISHED)
   {
     flash_triggered = false;
     set_marker(frame_id, LatencyMarkerType::TRIGGER_FLASH);

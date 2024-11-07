@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <bindQuirrelEx/bindQuirrelEx.h>
 #include <sqModules/sqModules.h>
 #include <perfMon/dag_cpuFreq.h>
@@ -129,8 +127,7 @@ void bind_dagor_time(SqModules *module_mgr)
 
   ///@module dagor.time
   /// Date/time getters and converters.
-  nsTbl //
-    .Func("ref_time_ticks", ref_time_ticks)
+  nsTbl.Func("ref_time_ticks", ref_time_ticks)
     .Func("get_time_usec", get_time_usec)
     .Func("get_time_msec", get_time_msec)
     ///@brief Returns the number of milliseconds that have passed since the client was started.
@@ -160,7 +157,7 @@ void bind_dagor_time(SqModules *module_mgr)
     ///@brief Converts UTC time table to UNIX timestamp.
     ///@param utcTimeTbl t : UTC time table
     ///@return i : UNIX timestamp
-    /**/;
+    ;
 
   module_mgr->addNativeModule("dagor.time", nsTbl);
 }

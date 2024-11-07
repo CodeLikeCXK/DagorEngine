@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #if _TARGET_PC_WIN
 #define _WIN32_WINNT 0x400
 #include <windows.h>

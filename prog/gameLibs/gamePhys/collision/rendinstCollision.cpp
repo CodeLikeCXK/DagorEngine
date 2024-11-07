@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <gamePhys/collision/rendinstCollision.h>
 #include <gamePhys/collision/collisionLib.h>
 #include <gamePhys/collision/collisionInstances.h>
@@ -178,12 +176,11 @@ struct SweepCollisionCB
   int checkMatId;
   ShapeQueryOutput &out;
   Tab<rendinst::RendInstDesc> *desc = nullptr;
-  RIFilterCB *filterCB = nullptr;
   int contactsNum = 0;
 
   SweepCollisionCB(const PhysBody *cast_shape, const TMatrix &from_tm, const TMatrix &to_tm, int cast_mat_id, ShapeQueryOutput &_out,
-    Tab<rendinst::RendInstDesc> *in_desc, RIFilterCB *_filterCB) :
-    castShape(cast_shape), checkMatId(cast_mat_id), desc(in_desc), filterCB(_filterCB), out(_out)
+    Tab<rendinst::RendInstDesc> *in_desc) :
+    castShape(cast_shape), checkMatId(cast_mat_id), desc(in_desc), out(_out)
   {
     from = from_tm;
     to = to_tm;
@@ -196,16 +193,11 @@ struct SweepCollisionCB
     ShapeQueryOutput prev = out;
     out.t = 1.0f;
     get_phys_world()->shapeQuery(castShape, from, to, make_span_const(&contact.body, 1), out);
-    if (out.t >= 1.f || (filterCB && !filterCB->onFilter(in_desc, out.t)))
+    contactsNum += (out.t < 1.f) ? 1 : 0;
+    if (out.t < 1.f && desc)
+      desc->push_back(in_desc);
+    if (out.t > prev.t)
       out = prev;
-    else
-    {
-      ++contactsNum;
-      if (desc)
-        desc->push_back(in_desc);
-      if (out.t > prev.t)
-        out = prev;
-    }
   }
 
   bool needsCollision(void *userDataB, bool /*b_is_static*/) const
@@ -219,14 +211,14 @@ struct SweepCollisionCB
 };
 
 void shape_query_ri(const PhysBody *shape, const TMatrix &from, const TMatrix &to, float rad, ShapeQueryOutput &out, int cast_mat_id,
-  Tab<rendinst::RendInstDesc> *out_desc, const TraceMeshFaces *handle, RIFilterCB *filterCB)
+  Tab<rendinst::RendInstDesc> *out_desc, const TraceMeshFaces *handle)
 {
   if (!get_phys_world())
     return;
 
   get_phys_world()->fetchSimRes(true);
 
-  SweepCollisionCB sweepCb(shape, from, to, cast_mat_id, out, out_desc, filterCB);
+  SweepCollisionCB sweepCb(shape, from, to, cast_mat_id, out, out_desc);
   RICollisionCB<SweepCollisionCB> callback(sweepCb);
 
   BBox3 box; // around from point
@@ -296,21 +288,11 @@ CollisionInstances *get_collision_instances_by_handle(void *handle)
   return &ri_instances[ri];
 }
 
-void flush_ri_instances()
-{
-  for (auto &ri : ri_instances)
-  {
-    ri.clearInstances();
-    ri.unlink();
-  }
-  last_non_empty_ri_instance = NON_EMPTY_HEAD_INDEX;
-  num_non_empty_ri_instances = 0;
-}
-
 void clear_ri_instances()
 {
   clear_and_shrink(ri_instances);
-  flush_ri_instances();
+  last_non_empty_ri_instance = NON_EMPTY_HEAD_INDEX;
+  num_non_empty_ri_instances = 0;
   ri_instances_time = 0;
 }
 

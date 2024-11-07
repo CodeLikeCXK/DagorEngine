@@ -36,18 +36,22 @@ void sq_vm_free(SQAllocContext ctx, void *p,SQUnsignedInteger size);
   #endif
 #endif
 
+#define HAVE_STATIC_ASSERT() ((_MSC_VER >= 1600 && !defined(__INTEL_COMPILER)) || (__cplusplus > 199711L))
 
-#if !defined(SQ_STATIC_ASSERT)
+#if !defined(SQ_STATIC_ASSERT) && HAVE_STATIC_ASSERT()
 #define SQ_STATIC_ASSERT(x) static_assert((x), "assertion failed: " #x)
 #endif
 
+#ifndef SQ_STATIC_ASSERT
+#define SQ_STATIC_ASSERT(x) if (sizeof(char[2*((x)?1:0)-1])) ; else
+#endif
+
+#undef HAVE_STATIC_ASSERT
 
 //sqvector mini vector class, supports objects by value
-template<typename T, typename SizeT = uint32_t> class sqvector
+template<typename T> class sqvector
 {
 public:
-    using size_type = SizeT;
-
     sqvector(SQAllocContext ctx)
         : _vals(NULL)
         ,  _size(0)
@@ -79,7 +83,7 @@ public:
         if(v._size > _allocated) {
             _realloc(v._size);
         }
-        for(size_type i = 0; i < v._size; i++) {
+        for(SQUnsignedInteger i = 0; i < v._size; i++) {
             new ((void *)&_vals[i]) T(v._vals[i]); //-V522
         }
         _size = v._size;
@@ -88,8 +92,8 @@ public:
     {
         _releasedata();
     }
-    void reserve(size_type newsize) { _realloc(newsize); }
-    void resize(size_type newsize, const T& fill = T())
+    void reserve(SQUnsignedInteger newsize) { _realloc(newsize); }
+    void resize(SQUnsignedInteger newsize, const T& fill = T())
     {
         if(newsize > _allocated)
             _realloc(newsize);
@@ -100,7 +104,7 @@ public:
             }
         }
         else{
-            for(size_type i = newsize; i < _size; i++) {
+            for(SQUnsignedInteger i = newsize; i < _size; i++) {
                 _vals[i].~T();
             }
             _size = newsize;
@@ -109,7 +113,7 @@ public:
     void clear() { resize(0); }
     void shrinktofit() { if(_size > 4) { _realloc(_size); } }
     T& top() const { return _vals[_size - 1]; }
-    inline size_type size() const { return _size; }
+    inline SQUnsignedInteger size() const { return _size; }
     bool empty() const { return (_size <= 0); }
     inline T &push_back(const T& val = T())
     {
@@ -121,15 +125,15 @@ public:
     {
         _size--; _vals[_size].~T();
     }
-    void insert(size_type idx, const T& val)
+    void insert(SQUnsignedInteger idx, const T& val)
     {
         resize(_size + 1);
-        for(size_type i = _size - 1; i > idx; i--) {
+        for(SQUnsignedInteger i = _size - 1; i > idx; i--) {
             _vals[i] = _vals[i - 1]; // -V1002
         }
         _vals[idx] = val; // -V1002
     }
-    void remove(size_type idx)
+    void remove(SQUnsignedInteger idx)
     {
         _vals[idx].~T();
         if(idx < (_size - 1)) {
@@ -137,9 +141,9 @@ public:
         }
         _size--;
     }
-    size_type capacity() { return _allocated; }
+    SQUnsignedInteger capacity() { return _allocated; }
     inline T &back() const { return _vals[_size - 1]; }
-    inline T& operator[](size_type pos) const{ return _vals[pos]; }
+    inline T& operator[](SQUnsignedInteger pos) const{ return _vals[pos]; }
     T* _vals;
     SQAllocContext _alloc_ctx;
 
@@ -151,7 +155,7 @@ public:
     iterator end() { return &_vals[_size]; }
     const_iterator end() const { return &_vals[_size]; }
 private:
-    void _realloc(size_type newsize)
+    void _realloc(SQUnsignedInteger newsize)
     {
         newsize = (newsize > 0)?newsize:4;
         _vals = (T*)SQ_REALLOC(_alloc_ctx, _vals, _allocated * sizeof(T), newsize * sizeof(T));
@@ -160,13 +164,13 @@ private:
     void _releasedata()
     {
         if(_allocated) {
-            for(size_type i = 0; i < _size; i++)
+            for(SQUnsignedInteger i = 0; i < _size; i++)
                 _vals[i].~T();
             SQ_FREE(_alloc_ctx, _vals, (_allocated * sizeof(T)));
         }
     }
-    size_type _size;
-    size_type _allocated;
+    SQUnsignedInteger _size;
+    SQUnsignedInteger _allocated;
 };
 
 #endif //_SQUTILS_H_

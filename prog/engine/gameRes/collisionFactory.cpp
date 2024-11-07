@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <gameRes/dag_collisionResource.h>
 #include <gameRes/dag_gameResSystem.h>
 #include <generic/dag_initOnDemand.h>

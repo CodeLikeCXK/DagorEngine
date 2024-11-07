@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <daRg/dag_sceneRender.h>
 #include <daRg/dag_renderState.h>
 

@@ -1,5 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-#pragma once
+#ifndef STRINGDICT_H
+#define STRINGDICT_H
 
 #include "stl.h"
 #include <string.h>
@@ -114,3 +114,5 @@ inline StringRef::StringRef(const StdString &str)
 };
 
 inline StringRef::StringRef(const StringRef &str) { mString = str.Get(); };
+
+#endif

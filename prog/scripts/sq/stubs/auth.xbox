@@ -1,4 +1,0 @@
-return {
-  get_xbox_login_url = @() ""
-  login_live = @(...) null
-}

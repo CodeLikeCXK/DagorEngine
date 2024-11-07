@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <daRg/robjWorldBlur.h>
 
 #include <daRg/dag_element.h>
@@ -9,7 +7,6 @@
 #include <gui/dag_stdGuiRender.h>
 
 #include <math/integer/dag_IPoint2.h>
-#include <memory/dag_framemem.h>
 
 #include <render/fx/uiPostFxManager.h>
 #include <render/hdrRender.h>
@@ -21,7 +18,7 @@ namespace darg
 
 static float gui_reverse_scale(float x) { return (x - 0.5f) * GUI_POS_SCALE_INV; }
 
-void RobjWorldBlur::render(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *rdata,
+void RobjWorldBlur::renderCustom(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *rdata,
   const RenderState &render_state)
 {
   RobjParamsBlur *params = static_cast<RobjParamsBlur *>(rdata->params);
@@ -31,11 +28,11 @@ void RobjWorldBlur::render(StdGuiRender::GuiContext &ctx, const Element *elem, c
 
   renderTexRect(ctx, rdata, render_state, PREMULTIPLIED, 0);
   if (params->fillColor.u != 0 || params->borderColor.u != 0)
-    RenderObjectBox::render(ctx, elem, rdata, render_state);
+    RenderObjectBox::renderCustom(ctx, elem, rdata, render_state);
 }
 
 // WT-specific
-void RobjWorldBlurPanelStub::render(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *rdata,
+void RobjWorldBlurPanelStub::renderCustom(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *rdata,
   const RenderState &render_state)
 {
   RobjParamsBlur *params = static_cast<RobjParamsBlur *>(rdata->params);
@@ -48,7 +45,7 @@ void RobjWorldBlurPanelStub::render(StdGuiRender::GuiContext &ctx, const Element
 
   renderTexRect(ctx, rdata, render_state, NONPREMULTIPLIED, 1.f);
   if (params->fillColor.u != 0 || params->borderColor.u != 0)
-    RenderObjectBox::render(ctx, elem, rdata, render_state);
+    RenderObjectBox::renderCustom(ctx, elem, rdata, render_state);
 
   params->color = tmp;
 }
@@ -62,10 +59,7 @@ void RobjBlurBase::renderTexRect(StdGuiRender::GuiContext &ctx, const ElemRender
   if (!params)
     return;
 
-  const auto uiBlurTexId = UiPostFxManager::getUiBlurTexId();
-  const auto uiBlurTexSdrId = UiPostFxManager::getUiBlurSdrTexId();
-  const d3d::SamplerHandle uiBlurTexSampler = UiPostFxManager::getUiBlurSampler();
-  const d3d::SamplerHandle uiBlurTexSdrSampler = UiPostFxManager::getUiBlurSdrSampler();
+  TEXTUREID uiBlurTexId = UiPostFxManager::getUiBlurTexId();
 
   float sw = StdGuiRender::screen_width();
   float sh = StdGuiRender::screen_height();
@@ -74,7 +68,7 @@ void RobjBlurBase::renderTexRect(StdGuiRender::GuiContext &ctx, const ElemRender
   E3DCOLOR color = color_apply_opacity(params->color, (uiBlurTexId == BAD_TEXTUREID) ? 0.25f : render_state.opacity);
   ctx.set_alpha_blend(blend_mode);
   ctx.set_color(color);
-  ctx.set_textures(uiBlurTexId, uiBlurTexSampler, uiBlurTexSdrId, uiBlurTexSdrSampler, false, hdrrender::is_hdr_enabled());
+  ctx.set_texture(uiBlurTexId, false, hdrrender::is_hdr_enabled());
   if (params->saturateFactor != 1.0f)
     ctx.set_picquad_color_matrix_saturate(params->saturateFactor);
 
@@ -126,7 +120,7 @@ static void render_callback_run(StdGuiRender::CallBackState &cbs)
 }
 
 
-void RobjWorldBlurPanel::render(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *rdata,
+void RobjWorldBlurPanel::renderCustom(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *rdata,
   const RenderState &render_state)
 {
   RobjParamsBlur *params = static_cast<RobjParamsBlur *>(rdata->params);
@@ -144,7 +138,7 @@ void RobjWorldBlurPanel::render(StdGuiRender::GuiContext &ctx, const Element *el
   renderTexRect(ctx, rdata, render_state, NONPREMULTIPLIED, 4.0);
 
   if (params->fillColor.u != 0 || params->borderColor.u != 0)
-    RenderObjectBox::render(ctx, elem, rdata, render_state);
+    RenderObjectBox::renderCustom(ctx, elem, rdata, render_state);
 }
 
 ROBJ_FACTORY_IMPL(RobjWorldBlur, RobjParamsBlur)

@@ -48,9 +48,7 @@ The following words are reserved as keywords and cannot be used as identifiers:
 +------------+------------+-----------+------------+------------+-------------+
 | shared     | private    | smart_ptr | generator  | yield      | unsafe      |
 +------------+------------+-----------+------------+------------+-------------+
-| assume     | explicit   | sealed    | static     | inscope    | fixed_array |
-+------------+------------+-----------+------------+------------+-------------+
-| typedecl   |            |           |            |            |             |
+| assume     | explicit   | sealed    | static     | inscope    |             |
 +------------+------------+-----------+------------+------------+-------------+
 
 The following words are reserved as type names and cannot be used as identifiers:
@@ -66,7 +64,7 @@ The following words are reserved as type names and cannot be used as identifiers
 +------------+------------+-----------+------------+------------+-------------+
 | lambda     | int8       | uint8     | int16      | uint16     | tuple       |
 +------------+------------+-----------+------------+------------+-------------+
-| variant    | range64    | urange64  |            |            |             |
+| variant    |            |           |            |            |             |
 +------------+------------+-----------+------------+------------+-------------+
 
 Keywords and types are covered in detail later in this document.

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <hash/xxh3.h>
 #include <daECS/core/internal/archetypes.h>
 namespace ecs

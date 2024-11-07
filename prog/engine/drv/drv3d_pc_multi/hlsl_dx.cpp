@@ -1,15 +1,11 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
-#include <drv/3d/dag_shader.h>
-#include <drv/3d/dag_platform_pc.h>
-#include <drv/3d/dag_driver.h>
-#include <drv/3d/dag_info.h>
+#include <3d/dag_drv3d_pc.h>
+#include <3d/dag_drv3d.h>
 #include <util/dag_string.h>
 #include <EASTL/unique_ptr.h>
 
 namespace d3d_multi_dx11
 {
-#include "d3d_api.inc.h"
+#include "d3d_api.h"
 }
 
 namespace drv3d_dx11

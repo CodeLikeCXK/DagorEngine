@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <EditorCore/ec_camera_elem.h>
 #include <EditorCore/ec_camera_dlg.h>
 

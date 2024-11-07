@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <daRg/dag_element.h>
 #include <daRg/dag_transform.h>
 #include <daRg/dag_stringKeys.h>
@@ -50,7 +48,6 @@ void AnimDesc::reset()
   prop = AP_INVALID;
   duration = 0;
   delay = 0;
-  loopPause = 0;
 
   from.Release();
   to.Release();
@@ -139,7 +136,6 @@ bool AnimDesc::load(const Sqrat::Table &desc, const StringKeys *csk)
   autoPlay = desc.RawGetSlotValue<bool>(csk->play, false);
   playFadeOut = desc.RawGetSlotValue<bool>(csk->playFadeOut, false);
   loop = desc.RawGetSlotValue<bool>(csk->loop, false);
-  loopPause = loop ? sec_to_usec(desc.RawGetSlotValue<float>(csk->loopPause, 0.0f)) : 0;
   globalTimer = desc.RawGetSlotValue<bool>(csk->globalTimer, false);
   trigger = desc.RawGetSlot(csk->trigger);
   sound = desc.RawGetSlot(csk->sound);
@@ -229,9 +225,9 @@ bool Animation::baseUpdate(int64_t dt)
   if (isPlayingLoop)
   {
     if (desc.globalTimer)
-      t = get_time_usec(get_anim_ref_time()) % desc.fullDuration();
+      t = get_time_usec(get_anim_ref_time()) % desc.duration;
     else
-      t = t % desc.fullDuration();
+      t = t % desc.duration;
   }
 
   if (isFinished())
@@ -276,7 +272,7 @@ void Animation::skip()
   if (!isFinished())
   {
     isPlayingLoop = false;
-    t = desc.fullDuration();
+    t = desc.duration;
     apply();
     callHandler(desc.onAbort, true);
     callHandler(desc.onExit, true);
@@ -307,11 +303,11 @@ void Animation::init(const AnimDesc &desc_)
   if (desc.autoPlay)
     start();
   else
-    t = desc.fullDuration();
+    t = desc.duration;
 }
 
 
-bool Animation::isFinished() const { return t >= desc.fullDuration(); }
+bool Animation::isFinished() const { return t >= desc.duration; }
 
 
 void Animation::start()
@@ -451,7 +447,8 @@ void ColorAnim::apply()
   if (desc.fromElemProp() || desc.toElemProp())
     adjust_color_for_animation(valFrom, valTo);
 
-  float k = applyEasing(effectiveK());
+  float k = clamp(float(t) / float(desc.duration), 0.0f, 1.0f);
+  k = applyEasing(k);
 
   ColorHsva res = lerp_hsva(valFrom, valTo, k);
   E3DCOLOR val = e3dcolor(hsv2rgb(res));
@@ -531,7 +528,8 @@ void FloatAnim::apply()
     default: G_ASSERTF(0, "Unsupported anim prop %d", desc.prop);
   }
 
-  float k = applyEasing(effectiveK());
+  float k = clamp(float(t) / float(desc.duration), 0.0f, 1.0f);
+  k = applyEasing(k);
   float val = lerp(valFrom, valTo, k);
   if (output)
     *output = val;
@@ -617,7 +615,8 @@ void Point2Anim::apply()
   }
 
 
-  float k = applyEasing(effectiveK());
+  float k = clamp(float(t) / float(desc.duration), 0.0f, 1.0f);
+  k = applyEasing(k);
   Point2 val = lerp(valFrom, valTo, k);
 
   switch (desc.prop)

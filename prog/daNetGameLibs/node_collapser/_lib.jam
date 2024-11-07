@@ -1,4 +1,0 @@
-if $(HaveRenderer) = yes {
-  gamePulls += daNetGameLibs_node_collapser_DAS_pull_AOT ;
-  UseProgLibs += daNetGameLibs/node_collapser ;
-}

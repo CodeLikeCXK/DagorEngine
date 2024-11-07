@@ -1,6 +1,7 @@
 //
 // DaEditorX
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -43,7 +44,6 @@ enum
   CM_EDITOR_HELP,
   CM_PLUGIN_HELP,
   CM_TUTORIALS,
-  CM_CONTROL_GALLERY,
   CM_ABOUT,
   CM_ANIMATE_VIEWPORTS,
   CM_USE_OCCLUDERS,

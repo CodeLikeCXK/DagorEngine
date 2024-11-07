@@ -1,22 +1,23 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
+#include <ioSys/dag_dataBlock.h>
 #include <debug/dag_log.h>
 #include <EASTL/string_view.h>
-#include <drv_returnAddrStore.h>
 
-
-class DataBlock;
-class String;
 
 #if COMMANDS_STORE_RETURN_ADDRESS
 
 #include <osApiWrappers/dag_stackHlp.h>
-#include <EASTL/hash_map.h>
-#include <EASTL/string.h>
-#include <util/dag_string.h>
+#include <drv_returnAddrStore.h>
+#include <eastl/hash_map.h>
 
-namespace drv3d_dx12::debug::call_stack::return_address
+namespace drv3d_dx12
+{
+namespace debug
+{
+namespace call_stack
+{
+namespace return_address
 {
 struct CommandData
 {
@@ -46,7 +47,7 @@ public:
 class Generator
 {
 public:
-  constexpr void configure(const DataBlock *) {}
+  void configure(const DataBlock *) {}
   CommandData generateCommandData() const { return {ScopedReturnAddressStore::get_threadlocal_saved_address()}; }
 };
 
@@ -91,11 +92,20 @@ public:
 
   eastl::string_view resolve(const CommandData &data) { return doResolve(data); }
 };
-} // namespace drv3d_dx12::debug::call_stack::return_address
+} // namespace return_address
+} // namespace call_stack
+} // namespace debug
+} // namespace drv3d_dx12
 
 #else
 
-namespace drv3d_dx12::debug::call_stack::return_address
+namespace drv3d_dx12
+{
+namespace debug
+{
+namespace call_stack
+{
+namespace return_address
 {
 struct CommandData
 {};
@@ -103,9 +113,9 @@ struct CommandData
 class ExecutionContextDataStore
 {
 public:
-  constexpr CommandData getCommandData() const { return {}; }
-  constexpr void setCommandData(const CommandData &, const char *) {}
-};
+  CommandData getCommandData() const { return {}; }
+  void setCommandData(const CommandData &, const char *) {}
+}; // namespace return_address
 
 class Generator
 {
@@ -114,17 +124,21 @@ public:
   {
     logdbg("DX12: debug::call_stack::return_address using null implementation! No return addresses are available!");
   }
-  constexpr CommandData generateCommandData() const { return {}; }
-  constexpr const char *getLastCommandName() const { return ""; }
+  CommandData generateCommandData() const { return {}; }
+  const char *getLastCommandName() const { return ""; }
 };
 
 class Reporter
 {
 public:
-  constexpr void report(const CommandData &) {}
-  constexpr void append(String &, const char *, const CommandData &) {}
-  constexpr eastl::string_view resolve(const CommandData &) { return {}; }
+  void report(const CommandData &) {}
+  void append(String &, const char *, const CommandData &) {}
+  eastl::string_view resolve(const CommandData &) { return {}; }
 };
-} // namespace drv3d_dx12::debug::call_stack::return_address
+} // namespace return_address
+} // namespace call_stack
+} // namespace debug
+} // namespace drv3d_dx12
+
 
 #endif

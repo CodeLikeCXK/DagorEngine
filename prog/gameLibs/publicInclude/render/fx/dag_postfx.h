@@ -1,11 +1,12 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
 #include <ioSys/dag_dataBlock.h>
-#include <drv/3d/dag_tex3d.h>
+#include <3d/dag_tex3d.h>
 #include <3d/dag_texMgr.h>
 #include <util/dag_string.h>
 
@@ -53,9 +54,13 @@ public:
   //! updates settings that don't require restart(), or return false to indicated need of restart()
   bool updateSettings(const DataBlock *level_settings, const DataBlock *game_settings);
 
-  TEXTUREID downsample(Texture *input_tex, TEXTUREID input_id);
+  void update(float timePassed);
+
   void apply(Texture *source, TEXTUREID sourceId, Texture *target, TEXTUREID targtexId, const TMatrix &view_tm,
     const TMatrix4 &proj_tm, bool force_disable_motion_blur = false);
+
+  bool getUseAdaptation();
+  void setUseAdaptation(bool use);
 
   DemonPostFx *getDemonPostFx() { return demonPostFx; }
   PostFxRenderer *getGenPostFx() { return genPostFx; }

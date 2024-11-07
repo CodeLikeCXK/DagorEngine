@@ -1,10 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include "ringbuf.h"
-#include <drv/3d/dag_texture.h>
-#include <drv/3d/dag_query.h>
-#include <util/dag_delayedAction.h>
+#include <3d/dag_drv3dCmd.h>
 
 struct VideoPlaybackData
 {
@@ -41,7 +38,7 @@ public:
       b.texY = d3d::create_tex(NULL, w, h, tex_flags, 1);
       if (!b.texY)
       {
-        DEBUG_CTX("can't create tex %d: w=%d, h=%d, tex_flags=0x%08X", i, w, h, tex_flags);
+        debug_ctx("can't create tex %d: w=%d, h=%d, tex_flags=0x%08X", i, w, h, tex_flags);
         return false;
       }
 
@@ -54,7 +51,7 @@ public:
       b.texV = d3d::create_tex(NULL, w / 2, h / 2, tex_flags, 1);
       if (!b.texU || !b.texV)
       {
-        DEBUG_CTX("can't create uv tex %d: w=%d, h=%d, tex_flags=0x%08X", i, w / 2, h / 2, tex_flags);
+        debug_ctx("can't create uv tex %d: w=%d, h=%d, tex_flags=0x%08X", i, w / 2, h / 2, tex_flags);
         return false;
       }
 
@@ -73,6 +70,8 @@ public:
       b.texY->texaddr(TEXADDR_CLAMP);
       b.texU->texaddr(TEXADDR_CLAMP);
       b.texV->texaddr(TEXADDR_CLAMP);
+
+      b.ev = d3d::create_event_query();
     }
     return true;
   }
@@ -85,8 +84,7 @@ public:
       release_managed_tex_verified(b.texIdY, b.texY);
       release_managed_tex_verified(b.texIdU, b.texU);
       release_managed_tex_verified(b.texIdV, b.texV);
-      if (auto ev = b.ev) // Note: ATTOW not all drivers can safely destroy event query on thread
-        run_action_on_main_thread([=]() { d3d::release_event_query(ev); });
+      d3d::release_event_query(b.ev);
     }
     memset(vBuf.buf, 0, sizeof(vBuf.buf));
   }

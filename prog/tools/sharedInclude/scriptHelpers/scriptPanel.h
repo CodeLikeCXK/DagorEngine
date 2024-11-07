@@ -1,17 +1,21 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __GAIJIN_SCRIPTHELPERS_SCRIPTPANEL_H__
+#define __GAIJIN_SCRIPTHELPERS_SCRIPTPANEL_H__
 #pragma once
 
 #include <sepGui/wndCommon.h>
 
 class IWndManager;
+class IWndEmbeddedWindow;
 
 
 namespace ScriptHelpers
 {
-bool create_helper_bar(IWndManager *manager);
+bool create_helper_bar(IWndManager *manager, void *htree, void *hpropbar);
 void rebuild_tree_list();
 
-void *on_wm_create_window(int type);
-void removeWindows();
-void updateImgui();
+IWndEmbeddedWindow *on_wm_create_window(void *handle, int type);
+bool on_wm_destroy_window(void *handle);
 }; // namespace ScriptHelpers
+
+
+#endif

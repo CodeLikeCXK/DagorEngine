@@ -1,8 +1,14 @@
-//
-// Dagor Engine 6.5 - 1st party libs
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-//
+/*
+ * Dagor Engine
+ * Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+ *
+ * (for conditions of use see prog/license.txt)
+*/
+
+#ifndef _DAGOR_DAG_VECTOR_H_
+#define _DAGOR_DAG_VECTOR_H_
 #pragma once
+
 
 //dag::Vector is (almost) std vector API, but it's maximum container size is dependent on 4th template parameter,
 //and it allows unititialized (initialized with new type;) values
@@ -428,7 +434,7 @@ protected:
   void DoInsertValue(const_iterator position, Args&&... args)
   {
     #if EASTL_ASSERT_ENABLED
-    if (DAGOR_UNLIKELY((position < begin()) || (position > end())))
+    if (EASTL_UNLIKELY((position < begin()) || (position > end())))
       DAG_ASSERTF(0, "Vector::insert/emplace -- invalid position");
     #endif
 
@@ -447,7 +453,13 @@ protected:
       {
         pointer pNewData = DoAllocate(nNewCap);
         ::new((void*)(pNewData + nDestPos)) value_type(eastl::forward<Args>(args)...); // Because the old data is potentially being moved rather than copied, we need to move
-        IF_CONSTEXPR(is_type_relocatable<value_type>::value)
+        IF_CONSTEXPR(CanRealloc())
+        {
+          // If realloc code path exist the only valid way we can get here is insert to the end of empty container
+          // (as otherwise realloc code path would have been taken)
+          DAG_ASSERTF(empty() && mpBegin() == destPosition, "");
+        }
+        else IF_CONSTEXPR(is_type_relocatable<value_type>::value)
         {
           if (nDestPos)
             memcpy((void*)pNewData, (const void*)mpBegin(), sizeof(value_type) * nDestPos);
@@ -501,7 +513,7 @@ protected:
   void DoInsertValues(const_iterator position, size_type n, const value_type& value)
   {
     #if EASTL_ASSERT_ENABLED
-    if (DAGOR_UNLIKELY((position < begin()) || (position > end())))
+    if (EASTL_UNLIKELY((position < begin()) || (position > end())))
       DAG_ASSERTF(0, "Vector::insert -- invalid position");
     #endif
 
@@ -519,7 +531,14 @@ protected:
       else
       {
         pointer pNewData = DoAllocate(nNewCap);
-        IF_CONSTEXPR(is_type_relocatable<value_type>::value)
+        IF_CONSTEXPR(CanRealloc())
+        {
+          // If realloc code path exist the only valid way we can get here is insert to the end of empty container
+          // (as otherwise realloc code path would have been taken)
+          DAG_ASSERTF(empty() && mpBegin() == destPosition, "");
+          eastl::uninitialized_fill_n_ptr(pNewData, n, value);
+        }
+        else IF_CONSTEXPR(is_type_relocatable<value_type>::value)
         {
           if (nDestPos)
             memcpy((void*)pNewData, (const void*)mpBegin(), sizeof(value_type) * nDestPos);
@@ -574,7 +593,7 @@ protected:
   void DoInsertValues(const_iterator position, size_type n)
   {
     #if EASTL_ASSERT_ENABLED
-    if (DAGOR_UNLIKELY((position < begin()) || (position > end())))
+    if (EASTL_UNLIKELY((position < begin()) || (position > end())))
       DAG_ASSERTF(0, "Vector::insert -- invalid position");
     #endif
 
@@ -592,7 +611,14 @@ protected:
       else
       {
         pointer pNewData = DoAllocate(nNewCap);
-        IF_CONSTEXPR(is_type_relocatable<value_type>::value)
+        IF_CONSTEXPR(CanRealloc())
+        {
+          // If realloc code path exist the only valid way we can get here is insert to the end of empty container
+          // (as otherwise realloc code path would have been taken)
+          DAG_ASSERTF(empty() && mpBegin() == destPosition, "");
+          small_vector_default_fill_n<T*, init_constructing>(pNewData, n);
+        }
+        else IF_CONSTEXPR(is_type_relocatable<value_type>::value)
         {
           if (nDestPos)
             memcpy((void*)pNewData, (const void*)mpBegin(), sizeof(value_type) * nDestPos);
@@ -746,7 +772,7 @@ protected:
                             EASTL_ITC_NS::bidirectional_iterator_tag)
   {
     #if EASTL_ASSERT_ENABLED
-    if (DAGOR_UNLIKELY((position < mpBegin()) || (position > end())))
+    if (EASTL_UNLIKELY((position < mpBegin()) || (position > end())))
       DAG_ASSERTF(0, "vector::insert -- invalid position");
     #endif
 
@@ -766,16 +792,18 @@ protected:
       else
       {
         pointer pNewData = DoAllocate(nNewSize), pNewEnd = pNewData;
-        IF_CONSTEXPR(is_type_relocatable<value_type>::value)
+        IF_CONSTEXPR(CanRealloc())
         {
-          if (nDestPos)
-            memcpy((void*)pNewData, (const void*)mpBegin(), sizeof(value_type) * nDestPos); //-V780
-          pNewEnd = eastl::uninitialized_copy_ptr(first, last, pNewEnd + nDestPos);
-          if (size_t sz = (char*)end() - (char*)destPosition)
-            memcpy((void*)pNewEnd, (const void*)destPosition, sz); //-V780
+          // If realloc code path exist the only valid way we can get here is insert to the end of empty container
+          // (as otherwise realloc code path would have been taken)
+          DAG_ASSERTF(empty() && mpBegin() == destPosition, "");
+          eastl::uninitialized_copy_ptr(first, last, pNewEnd);
         }
         else
         {
+#if (__cplusplus >= 201703L) || (defined(_MSVC_LANG) && _MSVC_LANG >= 201703L)
+          static_assert(!is_type_relocatable<value_type>::value, "should not reach here, expecting CanRealloc()==true");
+#endif
 #if EASTL_EXCEPTIONS_ENABLED
           try
           {
@@ -792,9 +820,9 @@ protected:
             throw;
           }
 #endif
+          eastl::destruct(mpBegin(), end());
         }
 
-        eastl::destruct(mpBegin(), end());
         DoFree(mpBegin(), allocated());
         mpBegin() = pNewData;
         allocated() = nNewSize;
@@ -884,9 +912,7 @@ protected:
   }
   void DoGrow(size_type n)
   {
-    if (DoReallocate(n))
-      ;
-    else if (used())
+    if (!DoReallocate(n))
     {
       pointer const pNewData = DoAllocate(n);
       pointer mpEnd = end();
@@ -900,12 +926,6 @@ protected:
 
       DoFree(mpBegin(), allocated());
       mpBegin()    = pNewData;
-    }
-    else
-    {
-      DoFree(mpBegin(), allocated()); // Free old mem before allocating new one to reduce peak mem usage
-      n = eastl::max(size_type(min_allocate_size_bytes/sizeof(value_type)), n);
-      mpBegin() = DoAllocate(n);
     }
 
     allocated() = n;
@@ -953,16 +973,22 @@ protected:
     static constexpr size_t min_size = value ? get_min_expand_size<AT>::min_expand_size : size_t(~size_t(0));
   };
 
+  static constexpr bool CanRealloc()
+  {
+    return (alignof(value_type) <= EA_PLATFORM_MIN_MALLOC_ALIGNMENT) &&
+           is_type_relocatable<value_type>::value &&
+           (usingStdAllocator || HasRealloc<allocator_type>::value);
+  }
+
   value_type* DoReallocate(size_type &n)
   {
     if (!mpBegin())
       return nullptr;
     IF_CONSTEXPR(alignof(value_type) <= EA_PLATFORM_MIN_MALLOC_ALIGNMENT && is_type_relocatable<value_type>::value)
     {
-      if (!empty()) // Don't try realloc empty array
-        return usingStdAllocator ?
-          DoStdRealloc<value_type, usingStdAllocator>(n) :
-          DoRealloc<value_type, HasRealloc<allocator_type>::value>(n);
+      return usingStdAllocator ?
+        DoStdRealloc<value_type, usingStdAllocator>(n) :
+        DoRealloc<value_type, HasRealloc<allocator_type>::value>(n);
     }
     return usingStdAllocator ?
       DoStdExpand<value_type, usingStdAllocator>(n) :
@@ -1001,7 +1027,7 @@ protected:
   DoStdExpand(size_type &n)
   {
     const size_t sz = size_t(n)*sizeof(VT);
-    if (DAGOR_LIKELY(sz < DAG_STD_EXPAND_MIN_SIZE))// cant expand small blocks
+    if (EASTL_LIKELY(sz < DAG_STD_EXPAND_MIN_SIZE))// cant expand small blocks
       return nullptr;
     VT * v = mpBegin();
     return DAG_RESIZE_IN_PLACE(v, sz) ? v : nullptr;
@@ -1024,7 +1050,7 @@ protected:
   T* DoAllocate(size_type &n)
   {
     #if EASTL_ASSERT_ENABLED
-    if (DAGOR_UNLIKELY(n >= eastl::numeric_limits<size_type>::max()))
+    if (EASTL_UNLIKELY(n >= eastl::numeric_limits<size_type>::max()))
       DAG_ASSERTF(0, "Vector::DoAllocate -- improbably large request.");
     #endif
     n = eastl::max(size_type(min_allocate_size_bytes/sizeof(value_type)), n);
@@ -1062,7 +1088,7 @@ inline typename Vector<T, Allocator, init_constructing, Counter>::reference
 Vector<T, Allocator, init_constructing, Counter>::operator[](size_type n)
 {
   #if EASTL_ASSERT_ENABLED
-  if (DAGOR_UNLIKELY(n >= size()))
+  if (EASTL_UNLIKELY(n >= size()))
     DAG_ASSERTF(0, "Vector::at n=%d num=%d, sizeof(T)=%d", n, size(), sizeof(T));
   #endif
 
@@ -1074,7 +1100,7 @@ inline typename Vector<T, Allocator, init_constructing, Counter>::const_referenc
 Vector<T, Allocator, init_constructing, Counter>::operator[](size_type n) const
 {
   #if EASTL_ASSERT_ENABLED
-  if (DAGOR_UNLIKELY(n >= size()))
+  if (EASTL_UNLIKELY(n >= size()))
     DAG_ASSERTF(0, "Vector::at n=%d num=%d, sizeof(T)=%d", n, size(), sizeof(T));
   #endif
 
@@ -1086,7 +1112,7 @@ inline typename Vector<T, Allocator, init_constructing, Counter>::reference
 Vector<T, Allocator, init_constructing, Counter>::front()
 {
   #if EASTL_ASSERT_ENABLED
-  if (DAGOR_UNLIKELY(size()<=0))
+  if (EASTL_UNLIKELY(size()<=0))
     DAG_ASSERTF(0, "Vector::front on empty sizeof(T)=%d", sizeof(T));
   #endif
 
@@ -1098,7 +1124,7 @@ inline typename Vector<T, Allocator, init_constructing, Counter>::const_referenc
 Vector<T, Allocator, init_constructing, Counter>::front() const
 {
   #if EASTL_ASSERT_ENABLED
-  if (DAGOR_UNLIKELY(size()<=0))
+  if (EASTL_UNLIKELY(size()<=0))
     DAG_ASSERTF(0, "Vector::front on empty sizeof(T)=%d", sizeof(T));
   #endif
 
@@ -1110,7 +1136,7 @@ inline typename Vector<T, Allocator, init_constructing, Counter>::reference
 Vector<T, Allocator, init_constructing, Counter>::back()
 {
   #if EASTL_ASSERT_ENABLED
-  if (DAGOR_UNLIKELY(size()<=0))
+  if (EASTL_UNLIKELY(size()<=0))
     DAG_ASSERTF(0, "Vector::back on empty sizeof(T)=%d", sizeof(T));
   #endif
 
@@ -1122,7 +1148,7 @@ inline typename Vector<T, Allocator, init_constructing, Counter>::const_referenc
 Vector<T, Allocator, init_constructing, Counter>::back() const
 {
   #if EASTL_ASSERT_ENABLED
-  if (DAGOR_UNLIKELY(size()<=0))
+  if (EASTL_UNLIKELY(size()<=0))
     DAG_ASSERTF(0, "Vector::back on empty sizeof(T)=%d", sizeof(T));
   #endif
 
@@ -1132,7 +1158,7 @@ Vector<T, Allocator, init_constructing, Counter>::back() const
 template <typename T, typename Allocator, bool init_constructing, typename Counter>
 inline T& Vector<T, Allocator, init_constructing, Counter>::push_back(const value_type& value)
 {
-  if (DAGOR_UNLIKELY(allocated() == used()))
+  if (EASTL_UNLIKELY(allocated() == used()))
     DoGrow(GetNewCapacity(used()));
   return *::new((void*)(mpBegin() + (used()++))) value_type(value);
 }
@@ -1140,7 +1166,7 @@ inline T& Vector<T, Allocator, init_constructing, Counter>::push_back(const valu
 template <typename T, typename Allocator, bool init_constructing, typename Counter>
 inline T& Vector<T, Allocator, init_constructing, Counter>::push_back(value_type&& value)
 {
-  if (DAGOR_UNLIKELY(allocated() == used()))
+  if (EASTL_UNLIKELY(allocated() == used()))
     DoGrow(GetNewCapacity(used()));
   return *::new((void*)(mpBegin() + (used()++))) value_type(eastl::move(value));
 }
@@ -1149,7 +1175,7 @@ template <typename T, typename Allocator, bool init_constructing, typename Count
 inline T&
 Vector<T, Allocator, init_constructing, Counter>::push_back()
 {
-  if (DAGOR_UNLIKELY(allocated() == used()))
+  if (EASTL_UNLIKELY(allocated() == used()))
     DoGrow(GetNewCapacity(used()));
   return *Construct<init_constructing, T>(mpBegin() + (used()++));
 }
@@ -1158,7 +1184,7 @@ Vector<T, Allocator, init_constructing, Counter>::push_back()
 template <typename T, typename Allocator, bool init_constructing, typename Counter>
 inline T& Vector<T, Allocator, init_constructing, Counter>::push_back_noinit()
 {
-  if (DAGOR_UNLIKELY(allocated() == used()))
+  if (EASTL_UNLIKELY(allocated() == used()))
     DoGrow(GetNewCapacity(used()));
   return *Construct<false, T>(mpBegin() + (used()++));
 }
@@ -1166,7 +1192,7 @@ inline T& Vector<T, Allocator, init_constructing, Counter>::push_back_noinit()
 template <typename T, typename Allocator, bool init_constructing, typename Counter>
 inline void* Vector<T, Allocator, init_constructing, Counter>::push_back_uninitialized()
 {
-  if (DAGOR_UNLIKELY(allocated() == used()))
+  if (EASTL_UNLIKELY(allocated() == used()))
     DoGrow(GetNewCapacity(used()));
   return (void*)(mpBegin() + (used()++));
 }
@@ -1186,7 +1212,7 @@ template<class... Args>
 inline typename Vector<T, Allocator, init_constructing, Counter>::reference
 Vector<T, Allocator, init_constructing, Counter>::emplace_back(Args&&... args)
 {
-  if (DAGOR_UNLIKELY(allocated() == used()))
+  if (EASTL_UNLIKELY(allocated() == used()))
     DoGrow(GetNewCapacity(used()));
   ::new((void*)(mpBegin() + used())) value_type(eastl::forward<Args>(args)...);
   ++used();
@@ -1218,7 +1244,7 @@ inline typename Vector<T, Allocator, init_constructing, Counter>::iterator
 Vector<T, Allocator, init_constructing, Counter>::erase(const_iterator position)
 {
   #if EASTL_ASSERT_ENABLED
-    if (DAGOR_UNLIKELY((position < begin()) || (position >= end())))
+    if (EASTL_UNLIKELY((position < begin()) || (position >= end())))
       DAG_ASSERTF(0, "Vector::erase on invalid position %d (T)=%d", position-cbegin(), sizeof(T));
   #endif
   iterator destPosition = const_cast<value_type*>(position);
@@ -1244,7 +1270,7 @@ inline typename Vector<T, Allocator, init_constructing, Counter>::iterator
 Vector<T, Allocator, init_constructing, Counter>::erase(const_iterator first, const_iterator last)
 {
   #if EASTL_ASSERT_ENABLED
-    if (DAGOR_UNLIKELY((first < mpBegin()) || (first > end()) || (last < mpBegin()) || (last > end()) || (last < first)))
+    if (EASTL_UNLIKELY((first < mpBegin()) || (first > end()) || (last < mpBegin()) || (last > end()) || (last < first)))
       DAG_ASSERTF(0, "Vector::erase on invalid position %d..%d (T)=%d", first-cbegin(), last-cbegin(), sizeof(T));
   #endif
   if (first != last)
@@ -1271,7 +1297,7 @@ inline typename Vector<T, Allocator, init_constructing, Counter>::iterator
 Vector<T, Allocator, init_constructing, Counter>::erase_unsorted(const_iterator position)
 {
   #if EASTL_ASSERT_ENABLED
-    if (DAGOR_UNLIKELY((position < begin()) || (position >= end())))
+    if (EASTL_UNLIKELY((position < begin()) || (position >= end())))
       DAG_ASSERTF(0, "Vector::erase on invalid position %d (T)=%d", position-cbegin(), sizeof(T));
   #endif
   iterator destPosition = const_cast<value_type*>(position);
@@ -1319,7 +1345,7 @@ inline typename Vector<T, Allocator, init_constructing, Counter>::iterator
 Vector<T, Allocator, init_constructing, Counter>::insert(const_iterator position, const value_type& value)
 {
   #if EASTL_ASSERT_ENABLED
-    if (DAGOR_UNLIKELY((position < mpBegin()) || (position > end())))
+    if (EASTL_UNLIKELY((position < mpBegin()) || (position > end())))
       DAG_ASSERTF(0, "Vector::insert on invalid position %d (T)=%d", position-cbegin(), sizeof(T));
   #endif
 
@@ -1464,3 +1490,5 @@ inline bool operator!=(const Vector<T, Allocator1, init1, Counter1>& a, const Ve
 
 }
 #undef IF_CONSTEXPR
+
+#endif

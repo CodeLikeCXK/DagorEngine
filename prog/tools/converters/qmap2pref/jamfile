@@ -1,5 +1,6 @@
 Root           ?= ../../../.. ;
 Location        = prog/tools/converters/qmap2pref ;
+DriverLinkage   = static ;
 ConsoleExe      = yes ;
 
 TargetType  = exe ;

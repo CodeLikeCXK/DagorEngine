@@ -1,6 +1,3 @@
-if (__name__ == "__analysis__")
-  return
-
 //expect:w210
 
 local buildBtnParams = ::kwarg(function(icon=null, option=null, count_list=null, counterFunc=null){ //-declared-never-used

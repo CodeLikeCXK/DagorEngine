@@ -1,4 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright 2023 by Gaijin Games KFT, All rights reserved.
+#ifndef _HID_TVOS_GAMEPAD_EX_H
+#define _HID_TVOS_GAMEPAD_EX_H
 #pragma once
 
 #import <GameController/GameController.h>
@@ -65,3 +67,5 @@ private:
   };
   TvosAxis axis[AXES_NUM];
 };
+
+#endif //_HID_TVOS_GAMEPAD_EX_H

@@ -1,5 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-#pragma once
+#ifndef COMPILESTATE_H_
+#define COMPILESTATE_H_
 
 #include <string>
 #include <vector>
@@ -33,3 +33,5 @@ private:
   std::vector<std::string> Contents;
   bool DebugMode;
 };
+
+#endif

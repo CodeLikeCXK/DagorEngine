@@ -1,7 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
-
-#include "vulkan_api.h"
 
 enum class FormatClass
 {

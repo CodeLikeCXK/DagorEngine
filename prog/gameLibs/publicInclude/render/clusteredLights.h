@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -8,8 +9,7 @@
 #include <render/spotLightsManager.h>
 #include <render/frustumClusters.h>
 #include <render/tiledLights.h>
-#include <drv/3d/dag_driver.h>
-#include <drv/3d/dag_info.h>
+#include <3d/dag_drv3d.h>
 #include <math/dag_TMatrix4.h>
 #include <generic/dag_tab.h>
 #include <generic/dag_staticTab.h>
@@ -19,61 +19,27 @@
 #include <math/dag_hlsl_floatx.h>
 #include "renderLights.hlsli"
 #include <shaders/dag_overrideStates.h>
-#include <render/dynamicShadowRender.h>
-#include <render/dynamicShadowRenderExtensions.h>
+#include <render/dynamicShadowRenderGPUObjects.h>
 #include <3d/dag_resPtr.h>
 
 class ShaderMaterial;
 class ShaderElement;
 class ShadowSystem;
-class ComputeShaderElement;
 class Occlusion;
 class DistanceReadbackLights;
 
-// Uses optimized shader variants for frames where few lights are
-// visible. See dynamic_lights_count shader variable.
-// "Few" means less than the threshold, which is the size of a GPU
-// word in bits.
-// should match render\shaders\dynamic_lights_count.dshl
-enum class DynLightsOptimizationMode : int
-{
-  NO_LIGHTS,
-  NO_SPOTS_FEW_OMNI,
-  FEW_SPOTS_NO_OMNI,
-  FEW_SPOTS_FEW_OMNI,
-  FULL_CLUSTERED
-};
-constexpr static int LIGHTS_OPTIMIZATION_THRESHOLD = 32;
-
-inline DynLightsOptimizationMode get_lights_count_interval(uint32_t spotsCount, uint32_t omniCount)
-{
-  if (spotsCount == 0 && omniCount == 0)
-    return DynLightsOptimizationMode::NO_LIGHTS;
-
-  constexpr int THRESHOLD = LIGHTS_OPTIMIZATION_THRESHOLD;
-  if (spotsCount == 0 && omniCount <= THRESHOLD)
-    return DynLightsOptimizationMode::NO_SPOTS_FEW_OMNI;
-  else if (spotsCount <= THRESHOLD && omniCount == 0)
-    return DynLightsOptimizationMode::FEW_SPOTS_NO_OMNI;
-  else if (spotsCount <= THRESHOLD && omniCount <= THRESHOLD)
-    return DynLightsOptimizationMode::FEW_SPOTS_FEW_OMNI;
-  return DynLightsOptimizationMode::FULL_CLUSTERED;
-}
 struct ClusteredLights
 {
-  static constexpr int DEFAULT_MAX_SHADOWS_TO_UPDATE_PER_FRAME = 4;
-
   typedef OmniLightsManager::RawLight OmniLight;
   typedef SpotLightsManager::RawLight SpotLight;
   static const int MAX_SHADOW_PRIORITY = 15; // 15 times more imprtant than anything else
-  ClusteredLights(const char *name_suffix = "");
+  ClusteredLights();
   ~ClusteredLights();
 
   // initial_frame_light_count is total visible lights for frame. In 32 (words)
   // shadows_quality is size of dynmic shadow map. 0 means no shadows
-  void init(int initial_frame_light_count, uint32_t shadows_quality, bool use_tiled_lights, const char *name_suffix = "");
+  void init(int initial_frame_light_count, uint32_t shadows_quality, bool use_tiled_lights);
   void setMaxClusteredDist(const float max_clustered_dist);
-  void setMaxShadowDist(const float max_shadow_dist) { maxShadowDist = max_shadow_dist; }
   void changeShadowResolution(uint32_t shadows_quality, bool dynamic_shadow_32bit);
   void close();
   void cullFrustumLights(vec3f cur_view_pos, mat44f_cref globtm, mat44f_cref view, mat44f_cref proj, float znear, Occlusion *occlusion,
@@ -92,14 +58,13 @@ struct ClusteredLights
   int getVisibleClusteredOmniCount() const { return renderOmniLights.size(); }
   int getVisibleSpotsCount() const { return getVisibleClusteredSpotsCount() + getVisibleNotClusteredSpotsCount(); }
   int getVisibleOmniCount() const { return getVisibleClusteredOmniCount() + getVisibleNotClusteredOmniCount(); }
-  bool cullOutOfFrustumLights(mat44f_cref globtm, SpotLightsManager::mask_type_t spot_light_mask,
+  void cullOutOfFrustumLights(mat44f_cref globtm, SpotLightsManager::mask_type_t spot_light_mask,
     OmniLightsManager::mask_type_t omni_light_mask); // cull without any grid
   void setShadowBias(float z_bias, float slope_z_bias, float shader_z_bias, float shader_slope_z_bias);
   void getShadowBias(float &z_bias, float &slope_z_bias, float &shader_z_bias, float &shader_slope_z_bias) const;
 
   void renderOtherLights();
   void setBuffersToShader();
-  void setEmptyOutOfFrustumLights();
   void setOutOfFrustumLightsToShader();
   void setInsideOfFrustumLightsToShader();
 
@@ -124,9 +89,8 @@ struct ClusteredLights
   // priority - the higher, the better. keep in mind, that with very high value you can steal all updates from other volumes
 
   // hint_dyamic (not cache static) - light is typically moving, and so will be rendered each frame. Makes sense only
-  // only_static_casters == false. only_static_casters - light will not cast shadows from dynamic objects
-  // quality - the higher the better. It is the speed of going from lowest mip (min_shadow_size) to high mip
-  // (max_shadow_size>>shadow_size_srl).
+  // only_static_casters == false. only_static_casters - light will not cast shadows from dynamic objects quality - the higher the
+  // better. It is the speed of going from lowest mip (min_shadow_size) to high mip (max_shadow_size>>shadow_size_srl).
   //  shadow_size_srl - maximum size degradation (shft right bits count for max shadow. If shadow is 256 maximum, and srl is 2, than
   //  maximum size will be 64)
   bool addShadowToLight(uint32_t id, bool only_static_casters, bool hint_dynamic, uint16_t quality, uint8_t priority,
@@ -142,20 +106,12 @@ struct ClusteredLights
   void invalidateAllShadows();                   //{ lightShadows->invalidateAllVolumes(); }
   void invalidateStaticObjects(bbox3f_cref box); // invalidate static content within box
 
-  using StaticRenderCallback = void(mat44f_cref globTm, const TMatrix &itm, int updateIndex, int viewIndex,
-    DynamicShadowRenderGPUObjects render_gpu_objects);
+  using StaticRenderCallback = void(mat44f_cref globTm, const TMatrix &itm, DynamicShadowRenderGPUObjects render_gpu_objects);
   using DynamicRenderCallback = void(const TMatrix &itm, const mat44f &view_tm, const mat44f &proj_tm);
-
-  void framePrepareShadows(dynamic_shadow_render::VolumesVector &volumesToRender, const Point3 &viewPos, mat44f_cref globtm, float hk,
-    dag::ConstSpan<bbox3f> dynamicBoxes, dynamic_shadow_render::FrameUpdates *frameUpdates);
-
-  void frameRenderShadows(const dag::ConstSpan<uint16_t> &volumesToRender,
-    eastl::fixed_function<sizeof(void *) * 2, StaticRenderCallback> renderStatic,
-    eastl::fixed_function<sizeof(void *) * 2, DynamicRenderCallback> renderDynamic);
-
+  void prepareShadows(const Point3 &viewPos, mat44f_cref globtm, float hk, dag::ConstSpan<bbox3f> dynamicBoxes,
+    eastl::fixed_function<sizeof(void *) * 2, StaticRenderCallback> render_static,
+    eastl::fixed_function<sizeof(void *) * 2, DynamicRenderCallback> render_dynamic);
   void updateShadowBuffers();
-
-  dynamic_shadow_render::QualityParams getQualityParams() const;
 
   void afterReset();
   void setResolution(uint32_t width, uint32_t height);
@@ -167,8 +123,6 @@ struct ClusteredLights
 
   void setNeedSsss(bool need_ssss);
   void setMaxShadowsToUpdateOnFrame(int max_shadows) { maxShadowsToUpdateOnFrame = max_shadows; }
-
-  void resetShadows();
 
 protected:
   Tab<uint16_t> visibleSpotLightsId;
@@ -185,10 +139,8 @@ protected:
   // So we limit it for all platforms.
   static constexpr int MAX_VISIBLE_FAR_LIGHTS = 65536 / max(sizeof(RenderSpotLight), sizeof(RenderOmniLight));
 
-  static bool reallocate_common(UniqueBuf &buf, uint16_t &size, int target_size_in_constants, const char *stat_name,
-    bool permanent = false);
+  static bool reallocate_common(UniqueBuf &buf, uint16_t &size, int target_size_in_constants, const char *stat_name);
   static bool updateConsts(Sbuffer *buf, void *data, int data_size, int elems_count);
-  void changeShadowResolutionByQuality(uint32_t shadow_quality, bool dynamic_shadow_32bit);
 
   template <int elem_size_in_constants, bool store_elems_count>
   struct ReallocatableConstantBuffer
@@ -207,7 +159,7 @@ protected:
       wasWritten = false;
     }
     ~ReallocatableConstantBuffer() { close(); }
-    bool reallocate(int target_size_in_elems, int max_size_in_elems, const char *stat_name, bool persistent = false)
+    bool reallocate(int target_size_in_elems, int max_size_in_elems, const char *stat_name)
     {
       wasWritten = false;
       int targetSizeInElems = min(target_size_in_elems, max_size_in_elems);
@@ -216,7 +168,7 @@ protected:
       int targetSizeInConstants = targetSizeInElems * ELEM_SIZE + (store_elems_count ? 1 : 0);
       if (!targetSizeInConstants || size >= targetSizeInConstants)
         return true;
-      return ClusteredLights::reallocate_common(buf, size, targetSizeInConstants, stat_name, persistent);
+      return ClusteredLights::reallocate_common(buf, size, targetSizeInConstants, stat_name);
     }
     D3DRESID getId() const
     {
@@ -276,15 +228,12 @@ protected:
   ReallocatableConstantBuffer<sizeof(RenderSpotLight) / 16, true> visibleSpotLightsCB, visibleFarSpotLightsCB;
   ReallocatableConstantBuffer<1, false> commonLightShadowsBufferCB;
   UniqueBufHolder spotLightSsssShadowDescBuffer;
-  UniqueBuf visibleSpotLightsMasksSB;
-  UniqueBuf visibleOmniLightsMasksSB;
+  UniqueBufHolder visibleSpotLightsMasksSB;
+  UniqueBufHolder visibleOmniLightsMasksSB;
 
   ReallocatableConstantBuffer<sizeof(RenderOmniLight) / 16, true> outOfFrustumOmniLightsCB;
   ReallocatableConstantBuffer<sizeof(RenderSpotLight) / 16, true> outOfFrustumVisibleSpotLightsCB;
   ReallocatableConstantBuffer<1, false> outOfFrustumCommonLightsShadowsCB;
-  Point4 omniOOFBox[2], spotOOFBox[2];
-  UniqueBufHolder outOfFrustumLightsFullGridCB;
-  eastl::unique_ptr<ComputeShaderElement> cull_out_of_frustum_lights_cs, clear_out_of_frustum_grid_cs;
 
   eastl::array<UniqueBuf, MAX_FRAMES> lightsFullGridCB;
   carray<uint32_t, MAX_FRAMES> currentIndicesSize;
@@ -310,16 +259,16 @@ protected:
   UniqueBuf coneSphereIb;
   static constexpr int INVALID_VOLUME = 0xFFFF;
 
-  OmniLightsManager omniLights;                                            //-V730_NOINIT
-  SpotLightsManager spotLights;                                            //-V730_NOINIT
-  float closeSliceDist = 4, maxClusteredDist = 500;                        //?
-  int maxShadowsToUpdateOnFrame = DEFAULT_MAX_SHADOWS_TO_UPDATE_PER_FRAME; // quality param
-  float maxShadowDist = 120.f;                                             // quality and scene param
+  OmniLightsManager omniLights;                     //-V730_NOINIT
+  SpotLightsManager spotLights;                     //-V730_NOINIT
+  float closeSliceDist = 4, maxClusteredDist = 500; //?
+  int maxShadowsToUpdateOnFrame = 4;                // quality param
+  float maxShadowDist = 120.f;                      // quality and scene param
   eastl::unique_ptr<ShadowSystem> lightShadows;
   eastl::unique_ptr<DistanceReadbackLights> dstReadbackLights;
   StaticTab<uint16_t, SpotLightsManager::MAX_LIGHTS> dynamicSpotLightsShadows; //-V730_NOINIT
   StaticTab<uint16_t, OmniLightsManager::MAX_LIGHTS> dynamicOmniLightsShadows; //-V730_NOINIT
-  eastl::bitset<SpotLightsManager::MAX_LIGHTS + OmniLightsManager::MAX_LIGHTS> dynamicLightsShadowsVolumeSet;
+  eastl::bitset<SpotLightsManager::MAX_LIGHTS> dynamicLightsShadowsVolumeSet;
   bool buffersFilled = false;
   bool lightsInitialized = false;
   void setSpotLightShadowVolume(int spot_light_id);
@@ -350,16 +299,4 @@ protected:
     int index_start, int fcount);
 
   eastl::unique_ptr<TiledLights> tiledLights;
-
-  eastl::string nameSuffix;
-  mutable eastl::string resNameTmp;
-  // append nameSuffix to this name to get unique d3d names
-  const char *getResName(const char *name) const
-  {
-    if (DAGOR_LIKELY(nameSuffix.empty()))
-      return name;
-    resNameTmp = name;
-    resNameTmp += nameSuffix;
-    return resNameTmp.c_str();
-  }
 };

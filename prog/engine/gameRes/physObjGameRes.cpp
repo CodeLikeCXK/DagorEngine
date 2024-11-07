@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <gameRes/dag_gameResSystem.h>
 #include <gameRes/dag_stdGameRes.h>
 #include <shaders/dag_dynSceneRes.h>
@@ -12,8 +10,6 @@
 #include <gameRes/dag_dumpResRefCountImpl.h>
 #include <osApiWrappers/dag_critSec.h>
 
-DynamicPhysObjectData::DynamicPhysObjectData() = default;
-DynamicPhysObjectData::~DynamicPhysObjectData() = default;
 
 class PhysObjGameResFactory final : public GameResourceFactory
 {

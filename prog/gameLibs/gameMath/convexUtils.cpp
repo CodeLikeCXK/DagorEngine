@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <gameMath/convexUtils.h>
 #include <vecmath/dag_vecMath.h>
 

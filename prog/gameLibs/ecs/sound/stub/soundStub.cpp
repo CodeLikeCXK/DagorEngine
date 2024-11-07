@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <ecs/core/entityManager.h>
 #include <ecs/sound/soundGroup.h>
 
@@ -10,8 +8,6 @@ using namespace sndsys;
 EventHandle get_sound(const SoundEventGroup &, event_id_t) { return {}; }
 bool has_sound(const SoundEventGroup &, event_id_t) { return false; }
 void reject_sound(SoundEventGroup &, event_id_t, bool) {}
-
-void abandon_sound(SoundEventGroup &, event_id_t) {}
 
 void release_sound(SoundEventGroup &, event_id_t) {}
 

@@ -1,15 +1,11 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <debug/dag_log.h>
 #include <math/dag_Point2.h>
-#include <drv/3d/dag_texture.h>
-#include <drv/3d/dag_tex3d.h>
-#include <drv/3d/dag_driver.h>
-#include <drv/3d/dag_info.h>
+#include <3d/dag_tex3d.h>
+#include <3d/dag_drv3d.h>
 #include <shaders/dag_shaderVar.h>
 #include <stdio.h>
-#include <drv/3d/dag_samplerHandle.h>
 
 
 namespace webbrowser
@@ -19,7 +15,6 @@ struct TextureBuffer
 {
   Texture *data = nullptr;
   TEXTUREID id = BAD_TEXTUREID;
-  d3d::SamplerHandle smp;
 }; // struct TextureBuffer
 
 
@@ -80,7 +75,6 @@ public:
   }
 
   TEXTUREID getActiveTextureId() { return this->buffers[curBufNo].id; }
-  d3d::SamplerHandle getActiveSampler() { return this->buffers[curBufNo].smp; }
   bool empty() { return this->isEmpty; }
   Point2 size() { return Point2(this->width, this->height); }
   Point2 pos() { return Point2(this->x, this->y); }
@@ -110,10 +104,7 @@ private:
       }
 
       b.id = register_managed_tex(texName, b.data);
-      b.data->disableSampler();
-      d3d::SamplerInfo smpInfo;
-      smpInfo.address_mode_u = smpInfo.address_mode_v = smpInfo.address_mode_w = d3d::AddressMode::Clamp;
-      b.smp = d3d::request_sampler(smpInfo);
+      b.data->texaddr(TEXADDR_CLAMP);
     }
 
     this->width = w;

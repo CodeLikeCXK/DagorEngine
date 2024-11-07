@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "tex_checker.h"
 
 #include <debug/dag_debug.h>

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <backend/resourceScheduling/packer.h>
 
 #include <debug/dag_assert.h>
@@ -227,11 +225,11 @@ struct GreedyScanlinePacker
         // When the allocator fails to allocate space for a resource due to
         // max heap size constraint, it returns a zero size/offset allocation.
         // Hence we simply set the resulting offset to NOT_SCHEDULED here.
-        if (DAGOR_LIKELY(allocation->size != 0 || allocation->offset != 0))
+        if (EASTL_LIKELY(allocation->size != 0 || allocation->offset != 0))
         {
           // If allocation respects hint, assign it as output offset.
           if (is_hinted(res) &&
-              DAGOR_LIKELY(res.sizeWithHint(allocation->offset) <= allocation->size && res.offsetHint >= allocation->offset))
+              EASTL_LIKELY(res.sizeWithHint(allocation->offset) <= allocation->size && res.offsetHint >= allocation->offset))
           {
             calculatedOffsets[endingIndex] = res.offsetHint;
           }
@@ -444,7 +442,7 @@ Allocation GreedyAllocator::allocate(const PackerInput::Resource &res, TimePoint
   }
   const MemorySize allocSize = res.sizeWithHint(currentHeapSize);
 
-  if (DAGOR_UNLIKELY(allocSize > maxHeapSize || currentHeapSize > maxHeapSize - allocSize))
+  if (EASTL_UNLIKELY(allocSize > maxHeapSize || currentHeapSize > maxHeapSize - allocSize))
   {
     G_ASSERTF(
       res.sizeWithPadding(currentHeapSize) > maxHeapSize || currentHeapSize > maxHeapSize - res.sizeWithPadding(currentHeapSize),

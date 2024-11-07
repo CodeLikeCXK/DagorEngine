@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <EASTL/unordered_set.h>
@@ -33,8 +32,7 @@ public:
     RESULT_ELEMS_ADDED_OR_REMOVED = 0x01,
     RESULT_HOTKEYS_STACK_MODIFIED = 0x02,
     RESULT_NEED_XMB_REBUILD = 0x04,
-    RESULT_INVALIDATE_RENDER_LIST = 0x08,
-    RESULT_INVALIDATE_INPUT_STACK = 0x10,
+    RESULT_INVALIDATE_RENDER_LIST = 0x08
   };
 
   static constexpr int F_DRAG_ACTIVE = 0x0001;

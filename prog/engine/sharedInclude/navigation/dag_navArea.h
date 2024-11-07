@@ -1,5 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-#pragma once
+
+#ifndef _NAV_AREA_H_
+#define _NAV_AREA_H_
 
 #include <generic/dag_tabUtils.h>
 
@@ -452,3 +453,6 @@ inline real CNavArea::getY(real x, real z) { return GetY(x, z); }
 inline void CNavArea::addHintPoint(NavHintPoint *point) { hintPoints.push_back(point); }
 
 inline void CNavArea::removeHintPoint(NavHintPoint *point) { tabutils::erase(hintPoints, point); }
+
+
+#endif // _NAV_AREA_H_

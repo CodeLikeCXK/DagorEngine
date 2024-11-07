@@ -1,5 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
+// Copyright 2023 by Gaijin Games KFT, All rights reserved.
 #include <shaders/shFunc.h>
 #include <debug/dag_debug.h>
 #include <math/dag_color.h>
@@ -70,15 +69,12 @@ int prepareArgs(FunctionId func, FuncArgument *args, int /*num*/)
       return 2;
     case BF_GET_SIZE: args[0].vt = shexpr::VT_BUFFER; return 1;
     case BF_GET_VIEWPORT: return 0;
-    case BF_REQUEST_SAMPLER:
+    case BF_CREATE_SAMPLER:
       args[0].vt = shexpr::VT_REAL;
       args[1].vt = shexpr::VT_COLOR4;
       args[2].vt = shexpr::VT_REAL;
       args[3].vt = shexpr::VT_REAL;
       return 4;
-    case BF_EXISTS_TEX: args[0].vt = shexpr::VT_TEXTURE; return 1;
-    case BF_EXISTS_BUF: args[0].vt = shexpr::VT_BUFFER; return 1;
-
     default: G_ASSERT(0);
   }
   return -1;
@@ -105,9 +101,7 @@ int getOpCount(FunctionId func)
     case BF_GET_DIMENSIONS: return 2;
     case BF_GET_SIZE: return 1;
     case BF_GET_VIEWPORT: return 0;
-    case BF_REQUEST_SAMPLER: return 4;
-    case BF_EXISTS_TEX: return 1;
-    case BF_EXISTS_BUF: return 1;
+    case BF_CREATE_SAMPLER: return 4;
     default: G_ASSERT(0);
   }
   return 0;
@@ -134,9 +128,7 @@ shexpr::ValueType getValueType(FunctionId func)
     case BF_GET_DIMENSIONS: return shexpr::VT_COLOR4;
     case BF_GET_SIZE: return shexpr::VT_REAL;
     case BF_GET_VIEWPORT: return shexpr::VT_COLOR4;
-    case BF_REQUEST_SAMPLER: return shexpr::VT_UNDEFINED;
-    case BF_EXISTS_TEX: return shexpr::VT_REAL;
-    case BF_EXISTS_BUF: return shexpr::VT_REAL;
+    case BF_CREATE_SAMPLER: return shexpr::VT_UNDEFINED;
     default: G_ASSERT(0);
   }
   return shexpr::VT_UNDEFINED;
@@ -229,12 +221,8 @@ bool getFuncId(const char *name, FunctionId &ret_func)
     ret_func = BF_GET_SIZE;
   else if (dd_stricmp(name, "get_viewport") == 0)
     ret_func = BF_GET_VIEWPORT;
-  else if (dd_stricmp(name, "request_sampler") == 0)
-    ret_func = BF_REQUEST_SAMPLER;
-  else if (dd_stricmp(name, "exists_tex") == 0)
-    ret_func = BF_EXISTS_TEX;
-  else if (dd_stricmp(name, "exists_buf") == 0)
-    ret_func = BF_EXISTS_BUF;
+  else if (dd_stricmp(name, "create_sampler") == 0)
+    ret_func = BF_CREATE_SAMPLER;
   else
     return false;
   return true;

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <gui/dag_visualLog.h>
 #include <util/dag_string.h>
 #include <winGuiWrapper/wgw_dialogs.h>

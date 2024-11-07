@@ -1,13 +1,11 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <daEditorE/de_objEditor.h>
 #include <daEditorE/de_interface.h>
 #include <daEditorE/de_objCreator.h>
 #include <generic/dag_sort.h>
 #include <libTools/util/strUtil.h>
-#include <drv/hid/dag_hiKeybIds.h>
-#include <drv/hid/dag_hiKeybData.h>
-#include <drv/hid/dag_hiPointingData.h>
+#include <humanInput/dag_hiKeybIds.h>
+#include <humanInput/dag_hiKeybData.h>
+#include <humanInput/dag_hiPointingData.h>
 #include <math/dag_mathAng.h>
 #include <debug/dag_debug.h>
 #include <util/dag_convar.h>
@@ -847,6 +845,18 @@ void ObjectEditor::setEditMode(int mode)
 
 
 void ObjectEditor::invalidateObjectProps() { areObjectPropsValid = false; }
+
+
+void ObjectEditor::updateObjectProps()
+{
+  /*
+    if (!areObjectPropsValid && objectPropBar)
+    {
+      objectPropBar->fillPanel();
+      areObjectPropsValid=true;
+    }
+  */
+}
 
 
 void ObjectEditor::dropObjects()

@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -11,7 +12,7 @@
 #include <EASTL/string.h>
 #include <EASTL/string_view.h>
 #include <EASTL/unique_ptr.h>
-#include <dag/dag_vectorSet.h>
+#include <EASTL/vector_set.h>
 #include <EASTL/fixed_vector.h>
 #include <EASTL/bitvector.h>
 #include <memory/dag_framemem.h>
@@ -93,7 +94,8 @@ public:
     }
     static ComponentsSet from(const component_t *b, size_t cnt) { return ComponentsSet{b, cnt}; }
   };
-  typedef dag::VectorSet<component_t> component_set;
+  typedef eastl::vector_set<component_t, eastl::less<component_t>, EASTLAllocatorType, dag::Vector<component_t, EASTLAllocatorType>>
+    component_set;
   static constexpr size_t PARENTS_INPLACE_SIZE = 5; // 98% templates in Enlisted have <=4 parents
   typedef InplaceKeyContainer<uint32_t, PARENTS_INPLACE_SIZE> ParentsList;
 
@@ -128,7 +130,7 @@ public:
   ComponentsSet getIgnoredInitialReplicationSet() const { return ignoredSet(); }
   ComponentsSet trackedSet() const { return ComponentsSet::from(sets.get() + trackedOfs(), trackedCount); }
   ComponentsSet replicatedSet() const { return ComponentsSet::from(sets.get() + replicatedOfs(), replicatedCount); }
-  bool isEqual(const Template &t, const ecs::ComponentTypes &types) const;
+  bool isEqual(const Template &t) const;
 
   bool isSingleton() const;
   const ChildComponent &getComponent(const HashedConstString &hash_name) const;
@@ -203,8 +205,6 @@ struct TemplateDBInfo
   TagsSet filterTags;
   ComponentsFlags componentFlags;
   bool hasServerTag = false;
-  EntityManager &mgr;
-  TemplateDBInfo(EntityManager &mgr) : mgr(mgr) {}
   void updateComponentTags(HashedConstString comp_name, const char *filter_tags, const char *templ_name, const char *tpath);
 
   const DataBlock *getTemplateMetaInfo(const char *templ_name) const;
@@ -318,13 +318,11 @@ struct TemplatesData : public TemplateComponentsDB
   typedef OAHashNameMap<false, FNV1OAHasher<false>> NameMap;
   typedef typename TemplateList::iterator iterator;
   typedef typename TemplateList::const_iterator const_iterator;
-  EntityManager *mgr = nullptr;
   TemplateList templates;
   NameMap templatesIds; // probably consider use compile time hashes for creation
 #if DAGOR_DBGLEVEL > 0
   OAHashNameMap<false> pathNames;
 #endif
-  TemplatesData(EntityManager *mgr) : mgr(mgr) {}
   size_t size() const { return templates.size(); }
   const_iterator begin() const { return templates.begin(); }
   const_iterator end() const { return templates.end(); }
@@ -383,9 +381,6 @@ struct TemplateRefs : public TemplatesData
   void amend(TemplateRefs &&overrides);
   void finalize(uint32_t tag);
   bool isTopoSorted() const;
-
-  TemplateRefs(EntityManager &mgr) : TemplatesData(&mgr) {}
-  TemplateRefs(EntityManager *mgr) : TemplatesData(mgr) {}
 
 private:
   void topoSort();
@@ -457,8 +452,6 @@ public:
   using TemplatesData::getTemplateById;
   using TemplatesData::getTemplateIdByName;
   using TemplatesData::size;
-
-  TemplateDB(EntityManager &mgr) : TemplatesData(&mgr), db(mgr) {}
 
   enum AddResult
   {

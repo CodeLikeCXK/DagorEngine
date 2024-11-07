@@ -110,7 +110,7 @@ function mkPcCursor(children, cursorBase=cursorPc){
 cursors.normal <- Cursor(@() mkPcCursor([tooltipCmp]))
 
 let helpSign = {
-  rendObj = ROBJ_TEXT
+  rendObj = ROBJ_INSCRIPTION
   text = "?"
   fontSize = hdpx(20)
   vplace = ALIGN_CENTER

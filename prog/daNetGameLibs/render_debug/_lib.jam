@@ -1,2 +1,0 @@
-gamePulls += framework_render_debug_pull daNetGameLibs_render_debug_DAS_pull_AOT ;
-UseProgLibs += daNetGameLibs/render_debug ;

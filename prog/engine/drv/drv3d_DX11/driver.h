@@ -1,4 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __DRV3D_DX11_DRIVER_H
+#define __DRV3D_DX11_DRIVER_H
 #pragma once
 
 #define INSIDE_DRIVER 1
@@ -20,11 +21,9 @@ struct RENDERDOC_API_1_5_0;
 // #include <d3dx10.h>
 
 // using dx9 interface
-#include <drv/3d/dag_buffers.h>
-#include <drv/3d/dag_texture.h>
-#include <drv/3d/dag_consts_base.h>
-#include <drv/3d/dag_driver.h>
-#include <drv/3d/dag_platform_pc.h>
+#include <3d/dag_3dConst_base.h>
+#include <3d/dag_drv3d.h>
+#include <3d/dag_drv3d_pc.h>
 #include <math/dag_mathBase.h>
 #include <generic/dag_carray.h>
 #include <generic/dag_tab.h>
@@ -39,10 +38,7 @@ struct RENDERDOC_API_1_5_0;
 #include <osApiWrappers/dag_spinlock.h>
 #include <AmdDxExtDepthBoundsApi.h>
 #include <supp/dag_comPtr.h>
-#include <drv/3d/dag_resetDevice.h>
-#include "streamline_adapter.h"
-#include "winapi_helpers.h"
-#include <EASTL/optional.h>
+#include <3d/dag_drv3dReset.h>
 
 /*
 #include "drvdesc.h"
@@ -59,9 +55,10 @@ struct ID3D11Device3;
 struct ID3D11DeviceContext1;
 
 #if DAGOR_DBGLEVEL > 0
-#define CHECK_MAIN_THREAD()                                                                                                         \
-  G_ASSERTF((gpuAcquireRefCount && gpuThreadId == GetCurrentThreadId()), "curThread=%X != gpuThread=%d, is_main=%d acquire_ref=%d", \
-    GetCurrentThreadId(), gpuThreadId, is_main_thread(), gpuAcquireRefCount)
+#define CHECK_MAIN_THREAD()                                                                                                          \
+  G_ASSERTF((!mt_enabled && !gpuAcquireRefCount && is_main_thread()) || (gpuAcquireRefCount && gpuThreadId == GetCurrentThreadId()), \
+    "curThread=%X != gpuThread=%d, is_main=%d acquire_ref=%d", GetCurrentThreadId(), gpuThreadId, is_main_thread(),                  \
+    gpuAcquireRefCount)
 #else
 #define CHECK_MAIN_THREAD() ((void)0)
 #endif
@@ -107,7 +104,7 @@ extern void dump_memory_if_needed(HRESULT hr);
 } // namespace drv3d_dx11
 
 #define __DXFATAL(x, ...) DAG_FATAL(x, ##__VA_ARGS__)
-#define __DXERR(x, ...)   LOGERR_CTX(x, ##__VA_ARGS__)
+#define __DXERR(x, ...)   logerr_ctx(x, ##__VA_ARGS__)
 //-V:DXFATAL:1048
 #define DXFATAL(expr, text, ...)                                                                        \
   do                                                                                                    \
@@ -133,7 +130,7 @@ extern void dump_memory_if_needed(HRESULT hr);
   } while (0)
 
 #define RETRY_CREATE_STAGING_TEX(HR, SZ, EXPR)                                       \
-  if (DAGOR_UNLIKELY(FAILED(HR)) && (HR) == E_OUTOFMEMORY)                           \
+  if (EASTL_UNLIKELY(FAILED(HR)) && (HR) == E_OUTOFMEMORY)                           \
   {                                                                                  \
     if (dgs_on_out_of_memory && dgs_on_out_of_memory(tql::sizeInKb(SZ + (2 << 20)))) \
       HR = EXPR;                                                                     \
@@ -179,8 +176,10 @@ extern SmartReadWriteFifoLock reset_rw_lock; // Read-lock for loading resources,
 extern Texture *secondary_backbuffer_color_tex;
 extern intptr_t gpuThreadId;
 extern int gpuAcquireRefCount;
+extern bool mt_enabled;
 extern D3D_FEATURE_LEVEL featureLevelsSupported;
 extern __declspec(thread) HRESULT last_hres;
+extern bool is_backbuffer_samplable_depth;
 extern bool is_nvapi_initialized;
 extern int default_display_index;
 extern IAmdDxExt *amdExtension;
@@ -206,14 +205,16 @@ extern HRESULT device_is_lost;
 extern unsigned texture_sysmemcopy_usage, vbuffer_sysmemcopy_usage, ibuffer_sysmemcopy_usage;
 extern bool use_tearing;
 extern double vsync_refresh_rate;
-extern eastl::optional<StreamlineAdapter> streamlineAdapter;
-extern HandlePointer waitableObject;
 
 extern float screen_aspect_ratio;
 
-inline float normalizeColor(int value)
+typedef Driver3dDesc DriverDesc;
+
+static BOOL toBOOL(bool b) { return b ? TRUE : FALSE; }
+
+static inline float normalizeColor(int value)
 {
-  constexpr float oneOver255 = 1. / 255;
+  static const float oneOver255 = 1. / 255;
   return clamp<float>(oneOver255 * value, 0., 1.0);
 }
 
@@ -224,7 +225,6 @@ inline float normalizeColor(int value)
     float maxPointSpriteSize;
   };*/
 
-typedef Driver3dDesc DriverDesc;
 extern DriverDesc g_device_desc;
 
 struct ContextAutoLock
@@ -255,7 +255,6 @@ struct AutoAcquireGpu
 void remove_texture_from_samplers(BaseTexture *tex);
 void remove_buffer_from_slot(Sbuffer *buf);
 void remove_view_from_uav(ID3D11UnorderedAccessView *view);
-void remove_view_from_uav_ignore_slot(int shader_stage, int ignore_slot, ID3D11UnorderedAccessView *view);
 void disable_conditional_render_unsafe();
 }; // namespace drv3d_dx11
 
@@ -268,6 +267,7 @@ using namespace drv3d_generic;
 #include "buffers.h"
 #include "states.h"
 #include "shaders.h"
+#include "sampler.h"
 
 
 namespace drv3d_dx11
@@ -283,6 +283,7 @@ enum
 struct DriverState
 {
   Texture *backBufferColorTex;
+  Texture *backBufferDepthTex;
   uint16_t width;
   uint16_t height;
 
@@ -291,6 +292,7 @@ struct DriverState
   int msaaQuality;
   bool msaaEnabled;
 
+  Tab<BaseTexture *> depthTextures;
   bool createSurfaces(uint32_t screenWidth, uint32_t screenHeight);
 };
 
@@ -451,7 +453,6 @@ void close_rendertargets();
 void close_buffers();
 void close_shaders();
 void close_states();
-void close_samplers();
 void recreate_render_states();
 void close_textures();
 void recreate_all_queries();
@@ -545,7 +546,6 @@ static void close_all()
   close_buffers();
   close_shaders();
   close_states();
-  close_samplers();
   close_predicates();
   close_textures();
   close_frame_callbacks();
@@ -558,3 +558,5 @@ const char *dx11_error(HRESULT hr);
 void override_unsupported_bc(uint32_t &cflg);
 HRESULT set_fullscreen_state(bool fullscreen);
 } // namespace drv3d_dx11
+
+#endif

@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <memory/dag_linearHeapAllocator.h>
@@ -14,6 +13,8 @@ struct FrameBoundaryElem
   FrameBoundaryElem(RegionId region_id, TEXTUREID texture_id, IPoint2 frame_dim) :
     regionId(region_id), textureId(texture_id), frameDim(frame_dim)
   {}
+
+  ~FrameBoundaryElem() = default;
 
   TEXTUREID textureId;
   IPoint2 frameDim;
@@ -43,7 +44,6 @@ public:
 
   void afterDeviceReset();
 
-  void init(bool use_sbuffer);
   void update(unsigned int current_frame);
   void prepareRender();
 
@@ -67,7 +67,6 @@ protected:
   dag::Vector<FrameBoundaryElem> frameBoundaryElemArr;
   dag::Vector<FrameBoundaryElem> dirtyElemArr;
 
-  int frameBoundaryBufferInitialSize = 0;
   int bufferElemCnt = 0;
 
   UniqueBuf frameBoundaryBuffer;

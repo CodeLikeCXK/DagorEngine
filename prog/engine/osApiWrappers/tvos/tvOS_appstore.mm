@@ -1,4 +1,10 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+//
+//  apstorekit.mm
+//  bot
+//
+//  Created by Sergey Kushnirenko on 03/03/2017.
+//  Copyright © 2017 All rights reserved.
+//
 
 #import <Foundation/Foundation.h>
 #import <StoreKit/StoreKit.h>

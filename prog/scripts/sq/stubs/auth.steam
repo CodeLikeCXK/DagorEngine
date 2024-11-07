@@ -1,4 +1,0 @@
-return {
-  get_steam_link_token = @(_event_cb) ""
-  login_steam = @(_params, _id) null
-}

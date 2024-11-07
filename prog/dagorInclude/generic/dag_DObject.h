@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -21,7 +22,7 @@
 #include <osApiWrappers/dag_atomic.h>
 #include <dag/dag_relocatable.h>
 
-#include <supp/dag_define_KRNLIMP.h>
+#include <supp/dag_define_COREIMP.h>
 
 /**
   Class id for objects derived from DObject.
@@ -77,8 +78,6 @@ public:
 #else
   DObject() { ref_count = 0; }
   DObject(const DObject & /*src*/) : ref_count(0) {}
-  DObject &operator=(const DObject &) = delete;
-  DObject &operator=(DObject &&) = default;
 
   virtual ~DObject() {}
 
@@ -237,10 +236,9 @@ typedef Ptr<DObject> DObjectPtr;
 /// 'auto' declare class and some other stuff
 #define decl_ptr(cn) typedef Ptr<class cn> cn##Ptr;
 
-#define decl_dclass_hdr(classname, baseclass) \
-  decl_ptr(classname)                         \
-  class classname : public baseclass          \
-  {                                           \
+#define decl_dclass_hdr(classname, baseclass)            \
+  decl_ptr(classname) class classname : public baseclass \
+  {                                                      \
   public:
 
 #define decl_class_name(classname)        \
@@ -250,17 +248,12 @@ typedef Ptr<DObject> DObjectPtr;
   }
 
 #define decl_issubof(classname, baseclass)                 \
-  static constexpr DClassID CLASS_ID = classname##CID;     \
-  static constexpr const char *CLASS_NAME = #classname;    \
   bool isSubOf(DClassID id) override                       \
   {                                                        \
     return id == classname##CID || baseclass::isSubOf(id); \
   }
 
-#define decl_dclass(cn, bc) \
-  decl_dclass_hdr(cn, bc)   \
-  decl_class_name(cn)       \
-  decl_issubof(cn, bc)
+#define decl_dclass(cn, bc) decl_dclass_hdr(cn, bc) decl_class_name(cn) decl_issubof(cn, bc)
 
 #define decl_dclass_and_id(cn, bc, id) \
   decl_dclassid(id, cn);               \
@@ -276,7 +269,7 @@ decl_dclassid(1, DObject);
 
 KRNLIMP void check_lost_dobjects();
 
-#include <supp/dag_undef_KRNLIMP.h>
+#include <supp/dag_undef_COREIMP.h>
 
 /// @}
 /// @}

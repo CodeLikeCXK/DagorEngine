@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <render/debug3dSolidBuffered.h>
 #include <generic/dag_tab.h>
 #include <generic/dag_carray.h>

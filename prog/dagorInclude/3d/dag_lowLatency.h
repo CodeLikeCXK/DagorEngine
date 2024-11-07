@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -19,7 +20,6 @@ namespace lowlatency
 {
 
 void init();
-bool is_inited();
 void close();
 uint32_t start_frame();
 uint32_t get_current_frame();

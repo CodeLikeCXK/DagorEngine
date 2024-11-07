@@ -1,12 +1,13 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
 #include <ioSys/dag_baseIo.h>
 
-#include <supp/dag_define_KRNLIMP.h>
+#include <supp/dag_define_COREIMP.h>
 
 // Chained memory segments to store data
 struct MemoryChainedData
@@ -222,4 +223,4 @@ protected:
   void initDefs();
 };
 
-#include <supp/dag_undef_KRNLIMP.h>
+#include <supp/dag_undef_COREIMP.h>

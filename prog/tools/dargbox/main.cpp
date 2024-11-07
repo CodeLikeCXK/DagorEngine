@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <shaders/dag_shaders.h>
 #include <shaders/dag_shaderBlock.h>
 
@@ -9,15 +7,15 @@
 #include <startup/dag_startupTex.h>
 #include <startup/dag_fatalHandler.inc.cpp>
 
-#include <drv/hid/dag_hiGlobals.h>
-#include <drv/hid/dag_hiPointingData.h>
+#include <humanInput/dag_hiGlobals.h>
+#include <humanInput/dag_hiPointingData.h>
 #include <workCycle/dag_startupModules.h>
 #include <workCycle/dag_gameSettings.h>
 #include <workCycle/dag_workCycle.h>
 #include <gameRes/dag_gameResSystem.h>
 #include <gameRes/dag_stdGameRes.h>
 #include <3d/dag_picMgr.h>
-#include <drv/3d/dag_resetDevice.h>
+#include <3d/dag_drv3dReset.h>
 #include <3d/dag_texPackMgr2.h>
 #include <fx/dag_commonFx.h>
 #include <fx/dag_fxInterface.h>
@@ -45,7 +43,25 @@
 #include "vr.h"
 #include <quirrel/udp/udp.h>
 
-#include "setupLogsDir.h"
+#define __DEBUG_MODERN_PREFIX dargbox_get_log_prefix()
+#define __DEBUG_DYNAMIC_LOGSYS
+#define __DEBUG_CLASSIC_LOGSYS_FILEPATH dargbox_get_log_prefix()
+#define __DEBUG_USE_CLASSIC_LOGSYS()    (false)
+
+static String dargbox_get_log_prefix(/*bool do_crypt*/)
+{
+  String prefix(framemem_ptr());
+  const char *pathArg = ::dgs_get_argv("logspath");
+  if (pathArg && *pathArg)
+  {
+    prefix = pathArg;
+    if (prefix[prefix.length() - 1] != '/' && prefix[prefix.length() - 1] != '\\')
+      prefix.append("/");
+  }
+  prefix.append(".logs/");
+  return prefix;
+}
+
 
 #if _TARGET_PC_WIN
 #define __UNLIMITED_BASE_PATH 1
@@ -161,8 +177,9 @@ static void post_shutdown_handler()
   }
 
   shutdown_game(RESTART_UI);
+  del_it(::gui_cursor);
   PictureManager::release();
-  DEBUG_CTX("shutdown!");
+  debug_ctx("shutdown!");
   shutdown_game(RESTART_INPUT);
   EffectsInterface::shutdown();
   shutdown_game(RESTART_ALL);
@@ -226,28 +243,13 @@ static void dagor_main(int nCmdShow)
 #if _TARGET_ANDROID
   {
     static char android_mount_path[DAGOR_MAX_PATH] = "";
-    const char *vromsFileNames[] = {"android.vromfs.bin", "dargbox.vromfs.bin"};
-    for (const char *vromFileName : vromsFileNames)
-    {
-      VirtualRomFsData *vfsys = load_vromfs_from_asset(vromFileName, inimem);
-      if (vfsys)
-      {
-        android_mount_path[0] = 0;
-        add_vromfs(vfsys, true, android_mount_path);
-      }
-      else
-        logerr("failed to load vromfs: %s", vromFileName);
-    }
-  }
-#else
-  if (!::dgs_get_argv("nobasevrom"))
-  {
-    VirtualRomFsData *vfbase = load_vromfs_dump("dargbox.vromfs.bin", inimem);
-    static char main_mount_path[DAGOR_MAX_PATH] = "";
-    if (vfbase)
-      add_vromfs(vfbase, true, main_mount_path);
+    VirtualRomFsData *vfsys = load_vromfs_from_asset("android.vromfs.bin", inimem);
+    G_ASSERT(vfsys);
+    if (vfsys)
+      add_vromfs(vfsys, true, android_mount_path);
   }
 #endif
+
   //::dgs_dont_use_cpu_in_background = true;
   ::dgs_post_shutdown_handler = post_shutdown_handler;
   dagor_install_dev_fatal_handler(NULL);
@@ -274,7 +276,7 @@ static void dagor_main(int nCmdShow)
       String buf(0, "%s/", ::dgs_get_settings()->getStr(i));
       dd_simplify_fname_c(buf);
       if (dd_add_base_path(buf))
-        DEBUG_CTX("addpath: %s", buf.str());
+        debug_ctx("addpath: %s", buf.str());
     }
 
 
@@ -307,7 +309,7 @@ static void dagor_main(int nCmdShow)
       if (VirtualRomFsData *d = load_vromfs_dump(fn, midmem))
         add_vromfs(d);
       else
-        LOGERR_CTX("failed to load vromfs: %s", fn);
+        logerr_ctx("failed to load vromfs: %s", fn);
     }
 
   nid = ::dgs_get_settings()->getNameId("basevromfs");
@@ -328,7 +330,7 @@ static void dagor_main(int nCmdShow)
         if (d)
           add_vromfs(d);
         else
-          LOGERR_CTX("failed to load vromfs: %s", fn);
+          logerr_ctx("failed to load vromfs: %s", fn);
       }
   }
 
@@ -375,12 +377,13 @@ static void dagor_main(int nCmdShow)
 
   ::dargbox_init_joystick();
   HumanInput::stg_pnt.touchScreen = ::dgs_get_settings()->getBool("touchScreen", false);
-  HumanInput::stg_pnt.emuTouchScreenWithMouse = ::dgs_get_settings()->getBool("emuTouchScreenWithMouse", false);
 
   ::startup_game(RESTART_ALL);
   shaders_register_console(true);
 
   startup_shaders(::dgs_get_settings()->getStr("shaders", "shaders/game"));
+
+  d3d::driver_command(DRV3D_COMMAND_ENABLE_MT, NULL, NULL, NULL);
 
   ::startup_game(RESTART_ALL);
 
@@ -412,6 +415,7 @@ static void dagor_main(int nCmdShow)
   ::startup_gui_base(::dgs_get_settings()->getStr("fonts", "fonts/fonts.blk"));
   ::startup_game(RESTART_ALL);
 
+  ::gui_cursor = ::create_gui_cursor_lite();
   gui_mgr.demandInit();
   ::dagor_gui_manager = gui_mgr;
 

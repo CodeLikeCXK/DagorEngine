@@ -1,9 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "joystickParams.h"
 
 #include <workCycle/dag_workCycle.h>
-#include <drv/hid/dag_hiJoystick.h>
+#include <humanInput/dag_hiJoystick.h>
 #include <startup/dag_inpDevClsDrv.h>
 #include <ioSys/dag_dataBlock.h>
 #include <debug/dag_debug.h>
@@ -217,7 +215,7 @@ void JoystickParams::setupXbox360Joystick(HumanInput::IGenJoystick *joy)
     if (a.axisId >= 0)
       joy->setAxisLimits(a.axisId, a.rangeMin, a.rangeMax);
     else
-      LOGERR_CTX("XBox360 joystick axis %s not found on gamepad", axis_names[i]);
+      logerr_ctx("XBox360 joystick axis %s not found on gamepad", axis_names[i]);
   }
 }
 

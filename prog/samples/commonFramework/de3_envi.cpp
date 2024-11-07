@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "de3_envi.h"
 #include "de3_worldrenderer.h"
 #include "de3_ICamera.h"
@@ -7,8 +5,7 @@
 #include <render/fx/dag_demonPostFx.h>
 #include <shaders/dag_shaderVar.h>
 #include <shaders/dag_shaders.h>
-#include <drv/3d/dag_matricesAndPerspective.h>
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
 #include <3d/dag_render.h>
 #include <debug/dag_debug.h>
 

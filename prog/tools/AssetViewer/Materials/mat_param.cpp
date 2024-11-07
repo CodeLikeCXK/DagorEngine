@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "mat_param.h"
 #include "mat_paramDesc.h"
 #include "mat_util.h"

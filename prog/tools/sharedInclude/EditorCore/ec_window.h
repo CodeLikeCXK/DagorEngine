@@ -1,4 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __GAIJIN_EDITORCORE_EC_WINDOW_H__
+#define __GAIJIN_EDITORCORE_EC_WINDOW_H__
 #pragma once
 
 typedef void *TEcHandle;
@@ -43,3 +44,6 @@ public:
 private:
   TEcHandle mHWnd;
 };
+
+
+#endif

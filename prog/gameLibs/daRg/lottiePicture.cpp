@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <daRg/dag_picture.h>
 #include "scriptBinding.h"
 #include <sqModules/sqModules.h>

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "gamePhys/props/atmosphere.h"
 #include <math/dag_mathBase.h>
 #include <math/dag_mathUtils.h>

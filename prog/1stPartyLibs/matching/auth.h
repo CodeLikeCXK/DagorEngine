@@ -1,5 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-#pragma once
+#ifndef GAIJIN_MATCHING_AUTH_H
+#define GAIJIN_MATCHING_AUTH_H
 
 #include  "types.h"
 
@@ -17,3 +17,5 @@ namespace matching
                            void const* room_secret, size_t secret_size,
                            AuthKey& output);
 }
+
+#endif

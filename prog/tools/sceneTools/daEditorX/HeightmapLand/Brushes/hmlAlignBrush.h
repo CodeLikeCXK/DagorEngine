@@ -1,5 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __GAIJIN_HEIGHTMAPLAND_SMOOTH_BRUSH__
+#define __GAIJIN_HEIGHTMAPLAND_SMOOTH_BRUSH__
 #pragma once
+
 
 #include "hmlBrush.h"
 
@@ -18,8 +20,8 @@ public:
     collisionOffset(-0.1)
   {}
 
-  virtual void fillParams(PropPanel::ContainerPropertyControl &panel);
-  virtual void updateToPanel(PropPanel::ContainerPropertyControl &panel);
+  virtual void fillParams(PropPanel2 &panel);
+  virtual void updateToPanel(PropPanel2 &panel);
 
   virtual void onRBBrushPaintStart(int buttons, int key_modif) { onBrushPaintStart(buttons, key_modif); }
   virtual void onBrushPaintStart(int buttons, int key_modif)
@@ -34,7 +36,7 @@ public:
   virtual void saveToBlk(DataBlock &blk) const;
   virtual void loadFromBlk(const DataBlock &blk);
 
-  virtual bool updateFromPanelRef(PropPanel::ContainerPropertyControl &panel, int pid);
+  virtual bool updateFromPanelRef(PropPanel2 &panel, int pid);
 
 protected:
   float trail, sigma;
@@ -42,3 +44,6 @@ protected:
   bool started, continuos, alignCollision, alignCollisionTop;
   float collisionOffset;
 };
+
+
+#endif //__GAIJIN_HEIGHTMAP_BRUSH__

@@ -67,8 +67,7 @@ float calcUnifiedDirectional(float2 K, float2 W, float v, float a, float dir_dep
   float Omega = OMEGA;
 
   // phase speed
-  float Ksqr = K.x * K.x + K.y * K.y;
-  float k = sqrt(Ksqr);
+  float k = sqrt(K.x * K.x + K.y * K.y);
   if (k <= 0.0001)
   {
     return 0;
@@ -121,10 +120,5 @@ float calcUnifiedDirectional(float2 K, float2 W, float v, float a, float dir_dep
   if (Kcos < 0)
     sw *= (1.0f-dir_depend);
 
-  // largest possible wave from constant wind of velocity v
-  float l = v * v / GRAV_ACCEL;
-  // damp out waves with very small length w << l
-  float w = small_wave_fraction * l;
-
-  return sw * exp(-Ksqr * w * w);
+  return sw;
 }

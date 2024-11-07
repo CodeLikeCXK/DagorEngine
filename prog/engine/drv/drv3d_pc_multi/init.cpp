@@ -1,8 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
-#include <drv/3d/dag_driver.h>
-#include <drv/3d/dag_info.h>
-#include <drv/3d/dag_res.h>
+#include <3d/dag_drv3d.h>
+#include <3d/dag_drv3d_res.h>
 #include <ioSys/dag_dataBlock.h>
 #include <generic/dag_carray.h>
 #include <util/dag_localization.h>
@@ -10,7 +7,6 @@
 #include <startup/dag_globalSettings.h>
 #include <osApiWrappers/dag_miscApi.h>
 #include <osApiWrappers/dag_messageBox.h>
-#include <drv_utils.h>
 #if _TARGET_PC_WIN
 #include <windows.h>
 #endif
@@ -32,28 +28,28 @@ enum
 #if USE_MULTI_D3D_DX11
 namespace d3d_multi_dx11
 {
-#include "d3d_api.inc.h"
+#include "d3d_api.h"
 }
 #endif
 
 #if USE_MULTI_D3D_stub
 namespace d3d_multi_stub
 {
-#include "d3d_api.inc.h"
+#include "d3d_api.h"
 }
 #endif
 
 #if USE_MULTI_D3D_vulkan
 namespace d3d_multi_vulkan
 {
-#include "d3d_api.inc.h"
+#include "d3d_api.h"
 }
 #endif
 
 #if USE_MULTI_D3D_Metal
 namespace d3d_multi_metal
 {
-#include "d3d_api.inc.h"
+#include "d3d_api.h"
 }
 
 
@@ -63,7 +59,7 @@ extern bool isMetalAvailable();
 #if USE_MULTI_D3D_DX12
 namespace d3d_multi_dx12
 {
-#include "d3d_api.inc.h"
+#include "d3d_api.h"
 }
 APISupport get_dx12_support_status(bool use_any_device = true);
 #endif
@@ -78,30 +74,54 @@ static const carray<DriverCode, API_COUNT> api_drv_codes = {
 };
 
 D3dInterfaceTable d3di;
+bool d3d::HALF_TEXEL_OFS = false;
+float d3d::HALF_TEXEL_OFSFU = 0.f;
 
 static int active_api = API_NONE;
 
 #if USE_MULTI_D3D_DX11
-static inline void select_api_dx11() { d3d_multi_dx11::fill_interface_table(d3di); }
+static inline void select_api_dx11()
+{
+  d3d_multi_dx11::fill_interface_table(d3di);
+  d3d::HALF_TEXEL_OFS = d3d_multi_dx11::HALF_TEXEL_OFS;
+  d3d::HALF_TEXEL_OFSFU = d3d_multi_dx11::HALF_TEXEL_OFSFU;
+}
 #endif
 
 #if USE_MULTI_D3D_stub
-static inline void select_api_stub() { d3d_multi_stub::fill_interface_table(d3di); }
+static inline void select_api_stub()
+{
+  d3d_multi_stub::fill_interface_table(d3di);
+  d3d::HALF_TEXEL_OFS = d3d_multi_stub::HALF_TEXEL_OFS;
+  d3d::HALF_TEXEL_OFSFU = d3d_multi_stub::HALF_TEXEL_OFSFU;
+}
 #endif
 
 #if USE_MULTI_D3D_vulkan
-static inline void select_api_vulkan() { d3d_multi_vulkan::fill_interface_table(d3di); }
+static inline void select_api_vulkan()
+{
+  d3d_multi_vulkan::fill_interface_table(d3di);
+  d3d::HALF_TEXEL_OFS = d3d_multi_vulkan::HALF_TEXEL_OFS;
+  d3d::HALF_TEXEL_OFSFU = d3d_multi_vulkan::HALF_TEXEL_OFSFU;
+}
 #endif
 
 #if USE_MULTI_D3D_Metal
 static inline int select_api_metal()
 {
   d3d_multi_metal::fill_interface_table(d3di);
+  d3d::HALF_TEXEL_OFS = d3d_multi_metal::HALF_TEXEL_OFS;
+  d3d::HALF_TEXEL_OFSFU = d3d_multi_metal::HALF_TEXEL_OFSFU;
   return API_METAL;
 }
 #endif
 #if USE_MULTI_D3D_DX12
-static inline void select_api_dx12() { d3d_multi_dx12::fill_interface_table(d3di); }
+static inline void select_api_dx12()
+{
+  d3d_multi_dx12::fill_interface_table(d3di);
+  d3d::HALF_TEXEL_OFS = d3d_multi_dx12::HALF_TEXEL_OFS;
+  d3d::HALF_TEXEL_OFSFU = d3d_multi_dx12::HALF_TEXEL_OFSFU;
+}
 #endif
 
 #if USE_MULTI_D3D_DX11
@@ -115,8 +135,6 @@ static bool is_dx11_supported_by_os()
   SYSTEM_INFO si;
   GetNativeSystemInfo(&si);
   const char *arch = (si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64) ? "x64" : "x86";
-  if (si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_ARM64)
-    arch = "arm64";
 
   if (get_version_ex(&osvi))
     debug("detected Windows %s v%d.%d, %s", osvi.wProductType == VER_NT_WORKSTATION ? "Workstation" : "Server", osvi.dwMajorVersion,
@@ -146,12 +164,14 @@ static bool is_dx11_supported_by_os()
 
 static void message_box_os_compatibility_mode()
 {
+#if _TARGET_STATIC_LIB // No os_message_box in daKernel.
   static bool show = true;
   if (show)
-    drv_message_box(get_localized_text("msgbox/os_compatibility",
-                      "The game is running in Windows compatibility mode and can have stability and performance issues."),
+    os_message_box(get_localized_text("msgbox/os_compatibility",
+                     "The game is running in Windows compatibility mode and can have stability and performance issues."),
       get_localized_text("video/settings_adjusted_hdr"), GUI_MB_ICON_INFORMATION);
   show = false;
+#endif
 }
 #endif
 
@@ -185,7 +205,7 @@ static int detect_api(const char *drv)
             messageShown = true;
             const char *address = "https://support.gaijin.net/hc/articles/4405867465489";
             String message(1024, "%s\n<a href=\"%s\">%s</a>", get_localized_text("video/outdated_driver"), address, address);
-            drv_message_box(message.data(), get_localized_text("video/outdated_driver_hdr"), GUI_MB_OK | GUI_MB_ICON_ERROR);
+            os_message_box(message.data(), get_localized_text("video/outdated_driver_hdr"), GUI_MB_OK | GUI_MB_ICON_ERROR);
           }
           break;
         default: break;
@@ -197,7 +217,7 @@ static int detect_api(const char *drv)
       if (!messageShown)
       {
         messageShown = true;
-        drv_message_box(get_localized_text("video/previous_run_failed_text"), get_localized_text("video/previous_run_failed_caption"),
+        os_message_box(get_localized_text("video/previous_run_failed_text"), get_localized_text("video/previous_run_failed_caption"),
           GUI_MB_OK);
       }
     }
@@ -217,7 +237,7 @@ static int detect_api(const char *drv)
       return select_api_metal();
 #endif
 
-    drv_message_box(get_localized_text("video/incompatible_mac"), get_localized_text("video/outdated_driver_hdr"), GUI_MB_OK);
+    os_message_box(get_localized_text("video/incompatible_mac"), get_localized_text("video/outdated_driver_hdr"), GUI_MB_OK);
     exit(1);
   }
 #if USE_MULTI_D3D_DX11
@@ -269,17 +289,6 @@ static inline int get_selected_api()
     return active_api;
 
   const char *drv = ::dgs_get_settings()->getBlockByNameEx("video")->getStr("driver", "auto");
-
-  const bool enableNonAutoDriver = ::dgs_get_settings()->getBlockByNameEx("video")->getBool("enableNonAutoDriver", true);
-  if (!enableNonAutoDriver)
-  {
-    if (!strcmp(drv, "auto"))
-    {
-      debug("If it is required for debug purposes add video { enableNonAutoDriver:b=yes; } in settings");
-      logerr("Only auto driver is allowed! Got %s instead", drv);
-    }
-    drv = "auto";
-  }
   active_api = detect_api(drv);
   if (active_api == API_NONE) //-V547
     DAG_FATAL("D3D API not selected, settings.blk: video { driver:t=\"%s\" }", drv);
@@ -356,12 +365,17 @@ bool d3d::init_video(void *hinst, main_wnd_f *f, const char *wcname, int ncmdsho
         return true;
       }
 
+#if _TARGET_STATIC_LIB // No os_message_box in daKernel.
       if (detect_os_compatibility_mode())
         message_box_os_compatibility_mode();
 
-      drv_message_box(get_localized_text("msgbox/dx9_gpu", "The game requires videocard with DirectX 10 or higher hardware support. "),
-        "Initialization error", GUI_MB_OK | GUI_MB_ICON_ERROR);
-
+      if (!dgs_execute_quiet)
+        os_message_box(
+          get_localized_text("msgbox/dx9_gpu", "The game requires videocard with DirectX 10 or higher hardware support. "),
+          "Initialization error", GUI_MB_OK | GUI_MB_ICON_ERROR);
+      debug_flush(false);
+      _exit(1);
+#endif
       break;
 #endif
 #if USE_MULTI_D3D_stub

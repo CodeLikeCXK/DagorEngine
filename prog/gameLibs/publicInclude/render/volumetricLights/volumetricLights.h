@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -42,21 +43,6 @@ public:
     EnableDistantFog,
   };
 
-  class VolfogMediaInjectionGuard
-  {
-  public:
-    VolfogMediaInjectionGuard(const VolfogMediaInjectionGuard &other) = delete;
-    VolfogMediaInjectionGuard &operator=(const VolfogMediaInjectionGuard &other) = delete;
-
-    explicit VolfogMediaInjectionGuard(BaseTexture *tex);
-    ~VolfogMediaInjectionGuard();
-
-  private:
-    BaseTexture *tex;
-  };
-
-  static bool IS_SUPPORTED;
-
   VolumeLight();
   ~VolumeLight();
   void close();
@@ -82,9 +68,7 @@ public:
   bool updateShaders(const String &shader_name, const DataBlock &shader_blk, String &out_errors);
   void initShaders(const DataBlock &shader_blk);
   void enableOptionalShader(const String &shader_name, bool enable);
-
-  VolfogMediaInjectionGuard StartVolfogMediaInjection();
-
+  const UniqueTexHolder &getInitialMedia() const { return initialMedia; }
   void onSettingsChange(VolfogQuality volfog_quality, VolfogShadowCasting shadow_casting, DistantFogQuality df_quality);
 
   Frustum calcFrustum(const TMatrix4 &view_tm, const Driver3dPerspective &persp) const;
@@ -109,8 +93,6 @@ protected:
   bool canUsePixelShader() const;
   bool canUseVolfogShadow() const;
 
-  IPoint3 getVolfogShadowRes() const { return IPoint3(froxelResolution.x / 4, froxelResolution.y / 4, froxelResolution.z / 2); }
-
   void performRaymarching(bool use_node_based_input, const TMatrix4 &view_tm, const Point3 &pos_diff);
 
   bool hasDistantFog() const;
@@ -126,7 +108,6 @@ protected:
   eastl::array<UniqueTex, FRAME_HISTORY> volfogWeight;
 
   eastl::array<UniqueTex, FRAME_HISTORY> volfogShadow;
-  UniqueTexHolder volfogShadowOcclusion;
 
   UniqueTexHolder poissonSamples; // TODO: refactor and optimize it
   UniqueBufHolder froxelFogDitheringSamples;
@@ -146,21 +127,25 @@ protected:
 
   UniqueTexHolder distantFogDebug;
 
-  eastl::unique_ptr<ComputeShaderElement> froxelFogOcclusionCs;
-  eastl::unique_ptr<ComputeShaderElement> froxelFogLightCalcPropagateCs;
-  eastl::unique_ptr<ComputeShaderElement> froxelFogFillMediaCs;
+  eastl::unique_ptr<ComputeShaderElement> volfogOcclusionCs;
+  eastl::unique_ptr<ComputeShaderElement> viewInitialInscatterCs;
+  eastl::unique_ptr<ComputeShaderElement> fillMediaCs;
+  eastl::unique_ptr<ComputeShaderElement> viewResultInscatterCs;
   eastl::unique_ptr<ComputeShaderElement> volfogShadowCs;
+  eastl::unique_ptr<ComputeShaderElement> clearVolfogShadowCs;
 
-  PostFxRenderer froxelFogLightCalcPropagatePs;
+  PostFxRenderer viewResultInscatterPs;
 
   eastl::unique_ptr<ComputeShaderElement> distantFogRaymarchCs;
   eastl::unique_ptr<ComputeShaderElement> distantFogReconstructCs;
-  eastl::unique_ptr<ComputeShaderElement> distantFogStartWeightMipGenerationCs;
+  eastl::unique_ptr<ComputeShaderElement> distantFogMipGenerationCs;
   eastl::unique_ptr<ComputeShaderElement> distantFogFxMipGenerationCs;
 
-  eastl::unique_ptr<NodeBasedShader> nodeBasedFroxelFogFillMediaCs;
+  eastl::unique_ptr<NodeBasedShader> nodeBasedFillMediaCs;
   eastl::unique_ptr<NodeBasedShader> nodeBasedDistantFogRaymarchCs;
   eastl::unique_ptr<NodeBasedShader> nodeBasedFogShadowCs;
+
+  eastl::shared_ptr<texture_util::ShaderHelper> shaderHelperUtils;
 
   IPoint3 froxelOrigResolution = IPoint3::ZERO;
   IPoint3 froxelResolution = IPoint3::ZERO;
@@ -179,9 +164,6 @@ protected:
   bool isReady = false;
   bool preferLinearAccumulation = false;
   VolfogQuality volfogQuality = VolfogQuality::Default;
-
-  bool enableVolfogShadows = false;
-  bool enableDistantFog = false;
 
   bool useExperimentalOffscreenReprojection = false;
 };

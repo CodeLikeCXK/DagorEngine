@@ -1,5 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
+#include <dllPluginCore/core.h>
 #include <osApiWrappers/dag_files.h>
 #include <libTools/util/strUtil.h>
 #include <image/dag_texPixel.h>

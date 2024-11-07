@@ -58,7 +58,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // Public ASSIMP data structures
 #include <assimp/types.h>
-#include <EASTL/set.h> // Dagor patch for GetExtensionList
 
 #include <exception>
 
@@ -585,9 +584,6 @@ public:
      * See the aiString version for detailed and up-to-date docs.
      * @see GetExtensionList(aiString&)*/
     inline void GetExtensionList(eastl::string &szOut) const;
-
-    // Dagor patch
-    void GetExtensionList(eastl::set<eastl::string> &extensions) const;
 
     // -------------------------------------------------------------------
     /** Get the number of importers currently registered with Assimp. */

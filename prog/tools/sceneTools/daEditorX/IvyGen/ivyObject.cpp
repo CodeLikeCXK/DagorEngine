@@ -1,9 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "ivyObject.h"
 
-#include <EditorCore/ec_IEditorCore.h>
-#include <drv/3d/dag_driver.h>
+#include <dllPluginCore/core.h>
+#include <3d/dag_drv3d.h>
 
 #include "plugIn.h"
 #include <sceneRay/dag_sceneRay.h>
@@ -25,10 +23,6 @@
 #include <libTools/staticGeom/staticGeometryContainer.h>
 
 #include <debug/dag_debug.h>
-
-using editorcore_extapi::dagGeom;
-using editorcore_extapi::dagRender;
-using editorcore_extapi::make_full_start_path;
 
 extern IDagorPhys *dagPhys;
 
@@ -272,8 +266,7 @@ bool IvyObject::getWorldBox(BBox3 &box) const
   return true;
 }
 
-void IvyObject::fillProps(PropPanel::ContainerPropertyControl &panel, DClassID for_class_id,
-  dag::ConstSpan<RenderableEditableObject *> objects)
+void IvyObject::fillProps(PropPanel2 &panel, DClassID for_class_id, dag::ConstSpan<RenderableEditableObject *> objects)
 {
   bool one_type = true;
 
@@ -289,7 +282,7 @@ void IvyObject::fillProps(PropPanel::ContainerPropertyControl &panel, DClassID f
 
   if (one_type)
   {
-    PropPanel::ContainerPropertyControl *grp = panel.createGroup(PID_PARAMS_GRP, "Ivy parameters");
+    PropertyContainerControlBase *grp = panel.createGroup(PID_PARAMS_GRP, "Ivy parameters");
 
     panel.createIndent();
 
@@ -334,7 +327,7 @@ void IvyObject::fillProps(PropPanel::ContainerPropertyControl &panel, DClassID f
 
     grp = panel.createGroup(PID_GEOM_GRP, "Geometry");
 
-    PropPanel::ContainerPropertyControl *gtRadio = grp->createRadioGroup(PID_GEN_TYPE, "Geometry type:");
+    PropertyContainerControlBase *gtRadio = grp->createRadioGroup(PID_GEN_TYPE, "Geometry type:");
     gtRadio->createRadio(PID_GEN_TYPE + GEOM_TYPE_PRISM, "prism");
     gtRadio->createRadio(PID_GEN_TYPE + GEOM_TYPE_BILLBOARDS, "billboards");
     grp->setInt(PID_GEN_TYPE, PID_GEN_TYPE + genGeomType);
@@ -401,8 +394,7 @@ void IvyObject::fillProps(PropPanel::ContainerPropertyControl &panel, DClassID f
   }
 }
 
-void IvyObject::onPPChange(int pid, bool edit_finished, PropPanel::ContainerPropertyControl &panel,
-  dag::ConstSpan<RenderableEditableObject *> objects)
+void IvyObject::onPPChange(int pid, bool edit_finished, PropPanel2 &panel, dag::ConstSpan<RenderableEditableObject *> objects)
 {
 #define CHANGE_VAL(type, pname, getfunc)               \
   {                                                    \
@@ -474,7 +466,7 @@ void IvyObject::onPPChange(int pid, bool edit_finished, PropPanel::ContainerProp
     CHANGE_VAL(bool, needRenderDebug, getBool)
   // else if (pid == PID_DECREASE)
   // CHANGE_VAL(bool, needDecreaseGrow, getCheck)
-  else if (pid == PID_GEN_TYPE && panel.getInt(pid) != PropPanel::RADIO_SELECT_NONE)
+  else if (pid == PID_GEN_TYPE && panel.getInt(pid) != RADIO_SELECT_NONE)
   {
     int type = panel.getInt(pid) - PID_GEN_TYPE;
     for (int i = 0; i < objects.size(); i++)
@@ -534,7 +526,7 @@ void IvyObject::onPPChange(int pid, bool edit_finished, PropPanel::ContainerProp
 }
 
 
-void IvyObject::onPPBtnPressed(int pid, PropPanel::ContainerPropertyControl &panel, dag::ConstSpan<RenderableEditableObject *> objects)
+void IvyObject::onPPBtnPressed(int pid, PropPanel2 &panel, dag::ConstSpan<RenderableEditableObject *> objects)
 {
   switch (pid)
   {

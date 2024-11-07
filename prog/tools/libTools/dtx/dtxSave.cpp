@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <libTools/dtx/dtxSave.h>
 #include <libTools/util/de_TextureName.h>
 #include <ioSys/dag_ioUtils.h>
@@ -156,7 +154,7 @@ bool getDdsInfo(const char *filename, int *src_type, int *src_format, int *src_m
         *src_type = ddstexture::Converter::type2D;
     }
   }
-  DAGOR_CATCH(const IGenLoad::LoadException &e) { return false; }
+  DAGOR_CATCH(IGenLoad::LoadException & e) { return false; }
 
   return true;
 }
@@ -190,7 +188,7 @@ bool tgaWithAlpha(const char *filename)
     if (hdr.cmlen)
       crd.seekrel(hdr.cmlen * ((hdr.cmes + 7) / 8));
   }
-  DAGOR_CATCH(const IGenLoad::LoadException &e) { return false; }
+  DAGOR_CATCH(IGenLoad::LoadException & e) { return false; }
 
   return hdr.bits == 32;
 }

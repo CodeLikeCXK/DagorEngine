@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "common.h"
 #include <util/dag_string.h>
 #include <dag/dag_vectorSet.h>

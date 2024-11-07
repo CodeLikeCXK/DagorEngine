@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -13,7 +14,7 @@ typedef TCHR *PTCHR;
 #include <debug/dag_fatal.h>
 #include <debug/dag_debug.h>
 #include <debug/dag_assert.h>
-#include <supp/dag_define_KRNLIMP.h>
+#include <supp/dag_define_COREIMP.h>
 
 
 // general quit routine (to be used instead of exit() or abort())
@@ -89,4 +90,4 @@ inline constexpr T max(const T val1, const T val2)
 inline void inplace_min(float &m, float a) { m = min(m, a); }
 inline void inplace_max(float &m, float a) { m = max(m, a); }
 
-#include <supp/dag_undef_KRNLIMP.h>
+#include <supp/dag_undef_COREIMP.h>

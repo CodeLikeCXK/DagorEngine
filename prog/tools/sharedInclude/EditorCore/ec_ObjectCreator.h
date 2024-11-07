@@ -1,4 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright 2023 by Gaijin Games KFT, All rights reserved.
+
+#ifndef __GAIJIN_EDITORCORE_EC_OBJECT_CREATOR_H__
+#define __GAIJIN_EDITORCORE_EC_OBJECT_CREATOR_H__
 #pragma once
 
 #include <EditorCore/ec_IObjectCreator.h>
@@ -504,3 +507,5 @@ class SpiralStairCreator : public CylinderCreator
 public:
   virtual void render();
 };
+
+#endif

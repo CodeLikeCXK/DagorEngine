@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <dasModules/aotGrid.h>
 
 DAS_BASE_BIND_ENUM(GridEntCheck, GridEntCheck, POS, BOUNDING);

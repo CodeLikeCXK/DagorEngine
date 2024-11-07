@@ -1,8 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <util/dag_stdint.h>
-#include <drv/3d/dag_tex3d.h>
+#include <3d/dag_tex3d.h>
 #include <3d/ddsFormat.h>
 #include <debug/dag_debug.h>
 
@@ -70,6 +69,7 @@ inline bool create_dds_header(void *data, int size, int w, int h, int bpp, int m
           dsc.ddpfPixelFormat.dwRGBBitCount = 8;
         break;
       case TEXFMT_A8R8G8B8: dfmt = D3DFMT_A8R8G8B8; break;
+      case TEXFMT_V16U16: dfmt = D3DFMT_V16U16; break;
       case TEXFMT_L16: dfmt = D3DFMT_L16; break;
       case TEXFMT_A8: dfmt = D3DFMT_A8; break;
       case TEXFMT_L8: dfmt = D3DFMT_L8; break;

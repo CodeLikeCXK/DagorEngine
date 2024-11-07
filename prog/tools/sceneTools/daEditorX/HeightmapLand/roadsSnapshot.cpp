@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "roadsSnapshot.h"
 #include "hmlObjectsEditor.h"
 #include "hmlSplineObject.h"

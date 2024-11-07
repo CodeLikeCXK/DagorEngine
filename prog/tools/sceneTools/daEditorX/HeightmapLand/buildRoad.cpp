@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <windows.h>
 #include "hmlSplineObject.h"
 #include "hmlSplinePoint.h"
@@ -14,10 +12,7 @@
 #include <math/dag_quatInterp.h>
 #include <math/dag_math2d.h>
 #include <perfMon/dag_cpuFreq.h>
-#include <EditorCore/ec_IEditorCore.h>
-
-using editorcore_extapi::dagGeom;
-using editorcore_extapi::make_full_start_path;
+#include <dllPluginCore/core.h>
 
 using namespace roadbuildertool;
 

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <osApiWrappers/dag_rwLock.h>
 
 #if _TARGET_PC_WIN | _TARGET_XBOX

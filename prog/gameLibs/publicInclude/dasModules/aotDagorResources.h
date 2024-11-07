@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -10,10 +11,10 @@
 
 namespace bind_dascript
 {
-inline const char *get_game_resource_name(int res_id, das::Context *ctx, das::LineInfoArg *at)
+inline const char *get_game_resource_name(int res_id, das::Context *ctx)
 {
   String res;
   ::get_game_resource_name(res_id, res);
-  return ctx->allocateString(res.c_str(), res.length(), at);
+  return ctx->stringHeap->allocateString(res.c_str(), res.length());
 }
 } // namespace bind_dascript

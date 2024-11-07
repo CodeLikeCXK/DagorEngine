@@ -1,12 +1,13 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
 #include <util/dag_stdint.h>
 
-#include <supp/dag_define_KRNLIMP.h>
+#include <supp/dag_define_COREIMP.h>
 
 class IWndProcComponent
 {
@@ -39,4 +40,4 @@ struct ScopeDetachAllWndComponents
 
 KRNLIMP bool perform_wnd_proc_components(void *hwnd, unsigned msg, uintptr_t wParam, intptr_t lParam, intptr_t &result);
 
-#include <supp/dag_undef_KRNLIMP.h>
+#include <supp/dag_undef_COREIMP.h>

@@ -1,5 +1,5 @@
 
-function foo(x, y) {
+let function foo(x, y) {
     let c = class {
         x = 10
         function zed() {

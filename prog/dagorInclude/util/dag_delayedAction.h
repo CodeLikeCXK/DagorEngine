@@ -1,11 +1,12 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
 #include <osApiWrappers/dag_miscApi.h>
-#include <supp/dag_define_KRNLIMP.h>
+#include <supp/dag_define_COREIMP.h>
 #include <EASTL/utility.h>
 
 #define ACTION_DEBUG_NAMES 1
@@ -62,11 +63,11 @@ KRNLIMP void perform_regular_actions_for_idle_cycle();
 template <class F>
 DelayedAction *make_delayed_action(F &&func)
 {
-  struct GenDelayedAction final : public DelayedAction
+  struct GenDelayedAction : public DelayedAction
   {
     GenDelayedAction(F &&func_) : func(eastl::forward<F>(func_)) {}
-    void performAction() override { func(); }
-    eastl::remove_reference_t<F> func;
+    virtual void performAction() { func(); }
+    F func;
   };
   return new GenDelayedAction(eastl::forward<F>(func));
 };
@@ -84,15 +85,6 @@ void run_action_on_main_thread(F &&func)
     func();
   else
     delayed_call(eastl::forward<F>(func));
-}
-
-template <class F>
-void run_action_on_main_thread_and_wait(F &&func)
-{
-  if (is_main_thread())
-    func();
-  else
-    execute_delayed_action_on_main_thread(make_delayed_action(eastl::forward<F>(func)));
 }
 
 template <class F>
@@ -115,4 +107,4 @@ auto make_delayed_func(F func)
 #define add_delayed_callback_buffered(...) add_delayed_callback_buffered(__VA_ARGS__, "DelayedActionCB(buf)" ACTION_DEBUG_NAMES_LOC)
 #endif
 
-#include <supp/dag_undef_KRNLIMP.h>
+#include <supp/dag_undef_COREIMP.h>

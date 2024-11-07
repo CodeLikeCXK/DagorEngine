@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <shaders/dag_shMaterialUtils.h>
 #include <shaders/dag_shaderCommon.h>
 #include "shadersBinaryData.h"

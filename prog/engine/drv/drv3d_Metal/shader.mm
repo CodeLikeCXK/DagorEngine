@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 
 #include <math/dag_TMatrix.h>
 #include "render.h"
@@ -50,7 +49,7 @@ namespace drv3d_metal
       {
         tex_binding[i] = i;
         tex_remap[i] = i;
-        tex_type[i].value = 0;
+        tex_type[i] = 0;
       }
       if (strstr(source, "// debug_vs_metal"))
       {
@@ -103,12 +102,6 @@ namespace drv3d_metal
         }
       }
 
-      if (shd_type == 2)
-      {
-        output_mask = *((uint32_t*)ptr);
-        ptr += 4;
-      }
-
       if (shd_type == 3)
       {
         tgrsz_x = *((int*)ptr);
@@ -150,7 +143,7 @@ namespace drv3d_metal
         tex_remap[i] = *((int*)ptr);
         ptr += 4;
 
-        tex_type[i].value = *((int*)ptr);
+        tex_type[i] = *((int*)ptr);
         ptr += 4;
       }
 

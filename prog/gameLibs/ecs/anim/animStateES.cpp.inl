@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <ecs/core/entitySystem.h>
 #include <ecs/core/attributeEx.h>
 #include <ecs/core/entityManager.h>
@@ -23,7 +21,7 @@ static void restriction_parse_es(const ecs::Event &, ecs::EntityId eid, const An
   const ecs::Object &human_anim_restrictions__prohibited, ecs::Array &human_anim_restriction_ids__prohibited)
 {
   const AnimV20::AnimationGraph *animGraph = animchar.getAnimGraph();
-  if (DAGOR_UNLIKELY(!animGraph))
+  if (EASTL_UNLIKELY(!animGraph))
   {
     G_ASSERT_LOG(animGraph, "%s: animGraph is NULL for %d<%s>", __FUNCTION__, ecs::entity_id_t(eid),
       g_entity_mgr->getEntityTemplateName(eid));

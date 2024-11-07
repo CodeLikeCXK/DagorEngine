@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <supp/_platform.h>
 #include <memory/dag_mem.h>
 #include <osApiWrappers/dag_localConv.h>
@@ -11,7 +9,7 @@
 #include <dag_noise/dag_uint_noise.h>
 #include <util/engineInternals.h>
 #include <time.h>
-#include <supp/dag_define_KRNLIMP.h>
+#include <supp/dag_define_COREIMP.h>
 
 extern void check_cpuid();
 extern void init_math();
@@ -28,9 +26,7 @@ void default_crt_init_kernel_lib()
 #if !_TARGET_XBOX
   init_main_thread_id();
 #endif
-#if _TARGET_PC_WIN
   DaThread::setCurrentThreadName("Main Thread");
-#endif
 }
 
 void default_crt_init_core_lib()

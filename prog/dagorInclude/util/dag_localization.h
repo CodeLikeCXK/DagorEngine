@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -14,12 +15,8 @@ typedef class LocalizedTextEntry *LocTextId;
 
 //! returns currently set default language in dgs_get_settings()
 const char *get_current_language();
-//! returns override language for platforms
-const char *get_force_language();
-void set_language_to_settings(const char *lang);
 
 LocTextId get_localized_text_id(const char *key, bool ci = false);
-LocTextId get_localized_text_id_silent(const char *key, bool ci = false);
 LocTextId get_optional_localized_text_id(const char *key, bool ci = false);
 
 
@@ -31,18 +28,6 @@ const char *get_fake_loc_for_missing_key(const char *key);
 __forceinline const char *get_localized_text(const char *key, bool ci = false)
 {
   LocTextId locId = get_localized_text_id(key, ci);
-  if (!locId)
-#if _TARGET_PC | DAGOR_DBGLEVEL > 0
-    return get_fake_loc_for_missing_key(key);
-#else
-    return "";
-#endif
-  return get_localized_text(locId);
-}
-
-__forceinline const char *get_localized_text_silent(const char *key, bool ci = false)
-{
-  LocTextId locId = get_localized_text_id_silent(key, ci);
   if (!locId)
 #if _TARGET_PC | DAGOR_DBGLEVEL > 0
     return get_fake_loc_for_missing_key(key);

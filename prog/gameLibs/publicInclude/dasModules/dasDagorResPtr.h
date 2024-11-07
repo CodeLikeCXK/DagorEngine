@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -105,17 +106,6 @@ inline Sbuffer *UniqueBuf_get_buf(const UniqueBuf &buf) { return buf.getBuf(); }
 inline Sbuffer *UniqueBufHolder_get_buf(const UniqueBufHolder &buf) { return buf.getBuf(); }
 } // namespace bind_dascript
 
-template <class T>
-struct ManagedResView_JitAbiWrapper : ManagedResView<T>
-{
-  ManagedResView_JitAbiWrapper(vec4f v) { ::memcpy(this, &v, sizeof(ManagedResView<T>)); }
-  operator vec4f()
-  {
-    vec4f result;
-    ::memcpy(&result, this, sizeof(ManagedResView<T>));
-    return result;
-  }
-};
 
 namespace das
 {
@@ -137,25 +127,25 @@ struct cast<ManagedResView<T>>
   }
 };
 
-template <class T>
-struct WrapType<ManagedResView<T>>
+template <>
+struct WrapType<ManagedTexView>
 {
   enum
   {
-    value = true
+    value = false
   };
-  typedef vec4f type;
-  typedef vec4f rettype;
+  typedef void *type;
+  typedef void *rettype;
 };
-template <class T>
-struct WrapArgType<ManagedResView<T>>
+template <>
+struct WrapType<ManagedBufView>
 {
-  typedef ManagedResView_JitAbiWrapper<T> type;
-};
-template <class T>
-struct WrapRetType<ManagedResView<T>>
-{
-  typedef ManagedResView_JitAbiWrapper<T> type;
+  enum
+  {
+    value = false
+  };
+  typedef void *type;
+  typedef void *rettype;
 };
 
 template <class T>

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "prefabCache.h"
 #include <de3_interface.h>
 #include <libTools/dagFileRW/dagFileNode.h>

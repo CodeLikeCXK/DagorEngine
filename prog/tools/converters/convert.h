@@ -1,4 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright 2023 by Gaijin Games KFT, All rights reserved.
+#ifndef _GAIJIN_TOOLS_CONVERT_H
+#define _GAIJIN_TOOLS_CONVERT_H
 #pragma once
 
 #include <generic/dag_tab.h>
@@ -99,3 +101,5 @@ int optimize_verts(Face *tface, int fcount, Tab<Vert> &tvert, real eps, Tab<int>
     }
   return 1;
 }
+
+#endif

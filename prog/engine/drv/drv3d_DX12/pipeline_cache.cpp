@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "device.h"
 
 #include <ioSys/dag_fileIo.h>
@@ -57,7 +55,7 @@ enum CacheFileFlags
 };
 
 constexpr uint32_t CACHE_FILE_MAGIC = _MAKE4C('CX12');
-constexpr uint32_t CACHE_FILE_VERSION = 27;
+constexpr uint32_t CACHE_FILE_VERSION = 24;
 constexpr uint32_t EXPECTED_POINTER_SIZE = static_cast<uint32_t>(sizeof(void *));
 // Version history:
 // 1 - initial
@@ -86,9 +84,6 @@ constexpr uint32_t EXPECTED_POINTER_SIZE = static_cast<uint32_t>(sizeof(void *))
 // 22 - GraphicsPipeline::VariantCacheEntry changed
 // 23 - MSAA support
 // 24 - shader bin dump table / cache invalidation
-// 25 - graphics root signature was using wrong type for combine masks
-// 26 - InputLayout data structure updated, fixed padding issues, reduced size, fixed issues with uninitialized bits
-// 27 - FramebufferLayout data structure updated, fixed padding issues, fixed issues with uninitialized bits
 } // namespace
 
 void PipelineCache::init(const SetupParameters &params)
@@ -120,7 +115,7 @@ void PipelineCache::init(const SetupParameters &params)
 
 struct MemoryWriteBuffer
 {
-  dag::Vector<uint8_t> buf;
+  eastl::vector<uint8_t> buf;
   void append(const void *ptr, size_t sz)
   {
     buf.insert(buf.end(), reinterpret_cast<const uint8_t *>(ptr), reinterpret_cast<const uint8_t *>(ptr) + sz);
@@ -149,7 +144,7 @@ void PipelineCache::shutdown(const ShutdownParameters &params)
       pipeline::DataBlockEncodeVisitor<pipeline::InputLayoutEncoder> visitor{*inputLayoutOutBlock};
       for (auto &layout : inputLayouts)
       {
-        visitor.encode2(layout);
+        visitor.encode(layout);
       }
     }
 
@@ -158,7 +153,7 @@ void PipelineCache::shutdown(const ShutdownParameters &params)
       pipeline::DataBlockEncodeVisitor<pipeline::RenderStateEncoder> visitor{*renderStateOutBlock};
       for (auto &state : staticRenderStates)
       {
-        visitor.encode2(state);
+        visitor.encode(state);
       }
     }
 
@@ -167,13 +162,13 @@ void PipelineCache::shutdown(const ShutdownParameters &params)
       pipeline::DataBlockEncodeVisitor<pipeline::FramebufferLayoutEncoder> visitor{*framebufferLayoutOutBlock};
       for (auto &layout : framebufferLayouts)
       {
-        visitor.encode2(layout);
+        visitor.encode(layout);
       }
     }
 
     if (auto graphicsPipelinesOutBlock = cacheOutBlock.addNewBlock("graphics_pipelines"))
     {
-      pipeline::DataBlockEncodeVisitor<pipeline::GraphicsPipelineEncoder> visitor{*graphicsPipelinesOutBlock};
+      pipeline::DataBlockEncodeVisitor<pipeline::GraphicsPipelineEncoder> visitor{*graphicsPipelinesOutBlock, nullptr, 0u};
       for (auto &pipeline : graphicsCache)
       {
         if (pipeline.variantCache.empty())
@@ -190,7 +185,7 @@ void PipelineCache::shutdown(const ShutdownParameters &params)
 
     if (auto meshPipelinesOutBlock = cacheOutBlock.addNewBlock("mesh_pipelines"))
     {
-      pipeline::DataBlockEncodeVisitor<pipeline::MeshPipelineEncoder> visitor{*meshPipelinesOutBlock};
+      pipeline::DataBlockEncodeVisitor<pipeline::MeshPipelineEncoder> visitor{*meshPipelinesOutBlock, nullptr, 0u};
       for (auto &pipeline : graphicsCache)
       {
         if (pipeline.variantCache.empty())
@@ -207,11 +202,17 @@ void PipelineCache::shutdown(const ShutdownParameters &params)
 
     if (auto computePipelinesOutBlock = cacheOutBlock.addNewBlock("compute_pipelines"))
     {
-      pipeline::DataBlockEncodeVisitor<pipeline::ComputePipelineEncoder> visitor{*computePipelinesOutBlock};
+      pipeline::DataBlockEncodeVisitor<pipeline::ComputePipelineEncoder> visitor{*computePipelinesOutBlock, nullptr, 0u};
       for (auto &pipeline : computeBlobs)
       {
         visitor.encode(pipeline);
       }
+    }
+
+    if (auto feeaturesOutBlock = cacheOutBlock.addNewBlock("features"))
+    {
+      pipeline::DataBlockEncodeVisitor<pipeline::DeviceCapsAndShaderModelEncoder> visitor{*feeaturesOutBlock};
+      visitor.encode(pipeline::DeviceCapsAndShaderModelEncoder::EncodingMode::pipelines, params.features);
     }
 
     cacheOutBlock.saveToTextFile("cache/dx12_cache.blk");
@@ -225,8 +226,8 @@ void PipelineCache::shutdown(const ShutdownParameters &params)
   FullFileSaveCB cacheFile{params.fileName, DF_WRITE | DF_CREATE | DF_IGNORE_MISSING};
   if (!cacheFile.fileHandle)
   {
-    D3D_ERROR("DX12: Failed to open %s to serialize pipeline cache, missing cache folder or "
-              "insufficient privileges might be the cause for this error",
+    logerr("DX12: Failed to open %s to serialize pipeline cache, missing cache folder or "
+           "insufficient privileges might be the cause for this error",
       params.fileName);
     return;
   }
@@ -324,13 +325,13 @@ void PipelineCache::shutdown(const ShutdownParameters &params)
 
   if (library)
   {
-    dag::Vector<uint8_t> blob;
+    eastl::vector<uint8_t> blob;
     blob.resize(library->GetSerializedSize());
     library->Serialize(blob.data(), blob.size());
     mem.append(blob.data(), blob.size());
   }
 
-  dag::Vector<uint8_t> compressedMemory;
+  eastl::vector<uint8_t> compressedMemory;
 #if DX12_ENABLE_CACHE_COMPRESSION
   compressedMemory.resize(mem.buf.size() * 2);
   auto compSize = zstd_compress(compressedMemory.data(), compressedMemory.size(), mem.buf.data(), mem.buf.size(), 20);
@@ -777,7 +778,7 @@ namespace
 {
 struct MemoryReadBuffer
 {
-  dag::Vector<uint8_t> buf;
+  eastl::vector<uint8_t> buf;
   size_t location = 0;
   template <typename T>
   const T *readRange(size_t cnt = 1)
@@ -808,7 +809,7 @@ void PipelineCache::preRecovery()
   if (library && hasChanged)
   {
     // try to recover pipeline library cache blob and reuse it later
-    dag::Vector<uint8_t> newBlob;
+    eastl::vector<uint8_t> newBlob;
     auto sz = library->GetSerializedSize();
     if (sz)
     {
@@ -858,7 +859,7 @@ void PipelineCache::recover(ID3D12Device1 *device, D3D12_SHADER_CACHE_SUPPORT_FL
 #endif
 }
 
-bool PipelineCache::onBindumpLoad(ID3D12Device1 *device, eastl::span<const dxil::HashValue> all_shader_hashes)
+void PipelineCache::onBindumpLoad(ID3D12Device1 *device, eastl::span<const dxil::HashValue> all_shader_hashes)
 {
   logdbg("DX12: onBindumpLoad...");
   auto newHash = dxil::HashValue::calculate(all_shader_hashes.data(), all_shader_hashes.size());
@@ -866,7 +867,7 @@ bool PipelineCache::onBindumpLoad(ID3D12Device1 *device, eastl::span<const dxil:
   if (static_cast<uint32_t>(all_shader_hashes.size()) == shaderInDumpCount && newHash == shaderInDumpHash)
   {
     logdbg("DX12: Full match!");
-    return true;
+    return;
   }
 
   logdbg("DX12: No match, resetting cache");
@@ -890,8 +891,6 @@ bool PipelineCache::onBindumpLoad(ID3D12Device1 *device, eastl::span<const dxil:
   G_UNUSED(device);
 #endif
   initialPipelineBlob.clear();
-  hasChanged = true;
-  return false;
 }
 
 bool PipelineCache::loadFromFile(const SetupParameters &params)
@@ -910,7 +909,7 @@ bool PipelineCache::loadFromFile(const SetupParameters &params)
   auto ln = cacheFile.tryRead(&fileHeader, sizeof(fileHeader));
   if (ln != sizeof(fileHeader) || (fileHeader.magic != CACHE_FILE_MAGIC))
   {
-    logwarn("DX12: Pipeline cache file is invalid");
+    logerr("DX12: Pipeline cache file is invalid");
     return false;
   }
 
@@ -942,7 +941,7 @@ bool PipelineCache::loadFromFile(const SetupParameters &params)
   fileHeader.headerChecksum = dxil::HashValue{};
   if (compareHash != dxil::HashValue::calculate(&fileHeader, 1))
   {
-    logwarn("DX12: Pipeline cache file is corrupted");
+    logerr("DX12: Pipeline cache file is corrupted");
     return false;
   }
 
@@ -950,18 +949,18 @@ bool PipelineCache::loadFromFile(const SetupParameters &params)
   data.buf.resize(fileHeader.uncompressedContentSize);
   if (fileHeader.compressedContentSize)
   {
-    dag::Vector<uint8_t> compressedData;
+    eastl::vector<uint8_t> compressedData;
     compressedData.resize(fileHeader.compressedContentSize);
     ln = cacheFile.tryRead(compressedData.data(), compressedData.size());
     if (ln != compressedData.size())
     {
-      logwarn("DX12: Error while reading data");
+      logerr("DX12: Error while reading data");
       return false;
     }
     auto outSize = zstd_decompress(data.buf.data(), data.buf.size(), compressedData.data(), compressedData.size());
     if (outSize != data.buf.size())
     {
-      logwarn("DX12: Error while decompressing data");
+      logerr("DX12: Error while decompressing data");
       return false;
     }
   }
@@ -970,14 +969,14 @@ bool PipelineCache::loadFromFile(const SetupParameters &params)
     ln = cacheFile.tryRead(data.buf.data(), data.buf.size());
     if (ln != data.buf.size())
     {
-      logwarn("DX12: Error while reading data");
+      logerr("DX12: Error while reading data");
       return false;
     }
   }
 
   if (fileHeader.dataChecksum != dxil::HashValue::calculate(data.buf.data(), data.buf.size()))
   {
-    logwarn("DX12: Pipeline cache file is corrupted");
+    logerr("DX12: Pipeline cache file is corrupted");
     return false;
   }
 
@@ -1008,21 +1007,21 @@ bool PipelineCache::loadFromFile(const SetupParameters &params)
     ComputeBlob blob = {};
     if (!data.read(blob.hash))
     {
-      logwarn("DX12: Error while decoding pipeline cache");
+      logerr("DX12: Error while decoding pipeline cache");
       computeBlobs.clear();
       return false;
     }
     uint32_t sz = 0;
     if (!data.read(sz))
     {
-      logwarn("DX12: Error while decoding pipeline cache");
+      logerr("DX12: Error while decoding pipeline cache");
       computeBlobs.clear();
       return false;
     }
     auto pso = data.readRange<uint8_t>(sz);
     if (!pso)
     {
-      logwarn("DX12: Error while decoding pipeline cache");
+      logerr("DX12: Error while decoding pipeline cache");
       computeBlobs.clear();
       return false;
     }
@@ -1045,7 +1044,7 @@ bool PipelineCache::loadFromFile(const SetupParameters &params)
     GraphicsPipeline blob = {};
     if (!data.read(blob.ident))
     {
-      logwarn("DX12: Error while decoding pipeline cache");
+      logerr("DX12: Error while decoding pipeline cache");
       computeBlobs.clear();
       graphicsCache.clear();
       return false;
@@ -1053,7 +1052,7 @@ bool PipelineCache::loadFromFile(const SetupParameters &params)
     uint32_t sz = 0;
     if (!data.read(sz))
     {
-      logwarn("DX12: Error while decoding pipeline cache");
+      logerr("DX12: Error while decoding pipeline cache");
       computeBlobs.clear();
       graphicsCache.clear();
       return false;
@@ -1067,35 +1066,35 @@ bool PipelineCache::loadFromFile(const SetupParameters &params)
       GraphicsPipeline::VariantCacheEntry vce = {};
       if (!data.read(vce.topology))
       {
-        logwarn("DX12: Error while decoding pipeline cache");
+        logerr("DX12: Error while decoding pipeline cache");
         computeBlobs.clear();
         graphicsCache.clear();
         return false;
       }
       if (!data.read(vce.framebufferLayoutIndex))
       {
-        logwarn("DX12: Error while decoding pipeline cache");
+        logerr("DX12: Error while decoding pipeline cache");
         computeBlobs.clear();
         graphicsCache.clear();
         return false;
       }
       if (!data.read(vce.inputLayoutIndex))
       {
-        logwarn("DX12: Error while decoding pipeline cache");
+        logerr("DX12: Error while decoding pipeline cache");
         computeBlobs.clear();
         graphicsCache.clear();
         return false;
       }
       if (!data.read(vce.isWireFrame))
       {
-        logwarn("DX12: Error while decoding pipeline cache");
+        logerr("DX12: Error while decoding pipeline cache");
         computeBlobs.clear();
         graphicsCache.clear();
         return false;
       }
       if (!data.read(vce.staticRenderStateIndex))
       {
-        logwarn("DX12: Error while decoding pipeline cache");
+        logerr("DX12: Error while decoding pipeline cache");
         computeBlobs.clear();
         graphicsCache.clear();
         return false;
@@ -1103,7 +1102,7 @@ bool PipelineCache::loadFromFile(const SetupParameters &params)
       uint32_t psoSz = 0;
       if (!data.read(psoSz))
       {
-        logwarn("DX12: Error while decoding pipeline cache");
+        logerr("DX12: Error while decoding pipeline cache");
         computeBlobs.clear();
         graphicsCache.clear();
         return false;
@@ -1111,7 +1110,7 @@ bool PipelineCache::loadFromFile(const SetupParameters &params)
       auto pso = data.readRange<uint8_t>(psoSz);
       if (!pso)
       {
-        logwarn("DX12: Error while decoding pipeline cache");
+        logerr("DX12: Error while decoding pipeline cache");
         computeBlobs.clear();
         graphicsCache.clear();
         return false;
@@ -1134,7 +1133,7 @@ bool PipelineCache::loadFromFile(const SetupParameters &params)
     ComputeSignatureBlob csb = {};
     if (!data.read(csb.def))
     {
-      logwarn("DX12: Error while decoding pipeline cache");
+      logerr("DX12: Error while decoding pipeline cache");
       computeBlobs.clear();
       graphicsCache.clear();
       computeSignatures.clear();
@@ -1143,7 +1142,7 @@ bool PipelineCache::loadFromFile(const SetupParameters &params)
     uint32_t sigSz = 0;
     if (!data.read(sigSz))
     {
-      logwarn("DX12: Error while decoding pipeline cache");
+      logerr("DX12: Error while decoding pipeline cache");
       computeBlobs.clear();
       graphicsCache.clear();
       computeSignatures.clear();
@@ -1152,7 +1151,7 @@ bool PipelineCache::loadFromFile(const SetupParameters &params)
     auto sig = data.readRange<uint8_t>(sigSz);
     if (!sig)
     {
-      logwarn("DX12: Error while decoding pipeline cache");
+      logerr("DX12: Error while decoding pipeline cache");
       computeBlobs.clear();
       graphicsCache.clear();
       computeSignatures.clear();
@@ -1170,7 +1169,7 @@ bool PipelineCache::loadFromFile(const SetupParameters &params)
     GraphicsSignatureBlob gsb = {};
     if (!data.read(gsb.def))
     {
-      logwarn("DX12: Error while decoding pipeline cache");
+      logerr("DX12: Error while decoding pipeline cache");
       computeBlobs.clear();
       graphicsCache.clear();
       computeSignatures.clear();
@@ -1180,7 +1179,7 @@ bool PipelineCache::loadFromFile(const SetupParameters &params)
     uint32_t sigSz = 0;
     if (!data.read(sigSz))
     {
-      logwarn("DX12: Error while decoding pipeline cache");
+      logerr("DX12: Error while decoding pipeline cache");
       computeBlobs.clear();
       graphicsCache.clear();
       computeSignatures.clear();
@@ -1190,7 +1189,7 @@ bool PipelineCache::loadFromFile(const SetupParameters &params)
     auto sig = data.readRange<uint8_t>(sigSz);
     if (!sig)
     {
-      logwarn("DX12: Error while decoding pipeline cache");
+      logerr("DX12: Error while decoding pipeline cache");
       computeBlobs.clear();
       graphicsCache.clear();
       computeSignatures.clear();
@@ -1209,7 +1208,7 @@ bool PipelineCache::loadFromFile(const SetupParameters &params)
     GraphicsSignatureBlob gsb = {};
     if (!data.read(gsb.def))
     {
-      logwarn("DX12: Error while decoding pipeline cache");
+      logerr("DX12: Error while decoding pipeline cache");
       computeBlobs.clear();
       graphicsCache.clear();
       computeSignatures.clear();
@@ -1220,7 +1219,7 @@ bool PipelineCache::loadFromFile(const SetupParameters &params)
     uint32_t sigSz = 0;
     if (!data.read(sigSz))
     {
-      logwarn("DX12: Error while decoding pipeline cache");
+      logerr("DX12: Error while decoding pipeline cache");
       computeBlobs.clear();
       graphicsCache.clear();
       computeSignatures.clear();
@@ -1231,7 +1230,7 @@ bool PipelineCache::loadFromFile(const SetupParameters &params)
     auto sig = data.readRange<uint8_t>(sigSz);
     if (!sig)
     {
-      logwarn("DX12: Error while decoding pipeline cache");
+      logerr("DX12: Error while decoding pipeline cache");
       computeBlobs.clear();
       graphicsCache.clear();
       computeSignatures.clear();
@@ -1249,7 +1248,7 @@ bool PipelineCache::loadFromFile(const SetupParameters &params)
   {
     if (!data.read(staticRenderStates[i]))
     {
-      logwarn("DX12: Error while decoding static render state cache");
+      logerr("DX12: Error while decoding static render state cache");
       computeBlobs.clear();
       graphicsCache.clear();
       computeSignatures.clear();
@@ -1264,7 +1263,7 @@ bool PipelineCache::loadFromFile(const SetupParameters &params)
   {
     if (!data.read(inputLayouts[i]))
     {
-      logwarn("DX12: Error while decoding input layout cache");
+      logerr("DX12: Error while decoding input layout cache");
       computeBlobs.clear();
       graphicsCache.clear();
       computeSignatures.clear();
@@ -1280,7 +1279,7 @@ bool PipelineCache::loadFromFile(const SetupParameters &params)
   {
     if (!data.read(framebufferLayouts[i]))
     {
-      logwarn("DX12: Error while decoding framebuffer layout cache");
+      logerr("DX12: Error while decoding framebuffer layout cache");
       computeBlobs.clear();
       graphicsCache.clear();
       computeSignatures.clear();

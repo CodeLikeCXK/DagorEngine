@@ -1,6 +1,6 @@
-function foo() {
+let function foo() {
   const x = "asdf"
-  function bar() {
+  let function bar() {
     let a = x
   }
 }

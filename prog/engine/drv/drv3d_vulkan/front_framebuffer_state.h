@@ -1,6 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
-
 #include "util/tracked_state.h"
 #include "state_field_framebuffer.h"
 #include "render_pass.h"

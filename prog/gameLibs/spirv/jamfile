@@ -40,6 +40,8 @@ if ! [ GLOB $(_DEVTOOL)/DXC-$(DXC_VERSION)/include : * ] { exit FATAL\: \"DXC-$(
 AddIncludes += $(_DEVTOOL)/DXC-$(DXC_VERSION)/include
 ;
 
+if $(Platform) in macosx linux64 { UseProgLibs += gameLibs/folders ; }
+
 UseProgLibs +=
   3rdPartyLibs/vulkan/spirv-tools
 ;
@@ -61,11 +63,11 @@ if $(DontUseVulkanGlslang) = no {
 
 CPPopt = -D_CROSS_TARGET_SPIRV=1
 ;
-if $(Platform) = macOS {
+if $(Platform) = macosx {
   CPPopt += -Wno-switch -Wno-ambiguous-reversed-operator -Wno-deprecated-declarations
 ;
 }
-if $(Platform) = linux && $(PlatformSpec) = clang {
+if $(Platform) = linux64 && $(PlatformSpec) = clang {
   CPPopt += -Wno-sometimes-uninitialized -Wno-switch -Wno-ambiguous-reversed-operator -Wno-deprecated-declarations -D__EMULATE_UUID ;
 }
 

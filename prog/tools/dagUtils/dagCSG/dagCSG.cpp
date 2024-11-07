@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 
 #include <generic/dag_smallTab.h>
 #include <osApiWrappers/dag_basePath.h>

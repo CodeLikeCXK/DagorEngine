@@ -10,8 +10,7 @@
   for ( int i = 0, ie = data.dispatchesCount ; i < ie ; ++i )
   {
     const DispatchDesc &ddesc = dispatches[i];
-    uint headOffset = ddesc.headOffsetAndLodOfs & 0xffffff;
-    const DataHead &head = *(DataHead*)(curBuf + headOffset / DAFX_ELEM_STRIDE);
+    const DataHead &head = *(DataHead*)(curBuf + ddesc.headOffset / DAFX_ELEM_STRIDE);
     dafx_fill_cdesc( head, ddesc, cdesc );
     cdesc.count = ddesc.startAndCount >> 16;
     cdesc.start = ddesc.startAndCount & 0xffff;
@@ -51,8 +50,7 @@
     return;
 
   DataHead head;
-  uint headOffset = ddesc.headOffsetAndLodOfs & 0xffffff;
-  dafx_fill_data_head( headOffset / DAFX_ELEM_STRIDE, head );
+  dafx_fill_data_head( ddesc.headOffset / DAFX_ELEM_STRIDE, head );
 
   ComputeCallDesc cdesc;
   dafx_fill_cdesc( head, ddesc, cdesc );

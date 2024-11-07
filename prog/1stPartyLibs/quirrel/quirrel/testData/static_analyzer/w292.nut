@@ -1,4 +1,3 @@
-#allow-delete-operator
 //-file:declared-never-used
 //-file:unconditional-terminated-loop
 

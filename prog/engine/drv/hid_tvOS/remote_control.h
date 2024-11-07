@@ -1,15 +1,17 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-#pragma once
+// Copyright 2023 by Gaijin Games KFT, All rights reserved.
+#ifndef _HID_TVOS_REMOTE_CONTROL_H
+#define _HID_TVOS_REMOTE_CONTROL_H
 
+#pragma once
 #import <GameController/GameController.h>
 #import <UIKit/UIGestureRecognizerSubclass.h>
 #import <UIKit/UIPress.h>
 
-#include <drv/hid/dag_hiJoystick.h>
-#include <drv/hid/dag_hiGlobals.h>
-#include <drv/hid/dag_hiCreate.h>
-#include <drv/hid/dag_hiTvosMap.h>
-#include <drv/hid/dag_hiXInputMappings.h>
+#include <humanInput/dag_hiJoystick.h>
+#include <humanInput/dag_hiGlobals.h>
+#include <humanInput/dag_hiCreate.h>
+#include <humanInput/dag_hiTvosMap.h>
+#include <humanInput/dag_hiXInputMappings.h>
 
 #include <debug/dag_debug.h>
 
@@ -240,3 +242,5 @@ private:
   float minAxis[AXES_NUM];
   float maxAxis[AXES_NUM];
 };
+
+#endif //_HID_TVOS_REMOTE_CONTROL_H

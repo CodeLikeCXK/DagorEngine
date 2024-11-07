@@ -122,14 +122,16 @@ android {
           //nativeSymbolUploadEnabled true
           //unstrippedNativeLibsDir file("unstripped_libs")
           //upload obfuscate file to crashlytics if proguard file is present
-          //if (project.file("project.proguard").exists()) {
+          //if (project.file("proguard-project.txt").exists()) {
             //mappingFileUploadEnabled true
           //}
       // }
 
       if (signedRelease == "true") {
-        if (project.file("project.proguard").exists()) {
+        if (project.file("proguard-project.txt").exists()) {
           minifyEnabled true
+          proguardFile getDefaultProguardFile('proguard-android-optimize.txt')
+          proguardFile 'proguard-project.txt'
           println("Obfuscating java code")
         } else {
           minifyEnabled false
@@ -148,6 +150,7 @@ android {
 
     debug {
       minifyEnabled false
+      proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
     }
   }
 }

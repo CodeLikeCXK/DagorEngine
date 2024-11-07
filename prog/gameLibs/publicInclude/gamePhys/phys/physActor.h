@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -13,8 +14,6 @@
 class NetCrew;
 class NetWeapon;
 class NetWeaponControl;
-class NetAutopilot;
-class NetAvionics;
 struct PhysDesyncStats;
 class Point3;
 namespace danet
@@ -124,15 +123,12 @@ public:
   }
   virtual DPoint3 calcPosAtTime(double /*at_time*/) const { return DPoint3(0.0, 0.0, 0.0); }
   virtual Quat calcQuatAtTime(double /*at_time*/) const { return Quat(0.0f, 0.0f, 0.0f, 1.0f); }
-  virtual Point3 calcAngularRate() const { return Point3(0.0f, 0.0f, 0.0f); }
 
   virtual void repair() {}
 
   virtual NetCrew *getCrew() { return NULL; }
   virtual dag::ConstSpan<NetWeapon *> getAllWeapons() const { return {}; }
   virtual dag::ConstSpan<NetWeaponControl *> getAllWeaponControls() const { return {}; }
-  virtual NetAutopilot *getAutopilot() const { return NULL; }
-  virtual NetAvionics *getAvionics() { return NULL; }
   virtual void validateGunsLists(){};
 
   virtual const char *getActorName() const { return nullptr; }

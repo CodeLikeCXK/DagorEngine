@@ -1,8 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
-#include <drv/3d/dag_draw.h>
-#include <drv/3d/dag_vertexIndexBuffer.h>
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d_multi.h>
 #include <3d/dag_materialData.h>
 #include <3d/dag_render.h>
 #include <gameRes/dag_gameResources.h>

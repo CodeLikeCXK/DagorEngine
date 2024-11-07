@@ -1,16 +1,12 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "shaders.h"
 #include "context.h"
 #include <dag_noise/dag_uint_noise.h>
 #include <generic/dag_relocatableFixedVector.h>
 #include <memory/dag_framemem.h>
-#include <drv/3d/dag_shaderConstants.h>
-#include <drv/3d/dag_buffers.h>
 
 namespace dafx
 {
-RenderShaderId register_render_shader(Shaders &dst, const eastl::string &shader_name, const eastl::string &sys_name, VDECL vdecl)
+RenderShaderId register_render_shader(Shaders &dst, const eastl::string &shader_name, const eastl::string &sys_name)
 {
   G_UNREFERENCED(sys_name);
 
@@ -25,7 +21,6 @@ RenderShaderId register_render_shader(Shaders &dst, const eastl::string &shader_
     del_it(res);
     return RenderShaderId();
   }
-  res->shader->replaceVdecl(vdecl);
 
   RenderShaderId rid = dst.renderShaders.emplaceOne(RenderShaderPtr(res));
   dst.renderShadersMap.insert(shader_name).first->second = rid;
@@ -96,7 +91,7 @@ void register_cpu_override_shader(ContextId cid, const eastl::string &shader_nam
 // cpu shaders
 //
 
-template <typename T_state, int T_shader, bool T_allow_sim_lods>
+template <typename T_state, int T_shader>
 int update_cpu_tasks(Context &ctx, const eastl::vector<int> &workers, int start, int count)
 {
   if (workers.empty())
@@ -115,9 +110,6 @@ int update_cpu_tasks(Context &ctx, const eastl::vector<int> &workers, int start,
   int cpuElemProcessed = 0;
   InstanceGroups &stream = ctx.instances.groups;
 
-  G_STATIC_ASSERT(Config::max_simulation_lods <= 8); // we can use more, but then we need to change packing, or change it to 1 << lod
-                                                     // in shader per part
-
   for (int ii = start, ie = start + count; ii < ie; ++ii)
   {
     int sid = workers[ii];
@@ -126,8 +118,6 @@ int update_cpu_tasks(Context &ctx, const eastl::vector<int> &workers, int start,
     if (state.count == 0) // was destroyed already
       continue;
 
-    G_FAST_ASSERT(stream.get<INST_FLAGS>(sid) & SYS_VALID);
-
     const InstanceState &inst = stream.get<INST_ACTIVE_STATE>(sid); // -V758
     CpuBuffer &buf = stream.get<INST_CPU_BUFFER>(sid);
 
@@ -135,13 +125,8 @@ int update_cpu_tasks(Context &ctx, const eastl::vector<int> &workers, int start,
     shaders.push_back(stream.get<T_shader>(sid));
     DispatchDesc &ddesc = dispatches.push_back();
 
-    int lod = T_allow_sim_lods ? stream.get<INST_LOD>(sid) : 0;
-
-    int lodOfs = 1 << lod;
-    G_FAST_ASSERT(buf.offset <= 0xffffff && lodOfs <= 0xff);
-
     int rnd = interlocked_increment(ctx.rndSeed);
-    ddesc.headOffsetAndLodOfs = (buf.offset & 0xffffff) | (lodOfs << 24);
+    ddesc.headOffset = buf.offset;
     ddesc.startAndCount = state.start | (state.count << 16);
     ddesc.aliveStartAndCount = inst.aliveStart | (inst.aliveCount << 16);
     ddesc.rndSeedAndCullingId = (uint32_hash(rnd + sid + ddesc.startAndCount) % 0xff) | (stream.get<INST_CULLING_ID>(sid) << 8);
@@ -200,20 +185,19 @@ int update_cpu_tasks(Context &ctx, const eastl::vector<int> &workers, int start,
 
 int update_cpu_emission(Context &ctx, const eastl::vector<int> &workers, int start, int count)
 {
-  return update_cpu_tasks<EmissionState, INST_EMISSION_CPU_SHADER, false>(ctx, workers, start, count);
+  return update_cpu_tasks<EmissionState, INST_EMISSION_CPU_SHADER>(ctx, workers, start, count);
 }
 
 int update_cpu_simulation(Context &ctx, const eastl::vector<int> &workers, int start, int count)
 {
-  TIME_PROFILE(dafx_update_cpu_simulation);
-  return update_cpu_tasks<SimulationState, INST_SIMULATION_CPU_SHADER, true>(ctx, workers, start, count);
+  return update_cpu_tasks<SimulationState, INST_SIMULATION_CPU_SHADER>(ctx, workers, start, count);
 }
 
 //
 // gpu shaders
 //
 
-template <typename T_state, int T_shader, bool T_allow_sim_lods>
+template <typename T_state, int T_shader>
 void update_gpu_tasks(Context &ctx, const eastl::vector<int> &workers)
 {
   if (workers.empty())
@@ -253,13 +237,8 @@ void update_gpu_tasks(Context &ctx, const eastl::vector<int> &workers)
     shaders.push_back(stream.get<T_shader>(sid));
     DispatchDesc &ddesc = dispatches.push_back();
 
-    int lodOfs = 0;
-    if (T_allow_sim_lods)
-      lodOfs = 1 << stream.get<INST_LOD>(sid);
-    G_FAST_ASSERT(buf.offset < 0xffffff && lodOfs < 0xff);
-
     int rnd = interlocked_increment(ctx.rndSeed);
-    ddesc.headOffsetAndLodOfs = (buf.offset & 0xffffff) | (lodOfs << 24);
+    ddesc.headOffset = buf.offset;
     ddesc.startAndCount = state.start | (state.count << 16);
     ddesc.aliveStartAndCount = inst.aliveStart | (inst.aliveCount << 16);
     ddesc.rndSeedAndCullingId = (uint32_hash(rnd + sid + ddesc.startAndCount) % 0xff) | (stream.get<INST_CULLING_ID>(sid) << 8);
@@ -291,12 +270,8 @@ void update_gpu_tasks(Context &ctx, const eastl::vector<int> &workers)
   }
 
   ctx.globalData.gpuBuf.setVar();
-  // can be null when we cycle for fx update without requestion actual gpu feedback (pre-sim in benchmarks)
-  // there will be no UAV writes on null buff in this case, since set have dafx_update_gpu_culling interval to off in this case
-  Sbuffer *gpuFeedbackBuf = ctx.culling.gpuFeedbacks[ctx.culling.gpuFeedbackIdx].gpuRes.getBuf();
-  if (gpuFeedbackBuf)
-    d3d::resource_barrier({gpuFeedbackBuf, RB_NONE});
-  if (!d3d::set_rwbuffer(STAGE_CS, DAFX_CULLING_DATA_UAV_SLOT, gpuFeedbackBuf))
+  d3d::resource_barrier({ctx.culling.gpuFeedbacks[ctx.culling.gpuFeedbackIdx].gpuRes.getBuf(), RB_NONE});
+  if (!d3d::set_rwbuffer(STAGE_CS, DAFX_CULLING_DATA_UAV_SLOT, ctx.culling.gpuFeedbacks[ctx.culling.gpuFeedbackIdx].gpuRes.getBuf()))
     return;
 
   // cache
@@ -350,8 +325,7 @@ void update_gpu_tasks(Context &ctx, const eastl::vector<int> &workers)
       if (!d3d::set_immediate_const(STAGE_CS, params, 2))
         return;
       curShaderPtr->dispatch((groupSize * curBucketSize) / DAFX_DEFAULT_WARP, 1, 1, GpuPipeline::GRAPHICS, false);
-      if (gpuFeedbackBuf)
-        d3d::resource_barrier({gpuFeedbackBuf, RB_NONE});
+      d3d::resource_barrier({ctx.culling.gpuFeedbacks[ctx.culling.gpuFeedbackIdx].gpuRes.getBuf(), RB_NONE});
       d3d::resource_barrier({curPagePtr->res.getBuf(), RB_NONE});
       gpuDispatchCalls++;
     }
@@ -414,12 +388,12 @@ void update_gpu_tasks(Context &ctx, const eastl::vector<int> &workers)
 void update_gpu_emission(Context &ctx, const eastl::vector<int> &workers)
 {
   TIME_D3D_PROFILE(dafx_update_gpu_emission);
-  update_gpu_tasks<EmissionState, INST_EMISSION_GPU_SHADER, false>(ctx, workers);
+  update_gpu_tasks<EmissionState, INST_EMISSION_GPU_SHADER>(ctx, workers);
 }
 
 void update_gpu_simulation(Context &ctx, const eastl::vector<int> &workers)
 {
   TIME_D3D_PROFILE(dafx_update_gpu_simulation);
-  update_gpu_tasks<SimulationState, INST_SIMULATION_GPU_SHADER, true>(ctx, workers);
+  update_gpu_tasks<SimulationState, INST_SIMULATION_GPU_SHADER>(ctx, workers);
 }
 } // namespace dafx

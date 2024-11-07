@@ -1,15 +1,8 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "selectionNodesProcessing.h"
 #include "nodesProcessing.h"
 #include "propPanelPids.h"
 #include <assets/asset.h>
 #include <assets/assetMgr.h>
-#include <propPanel/control/container.h>
-
-using PropPanel::TLeafHandle;
-
-static const char *LEAF_ICON = "res_animbnl";
 
 static void find_node_idx(Tab<int> &selected_idx, const Tab<String> &node_names, const char *node_name)
 {
@@ -26,10 +19,9 @@ void SelectionNodesProcessing::init(DagorAsset *asset, CollisionResource *collis
 {
   curAsset = asset;
   collisionRes = collision_resource;
-  updateHiddenNodes();
 }
 
-void SelectionNodesProcessing::setPropPanel(PropPanel::ContainerPropertyControl *prop_panel) { panel = prop_panel; }
+void SelectionNodesProcessing::setPropPanel(PropertyContainerControlBase *prop_panel) { panel = prop_panel; }
 
 static bool contains_node(const dag::Vector<String> &skip_nodes, const char *node)
 {
@@ -75,54 +67,43 @@ void fill_skip_nodes_from_container(const dag::Vector<SelectedNodesSettings> &co
   }
 }
 
-static void create_tree_leaf_from_node(const SelectedNodesSettings &selected_nodes, const char *icon_name,
-  PropPanel::ContainerPropertyControl *tree)
+static void create_tree_leaf_from_node(const SelectedNodesSettings &selectedNodes, const char *icon_name,
+  PropertyContainerControlBase *tree)
 {
-  String nodeName{selected_nodes.nodeName};
-  if (selected_nodes.isPhysCollidable)
+  String nodeName{selectedNodes.nodeName};
+  if (selectedNodes.isPhysCollidable)
     nodeName.insert(0, "[phys]");
-  if (selected_nodes.isTraceable)
+  if (selectedNodes.isTraceable)
     nodeName.insert(0, "[trace]");
   TLeafHandle leaf = tree->createTreeLeaf(0, nodeName, icon_name);
-  tree->setCheckboxEnable(leaf, false);
 
-  for (const auto refNode : selected_nodes.refNodes)
+  for (const auto refNode : selectedNodes.refNodes)
   {
-    TLeafHandle childLeaf = tree->createTreeLeaf(leaf, refNode, LEAF_ICON);
-    tree->setCheckboxEnable(childLeaf, false);
-  }
-}
-
-const char *get_collision_type_icon_name(ExportCollisionNodeType type)
-{
-  switch (type)
-  {
-    case ExportCollisionNodeType::KDOP:
-    case ExportCollisionNodeType::CONVEX_COMPUTER:
-    case ExportCollisionNodeType::CONVEX_VHACD: return "convex_hull";
-    case ExportCollisionNodeType::MESH: return "mesh";
-    case ExportCollisionNodeType::BOX: return "contour_box";
-    case ExportCollisionNodeType::SPHERE: return "contour_sphere";
-    default: logerr("unknown export collision type idx: %d", type); return "";
+    tree->createTreeLeaf(leaf, refNode, "childLeaf");
   }
 }
 
 template <typename T>
-void create_tree_leaf_from_container(const T &collision_container, PropPanel::ContainerPropertyControl *tree)
+void create_tree_leaf_from_container(const T &collision_container, PropertyContainerControlBase *tree, const char *icon_name)
 {
   for (const auto &settings : collision_container)
   {
-    create_tree_leaf_from_node(settings.selectedNodes, get_collision_type_icon_name(settings.selectedNodes.type), tree);
+    create_tree_leaf_from_node(settings.selectedNodes, icon_name, tree);
   }
 }
 
 template <>
-void create_tree_leaf_from_container(const dag::Vector<SelectedNodesSettings> &collision_container,
-  PropPanel::ContainerPropertyControl *tree)
+void create_tree_leaf_from_container(const dag::Vector<SelectedNodesSettings> &collision_container, PropertyContainerControlBase *tree,
+  const char *icon_name)
 {
   for (const auto &settings : collision_container)
   {
-    create_tree_leaf_from_node(settings, get_collision_type_icon_name(settings.type), tree);
+    switch (settings.type)
+    {
+      case ExportCollisionNodeType::MESH: create_tree_leaf_from_node(settings, "mesh", tree); break;
+      case ExportCollisionNodeType::BOX: create_tree_leaf_from_node(settings, "box", tree); break;
+      case ExportCollisionNodeType::SPHERE: create_tree_leaf_from_node(settings, "sphere", tree); break;
+    }
   }
 }
 
@@ -135,26 +116,7 @@ static void add_skip_nodes_convex_hulls(const DataBlock *node, dag::Vector<Strin
   }
 }
 
-void init_checkbox_icons(PropPanel::ContainerPropertyControl *tree)
-{
-  TLeafHandle root = tree->getRootLeaf();
-
-  // Set icons if tree have 1 or more leaf with enable checkbox
-  for (TLeafHandle leaf = root; leaf;)
-  {
-    if (tree->isCheckboxEnable(leaf))
-    {
-      G_ASSERT(tree->isImguiContainer());
-      PropPanel::ContainerPropertyControl *imguiTree = static_cast<PropPanel::ContainerPropertyControl *>(tree);
-      imguiTree->setTreeCheckboxIcons("eye_show", "eye_hide");
-      break;
-    }
-    else if ((leaf = tree->getNextLeaf(leaf)) == root)
-      break;
-  }
-}
-
-void SelectionNodesProcessing::fillInfoTree(PropPanel::ContainerPropertyControl *tree)
+void SelectionNodesProcessing::fillInfoTree(PropertyContainerControlBase *tree)
 {
   dag::Vector<String> skipNodes;
 
@@ -164,14 +126,15 @@ void SelectionNodesProcessing::fillInfoTree(PropPanel::ContainerPropertyControl 
     {
       const DataBlock *node = nodes->getBlock(i);
       const char *collision = node->getStr("collision", nullptr);
-      const char *iconName = get_collision_type_icon_name(get_export_type_by_name(collision));
+      String iconName;
+      if (collision)
+        iconName = collision;
       String nodeName{node->getBlockName()};
       if (node->getBool("isPhysCollidable"))
         nodeName.insert(0, "[phys]");
       if (node->getBool("isTraceable"))
         nodeName.insert(0, "[trace]");
       TLeafHandle leaf = tree->createTreeLeaf(0, nodeName, iconName);
-      tree->setCheckboxValue(leaf, true);
       const DataBlock *refNodes = node->getBlockByName("refNodes");
       skipNodes.push_back() = node->getBlockName();
       if (get_export_type_by_name(collision) == ExportCollisionNodeType::CONVEX_VHACD)
@@ -181,8 +144,7 @@ void SelectionNodesProcessing::fillInfoTree(PropPanel::ContainerPropertyControl 
 
       for (int j = 0; j < refNodes->blockCount(); ++j)
       {
-        TLeafHandle childLeaf = tree->createTreeLeaf(leaf, refNodes->getBlock(j)->getBlockName(), LEAF_ICON);
-        tree->setCheckboxEnable(childLeaf, false);
+        tree->createTreeLeaf(leaf, refNodes->getBlock(j)->getBlockName(), "childLeaf");
       }
     }
   }
@@ -192,17 +154,17 @@ void SelectionNodesProcessing::fillInfoTree(PropPanel::ContainerPropertyControl 
   fill_skip_nodes_from_container(convexsComputerSettings, skipNodes);
   fill_skip_nodes_from_container(convexsVhacdSettings, skipNodes);
 
-  create_tree_leaf_from_container(combinedNodesSettings, tree);
-  create_tree_leaf_from_container(kdopsSettings, tree);
-  create_tree_leaf_from_container(convexsComputerSettings, tree);
-  create_tree_leaf_from_container(convexsVhacdSettings, tree);
+  create_tree_leaf_from_container(combinedNodesSettings, tree, nullptr);
+  create_tree_leaf_from_container(kdopsSettings, tree, "kdop");
+  create_tree_leaf_from_container(convexsComputerSettings, tree, "convexComputer");
+  create_tree_leaf_from_container(convexsVhacdSettings, tree, "convexVhacd");
 
   dag::ConstSpan<CollisionNode> nodes = collisionRes->getAllNodes();
   for (const auto &node : nodes)
   {
     if (!contains_node(skipNodes, node.name))
     {
-      const char *iconName = "";
+      String iconName;
       String nodeName{node.name};
       if (node.behaviorFlags & CollisionNode::PHYS_COLLIDABLE)
         nodeName.insert(0, "[phys]");
@@ -211,19 +173,15 @@ void SelectionNodesProcessing::fillInfoTree(PropPanel::ContainerPropertyControl 
       switch (node.type)
       {
         case COLLISION_NODE_TYPE_MESH: iconName = "mesh"; break;
-        case COLLISION_NODE_TYPE_POINTS: iconName = "disconnected_points"; break;
-        case COLLISION_NODE_TYPE_BOX: iconName = "contour_box"; break;
-        case COLLISION_NODE_TYPE_SPHERE: iconName = "contour_sphere"; break;
-        case COLLISION_NODE_TYPE_CAPSULE: iconName = "contour_capsule"; break;
-        case COLLISION_NODE_TYPE_CONVEX: iconName = "convex_hull"; break;
+        case COLLISION_NODE_TYPE_POINTS: iconName = "points"; break;
+        case COLLISION_NODE_TYPE_BOX: iconName = "box"; break;
+        case COLLISION_NODE_TYPE_SPHERE: iconName = "sphere"; break;
+        case COLLISION_NODE_TYPE_CAPSULE: iconName = "capsule"; break;
+        case COLLISION_NODE_TYPE_CONVEX: iconName = "convex"; break;
       }
-      TLeafHandle leaf = tree->createTreeLeaf(0, nodeName, iconName);
-      tree->setCheckboxValue(leaf, true);
+      tree->createTreeLeaf(0, nodeName, iconName);
     }
   }
-
-  updateHiddenNodes();
-  init_checkbox_icons(tree);
 }
 
 template <typename TCollision, typename TNames>
@@ -665,11 +623,11 @@ void SelectionNodesProcessing::selectNode(const char *node_name, bool ctrl_press
   find_node_idx(sels, nodes, nodeName);
   panel->setSelection(PID_SELECTABLE_NODES_LIST, sels);
 
-  PropPanel::PropertyControlBase *treeControl = panel->getById(PID_COLLISION_NODES_TREE);
+  PropertyControlBase *treeControl = panel->getById(PID_COLLISION_NODES_TREE);
   if (!treeControl)
     return;
 
-  PropPanel::ContainerPropertyControl *tree = treeControl->getContainer();
+  PropertyContainerControlBase *tree = treeControl->getContainer();
   iterate_all_leafs_linear(*tree, tree->getRootLeaf(), [tree, &nodeName](TLeafHandle child) {
     String leafName(tree->getCaption(child));
     NodesProcessing::delete_flags_prefix(leafName);
@@ -823,12 +781,4 @@ void SelectionNodesProcessing::clearSettings()
   exportedConvexsVhacdSettings.clear();
   exportedConvexsComputerSettings.clear();
   clearRejectedSettings();
-}
-
-bool SelectionNodesProcessing::haveUnsavedChanges()
-{
-  return !calcCollisionAfterReject &&
-         (combinedNodesSettings.size() || kdopsSettings.size() || convexsComputerSettings.size() || convexsVhacdSettings.size() ||
-           exportedCombinedNodesSettings.size() || exportedKdopsSettings.size() || exportedConvexsComputerSettings.size() ||
-           exportedConvexsVhacdSettings.size());
 }

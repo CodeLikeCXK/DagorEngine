@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #ifndef TESTAPP
 #include <lagCatcher/lagCatcher.h>
 #endif

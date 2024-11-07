@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "de3_loghandler.h"
 
 #if DAGOR_DBGLEVEL > 0

@@ -1,5 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-#pragma once
+#ifndef ELEMENT_H_
+#define ELEMENT_H_
 
 #include <string>
 
@@ -25,3 +25,5 @@ public:
 private:
   FileStructure *theStructure;
 };
+
+#endif

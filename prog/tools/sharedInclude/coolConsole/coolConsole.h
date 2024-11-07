@@ -1,5 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __GAIJIN_COOL_CONSOLE__
+#define __GAIJIN_COOL_CONSOLE__
 #pragma once
+
 
 #include <libTools/util/iLogWriter.h>
 #include <libTools/util/progressInd.h>
@@ -233,3 +235,6 @@ public:
   virtual void redrawScreen() {}
   virtual void destroy() {}
 };
+
+
+#endif //__GAIJIN_COOL_CONSOLE__

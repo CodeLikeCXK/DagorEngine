@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <assets/daBuildExpPluginChain.h>
 #include <assets/assetExporter.h>
 #include <assets/assetRefs.h>
@@ -188,6 +186,7 @@ public:
             "include $(Root)/$(Location)/jam-list ;\n\n"
             "Sources += factory.cpp ;\n\n"
             "AddIncludes = $(Root)/prog/engine ;\n\n"
+            "CPPopt = -D__B_CORE ;\n\n"
             "include $(Root)/prog/_jBuild/build.jam ;\n",
         fpJamF);
       fclose(fpJamF);

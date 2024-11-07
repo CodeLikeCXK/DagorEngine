@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <osApiWrappers/dag_atomic.h>
 #include <mutex>
 #include "daProfilerInternal.h"
@@ -36,10 +34,7 @@ RegisterThreadResult ProfilerData::addThreadData(uint32_t description)
     return RegisterThreadResult::AlreadyRegistered;
 
   if (!threadsDataStor.capacity())
-  {
     threadsDataStor.reserve((get_logical_cores() + 7) & ~7);
-    threadsData.reserve(threadsDataStor.capacity());
-  }
 
   const int64_t threadId = get_current_thread_id();
   auto threadEmpty = threadsData.end();

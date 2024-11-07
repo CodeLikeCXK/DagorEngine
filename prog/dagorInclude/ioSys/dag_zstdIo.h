@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -11,7 +12,7 @@ struct ZSTD_DCtx_s;
 struct ZSTD_CDict_s;
 struct ZSTD_DDict_s;
 
-#include <supp/dag_define_KRNLIMP.h>
+#include <supp/dag_define_COREIMP.h>
 
 class ZstdLoadFromMemCB : public IGenLoad
 {
@@ -116,7 +117,7 @@ public:
     return 0;
   }
   virtual const char *getTargetName() { return cwrDest ? cwrDest->getTargetName() : NULL; }
-  virtual void flush();
+  virtual void flush() {}
 
 protected:
   static constexpr int BUFFER_SIZE = (32 << 10);
@@ -205,4 +206,4 @@ KRNLIMP int64_t zstd_stream_compress_data_with_dict(IGenSave &dest, IGenLoad &sr
 // decompresses stream using dictionary (created with zstd_create_dict)
 KRNLIMP int64_t zstd_stream_decompress_data(IGenSave &dest, IGenLoad &src, const size_t compr_sz, const ZSTD_DDict_s *dict);
 
-#include <supp/dag_undef_KRNLIMP.h>
+#include <supp/dag_undef_COREIMP.h>

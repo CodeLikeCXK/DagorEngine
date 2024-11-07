@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <memory/dag_physMem.h>
 #if _TARGET_C1 | _TARGET_C2
 
@@ -69,15 +67,15 @@ void *alloc_phys_mem(size_t size, size_t alignment, uint32_t prot_flags, bool cp
 #endif
 }
 
-bool free_phys_mem(void *ptr, bool ignore_unknown)
+void free_phys_mem(void *ptr)
 {
   if (ptr == NULL)
-    return true;
+    return;
 #if _TARGET_ANDROID | _TARGET_PC_WIN | _TARGET_XBOX | _TARGET_C3
-  G_UNUSED(ignore_unknown);
   memfree(ptr, midmem);
-  return true;
+
 #else
+
   phys_map.lock();
   for (int i = 0; i < phys_map.size(); ++i)
   {
@@ -92,12 +90,12 @@ bool free_phys_mem(void *ptr, bool ignore_unknown)
       total_allocated_pages -= uint32_t(blk.size / 4096);
       erase_items_fast(phys_map, i, 1);
       phys_map.unlock();
-      return true;
+      return;
     }
   }
+  G_ASSERTF(0, "phys_release: non existent block &p", ptr);
+  debug("phys_release: non existent block %p", ptr);
   phys_map.unlock();
-  G_ASSERT_LOG(ignore_unknown, "phys_release: non existent block %p", ptr);
-  return false;
 #endif
 }
 
@@ -113,6 +111,3 @@ void add_ext_allocated_phys_mem(int64_t size)
 }
 
 } // namespace dagor_phys_memory
-
-#define EXPORT_PULL dll_pull_memory_physmem
-#include <supp/exportPull.h>

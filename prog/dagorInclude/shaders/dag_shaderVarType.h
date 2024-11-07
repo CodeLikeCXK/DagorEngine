@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -18,7 +19,6 @@ enum ShaderVarType
   SHVT_INT4,
   SHVT_FLOAT4X4,
   SHVT_SAMPLER,
-  SHVT_TLAS,
 };
 
 enum ShaderVarTextureType : int

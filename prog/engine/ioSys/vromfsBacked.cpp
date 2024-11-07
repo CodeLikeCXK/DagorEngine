@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <osApiWrappers/dag_vromfs.h>
 #include <osApiWrappers/dag_localConv.h>
 #include <util/dag_base32.h>
@@ -133,7 +131,7 @@ VirtualRomFsPack *open_backed_vromfs_pack(const char *fname, IMemAlloc *mem, Vir
   {
     logerr("bvrom: cache_vrom=%p (%s) doesn't contain content-SHA1 (ptr=%p), cannot be used", cache_vrom, cache_vrom->getFilePath(),
       cache_vrom->ptr);
-    G_ASSERTF((void *)cache_vrom < (void *)cache_vrom->ptr, //-V547
+    G_ASSERTF((void *)cache_vrom < (void *)cache_vrom->ptr,
       "cache_vrom=%p cache_vrom->ptr=%p\n"
       "cache will be released and not used",
       cache_vrom, cache_vrom->ptr);

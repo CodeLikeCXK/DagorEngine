@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "../av_plugin.h"
 #include "../av_appwnd.h"
 #include <assets/asset.h>
@@ -8,10 +6,10 @@
 #include <util/dag_globDef.h>
 #include <debug/dag_debug.h>
 
-#include <propPanel/control/container.h>
-#include <propPanel/c_control_event_handler.h>
+#include <propPanel2/c_panel_base.h>
+#include <propPanel2/c_control_event_handler.h>
 
-class CustomEditorPlugin : public IGenEditorPlugin, public PropPanel::ControlEventHandler
+class CustomEditorPlugin : public IGenEditorPlugin, public ControlEventHandler
 {
 public:
   CustomEditorPlugin() {}
@@ -60,12 +58,12 @@ public:
     //        strcmp(asset.getTypeStr(), "dynModel")==0;
   }
 
-  virtual void fillPropPanel(PropPanel::ContainerPropertyControl &panel) { panel.setEventHandler(this); }
+  virtual void fillPropPanel(PropertyContainerControlBase &panel) { panel.setEventHandler(this); }
 
 
   virtual void postFillPropPanel() {}
 
-  virtual void onChange(int pcb_id, PropPanel::ContainerPropertyControl *panel) {}
+  virtual void onChange(int pcb_id, PropertyContainerControlBase *panel) {}
 };
 
 static InitOnDemand<CustomEditorPlugin> plugin;

@@ -1,10 +1,8 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "pull.h"
 #include <util/dag_stdint.h>
 #include <ioSys/dag_dataBlock.h>
 #include <perfMon/dag_statDrv.h>
-#include <supp/dag_define_KRNLIMP.h>
+#include <supp/dag_define_COREIMP.h>
 
 bool g_enable_time_profiler = false; // legacy way
 bool g_gpu_profiler_on = false;      // legacy way
@@ -40,7 +38,7 @@ int pull_dll_sum =
   dll_pull_kernel_kernelGlobalSetting + dll_pull_kernel_log + dll_pull_kernel_debugDumpStack + dll_pull_kernel_cpu_control +
   dll_pull_kernel_perfTimer +
 
-  dll_pull_memory_dagmem + dll_pull_memory_mspaceAlloc + dll_pull_memory_framemem + dll_pull_memory_physmem +
+  dll_pull_memory_dagmem + dll_pull_memory_mspaceAlloc + dll_pull_memory_framemem +
 
   dll_pull_iosys_asyncIo + dll_pull_iosys_asyncIoCached + dll_pull_iosys_asyncWrite + dll_pull_iosys_baseIo + dll_pull_iosys_fileIo +
   dll_pull_iosys_ioUtils + dll_pull_iosys_memIo + dll_pull_iosys_obsolete_cfg + dll_pull_iosys_zlibIo + dll_pull_iosys_lzmaDecIo +
@@ -57,7 +55,7 @@ int pull_dll_sum =
   dll_pull_baseutil_threadPool + dll_pull_baseutil_watchdog + dll_pull_baseutil_delayedActions + dll_pull_baseutil_treeBitmap +
   dll_pull_baseutil_lag + dll_pull_baseutil_fnameMap + dll_pull_baseutil_fileMd5Validate +
 
-  (int)hdr_render_mode + (int)hdr_render_format + (int)(intptr_t)occlusion_map +
+  (int)(intptr_t)visibility_finder + (int)hdr_render_mode + (int)hdr_render_format + (int)(intptr_t)occlusion_map +
 
 #endif
   0;

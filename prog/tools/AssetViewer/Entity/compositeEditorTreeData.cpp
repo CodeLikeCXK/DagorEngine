@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "compositeEditorTreeData.h"
 #include <assets/asset.h>
 #include <de3_composit.h>

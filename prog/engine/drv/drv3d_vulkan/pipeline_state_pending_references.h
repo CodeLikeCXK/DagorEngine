@@ -1,16 +1,10 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-#pragma once
-
 // storage/managment of pending references
-
+#pragma once
 #include "driver.h"
 #include "image_resource.h"
 #include "buffer_resource.h"
 #include "render_pass_resource.h"
 #include "sampler_resource.h"
-#include "pipeline_state.h"
-#include "frame_info.h"
-#include "memory_heap_resource.h"
 
 namespace drv3d_vulkan
 {
@@ -22,10 +16,9 @@ class PipelineStatePendingReferenceList
   eastl::vector<ProgramID> progs;
   eastl::vector<RenderPassResource *> renderPasses;
   eastl::vector<SamplerResource *> samplers;
-  eastl::vector<MemoryHeapResource *> memHeaps;
 
   template <typename T>
-  void cleanupNonUsed(const PipelineState &front_state, const PipelineState &back_state)
+  void cleanupNonUsed(const PipelineState &state)
   {
     eastl::vector<T> &ref = getArray<T>();
     if (ref.empty())
@@ -34,7 +27,7 @@ class PipelineStatePendingReferenceList
     eastl::vector<T> copy = ref;
     ref.clear();
     for (T i : copy)
-      if (front_state.isReferenced(i) || back_state.isReferenced(i))
+      if (state.isReferenced(i))
         ref.push_back(i);
       else
         cleanupObj<T>(i);
@@ -65,16 +58,16 @@ public:
     shutdownArray<Buffer *>();
     shutdownArray<ProgramID>();
     shutdownArray<RenderPassResource *>();
-    shutdownArray<MemoryHeapResource *>();
+    shutdownArray<SamplerResource *>();
   }
 
-  void cleanupAllNonUsed(const PipelineState &front_state, const PipelineState &back_state)
+  void cleanupAllNonUsed(const PipelineState &state)
   {
-    cleanupNonUsed<Image *>(front_state, back_state);
-    cleanupNonUsed<Buffer *>(front_state, back_state);
-    cleanupNonUsed<ProgramID>(front_state, back_state);
-    cleanupNonUsed<RenderPassResource *>(front_state, back_state);
-    cleanupNonUsed<MemoryHeapResource *>(front_state, back_state);
+    cleanupNonUsed<Image *>(state);
+    cleanupNonUsed<Buffer *>(state);
+    cleanupNonUsed<ProgramID>(state);
+    cleanupNonUsed<RenderPassResource *>(state);
+    cleanupNonUsed<SamplerResource *>(state);
   }
 
   template <typename T>

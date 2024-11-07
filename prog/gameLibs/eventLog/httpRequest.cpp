@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "httpRequest.h"
 #include <asyncHTTPClient/asyncHTTPClient.h>
 #include <osApiWrappers/dag_events.h>

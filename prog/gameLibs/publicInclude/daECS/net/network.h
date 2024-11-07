@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -53,10 +54,8 @@ class CNetwork
 {
 public:
   CNetwork(INetDriver *drv_, INetworkObserver *obsrv, uint16_t protov = PROTO_VERSION_UNKNOWN, uint64_t session_rand = 0,
-    scope_query_cb_t &&sq = {});
+    scope_query_cb_t &&scope_query_ = scope_query_cb_t());
   ~CNetwork();
-
-  void setScopeQueryCb(scope_query_cb_t &&cb); // Shall be called before any client connected
 
   void update(int cur_time_ms, uint8_t replication_channel = 0);
 

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "riGen/riGridDebug.h"
 #include "riGen/riGrid.h"
 #include <ADT/linearGrid.h>

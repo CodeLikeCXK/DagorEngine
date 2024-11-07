@@ -1,4 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __GAIJIN_DAG_UTIL_H__
+#define __GAIJIN_DAG_UTIL_H__
 #pragma once
 
 #include <generic/dag_tab.h>
@@ -21,3 +22,5 @@ const char *get_dagutil_last_error();
 bool copy_dag_file(const char *src_name, const char *dst_name, Tab<String> &slotNames, Tab<String> &orgTexNames);
 
 bool get_dag_textures(const char *path, Tab<String> &list);
+
+#endif // __GAIJIN_DAG_UTIL_H__

@@ -1,7 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
-#include <drv/3d/dag_draw.h>
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
 #include <shaders/dag_shaders.h>
 #include <render/spheres_consts.hlsli>
 

@@ -1,6 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
-
 #include <daSkies2/daScattering.h>
 #include "clouds2.h"
 #include "preparedSkies.h"

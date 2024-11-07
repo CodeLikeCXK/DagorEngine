@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <stdint.h>
 
 uint32_t profiler_ticks_to_us = 1;

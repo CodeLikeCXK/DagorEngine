@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "panel.h"
 #include "guiScene.h"
 #include "cursor.h"
@@ -11,9 +9,6 @@
 
 #include <shaders/dag_shaderBlock.h>
 #include <perfMon/dag_statDrv.h>
-#include <drv/3d/dag_viewScissor.h>
-#include <drv/3d/dag_renderTarget.h>
-#include <drv/3d/dag_texture.h>
 
 
 namespace darg
@@ -178,8 +173,10 @@ void Panel::updateRenderInfoParamsFromScript()
 /* *******************************************************/
 
 
-PanelData::PanelData(GuiScene &scene, const Sqrat::Object &object, int panelIndex)
+void PanelData::init(GuiScene &scene, const Sqrat::Object &object, int panelIndex)
 {
+  close();
+
   panel.reset(new Panel(&scene));
   panel->init(object);
 
@@ -188,6 +185,13 @@ PanelData::PanelData(GuiScene &scene, const Sqrat::Object &object, int panelInde
   panel->updateSpatialInfoFromScript();
   if (panel->spatialInfo.anchor != PanelAnchor::None)
     syncCanvas();
+}
+
+
+void PanelData::close()
+{
+  panel.reset();
+  canvas.reset();
 }
 
 
@@ -223,7 +227,7 @@ E3DCOLOR PanelData::getPointerColor() const
 
 bool PanelData::isInThisPass(darg_panel_renderer::RenderPass render_pass) const
 {
-  int features = panel->renderInfo.worldRenderFeatures;
+  int features = isPanelInited() ? panel->renderInfo.worldRenderFeatures : 0;
 
   switch (render_pass)
   {
@@ -274,9 +278,6 @@ bool PanelData::needRenderInWorld() const
   if (panel->spatialInfo.geometry == PanelGeometry::None)
     return false;
 
-  if (panel->spatialInfo.renderRedirection)
-    return false;
-
   IPoint2 size;
   return getCanvasSize(size);
 }
@@ -325,7 +326,7 @@ void PanelData::syncCanvas()
 }
 
 
-void PanelData::updateTexture(GuiScene &scene, BaseTexture *target)
+void PanelData::updateTexture(GuiScene &scene)
 {
   if (!isAutoUpdated() && !isDirty)
     return;
@@ -336,16 +337,12 @@ void PanelData::updateTexture(GuiScene &scene, BaseTexture *target)
     SCOPE_RENDER_TARGET;
     SCOPE_VIEWPORT;
 
-    if (!target)
-    {
-      syncCanvas();
-      target = canvas->getTex2D();
-    }
+    syncCanvas();
 
     TextureInfo texInfo;
-    target->getinfo(texInfo);
+    canvas->getTex()->getinfo(texInfo);
 
-    d3d::set_render_target(target, 0);
+    d3d::set_render_target(canvas->getTex2D(), 0);
     d3d::setview(0, 0, texInfo.w, texInfo.h, 0, 1);
     d3d::clearview(CLEAR_TARGET, 0, 0, 0);
 
@@ -355,7 +352,6 @@ void PanelData::updateTexture(GuiScene &scene, BaseTexture *target)
     scene.refreshGuiContextState();
     scene.buildPanelRender(index);
 
-    // basically, the same as GuiScene::flushRenderImpl() / GuiScene::flushPanelRender()
     scene.getGuiContext()->setTarget();
     StdGuiRender::acquire();
     scene.getGuiContext()->flushData();

@@ -1,6 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
-#include <osApiWrappers/dag_basePath.h>
 #include <dasModules/aotDagorFiles.h>
 
 namespace bind_dascript
@@ -43,13 +40,13 @@ int dag_df_puts(const DagFile *fp, const char *str, das::Context *context)
   }
 }
 
-char *dag_df_gets(const DagFile *fp, int maxLen, das::Context *context, das::LineInfoArg *at)
+char *dag_df_gets(const DagFile *fp, int maxLen, das::Context *context)
 {
   void *temp = malloc(maxLen);
   char *hstr = nullptr;
   if (char *res = df_gets((char *)temp, maxLen, (file_ptr_t)fp))
   {
-    hstr = context->allocateString(res, strlen(res), at);
+    hstr = context->stringHeap->allocateString(res, strlen(res));
   }
   free(temp);
   return hstr;
@@ -80,9 +77,6 @@ vec4f dag_builtin_df_write(das::Context &, das::SimNode_CallBase *call, vec4f *a
   int res = df_write((file_ptr_t)fp, buf, len);
   return das::cast<int32_t>::from(res);
 }
-
-int dag_builtin_df_write_raw(const DagFile *fp, const void *buf, int32_t len) { return df_write((file_ptr_t)fp, buf, len); }
-
 // loads(file,block<data>)
 vec4f dag_builtin_df_load(das::Context &context, das::SimNode_CallBase *call, vec4f *args)
 {
@@ -138,7 +132,7 @@ int dag_df_stat(const char *path, DagorStat &buf)
 
 int dag_df_fstat(const DagFile *fp, DagorStat &buf) { return df_fstat((file_ptr_t)fp, &buf); }
 
-char *dag_df_get_real_name(const char *fname, das::Context *context, das::LineInfoArg *at)
+char *dag_df_get_real_name(const char *fname, das::Context *context)
 {
   if (!fname)
   {
@@ -147,13 +141,7 @@ char *dag_df_get_real_name(const char *fname, das::Context *context, das::LineIn
   auto rname = df_get_real_name(fname);
   if (!rname)
     return nullptr;
-  return context->allocateString(rname, strlen(rname), at);
-}
-
-char *das_dd_get_named_mount_path(const char *mount_name, das::Context *context, das::LineInfoArg *at)
-{
-  const char *path = ::dd_get_named_mount_path(mount_name ? mount_name : "", -1);
-  return path ? context->allocateString(path, strlen(path), at) : nullptr;
+  return context->stringHeap->allocateString(rname, strlen(rname));
 }
 
 class DagorFiles final : public das::Module
@@ -202,13 +190,6 @@ public:
       das::SideEffects::modifyExternal, "bind_dascript::dag_builtin_df_write");
     das::addInterop<dag_builtin_df_load, void, const DagFile *, int32_t, const das::Block &>(*this, lib, "_builtin_df_load",
       das::SideEffects::modifyExternal, "bind_dascript::dag_builtin_df_load");
-
-    das::addExtern<DAS_BIND_FUN(dag_builtin_df_write_raw)>(*this, lib, "_builtin_df_write_raw", das::SideEffects::modifyExternal,
-      "bind_dascript::dag_builtin_df_write_raw");
-
-    das::addExtern<DAS_BIND_FUN(das_dd_get_named_mount_path)>(*this, lib, "dd_get_named_mount_path", das::SideEffects::accessExternal,
-      "bind_dascript::das_dd_get_named_mount_path");
-
     // add builtin module
     compileBuiltinModule("dagorFiles.das", (unsigned char *)dagorFiles_das, sizeof(dagorFiles_das));
 

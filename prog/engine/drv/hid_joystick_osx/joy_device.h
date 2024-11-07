@@ -1,7 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
-#include <drv/hid/dag_hiJoystick.h>
+#include <humanInput/dag_hiJoystick.h>
 #include <util/dag_simpleString.h>
 #include <generic/dag_tab.h>
 #include <generic/dag_smallTab.h>

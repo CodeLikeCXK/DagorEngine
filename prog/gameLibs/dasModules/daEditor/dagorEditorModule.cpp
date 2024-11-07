@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <dasModules/aotDagorEditor.h>
 
 namespace bind_dascript
@@ -86,8 +84,6 @@ public:
 
     das::addExtern<DAS_BIND_FUN(::is_editor_activated)>(*this, lib, "is_editor_activated", das::SideEffects::accessExternal,
       "::is_editor_activated");
-    das::addExtern<DAS_BIND_FUN(::is_editor_free_camera_enabled)>(*this, lib, "is_editor_free_camera_enabled",
-      das::SideEffects::accessExternal, "::is_editor_free_camera_enabled");
 
     das::addExtern<DAS_BIND_FUN(::init_entity_object_editor)>(*this, lib, "init_entity_object_editor",
       das::SideEffects::modifyExternal, "::init_entity_object_editor");

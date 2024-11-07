@@ -1,6 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
-
 #include <perfMon/dag_drawStat.h>
 namespace gpu_profiler
 {

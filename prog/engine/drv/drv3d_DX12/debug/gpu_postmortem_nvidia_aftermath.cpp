@@ -1,12 +1,12 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
-#include "gpu_postmortem_nvidia_aftermath.h"
 #include "device.h"
 
 #include <debug/dag_logSys.h>
 #include <json/json.h>
+#include <eventLog/eventLog.h>
+#include <breakpad/binder.h>
 #include <util/dag_watchdog.h>
-#include <generic/dag_enumerate.h>
+
+using namespace drv3d_dx12;
 
 namespace
 {
@@ -41,7 +41,6 @@ const char *to_string(GFSDK_Aftermath_Result result)
     TS(FAIL_D3dDllNotSupported);
     TS(FAIL_D3dDllInterceptionNotSupported);
     TS(FAIL_Disabled);
-    TS(FAIL_NotSupportedOnContext);
 #undef TS
   }
   return "<unknown>";
@@ -257,7 +256,7 @@ public:
     {
       return 0;
     }
-    dag::Vector<GFSDK_Aftermath_GpuCrashDump_GpuInfo> data;
+    eastl::vector<GFSDK_Aftermath_GpuCrashDump_GpuInfo> data;
     data.resize(count);
     if (!AFTHERMATH_CALL(p.getGPUInfo(context, count, data.data())))
     {
@@ -283,16 +282,6 @@ public:
     }
   }
 
-  dag::Vector<GFSDK_Aftermath_GpuCrashDump_ResourceInfo> getResourceInfo(uint32_t resourceInfoCount)
-  {
-    dag::Vector<GFSDK_Aftermath_GpuCrashDump_ResourceInfo> resourceInfos(resourceInfoCount);
-    if (!AFTHERMATH_CALL(p.getPageFaultResourceInfo(context, resourceInfoCount, resourceInfos.data())))
-    {
-      resourceInfos.clear();
-    }
-    return resourceInfos;
-  }
-
   template <typename T>
   uint32_t forEachEventMarker(T clb) const
   {
@@ -301,7 +290,7 @@ public:
     {
       return 0;
     }
-    dag::Vector<GFSDK_Aftermath_GpuCrashDump_EventMarkerInfo> data;
+    eastl::vector<GFSDK_Aftermath_GpuCrashDump_EventMarkerInfo> data;
     data.resize(count);
     if (!AFTHERMATH_CALL(p.getEventMarkersInfo(context, count, data.data())))
     {
@@ -322,7 +311,7 @@ public:
     {
       return 0;
     }
-    dag::Vector<GFSDK_Aftermath_GpuCrashDump_ShaderInfo> data;
+    eastl::vector<GFSDK_Aftermath_GpuCrashDump_ShaderInfo> data;
     data.resize(count);
     if (!AFTHERMATH_CALL(p.getActiveShadersInfo(context, count, data.data())))
     {
@@ -344,7 +333,7 @@ void send_dump_context(T *ctx_ptr, const void *dump, const char *ext, size_t siz
   // we may support vulkan in the future, so reporting which api the error occurred is useful
   meta["api"] = "DX12";
   // Should any other vendor support stuff like this, we need to know which is which
-  meta["gpu_vendor"] = "NVIDIA";
+  meta["vendor"] = "NVIDIA";
   // Helpful should there be different types of dumps
   meta["file-ext"] = ext;
   // Vendor independent timestamp
@@ -418,46 +407,39 @@ void send_dump_context(T *ctx_ptr, const void *dump, const char *ext, size_t siz
       logdbg("DX12: GPU page fault access type %s", to_string(pageFaultInfo->accessType));
       logdbg("DX12: GPU page engine %s", to_string(pageFaultInfo->engine));
       logdbg("DX12: GPU page client %s", to_string(pageFaultInfo->client));
-      if (pageFaultInfo->resourceInfoCount > 0)
+      if (pageFaultInfo->bHasResourceInfo)
       {
-        Json::Value &resourceInfojson = meta["resource-info"];
+        meta["page-fault-resource-virtual-gpu-address"] = pageFaultInfo->resourceInfo.gpuVa;
+        meta["page-fault-resource-size"] = pageFaultInfo->resourceInfo.size;
+        meta["page-fault-resource-width"] = pageFaultInfo->resourceInfo.width;
+        meta["page-fault-resource-height"] = pageFaultInfo->resourceInfo.height;
+        meta["page-fault-resource-depth"] = pageFaultInfo->resourceInfo.depth;
+        meta["page-fault-resource-mip-levels"] = pageFaultInfo->resourceInfo.mipLevels;
+        meta["page-fault-resource-format-id"] = pageFaultInfo->resourceInfo.format;
+        meta["page-fault-resource-format"] = dxgi_format_name(static_cast<DXGI_FORMAT>(pageFaultInfo->resourceInfo.format));
+        meta["page-fault-resource-is-buffer-heap"] = pageFaultInfo->resourceInfo.bIsBufferHeap;
+        meta["page-fault-resource-is-static-texture"] = pageFaultInfo->resourceInfo.bIsStaticTextureHeap;
+        meta["page-fault-resource-is-render-target-or-depth-stencil-view"] =
+          pageFaultInfo->resourceInfo.bIsRenderTargetOrDepthStencilViewHeap;
+        meta["page-fault-resource-is-placed-resource"] = pageFaultInfo->resourceInfo.bPlacedResource;
+        meta["page-fault-resource-was-destroyed"] = pageFaultInfo->resourceInfo.bWasDestroyed;
+        meta["page-fault-resource-create-destroy-tick-count"] = pageFaultInfo->resourceInfo.createDestroyTickCount;
 
-        for (auto [i, resourceInfo] : enumerate(ctx.getResourceInfo(pageFaultInfo->resourceInfoCount)))
-        {
-          Json::Value &item = resourceInfojson[(int)i];
-
-          item["page-fault-resource-virtual-gpu-address"] = resourceInfo.gpuVa;
-          item["page-fault-resource-size"] = resourceInfo.size;
-          item["page-fault-resource-width"] = resourceInfo.width;
-          item["page-fault-resource-height"] = resourceInfo.height;
-          item["page-fault-resource-depth"] = resourceInfo.depth;
-          item["page-fault-resource-mip-levels"] = resourceInfo.mipLevels;
-          item["page-fault-resource-format-id"] = resourceInfo.format;
-          item["page-fault-resource-format"] = dxgi_format_name(static_cast<DXGI_FORMAT>(resourceInfo.format));
-          item["page-fault-resource-is-buffer-heap"] = resourceInfo.bIsBufferHeap;
-          item["page-fault-resource-is-static-texture"] = resourceInfo.bIsStaticTextureHeap;
-          item["page-fault-resource-is-render-target-or-depth-stencil-view"] = resourceInfo.bIsRenderTargetOrDepthStencilViewHeap;
-          item["page-fault-resource-is-placed-resource"] = resourceInfo.bPlacedResource;
-          item["page-fault-resource-was-destroyed"] = resourceInfo.bWasDestroyed;
-          item["page-fault-resource-create-destroy-tick-count"] = resourceInfo.createDestroyTickCount;
-
-          logdbg("DX12: Resource Info[%d]", i);
-          logdbg("DX12: Resource address %016X", resourceInfo.gpuVa);
-          logdbg("DX12: Resource size %u", resourceInfo.size);
-          logdbg("DX12: Resource width %u", resourceInfo.width);
-          logdbg("DX12: Resource height %u", resourceInfo.height);
-          logdbg("DX12: Resource depth %u", resourceInfo.depth);
-          logdbg("DX12: Resource mip levels %u", resourceInfo.mipLevels);
-          logdbg("DX12: Resource format id %u", resourceInfo.format);
-          logdbg("DX12: Resource DXGI format %s", dxgi_format_name(static_cast<DXGI_FORMAT>(resourceInfo.format)));
-          logdbg("DX12: Resource is BufferHeap %s", resourceInfo.bIsBufferHeap ? "Yes" : "No");
-          logdbg("DX12: Resource is StaticTextureHeap", resourceInfo.bIsStaticTextureHeap ? "Yes" : "No");
-          logdbg("DX12: Resource is RenderTargetViewHeap or DepthStencilViewHeap",
-            resourceInfo.bIsRenderTargetOrDepthStencilViewHeap ? "Yes" : "No");
-          logdbg("DX12: Resource is PlacedResource %s", resourceInfo.bPlacedResource ? "Yes" : "No");
-          logdbg("DX12: Resource wasDestroyed %s", resourceInfo.bWasDestroyed ? "Yes" : "No");
-          logdbg("DX12: Resource create destroy tick count", resourceInfo.createDestroyTickCount);
-        }
+        logdbg("DX12: Resource address %016X", pageFaultInfo->resourceInfo.gpuVa);
+        logdbg("DX12: Resource size %u", pageFaultInfo->resourceInfo.size);
+        logdbg("DX12: Resource width %u", pageFaultInfo->resourceInfo.width);
+        logdbg("DX12: Resource height %u", pageFaultInfo->resourceInfo.height);
+        logdbg("DX12: Resource depth %u", pageFaultInfo->resourceInfo.depth);
+        logdbg("DX12: Resource mip levels %u", pageFaultInfo->resourceInfo.mipLevels);
+        logdbg("DX12: Resource format id %u", pageFaultInfo->resourceInfo.format);
+        logdbg("DX12: Resource DXGI format %s", dxgi_format_name(static_cast<DXGI_FORMAT>(pageFaultInfo->resourceInfo.format)));
+        logdbg("DX12: Resource is BufferHeap %s", pageFaultInfo->resourceInfo.bIsBufferHeap ? "Yes" : "NO");
+        logdbg("DX12: Resource is StaticTextureHeap", pageFaultInfo->resourceInfo.bIsStaticTextureHeap ? "Yes" : "No");
+        logdbg("DX12: Resource is RenderTargetViewHeap or DepthStencilViewHeap",
+          pageFaultInfo->resourceInfo.bIsRenderTargetOrDepthStencilViewHeap ? "Yes" : "No");
+        logdbg("DX12: Resource is PlacedResource %s", pageFaultInfo->resourceInfo.bPlacedResource ? "Yes" : "No");
+        logdbg("DX12: Resource wasDestroyed %s", pageFaultInfo->resourceInfo.bWasDestroyed ? "Yes" : "No");
+        logdbg("DX12: Resource create destroy tick count", pageFaultInfo->resourceInfo.createDestroyTickCount);
       }
       else
       {
@@ -512,28 +494,23 @@ void send_dump_context(T *ctx_ptr, const void *dump, const char *ext, size_t siz
   }
 
   meta["content-type"] = "application/octet-stream";
-  meta["d3d_driver"] = d3d::get_driver_name();
-  if (auto netManager = drv3d_dx12::get_device().netManager.get(); netManager)
-    netManager->sendHttpEventLog("gpu_crash_dump", dump, size, &meta);
+  event_log::send_http_instant("gpu_crash_dump", dump, size, &meta);
 }
 } // namespace
 
-namespace drv3d_dx12::debug::gpu_postmortem::nvidia
-{
-
-LibPointer Aftermath::try_load_library()
+LibPointer debug::gpu_postmortem::nvidia::Aftermath::try_load_library()
 {
   static const char libName[] =
 #if _TARGET_64BIT
-    "GFSDK_2024.1.0.24075\\GFSDK_Aftermath_Lib.x64.dll";
+    "GFSDK_2022.2.0.22145\\GFSDK_Aftermath_Lib.x64.dll";
 #else
-    "GFSDK_2024.1.0.24075\\GFSDK_Aftermath_Lib.x86.dll";
+    "GFSDK_2022.2.0.22145\\GFSDK_Aftermath_Lib.x86.dll";
 #endif
   logdbg("DX12: ...loading '%s'...", libName);
   return {LoadLibraryA(libName), {}};
 }
 
-Aftermath::ApiTable Aftermath::try_load_api(HMODULE module)
+debug::gpu_postmortem::nvidia::Aftermath::ApiTable debug::gpu_postmortem::nvidia::Aftermath::try_load_api(HMODULE module)
 {
   ApiTable table;
 #define GPA(var, name)                                                                      \
@@ -567,7 +544,6 @@ Aftermath::ApiTable Aftermath::try_load_api(HMODULE module)
   GPA_CD(getGPUInfoCount, "GetGpuInfoCount");
   GPA_CD(getGPUInfo, "GetGpuInfo");
   GPA_CD(getPageFaultInfo, "GetPageFaultInfo");
-  GPA_CD(getPageFaultResourceInfo, "GetPageFaultResourceInfo");
   GPA_CD(getActiveShadersInfoCount, "GetActiveShadersInfoCount");
   GPA_CD(getActiveShadersInfo, "GetActiveShadersInfo");
   GPA_CD(getEventMarkersInfoCount, "GetEventMarkersInfoCount");
@@ -581,7 +557,7 @@ Aftermath::ApiTable Aftermath::try_load_api(HMODULE module)
   return table;
 }
 
-bool Aftermath::tryEnableDumps()
+bool debug::gpu_postmortem::nvidia::Aftermath::tryEnableDumps()
 {
   logdbg("DX12: ...enabling GPU crash dumps...");
   // let Aftermath store data that might be needed for dumps
@@ -598,7 +574,7 @@ bool Aftermath::tryEnableDumps()
   return true;
 }
 
-void Aftermath::onCrashDumpGenerate(const void *dump, const uint32_t size, bool manually_send)
+void debug::gpu_postmortem::nvidia::Aftermath::onCrashDumpGenerate(const void *dump, const uint32_t size, bool manually_send)
 {
   auto rawTime = time(nullptr);
   auto time = localtime(&rawTime);
@@ -619,15 +595,14 @@ void Aftermath::onCrashDumpGenerate(const void *dump, const uint32_t size, bool 
 
   WinAutoLock lock{crashWriteMutex};
   logdbg("DX12: Added GPU crash dump to crash report file...");
-  if (get_device().netManager)
-    get_device().netManager->addFileToCrashReport(path);
+  breakpad::add_file_to_report(path);
 
   logdbg("DX12: Preparing to send GPU dump...");
   AftermathCrashDumpDecoder<decltype(api.crashDump)> crashDumpDecoder{api.crashDump, dump, size};
   send_dump_context(&crashDumpDecoder, dump, "nv-gpudmp", size, rawTime, manually_send);
 }
 
-void Aftermath::onShaderDebugInfo(const void *dump, const uint32_t size)
+void debug::gpu_postmortem::nvidia::Aftermath::onShaderDebugInfo(const void *dump, const uint32_t size)
 {
   GFSDK_Aftermath_ShaderDebugInfoIdentifier ident{};
   api.getShaderDebugInfoIdentifier(GFSDK_Aftermath_Version_API, dump, size, &ident);
@@ -647,14 +622,13 @@ void Aftermath::onShaderDebugInfo(const void *dump, const uint32_t size)
 
   WinAutoLock lock{crashWriteMutex};
   logdbg("DX12: Added shader debug info to crash report file...");
-  if (get_device().netManager)
-    get_device().netManager->addFileToCrashReport(path);
+  breakpad::add_file_to_report(path);
 
   logdbg("DX12: Preparing to send shader debug info...");
   send_dump_context<AftermathCrashDumpDecoder<decltype(api.crashDump)>>(nullptr, dump, "nvdbg", size, rawTime, false);
 }
 
-void Aftermath::onCrashDumpDescription(PFN_GFSDK_Aftermath_AddGpuCrashDumpDescription add_value)
+void debug::gpu_postmortem::nvidia::Aftermath::onCrashDumpDescription(PFN_GFSDK_Aftermath_AddGpuCrashDumpDescription add_value)
 {
   if (auto gameName = ::dgs_get_settings()->getStr("gameName", nullptr))
   {
@@ -667,11 +641,10 @@ void Aftermath::onCrashDumpDescription(PFN_GFSDK_Aftermath_AddGpuCrashDumpDescri
   */
 }
 
-void Aftermath::onResolveMarkerCallback(const void *marker_id, uint32_t marker_id_size, void **resolved_marker_data,
+void debug::gpu_postmortem::nvidia::Aftermath::onResolveMarkerCallback(const void *marker_id, void **resolved_marker_data,
   uint32_t *marker_size)
 {
   G_UNUSED(marker_id);
-  G_UNUSED(marker_id_size);
   // For maximum CPU performance, use GFSDK_Aftermath_SetEventMarker() with dataSize=0.
   // This instructs Aftermath not to allocate and copy off memory internally, relying on
   // the application to resolve marker pointers in this callback.
@@ -682,30 +655,34 @@ void Aftermath::onResolveMarkerCallback(const void *marker_id, uint32_t marker_i
   *marker_size = sizeof(marker_data);
 }
 
-void GFSDK_AFTERMATH_CALL Aftermath::onCrashDumpGenerateProxy(const void *dump, const uint32_t size, void *self)
+void GFSDK_AFTERMATH_CALL debug::gpu_postmortem::nvidia::Aftermath::onCrashDumpGenerateProxy(const void *dump, const uint32_t size,
+  void *self)
 {
-  reinterpret_cast<Aftermath *>(self)->onCrashDumpGenerate(dump, size, false);
+  reinterpret_cast<debug::gpu_postmortem::nvidia::Aftermath *>(self)->onCrashDumpGenerate(dump, size, false);
 }
 
-void GFSDK_AFTERMATH_CALL Aftermath::onShaderDebugInfoProxy(const void *dump, const uint32_t size, void *self)
+void GFSDK_AFTERMATH_CALL debug::gpu_postmortem::nvidia::Aftermath::onShaderDebugInfoProxy(const void *dump, const uint32_t size,
+  void *self)
 {
-  reinterpret_cast<Aftermath *>(self)->onShaderDebugInfo(dump, size);
+  reinterpret_cast<debug::gpu_postmortem::nvidia::Aftermath *>(self)->onShaderDebugInfo(dump, size);
 }
 
-void GFSDK_AFTERMATH_CALL Aftermath::onCrashDumpDescriptionProxy(PFN_GFSDK_Aftermath_AddGpuCrashDumpDescription add_value, void *self)
+void GFSDK_AFTERMATH_CALL debug::gpu_postmortem::nvidia::Aftermath::onCrashDumpDescriptionProxy(
+  PFN_GFSDK_Aftermath_AddGpuCrashDumpDescription add_value, void *self)
 {
-  reinterpret_cast<Aftermath *>(self)->onCrashDumpDescription(add_value);
+  reinterpret_cast<debug::gpu_postmortem::nvidia::Aftermath *>(self)->onCrashDumpDescription(add_value);
 }
 
-void GFSDK_AFTERMATH_CALL Aftermath::onResolveMarkerCallbackProxy(const void *marker_id, uint32_t marker_id_size, void *self,
+void GFSDK_AFTERMATH_CALL debug::gpu_postmortem::nvidia::Aftermath::onResolveMarkerCallbackProxy(const void *marker_id, void *self,
   void **resolved_marker_data, uint32_t *marker_size)
 {
-  reinterpret_cast<Aftermath *>(self)->onResolveMarkerCallback(marker_id, marker_id_size, resolved_marker_data, marker_size);
+  reinterpret_cast<debug::gpu_postmortem::nvidia::Aftermath *>(self)->onResolveMarkerCallback(marker_id, resolved_marker_data,
+    marker_size);
 }
 
-void Aftermath::configure() {}
+void debug::gpu_postmortem::nvidia::Aftermath::configure() {}
 
-void Aftermath::beginCommandBuffer(ID3D12Device *, ID3D12GraphicsCommandList *cmd)
+void debug::gpu_postmortem::nvidia::Aftermath::beginCommandBuffer(ID3D12Device *, ID3D12GraphicsCommandList *cmd)
 {
   commandListTable.beginListWithCallback(cmd, [=](auto cmd) {
     GFSDK_Aftermath_ContextHandle handle = nullptr;
@@ -714,63 +691,65 @@ void Aftermath::beginCommandBuffer(ID3D12Device *, ID3D12GraphicsCommandList *cm
   });
 }
 
-void Aftermath::endCommandBuffer(ID3D12GraphicsCommandList *cmd) { commandListTable.endList(cmd); }
+void debug::gpu_postmortem::nvidia::Aftermath::endCommandBuffer(ID3D12GraphicsCommandList *cmd) { commandListTable.endList(cmd); }
 
-void Aftermath::beginEvent(ID3D12GraphicsCommandList *cmd, eastl::span<const char>, const eastl::string &full_path)
+void debug::gpu_postmortem::nvidia::Aftermath::beginEvent(ID3D12GraphicsCommandList *cmd, eastl::span<const char>,
+  eastl::span<const char> full_path)
 {
   auto &context = commandListTable.getList(cmd);
   api.setEventMarker(context.get(), full_path.data(), full_path.size());
 }
 
-void Aftermath::endEvent(ID3D12GraphicsCommandList *cmd, const eastl::string &full_path)
+void debug::gpu_postmortem::nvidia::Aftermath::endEvent(ID3D12GraphicsCommandList *cmd, eastl::span<const char> full_path)
 {
   auto &context = commandListTable.getList(cmd);
   api.setEventMarker(context.get(), full_path.data(), full_path.size());
 }
 
-void Aftermath::marker(ID3D12GraphicsCommandList *cmd, eastl::span<const char> text)
+void debug::gpu_postmortem::nvidia::Aftermath::marker(ID3D12GraphicsCommandList *cmd, eastl::span<const char> text)
 {
   auto &context = commandListTable.getList(cmd);
   api.setEventMarker(context.get(), text.data(), text.size());
 }
 
-void Aftermath::draw(const call_stack::CommandData &, D3DGraphicsCommandList *, const PipelineStageStateBase &,
-  const PipelineStageStateBase &, BasePipeline &, PipelineVariant &, uint32_t, uint32_t, uint32_t, uint32_t, D3D12_PRIMITIVE_TOPOLOGY)
+void debug::gpu_postmortem::nvidia::Aftermath::draw(const call_stack::CommandData &, D3DGraphicsCommandList *,
+  const PipelineStageStateBase &, const PipelineStageStateBase &, BasePipeline &, PipelineVariant &, uint32_t, uint32_t, uint32_t,
+  uint32_t, D3D12_PRIMITIVE_TOPOLOGY)
 {}
 
-void Aftermath::drawIndexed(const call_stack::CommandData &, D3DGraphicsCommandList *, const PipelineStageStateBase &,
-  const PipelineStageStateBase &, BasePipeline &, PipelineVariant &, uint32_t, uint32_t, uint32_t, int32_t, uint32_t,
-  D3D12_PRIMITIVE_TOPOLOGY)
+void debug::gpu_postmortem::nvidia::Aftermath::drawIndexed(const call_stack::CommandData &, D3DGraphicsCommandList *,
+  const PipelineStageStateBase &, const PipelineStageStateBase &, BasePipeline &, PipelineVariant &, uint32_t, uint32_t, uint32_t,
+  int32_t, uint32_t, D3D12_PRIMITIVE_TOPOLOGY)
 {}
 
-void Aftermath::drawIndirect(const call_stack::CommandData &, D3DGraphicsCommandList *, const PipelineStageStateBase &,
-  const PipelineStageStateBase &, BasePipeline &, PipelineVariant &, const BufferResourceReferenceAndOffset &)
+void debug::gpu_postmortem::nvidia::Aftermath::drawIndirect(const call_stack::CommandData &, D3DGraphicsCommandList *,
+  const PipelineStageStateBase &, const PipelineStageStateBase &, BasePipeline &, PipelineVariant &, BufferResourceReferenceAndOffset)
 {}
 
-void Aftermath::drawIndexedIndirect(const call_stack::CommandData &, D3DGraphicsCommandList *, const PipelineStageStateBase &,
-  const PipelineStageStateBase &, BasePipeline &, PipelineVariant &, const BufferResourceReferenceAndOffset &)
+void debug::gpu_postmortem::nvidia::Aftermath::drawIndexedIndirect(const call_stack::CommandData &, D3DGraphicsCommandList *,
+  const PipelineStageStateBase &, const PipelineStageStateBase &, BasePipeline &, PipelineVariant &, BufferResourceReferenceAndOffset)
 {}
 
-void Aftermath::dispatchIndirect(const call_stack::CommandData &, D3DGraphicsCommandList *, const PipelineStageStateBase &,
-  ComputePipeline &, const BufferResourceReferenceAndOffset &)
+void debug::gpu_postmortem::nvidia::Aftermath::dispatchIndirect(const call_stack::CommandData &, D3DGraphicsCommandList *,
+  const PipelineStageStateBase &, ComputePipeline &, BufferResourceReferenceAndOffset)
 {}
 
-void Aftermath::dispatch(const call_stack::CommandData &, D3DGraphicsCommandList *, const PipelineStageStateBase &, ComputePipeline &,
-  uint32_t, uint32_t, uint32_t)
+void debug::gpu_postmortem::nvidia::Aftermath::dispatch(const call_stack::CommandData &, D3DGraphicsCommandList *,
+  const PipelineStageStateBase &, ComputePipeline &, uint32_t, uint32_t, uint32_t)
 {}
 
-void Aftermath::dispatchMesh(const call_stack::CommandData &, D3DGraphicsCommandList *, const PipelineStageStateBase &,
-  const PipelineStageStateBase &, BasePipeline &, PipelineVariant &, uint32_t, uint32_t, uint32_t)
+void debug::gpu_postmortem::nvidia::Aftermath::dispatchMesh(const call_stack::CommandData &, D3DGraphicsCommandList *,
+  const PipelineStageStateBase &, const PipelineStageStateBase &, BasePipeline &, PipelineVariant &, uint32_t, uint32_t, uint32_t)
 {}
 
-void Aftermath::dispatchMeshIndirect(const call_stack::CommandData &, D3DGraphicsCommandList *, const PipelineStageStateBase &,
-  const PipelineStageStateBase &, BasePipeline &, PipelineVariant &, const BufferResourceReferenceAndOffset &,
-  const BufferResourceReferenceAndOffset &, uint32_t)
+void debug::gpu_postmortem::nvidia::Aftermath::dispatchMeshIndirect(const call_stack::CommandData &, D3DGraphicsCommandList *,
+  const PipelineStageStateBase &, const PipelineStageStateBase &, BasePipeline &, PipelineVariant &, BufferResourceReferenceAndOffset,
+  BufferResourceReferenceAndOffset, uint32_t)
 {}
 
-void Aftermath::blit(const call_stack::CommandData &, D3DGraphicsCommandList *) {}
+void debug::gpu_postmortem::nvidia::Aftermath::blit(const call_stack::CommandData &, D3DGraphicsCommandList *) {}
 
-void Aftermath::onDeviceRemoved(D3DDevice *, HRESULT reason, call_stack::Reporter &)
+void debug::gpu_postmortem::nvidia::Aftermath::onDeviceRemoved(D3DDevice *, HRESULT reason, call_stack::Reporter &)
 {
   if (DXGI_ERROR_INVALID_CALL == reason)
   {
@@ -841,7 +820,7 @@ void Aftermath::onDeviceRemoved(D3DDevice *, HRESULT reason, call_stack::Reporte
   }
 }
 
-bool Aftermath::sendGPUCrashDump(const char *type, const void *data, uintptr_t size)
+bool debug::gpu_postmortem::nvidia::Aftermath::sendGPUCrashDump(const char *type, const void *data, uintptr_t size)
 {
   if (0 != strcmp(type, "nv-gpudmp"))
   {
@@ -851,9 +830,10 @@ bool Aftermath::sendGPUCrashDump(const char *type, const void *data, uintptr_t s
   return true;
 }
 
-void Aftermath::onDeviceShutdown() { commandListTable.reset(); }
+void debug::gpu_postmortem::nvidia::Aftermath::onDeviceShutdown() { commandListTable.reset(); }
 
-bool Aftermath::onDeviceSetup(ID3D12Device *device, const Configuration &config, const Direct3D12Enviroment &)
+bool debug::gpu_postmortem::nvidia::Aftermath::onDeviceSetup(ID3D12Device *device, const Configuration &config,
+  const Direct3D12Enviroment &)
 {
   // clear old cached aftermath contexts, which can become invalid after manual
   // device reset for example
@@ -880,4 +860,3 @@ bool Aftermath::onDeviceSetup(ID3D12Device *device, const Configuration &config,
   logdbg("DX12: ...NVIDIA Aftermath GPU postmortem trace enabled for device %p", device);
   return true;
 }
-} // namespace drv3d_dx12::debug::gpu_postmortem::nvidia

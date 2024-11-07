@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #if !_TARGET_PC_WIN
 #undef _DEBUG_TAB_
 #endif
@@ -103,6 +101,12 @@ int AnimCommonStateHolder::getParamFlags(int id, int mask) const
 }
 
 
+real AnimCommonStateHolder::getParam(int id) const
+{
+  G_ASSERT(id >= 0 && id < val.size());
+  G_ASSERT(paramTypes[id] == PT_ScalarParam || paramTypes[id] == PT_TimeParam);
+  return val[id].scalar;
+}
 real *AnimCommonStateHolder::getParamScalarPtr(int id)
 {
   G_ASSERT(id >= 0 && id < val.size());

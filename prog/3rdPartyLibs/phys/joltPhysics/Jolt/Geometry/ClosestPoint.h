@@ -14,8 +14,7 @@ namespace ClosestPoint
 {
 	/// Compute barycentric coordinates of closest point to origin for infinite line defined by (inA, inB)
 	/// Point can then be computed as inA * outU + inB * outV
-	/// Returns false if the points inA, inB do not form a line (are at the same point)
-	inline bool GetBaryCentricCoordinates(Vec3Arg inA, Vec3Arg inB, float &outU, float &outV)
+	inline void GetBaryCentricCoordinates(Vec3Arg inA, Vec3Arg inB, float &outU, float &outV)
 	{
 		Vec3 ab = inB - inA;
 		float denominator = ab.LengthSq();
@@ -34,20 +33,17 @@ namespace ClosestPoint
 				outU = 0.0f;
 				outV = 1.0f;
 			}
-			return false;
 		}
 		else
 		{
 			outV = -inA.Dot(ab) / denominator;
 			outU = 1.0f - outV;
 		}
-		return true;
 	}
 
 	/// Compute barycentric coordinates of closest point to origin for plane defined by (inA, inB, inC)
 	/// Point can then be computed as inA * outU + inB * outV + inC * outW
-	/// Returns false if the points inA, inB, inC do not form a plane (are on the same line or at the same point)
-	inline bool GetBaryCentricCoordinates(Vec3Arg inA, Vec3Arg inB, Vec3Arg inC, float &outU, float &outV, float &outW)
+	inline void GetBaryCentricCoordinates(Vec3Arg inA, Vec3Arg inB, Vec3Arg inC, float &outU, float &outV, float &outW)
 	{
 		// Taken from: Real-Time Collision Detection - Christer Ericson (Section: Barycentric Coordinates)
 		// With p = 0
@@ -59,18 +55,16 @@ namespace ClosestPoint
 		Vec3 v2 = inC - inB;
 
 		// Make sure that the shortest edge is included in the calculation to keep the products a * b - c * d as small as possible to preserve accuracy
-		float d00 = v0.LengthSq();
-		float d11 = v1.LengthSq();
-		float d22 = v2.LengthSq();
+		float d00 = v0.Dot(v0);
+		float d11 = v1.Dot(v1);
+		float d22 = v2.Dot(v2);
 		if (d00 <= d22)
 		{
 			// Use v0 and v1 to calculate barycentric coordinates
 			float d01 = v0.Dot(v1);
 
-			// Denominator must be positive:
-			// |v0|^2 * |v1|^2 - (v0 . v1)^2 = |v0|^2 * |v1|^2 * (1 - cos(angle)^2) >= 0
 			float denominator = d00 * d11 - d01 * d01;
-			if (denominator < 1.0e-12f)
+			if (abs(denominator) < 1.0e-12f)
 			{
 				// Degenerate triangle, return coordinates along longest edge
 				if (d00 > d11)
@@ -83,7 +77,6 @@ namespace ClosestPoint
 					GetBaryCentricCoordinates(inA, inC, outU, outW);
 					outV = 0.0f;
 				}
-				return false;
 			}
 			else
 			{
@@ -100,7 +93,7 @@ namespace ClosestPoint
 			float d12 = v1.Dot(v2);
 
 			float denominator = d11 * d22 - d12 * d12;
-			if (denominator < 1.0e-12f)
+			if (abs(denominator) < 1.0e-12f)
 			{
 				// Degenerate triangle, return coordinates along longest edge
 				if (d11 > d22)
@@ -113,7 +106,6 @@ namespace ClosestPoint
 					GetBaryCentricCoordinates(inB, inC, outV, outW);
 					outU = 0.0f;
 				}
-				return false;
 			}
 			else
 			{
@@ -124,7 +116,6 @@ namespace ClosestPoint
 				outW = 1.0f - outU - outV;
 			}
 		}
-		return true;
 	}
 
 	/// Get the closest point to the origin of line (inA, inB)
@@ -183,7 +174,7 @@ namespace ClosestPoint
 		float n_len_sq = n.LengthSq();
 
 		// Check degenerate
-		if (n_len_sq < 1.0e-10f) // Square(FLT_EPSILON) was too small and caused numerical problems, see test case TestCollideParallelTriangleVsCapsule
+		if (n_len_sq < 1.0e-11f) // Square(FLT_EPSILON) was too small and caused numerical problems, see test case TestCollideParallelTriangleVsCapsule
 		{
 			// Degenerate, fallback to vertices and edges
 

@@ -1,6 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-#pragma once
-
 #include <sceneRay/dag_sceneRayDecl.h>
 
 class MeshData;

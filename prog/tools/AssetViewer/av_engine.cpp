@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "av_appwnd.h"
 #include "av_plugin.h"
 #include "assetBuildCache.h"
@@ -8,15 +6,13 @@
 #include <de3_lightProps.h>
 #include <de3_skiesService.h>
 #include <de3_dynRenderService.h>
-#include <de3_interface.h>
 #include <render/debugTexOverlay.h>
 
 #include <de3_huid.h>
 
 #include <3d/dag_render.h>
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
 #include <3d/dag_texPackMgr2.h>
-#include <3d/dag_stereoIndex.h>
 #include <shaders/dag_shaders.h>
 #include <shaders/dag_shaderMesh.h>
 #include <shaders/dag_shaderBlock.h>
@@ -25,13 +21,10 @@
 #include <EditorCore/ec_gizmofilter.h>
 
 #include <debug/dag_debug.h>
-#include <debug/dag_textMarks.h>
 #include <perfMon/dag_perfMonStat.h>
 #include <perfMon/dag_cpuFreq.h>
 #include <osApiWrappers/dag_cpuJobs.h>
 #include <assets/asset.h>
-
-#include <propPanel/control/panelWindow.h>
 
 #include "assetUserFlags.h"
 
@@ -45,7 +38,6 @@ extern void *get_generic_rendinstgen_service();
 extern void *get_generic_spline_gen_service();
 extern void *get_generic_wind_service();
 extern void *get_pixel_perfect_selection_service();
-extern void *get_visibility_finder_service();
 
 extern void terminate_interface_de3();
 extern InitOnDemand<DebugTexOverlay> av_show_tex_helper;
@@ -103,11 +95,6 @@ void *AssetViewerApp::queryEditorInterfacePtr(unsigned huid)
   if (huid == HUID_IPixelPerfectSelectionService)
     return get_pixel_perfect_selection_service();
 
-  if (huid == HUID_IVisibilityFinderProvider)
-    return get_visibility_finder_service();
-
-  RETURN_INTERFACE(huid, IMainWindowImguiRenderingService);
-
   return NULL;
 }
 
@@ -116,11 +103,9 @@ void AssetViewerApp::screenshotRender()
   bool last_skipRenderEnvi = skipRenderEnvi;
   if (screenshotObjOnTranspBkg)
     skipRenderObjects = skipRenderEnvi = true;
-  skipSetViewProj = true;
 
   queryEditorInterface<IDynRenderService>()->renderScreenshot();
 
-  skipSetViewProj = false;
   skipRenderObjects = false;
   skipRenderEnvi = last_skipRenderEnvi;
 }
@@ -216,11 +201,13 @@ void AssetViewerApp::switchToPlugin(int id)
     return;
   }
 
+  showAdditinalPropWindow(next ? next->havePropPanel() : false);
   showAdditinalToolWindow(next ? next->haveToolPanel() : false);
 
   if (next && !next->begin(curAsset))
   {
     curPluginId = oldCur;
+    showAdditinalPropWindow(cur->havePropPanel());
     showAdditinalToolWindow(cur->haveToolPanel());
     cur->begin(curAsset);
     return;
@@ -228,8 +215,6 @@ void AssetViewerApp::switchToPlugin(int id)
 
   ged.curEH = next ? next->getEventHandler() : (curAssetPackName.empty() ? NULL : &infoDrawStub);
   ged.setEH(appEH);
-
-  addAccelerators();
 
   if (autoZoomAndCenter)
     zoomAndCenter();
@@ -294,7 +279,7 @@ IWndManager *AssetViewerApp::getWndManager() const
 
 
 //==================================================================================================
-PropPanel::ContainerPropertyControl *AssetViewerApp::getCustomPanel(int id) const
+PropPanel2 *AssetViewerApp::getCustomPanel(int id) const
 {
   switch (id)
   {
@@ -306,28 +291,31 @@ PropPanel::ContainerPropertyControl *AssetViewerApp::getCustomPanel(int id) cons
 
 
 //==================================================================================================
-void AssetViewerApp::addPropPanel(int type, hdpi::Px width) { mManager->setWindowType(nullptr, type); }
+void *AssetViewerApp::addToolbar(hdpi::Px height)
+{
+  void *toolbar = mManager->splitNeighbourWindow(hwndToolbar, 0, height, WA_TOP);
+  if (!toolbar)
+    toolbar = mManager->splitWindow(0, 0, height, WA_TOP);
+  G_ASSERT(toolbar);
+  return toolbar;
+}
+
+
+//==================================================================================================
+void AssetViewerApp::addPropPanel(int type, hdpi::Px width)
+{
+  void *propbar = mManager->splitNeighbourWindow(hwndPPanel, 0, width, WA_RIGHT);
+  if (!propbar)
+    propbar = mManager->splitWindow(0, 0, width, WA_RIGHT);
+  G_ASSERT(propbar);
+
+  mManager->setWindowType(propbar, type);
+  mManager->setHeader(propbar, HEADER_TOP);
+  mManager->fixWindow(propbar, true);
+}
 
 
 void AssetViewerApp::removePropPanel(void *hwnd) { mManager->removeWindow(hwnd); }
-
-
-PropPanel::PanelWindowPropertyControl *AssetViewerApp::createPropPanel(ControlEventHandler *eh, const char *caption)
-{
-  return new PropPanel::PanelWindowPropertyControl(0, eh, nullptr, 0, 0, hdpi::Px(0), hdpi::Px(0), caption);
-}
-
-
-PropPanel::IMenu *AssetViewerApp::getMainMenu() { return GenericEditorAppWindow::getMainMenu(); }
-
-
-PropPanel::DialogWindow *AssetViewerApp::createDialog(hdpi::Px w, hdpi::Px h, const char *title)
-{
-  return new PropPanel::DialogWindow(0, w, h, title);
-}
-
-
-void AssetViewerApp::deleteDialog(PropPanel::DialogWindow *dlg) { delete dlg; }
 
 
 //==============================================================================
@@ -409,10 +397,7 @@ bool AssetViewerApp::traceRay(const Point3 &src, const Point3 &dir, float &dist,
 void AssetViewerApp::actObjects(real dt)
 {
   cpujobs::release_done_jobs();
-
-  PropPanel::process_message_queue();
-
-  ged.act(dt);
+  ged.act();
 
   static float timeToTrackFiles = 0;
   timeToTrackFiles -= dt;
@@ -429,27 +414,6 @@ void AssetViewerApp::actObjects(real dt)
   for (int i = 0; i < plugin.size(); ++i)
     plugin[i]->actObjects(dt);
 
-  // NOTE: ImGui porting: delay the selection of the last used asset (from the previous application run) till we have a
-  // valid viewport. This is needed to make sure that when ViewportWindow::zoomAndCenter executes the viewport's size is
-  // set. This is ugly but probably still more robust than handling it in ViewportWindow would be.
-  if (!assetToInitiallySelect.empty())
-  {
-    IGenViewportWnd *viewport = ged.getViewport(0);
-    if (viewport)
-    {
-      int viewportWidth = 0;
-      int viewportHeight = 0;
-      viewport->getViewportSize(viewportWidth, viewportHeight);
-      if (viewportWidth > 0 && viewportHeight > 0)
-      {
-        const DagorAsset *asset = DAEDITOR3.getAssetByName(assetToInitiallySelect);
-        assetToInitiallySelect.clear();
-        if (asset)
-          mTreeView->selectAsset(asset);
-      }
-    }
-  }
-
   static unsigned last_t = 0;
   if (last_t + 1000 < get_time_msec())
   {
@@ -465,15 +429,7 @@ void AssetViewerApp::beforeRenderObjects()
   ddsx::tex_pack2_perform_delayed_data_loading();
   ViewportWindow *vpw = ged.getRenderViewport();
   if (vpw)
-  {
-    if (!skipSetViewProj)
-      vpw->setViewProj();
-
-    int vp_w, vp_h;
-    vpw->getViewportSize(vp_w, vp_h);
-    TMatrix4 globTm = TMatrix4(vpw->getViewTm()) * vpw->getProjTm();
-    prepare_debug_text_marks(globTm, vp_w, vp_h);
-  }
+    vpw->setViewProj();
 
   IGenEditorPlugin *curPlug = curPlugin();
 
@@ -534,17 +490,12 @@ void AssetViewerApp::renderTransObjects()
     av_show_tex_helper->setTargetSize(Point2(w, h));
     av_show_tex_helper->render();
   }
-
-  render_debug_text_marks();
 }
 
 
 //==============================================================================
 void AssetViewerApp::renderGrid()
 {
-  if (DAEDITOR3.getStereoIndex() != StereoIndex::Mono)
-    return;
-
   Tab<Point3> pt(tmpmem);
   Tab<Point3> dirs(tmpmem);
 
@@ -560,9 +511,6 @@ void AssetViewerApp::renderGrid()
 
   TMatrix camera;
   ViewportWindow *vpw = ged.getRenderViewport();
-
-  if (vpw->isOrthogonal() && grid.getUseInfiniteGrid())
-    return;
 
   vpw->clientRectToWorld(pt.data(), dirs.data(), grid.getStep() * fakeGridSize);
   vpw->getCameraTransform(camera);

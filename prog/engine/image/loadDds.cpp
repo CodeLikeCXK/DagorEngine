@@ -1,13 +1,9 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <image/dag_dds.h>
 #include <ioSys/dag_fileIo.h>
 #include <debug/dag_log.h>
 #include <debug/dag_debug.h>
 #include <3d/ddsFormat.h>
-#include <drv/3d/dag_texture.h>
-#include <drv/3d/dag_driver.h>
-#include <drv/3d/dag_info.h>
+#include <3d/dag_drv3d.h>
 #include <osApiWrappers/dag_files.h>
 
 struct BitMaskFormat
@@ -37,6 +33,7 @@ BitMaskFormat bitMaskFormat[] = {
   {32, 0x00000000, 0xff0000, 0xff00, 0xff, D3DFMT_X8B8G8R8},
   {16, 0x00000000, 0x0000ff, 0xff00, 0x00, D3DFMT_V8U8},
   {16, 0x0000ff00, 0x0000ff, 0x0000, 0x00, D3DFMT_A8L8},
+  {32, 0x00000000, 0x0000FFFF, 0xFFFF0000, 0x00, D3DFMT_V16U16},
   {16, 0x00000000, 0x0000FFFF, 0x00000000, 0x00, D3DFMT_L16},
 };
 
@@ -237,6 +234,9 @@ bool load_dds(void *ptr, int len, int levels, int topmipmap, ImageInfoDDS &image
     fmt = bitMaskFormat[i].format;
     bitCount = bitMaskFormat[i].bitCount;
     shift = bitCount / 8;
+
+    if (fmt == D3DFMT_V16U16 && dsc.ddpfPixelFormat.dwFlags & DDPF_RGB)
+      fmt = D3DFMT_G16R16;
   }
 
   image_info.nlevels = levels;
@@ -278,14 +278,14 @@ bool load_dds(void *ptr, int len, int levels, int topmipmap, ImageInfoDDS &image
 
   if (w != image_info.width || h != image_info.height)
   {
-    DEBUG_CTX("non-matching DDS size: %dx%d (tex) != %dx%d (new)", image_info.width, image_info.height, w, h);
+    debug_ctx("non-matching DDS size: %dx%d (tex) != %dx%d (new)", image_info.width, image_info.height, w, h);
     logerr("non-matching DDS format");
     return 0;
   }
 
   if (len <= 0)
   {
-    DEBUG_CTX("invalid DDS data");
+    debug_ctx("invalid DDS data");
     logerr("invalid DDS data");
     return 0;
   }
@@ -314,7 +314,7 @@ bool load_dds(void *ptr, int len, int levels, int topmipmap, ImageInfoDDS &image
 
     if (len < sz)
     {
-      DEBUG_CTX("invalid DDS data2 (%i < %i)", len, sz);
+      debug_ctx("invalid DDS data2 (%i < %i)", len, sz);
       logerr("invalid DDS data");
       return 0;
     }

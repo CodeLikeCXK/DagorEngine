@@ -1,11 +1,12 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
 #include <util/dag_stdint.h>
-#include <supp/dag_define_KRNLIMP.h>
+#include <supp/dag_define_COREIMP.h>
 
 
 namespace cpujobs
@@ -18,7 +19,6 @@ class IJob
 {
 public:
   IJob() : next(NULL), needRelease(1) {}
-  IJob(IJob &&) = default;
   virtual ~IJob() {}
 
   //! called by job manager to perform task; executed in context of worker thread
@@ -95,8 +95,7 @@ KRNLIMP bool add_job(int core_or_vmgr_id, IJob *job, bool prepend = false, bool 
 KRNLIMP void reset_job_queue(int core_or_vmgr_id, bool auto_release_jobs = true);
 
 //! removes tagged queued jobs except for current; optionally calls release_done_jobs()
-//! returns the amount of jobs removed
-KRNLIMP int remove_jobs_by_tag(int core_or_vmgr_id, unsigned tag, bool auto_release_jobs = true);
+KRNLIMP void remove_jobs_by_tag(int core_or_vmgr_id, unsigned tag, bool auto_release_jobs = true);
 
 //! returns true if job manager has active jobs
 KRNLIMP bool is_job_manager_busy(int core_or_vmgr_id);
@@ -122,4 +121,4 @@ KRNLIMP bool is_exit_requested(int core_or_vmgr_id);
 KRNLIMP void release_done_jobs();
 } // namespace cpujobs
 
-#include <supp/dag_undef_KRNLIMP.h>
+#include <supp/dag_undef_COREIMP.h>

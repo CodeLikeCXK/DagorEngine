@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <statsd/statsd.h>
 #include <util/dag_simpleString.h>
 #include <stdlib.h>
@@ -10,7 +8,6 @@
 #include <EASTL/fixed_vector.h>
 #include <memory/dag_framemem.h>
 #include <initializer_list>
-#include <asyncResolveAddr/asyncResolveAddr.h>
 
 namespace statsd
 {
@@ -151,68 +148,6 @@ void set_prefix(const char **keys)
   }
 }
 
-static bool g_async_resolve_in_progress = false;
-static eastl::fixed_vector<SimpleString, 64, false /* bEnableOverflow*/> g_send_queue;
-
-static void on_resolved(const sockets::SocketAddr<OSAF_IPV4> &ipv4_addr)
-{
-  if (!stats_sock)
-    return;
-
-  auto shutdownAndFailWithMsg = [](auto... args) {
-#if DAGOR_DBGLEVEL > 0
-    logerr(args...);
-#else
-    logwarn(args...);
-#endif
-    shutdown();
-  };
-
-  g_async_resolve_in_progress = false;
-
-  if (!ipv4_addr.isValid())
-  {
-    shutdownAndFailWithMsg("%s: bad statsd address", __FUNCTION__);
-    return;
-  }
-
-  if (stats_sock.connect(ipv4_addr) != 0)
-  {
-    char errStr[512];
-    shutdownAndFailWithMsg("%s: connect() call failed: %s", __FUNCTION__, stats_sock.getLastErrorStr(errStr, sizeof(errStr)));
-    return;
-  }
-
-  debug("%s: [STATSD] flush message queue after resolve: %d", __FUNCTION__, g_send_queue.size());
-
-  for (const SimpleString &msg : g_send_queue)
-  {
-    int nsent = (int)stats_sock.send(msg.str(), msg.length());
-    try_recover_on_error(nsent, msg.str(), msg.length(), __FUNCTION__);
-  }
-
-  g_send_queue.clear();
-}
-
-static bool connect_async(const char *addr, int port)
-{
-  G_ASSERT(addr && *addr);
-
-  if (!stats_sock)
-  {
-    logerr("%s: uninitialized socket", __FUNCTION__);
-    return false;
-  }
-
-  debug("%s: statsd server: %s:%d", __FUNCTION__, addr, port);
-
-  g_async_resolve_in_progress = true;
-
-  sockets::resolve_socket_addr_async(addr, (uint16_t)port, on_resolved);
-
-  return true;
-}
-
 bool connect(const char *addr, int port)
 {
   G_ASSERT(addr && *addr);
@@ -261,7 +196,7 @@ static void send_internal(const char *metric, dag::ConstSpan<MetricTag> tags, Me
   if (!sending_enabled)
     return;
 
-  if (!stats_sock && !g_async_resolve_in_progress)
+  if (!stats_sock)
   {
     logerr("%s: uninitialized socket, init_statsd isn't called yet?", __FUNCTION__);
     return;
@@ -355,19 +290,8 @@ static void send_internal(const char *metric, dag::ConstSpan<MetricTag> tags, Me
   G_ASSERT(pos < (buf + sizeof(buf)));
   int total = (int)(pos - buf);
 
-  if (!g_async_resolve_in_progress)
-  {
-    int nsent = (int)stats_sock.send(buf, total);
-    try_recover_on_error(nsent, buf, total, __FUNCTION__);
-  }
-  else
-  {
-    debug("%s: [STATSD] schedule message for send after resolve", __FUNCTION__);
-    if (g_send_queue.full())
-      debug("%s: [STATSD] send queue is full, dropping message", __FUNCTION__);
-    else
-      g_send_queue.emplace_back(buf, total);
-  }
+  int nsent = (int)stats_sock.send(buf, total);
+  try_recover_on_error(nsent, buf, total, __FUNCTION__);
 }
 
 template <MetricType mtype, typename ValueType, typename... Args>
@@ -408,7 +332,7 @@ static void statsd_send(const char *metric, const char *type, const char *val_pr
   if (prefix.empty() || !sending_enabled)
     return;
 
-  if (!stats_sock && !g_async_resolve_in_progress)
+  if (!stats_sock)
   {
     logerr("%s: uninitialized socket, init_statsd isn't called yet?", __FUNCTION__);
     return;
@@ -424,19 +348,8 @@ static void statsd_send(const char *metric, const char *type, const char *val_pr
     return;
   }
 
-  if (!g_async_resolve_in_progress)
-  {
-    int nsent = stats_sock.send(buf, n);
-    try_recover_on_error(nsent, buf, n, __FUNCTION__);
-  }
-  else
-  {
-    debug("%s: [STATSD] schedule message for send after resolve", __FUNCTION__);
-    if (g_send_queue.full())
-      debug("%s: [STATSD] send queue is full, dropping message", __FUNCTION__);
-    else
-      g_send_queue.emplace_back(buf, n);
-  }
+  int nsent = stats_sock.send(buf, n);
+  try_recover_on_error(nsent, buf, n, __FUNCTION__);
 }
 
 // Common functions
@@ -585,9 +498,8 @@ void histogram(const char *metric, float value, const MetricTags &tags) { send_i
 
 void histogram(const char *metric, long value, const MetricTags &tags) { send_internal(metric, tags, HISTOGRAM, value); }
 
-template <typename ConnectFunc>
-static bool init_impl(ILogger *logger_, const char **keys, Env env, Circuit circuit, Application application, Platform platform,
-  Project project, Host hostcl, ConnectFunc connect_func)
+bool init(ILogger *logger_, const char **keys, const char *addr, int port, Env env, Circuit circuit, Application application,
+  Platform platform, Project project, Host hostcl)
 {
   if (sockets_initialized)
   {
@@ -606,8 +518,7 @@ static bool init_impl(ILogger *logger_, const char **keys, Env env, Circuit circ
   }
   sockets_initialized = true;
   set_prefix(keys);
-
-  if (connect_func())
+  if (connect(addr, port))
   {
     if (env.value != nullptr)
     {
@@ -624,20 +535,6 @@ static bool init_impl(ILogger *logger_, const char **keys, Env env, Circuit circ
   }
   shutdown();
   return false;
-}
-
-bool init(ILogger *logger_, const char **keys, const char *addr, int port, Env env, Circuit circuit, Application application,
-  Platform platform, Project project, Host hostcl)
-{
-  return init_impl(logger_, keys, env, circuit, application, platform, project, hostcl,
-    [addr, port]() { return connect(addr, port); });
-}
-
-bool init_async(ILogger *logger_, const char **keys, const char *addr, int port, Env env, Circuit circuit, Application application,
-  Platform platform, Project project, Host hostcl)
-{
-  return init_impl(logger_, keys, env, circuit, application, platform, project, hostcl,
-    [addr, port]() { return connect_async(addr, port); });
 }
 
 void report(void (*action)(const char *, long, const MetricTag &), long value, const char *fmt, ...)

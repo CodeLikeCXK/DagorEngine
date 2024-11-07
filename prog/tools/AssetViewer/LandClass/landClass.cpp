@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "../av_plugin.h"
 #include <EditorCore/ec_interface.h>
 #include <de3_genObjAlongSpline.h>
@@ -14,9 +12,9 @@
 #include <math/dag_e3dColor.h>
 #include <image/dag_texPixel.h>
 #include <3d/dag_texMgr.h>
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
 #include <libTools/renderUtil/dynRenderBuf.h>
-#include <propPanel/control/container.h>
+#include <propPanel2/c_panel_base.h>
 #include <de3_assetService.h>
 #include <de3_rasterizePoly.h>
 #include <de3_genObjByDensGridMask.h>
@@ -74,7 +72,7 @@ protected:
 };
 
 
-class LandClassViewPlugin : public IGenEditorPlugin, public PropPanel::ControlEventHandler
+class LandClassViewPlugin : public IGenEditorPlugin, public ControlEventHandler
 {
 public:
   LandClassViewPlugin() :
@@ -214,13 +212,13 @@ public:
 
   virtual bool supportAssetType(const DagorAsset &asset) const { return strcmp(asset.getTypeStr(), "land") == 0; }
 
-  virtual void fillPropPanel(PropPanel::ContainerPropertyControl &propPanel)
+  virtual void fillPropPanel(PropertyContainerControlBase &propPanel)
   {
     propPanel.setEventHandler(this);
 
     propPanel.createEditFloat(PID_POLYGON_SIZE, "polygon square size", radius);
 
-    PropPanel::ContainerPropertyControl *rg = propPanel.createRadioGroup(PID_POLYGON_TYPE_GROUP, "presentation type:");
+    PropertyContainerControlBase *rg = propPanel.createRadioGroup(PID_POLYGON_TYPE_GROUP, "presentation type:");
 
     rg->createRadio(FIG_TYPE_SQUARE, "square");
     rg->createRadio(FIG_TYPE_TRIANGLE, "triangle");
@@ -231,7 +229,7 @@ public:
 
   virtual void postFillPropPanel() {}
 
-  virtual void onChange(int pcb_id, PropPanel::ContainerPropertyControl *panel)
+  virtual void onChange(int pcb_id, PropertyContainerControlBase *panel)
   {
     if (!spline || assetName.empty())
       return;
@@ -241,7 +239,7 @@ public:
     else if (pcb_id == PID_POLYGON_TYPE_GROUP)
     {
       const FigType type = (FigType)panel->getInt(pcb_id);
-      if ((type == presentationType) || (type == (FigType)PropPanel::RADIO_SELECT_NONE))
+      if ((type == presentationType) || (type == (FigType)RADIO_SELECT_NONE))
         return;
 
       presentationType = type;

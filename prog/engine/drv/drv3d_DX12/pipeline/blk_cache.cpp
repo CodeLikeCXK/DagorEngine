@@ -1,20 +1,18 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "device.h"
 
 using namespace drv3d_dx12;
 
-bool drv3d_dx12::pipeline::InputLayoutDeEncoder::decodeDX12(const DataBlock &blk, InputLayout &target, dxil::HashValue &hash) const
+bool drv3d_dx12::pipeline::InputLayoutDeEncoder::decodeDX12(const DataBlock &blk, InputLayout &target) const
 {
   if (auto vertexAttributeSetBlk = blk.getBlockByName("vertexAttributeSet"))
   {
-    target.vertexAttributeLocationMask = vertexAttributeSetBlk->getInt("locationMask", 0);
-    target.vertexAttributeLocationSourceStream = vertexAttributeSetBlk->getInt64("locationSourceStream", 0);
+    target.vertexAttributeSet.locationMask = vertexAttributeSetBlk->getInt("locationMask", 0);
+    target.vertexAttributeSet.locationSourceStream = vertexAttributeSetBlk->getInt64("locationSourceStream", 0);
     auto count = min<uint32_t>(MAX_SEMANTIC_INDEX, vertexAttributeSetBlk->blockCount());
     for (uint32_t locationIndex = 0, locationBlockIndex = 0; locationIndex < MAX_SEMANTIC_INDEX && locationBlockIndex < count;
          ++locationIndex)
     {
-      if (0 == (target.vertexAttributeLocationMask & (1u << locationIndex)))
+      if (0 == (target.vertexAttributeSet.locationMask & (1u << locationIndex)))
       {
         continue;
       }
@@ -22,35 +20,32 @@ bool drv3d_dx12::pipeline::InputLayoutDeEncoder::decodeDX12(const DataBlock &blk
       auto compactedFormatAndOffset = vertexAttributeSetBlk->getBlock(locationBlockIndex++);
       if (compactedFormatAndOffset->paramExists("compactedFormatAndOffset"))
       {
-        target.vertexAttributeCompactedFormatAndOffset[locationIndex] =
+        target.vertexAttributeSet.compactedFormatAndOffset[locationIndex] =
           compactedFormatAndOffset->getInt("compactedFormatAndOffset", 0);
       }
       else
       {
         if (compactedFormatAndOffset->paramExists("offset"))
         {
-          target.setLocationStreamOffset(locationIndex, compactedFormatAndOffset->getInt("offset", 0));
+          target.vertexAttributeSet.setLocationStreamOffset(locationIndex, compactedFormatAndOffset->getInt("offset", 0));
         }
         if (compactedFormatAndOffset->paramExists("formatIndex"))
         {
-          target.setLocationFormatIndex(locationIndex, compactedFormatAndOffset->getInt("formatIndex", 0));
+          target.vertexAttributeSet.setLocationFormatIndex(locationIndex, compactedFormatAndOffset->getInt("formatIndex", 0));
         }
       }
     }
   }
   if (auto imputStreamSetBlk = blk.getBlockByName("inputStreamSet"))
   {
-    target.inputStreamUsageMask = imputStreamSetBlk->getInt("usageMask", 0);
-    target.inputStreamStepRateMask = imputStreamSetBlk->getInt("stepRateMask", 0);
+    target.inputStreamSet.usageMask = imputStreamSetBlk->getInt("usageMask", 0);
+    target.inputStreamSet.stepRateMask = imputStreamSetBlk->getInt("stepRateMask", 0);
   }
-
-  hash = decode_hash(blk, target);
   return true;
 }
 
-bool drv3d_dx12::pipeline::InputLayoutDeEncoder::decodeEngine(const DataBlock &blk, InputLayout &target, dxil::HashValue &hash) const
+bool drv3d_dx12::pipeline::InputLayoutDeEncoder::decodeEngine(const DataBlock &blk, InputLayout &target) const
 {
-  G_UNUSED(hash);
   InputLayout::DecodeContext ctx;
   uint32_t pc = blk.paramCount();
   for (uint32_t i = 0; i < pc; ++i)
@@ -60,18 +55,16 @@ bool drv3d_dx12::pipeline::InputLayoutDeEncoder::decodeEngine(const DataBlock &b
       break;
     }
   }
-
-  hash = dxil::HashValue::calculate(&target, 1);
   return true;
 }
 
-bool drv3d_dx12::pipeline::InputLayoutDeEncoder::decode(const DataBlock &blk, InputLayout &target, dxil::HashValue &hash) const
+bool drv3d_dx12::pipeline::InputLayoutDeEncoder::decode(const DataBlock &blk, InputLayout &target) const
 {
   if (0 == strcmp("dx12", blk.getStr("fmt", defaultFormat)))
   {
-    return decodeDX12(blk, target, hash);
+    return decodeDX12(blk, target);
   }
-  return decodeEngine(blk, target, hash);
+  return decodeEngine(blk, target);
 }
 
 bool drv3d_dx12::pipeline::InputLayoutDeEncoder::encode(DataBlock &blk, const InputLayout &source) const
@@ -83,11 +76,11 @@ bool drv3d_dx12::pipeline::InputLayoutDeEncoder::encode(DataBlock &blk, const In
   {
     return false;
   }
-  vertexAttributeSetBlk->setInt("locationMask", source.vertexAttributeLocationMask);
-  vertexAttributeSetBlk->setInt64("locationSourceStream", source.vertexAttributeLocationSourceStream);
+  vertexAttributeSetBlk->setInt("locationMask", source.vertexAttributeSet.locationMask);
+  vertexAttributeSetBlk->setInt64("locationSourceStream", source.vertexAttributeSet.locationSourceStream);
   for (uint32_t locationIndex = 0; locationIndex < MAX_SEMANTIC_INDEX; ++locationIndex)
   {
-    if (0 == (source.vertexAttributeLocationMask & (1u << locationIndex)))
+    if (0 == (source.vertexAttributeSet.locationMask & (1u << locationIndex)))
     {
       continue;
     }
@@ -101,21 +94,20 @@ bool drv3d_dx12::pipeline::InputLayoutDeEncoder::encode(DataBlock &blk, const In
     }
     if (use_combined_format)
     {
-      compactedFormatAndOffset->setInt("compactedFormatAndOffset", source.vertexAttributeCompactedFormatAndOffset[locationIndex]);
+      compactedFormatAndOffset->setInt("compactedFormatAndOffset", source.vertexAttributeSet.compactedFormatAndOffset[locationIndex]);
     }
     else
     {
-      compactedFormatAndOffset->setInt("offset", source.getLocationStreamOffset(locationIndex));
-      compactedFormatAndOffset->setInt("formatIndex", source.getLocationFormatIndex(locationIndex));
+      compactedFormatAndOffset->setInt("offset", source.vertexAttributeSet.getLocationStreamOffset(locationIndex));
+      compactedFormatAndOffset->setInt("formatIndex", source.vertexAttributeSet.getLocationFormatIndex(locationIndex));
     }
   }
-  imputStreamSetBlk->setInt("usageMask", source.inputStreamUsageMask);
-  imputStreamSetBlk->setInt("stepRateMask", source.inputStreamStepRateMask);
+  imputStreamSetBlk->setInt("usageMask", source.inputStreamSet.usageMask);
+  imputStreamSetBlk->setInt("stepRateMask", source.inputStreamSet.stepRateMask);
   return true;
 }
 
-bool drv3d_dx12::pipeline::RenderStateDeEncoder::decodeDX12(const DataBlock &blk, RenderStateSystem::StaticState &target,
-  dxil::HashValue &hash) const
+bool drv3d_dx12::pipeline::RenderStateDeEncoder::decodeDX12(const DataBlock &blk, RenderStateSystem::StaticState &target) const
 {
   target.enableDepthTest = blk.getBool("enableDepthTest", target.enableDepthTest);
   target.enableDepthWrite = blk.getBool("enableDepthWrite", target.enableDepthWrite);
@@ -161,8 +153,6 @@ bool drv3d_dx12::pipeline::RenderStateDeEncoder::decodeDX12(const DataBlock &blk
       param.enableBlending = blendBlk->getBool("enableBlending", param.enableBlending);
     }
   }
-
-  hash = decode_hash(blk, target);
   return true;
 }
 
@@ -222,12 +212,11 @@ bool drv3d_dx12::pipeline::RenderStateDeEncoder::decodeEngine(const DataBlock &b
   return true;
 }
 
-bool drv3d_dx12::pipeline::RenderStateDeEncoder::decode(const DataBlock &blk, RenderStateSystem::StaticState &target,
-  dxil::HashValue &hash) const
+bool drv3d_dx12::pipeline::RenderStateDeEncoder::decode(const DataBlock &blk, RenderStateSystem::StaticState &target) const
 {
   if (0 == strcmp("dx12", blk.getStr("fmt", defaultFormat)))
   {
-    return decodeDX12(blk, target, hash);
+    return decodeDX12(blk, target);
   }
 
   shaders::RenderState engineValue;
@@ -236,7 +225,6 @@ bool drv3d_dx12::pipeline::RenderStateDeEncoder::decode(const DataBlock &blk, Re
     return false;
   }
   target = RenderStateSystem::StaticState::fromRenderState(engineValue);
-  hash = dxil::HashValue::calculate(&target, 1);
   return true;
 }
 
@@ -269,8 +257,10 @@ bool drv3d_dx12::pipeline::RenderStateDeEncoder::encode(DataBlock &blk, const Re
   blk.setReal("depthBias", source.depthBias);
   blk.setReal("depthBiasSloped", source.depthBiasSloped);
 
+  auto hasIndipendentBlend = source.enableIndependentBlend;
+  auto blendCount = hasIndipendentBlend ? shaders::RenderState::NumIndependentBlendParameters : 1;
   char buf[32];
-  for (uint32_t bbi = 0; bbi < shaders::RenderState::NumIndependentBlendParameters; ++bbi)
+  for (uint32_t bbi = 0; bbi < blendCount; ++bbi)
   {
     sprintf_s(buf, "bp_%u", bbi);
     auto blendBlk = blendParamsBlk->addNewBlock(buf);
@@ -293,8 +283,7 @@ bool drv3d_dx12::pipeline::RenderStateDeEncoder::encode(DataBlock &blk, const Re
   return true;
 }
 
-bool drv3d_dx12::pipeline::FramebufferLayoutDeEncoder::decodeDX12(const DataBlock &blk, FramebufferLayout &target,
-  dxil::HashValue &hash) const
+bool drv3d_dx12::pipeline::FramebufferLayoutDeEncoder::decodeDX12(const DataBlock &blk, FramebufferLayout &target) const
 {
   auto formatNameId = blk.getNameId("colorFormats");
   if ((-1 != formatNameId) && blk.paramExists(formatNameId))
@@ -314,7 +303,6 @@ bool drv3d_dx12::pipeline::FramebufferLayoutDeEncoder::decodeDX12(const DataBloc
         target.colorTargetMask |= bit;
         targetMask ^= bit;
         target.colorFormats[i] = fmt;
-        break;
       }
 
       lastParamIndex = blk.findParam(formatNameId, lastParamIndex);
@@ -323,8 +311,6 @@ bool drv3d_dx12::pipeline::FramebufferLayoutDeEncoder::decodeDX12(const DataBloc
   }
   if (blk.paramExists("depthStencilFormat"))
     target.setDepthStencilAttachment(blk.getInt("depthMsaaLevel", 0), FormatStore(blk.getInt("depthStencilFormat", 0)));
-
-  hash = decode_hash(blk, target);
   return true;
 }
 
@@ -362,19 +348,13 @@ bool drv3d_dx12::pipeline::FramebufferLayoutDeEncoder::decodeEngine(const DataBl
   return true;
 }
 
-bool drv3d_dx12::pipeline::FramebufferLayoutDeEncoder::decode(const DataBlock &blk, FramebufferLayout &target,
-  dxil::HashValue &hash) const
+bool drv3d_dx12::pipeline::FramebufferLayoutDeEncoder::decode(const DataBlock &blk, FramebufferLayout &target) const
 {
   if (0 == strcmp("dx12", blk.getStr("fmt", defaultFormat)))
   {
-    return decodeDX12(blk, target, hash);
+    return decodeDX12(blk, target);
   }
-  if (decodeEngine(blk, target))
-  {
-    hash = dxil::HashValue::calculate(&target, 1);
-    return true;
-  }
-  return false;
+  return decodeEngine(blk, target);
 }
 
 bool drv3d_dx12::pipeline::FramebufferLayoutDeEncoder::encode(DataBlock &blk, const FramebufferLayout &source) const
@@ -393,16 +373,110 @@ bool drv3d_dx12::pipeline::FramebufferLayoutDeEncoder::encode(DataBlock &blk, co
     }
     blk.addInt("colorMsaaLevels", source.colorMsaaLevels);
   }
-  if (0 != source.hasDepth)
+  if (source.depthBitStates.hasDepth)
   {
     blk.setInt("depthStencilFormat", source.depthStencilFormat.wrapper.value);
-    blk.setInt("depthMsaaLevel", source.depthMsaaLevel);
+    blk.setInt("depthMsaaLevel", source.depthBitStates.depthMsaaLevel);
   }
   return true;
 }
 
+bool drv3d_dx12::pipeline::DeviceCapsAndShaderModelDeEncoder::decode(const DataBlock &blk, EncodingMode mode,
+  DeviceCapsAndShaderModel &target) const
+{
+  target.shaderModel.major = blk.getInt("shaderModelMajor", target.shaderModel.major);
+  target.shaderModel.major = blk.getInt("shaderModelMinor", target.shaderModel.minor);
+
+#define DX12_D3D_CAP(name) target.caps.name = blk.getBool(#name, target.caps.name);
+  if (EncodingMode::full == mode)
+  {
+    DX12_D3D_CAP_SET
+  }
+  else if (EncodingMode::pipelines == mode)
+  {
+    DX12_D3D_CAP_SET_RELEVANT_FOR_PIPELINES
+  }
+#undef DX12_D3D_CAP
+  return true;
+}
+
+bool drv3d_dx12::pipeline::DeviceCapsAndShaderModelDeEncoder::encode(DataBlock &blk, EncodingMode mode,
+  const DeviceCapsAndShaderModel &source) const
+{
+  blk.setInt("shaderModelMajor", source.shaderModel.major);
+  blk.setInt("shaderModelMinor", source.shaderModel.minor);
+#define DX12_D3D_CAP(name) blk.setBool(#name, source.caps.name);
+  if (EncodingMode::full == mode)
+  {
+    DX12_D3D_CAP_SET
+  }
+  else if (EncodingMode::pipelines == mode)
+  {
+    DX12_D3D_CAP_SET_RELEVANT_FOR_PIPELINES
+  }
+#undef DX12_D3D_CAP
+  return true;
+}
+
+bool drv3d_dx12::pipeline::FeatureSupportResolver::decode(const DataBlock &blk, CompatibilityMode mode, bool &target) const
+{
+  DeviceCapsAndShaderModel compare{};
+  if (!this->DeviceCapsAndShaderModelDeEncoder::decode(blk, mode, compare))
+  {
+    return false;
+  }
+  if (CompatibilityMode::full == mode)
+  {
+    target = compare.isCompatibleTo(features);
+  }
+  else if (CompatibilityMode::pipelines == mode)
+  {
+    target = compare.isPipelineCompatibleTo(features);
+  }
+  else
+  {
+    target = false;
+  }
+  return true;
+}
+
+bool drv3d_dx12::pipeline::FeatureSetChecker::checkFeatureSets(const DataBlock &blk) const
+{
+  if (!featureSet)
+  {
+    return true;
+  }
+
+  auto fiNameId = blk.getNameId("featureSet");
+  if (-1 == fiNameId)
+  {
+    return true;
+  }
+  int lastParamIndex = blk.findParam(fiNameId);
+  if (-1 == lastParamIndex)
+  {
+    return true;
+  }
+
+  do
+  {
+    auto fi = blk.getInt(lastParamIndex);
+    if ((fi < featureSetCount) && featureSet[fi])
+    {
+      return true;
+    }
+    lastParamIndex = blk.findParam(fiNameId, lastParamIndex);
+  } while (-1 != lastParamIndex);
+  return false;
+}
+
 bool drv3d_dx12::pipeline::GraphicsPipelineVariantDeEncoder::decode(const DataBlock &blk, GraphicsPipelineVariantState &target) const
 {
+  if (!checkFeatureSets(blk))
+  {
+    return false;
+  }
+
   if (!blk.paramExists("renderState") || !blk.paramExists("outputFormat") || !blk.paramExists("inputLayout") ||
       !blk.paramExists("primitiveTopology"))
   {
@@ -416,13 +490,8 @@ bool drv3d_dx12::pipeline::GraphicsPipelineVariantDeEncoder::decode(const DataBl
   return true;
 }
 
-bool drv3d_dx12::pipeline::GraphicsPipelineVariantDeEncoder::encode(DataBlock &blk, const GraphicsPipelineVariantState &source,
-  int feature_set_id) const
+bool drv3d_dx12::pipeline::GraphicsPipelineVariantDeEncoder::encode(DataBlock &blk, const GraphicsPipelineVariantState &source) const
 {
-  if (-1 != feature_set_id)
-  {
-    blk.addInt("featureSet", feature_set_id);
-  }
   blk.setInt("renderState", source.staticRenderStateIndex);
   blk.setInt("outputFormat", source.framebufferLayoutIndex);
   blk.setInt("inputLayout", source.inputLayoutIndex);
@@ -433,6 +502,11 @@ bool drv3d_dx12::pipeline::GraphicsPipelineVariantDeEncoder::encode(DataBlock &b
 
 bool drv3d_dx12::pipeline::MeshPipelineVariantDeEncoder::decode(const DataBlock &blk, MeshPipelineVariantState &target) const
 {
+  if (!checkFeatureSets(blk))
+  {
+    return false;
+  }
+
   if (!blk.paramExists("renderState") || !blk.paramExists("outputFormat"))
   {
     return false;
@@ -443,13 +517,8 @@ bool drv3d_dx12::pipeline::MeshPipelineVariantDeEncoder::decode(const DataBlock 
   return true;
 }
 
-bool drv3d_dx12::pipeline::MeshPipelineVariantDeEncoder::encode(DataBlock &blk, const MeshPipelineVariantState &source,
-  int feature_set_id) const
+bool drv3d_dx12::pipeline::MeshPipelineVariantDeEncoder::encode(DataBlock &blk, const MeshPipelineVariantState &source) const
 {
-  if (-1 != feature_set_id)
-  {
-    blk.addInt("featureSet", feature_set_id);
-  }
   blk.setInt("renderState", source.staticRenderStateIndex);
   blk.setInt("outputFormat", source.framebufferLayoutIndex);
   blk.setBool("wireFrame", 0 != source.isWireFrame);
@@ -458,6 +527,11 @@ bool drv3d_dx12::pipeline::MeshPipelineVariantDeEncoder::encode(DataBlock &blk, 
 
 bool drv3d_dx12::pipeline::ComputePipelineDeEncoder::decode(const DataBlock &blk, ComputePipelineIdentifier &target) const
 {
+  if (!checkFeatureSets(blk))
+  {
+    return false;
+  }
+
   auto hash = blk.getStr("hash", nullptr);
   if (!hash)
   {
@@ -467,93 +541,9 @@ bool drv3d_dx12::pipeline::ComputePipelineDeEncoder::decode(const DataBlock &blk
   return true;
 }
 
-bool drv3d_dx12::pipeline::ComputePipelineDeEncoder::encode(DataBlock &blk, const ComputePipelineIdentifier &source,
-  int feature_set_id) const
+bool drv3d_dx12::pipeline::ComputePipelineDeEncoder::encode(DataBlock &blk, const ComputePipelineIdentifier &source) const
 {
   ComputePipelineIdentifierHashSet set = source;
-  if (-1 != feature_set_id)
-  {
-    blk.addInt("featureSet", feature_set_id);
-  }
   blk.setStr("hash", set.hash);
-  return true;
-}
-
-bool drv3d_dx12::pipeline::SignatueHashDeEncoder::decode(const DataBlock &blk, uint32_t param_index,
-  cacheBlk::SignatureHash &target) const
-{
-  if (blk.paramCount() <= param_index)
-  {
-    return false;
-  }
-
-  if (DataBlock::TYPE_STRING != blk.getParamType(param_index))
-  {
-    return false;
-  }
-
-  target.name = blk.getParamName(param_index);
-  target.hash = blk.getStr(param_index);
-  target.timestamp = 0;
-  return true;
-}
-
-bool drv3d_dx12::pipeline::SignatueHashDeEncoder::decode(const DataBlock &blk, cacheBlk::SignatureHash &target) const
-{
-  auto hashParamIndex = blk.findParam("hash");
-  if (DataBlock::TYPE_STRING != blk.getParamType(hashParamIndex))
-    return false;
-  auto stampParamIndex = blk.findParam("stamp");
-  if (DataBlock::TYPE_INT64 != blk.getParamType(stampParamIndex))
-    return false;
-
-  target.name = blk.getBlockName();
-  target.hash = blk.getStr(hashParamIndex);
-  target.timestamp = blk.getInt64(stampParamIndex);
-  return true;
-}
-
-bool drv3d_dx12::pipeline::SignatueHashDeEncoder::encode(DataBlock &blk, const cacheBlk::SignatureHash &source) const
-{
-  auto subBlk = blk.addNewBlock(source.name.c_str());
-  if (!subBlk)
-    return false;
-  subBlk->setStr("hash", source.hash.c_str());
-  subBlk->setInt64("stamp", source.timestamp);
-  return true;
-}
-
-bool drv3d_dx12::pipeline::SignatueHashDeEncoder::encode(DataBlock &blk, const char *name, const char *hash, int64_t timestamp) const
-{
-  auto subBlk = blk.addNewBlock(name);
-  if (!subBlk)
-    return false;
-  subBlk->setStr("hash", hash);
-  subBlk->setInt64("stamp", timestamp);
-  return true;
-}
-
-bool drv3d_dx12::pipeline::UseDeEnCoder::decode(const DataBlock &blk, uint32_t param_index, uint32_t &static_code,
-  uint32_t &dynamic_code) const
-{
-  if (blk.paramCount() <= param_index)
-  {
-    return false;
-  }
-
-  if (DataBlock::TYPE_INT64 != blk.getParamType(param_index))
-  {
-    return false;
-  }
-
-  auto raw = static_cast<uint64_t>(blk.getInt64(param_index));
-  dynamic_code = static_cast<uint32_t>(raw >> 32);
-  static_code = static_cast<uint32_t>(raw);
-  return true;
-}
-
-bool drv3d_dx12::pipeline::UseDeEnCoder::encode(DataBlock &blk, uint32_t static_code, uint32_t dynamic_code) const
-{
-  blk.addInt64("use", (uint64_t{dynamic_code} << 32) | uint64_t{static_code});
   return true;
 }

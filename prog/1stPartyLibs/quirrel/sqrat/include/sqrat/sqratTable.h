@@ -49,9 +49,6 @@ public:
     TableBase(const Object& obj) : Object(obj) {
     }
 
-    TableBase(Object && obj) : Object(SQRAT_STD::move(obj)) {
-    }
-
     TableBase(HSQOBJECT o, HSQUIRRELVM v) : Object(o, v) {
     }
 
@@ -307,9 +304,6 @@ public:
     }
 
     Table(const Object& obj) : TableBase(obj) {
-    }
-
-    Table(Object && obj) : TableBase(SQRAT_STD::move(obj)) {
     }
 
     Table(HSQOBJECT o, HSQUIRRELVM v) : TableBase(o, v) {

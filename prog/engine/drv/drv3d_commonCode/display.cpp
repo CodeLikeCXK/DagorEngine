@@ -1,11 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
-#include <drv/3d/dag_driver.h>
-#include <drv/3d/dag_info.h>
+#include <3d/dag_drv3d.h>
 #include <startup/dag_globalSettings.h>
 #include <ioSys/dag_dataBlock.h>
 #include "gpuConfig.h"
-#include "drv_log_defs.h"
 
 #if !_TARGET_APPLE // see displayM.mm for MacOS
 
@@ -72,11 +68,6 @@ void d3d::update_window_mode()
       dgs_set_window_mode(WindowMode::WINDOWED);
       return;
     }
-    if (!strcmp(modeStr, "resizablewindowed"))
-    {
-      dgs_set_window_mode(WindowMode::WINDOWED_RESIZABLE);
-      return;
-    }
     if (!strcmp(modeStr, "noborderwindow"))
     {
       dgs_set_window_mode(WindowMode::WINDOWED_NO_BORDER);
@@ -84,7 +75,7 @@ void d3d::update_window_mode()
     }
     if (strcmp(modeStr, "fullscreen") != 0)
     {
-      D3D_ERROR("%s is invalid arg for config:video/mode:t", modeStr);
+      logerr("%s is invalid arg for config:video/mode:t", modeStr);
     }
   }
 

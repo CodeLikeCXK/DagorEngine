@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <webui/httpserver.h>
 #include <util/dag_lookup.h>
 #include <errno.h>
@@ -150,7 +148,7 @@ static void on_shader_vars(RequestInfo *params)
   YAMemSave buf;
   char stack_buf[256];
   char stack_buf2[256];
-  const char *tn[] = {"INT", "REAL", "COL4", "TEX", "BUF", "INT4", "MAT", "SMP"};
+  const char *tn[] = {"INT", "REAL", "COL4", "TEX", "BUF", "INT4", "MAT"};
   const char *hs[] = {
     "#",
     "name",

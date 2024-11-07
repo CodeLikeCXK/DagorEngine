@@ -1,14 +1,8 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <osApiWrappers/dag_critSec.h>
 #include <heightmap/lodGrid.h>
 #include <heightmap/heightmapRenderer.h>
 #include <heightmap/heightmapHandler.h>
 #include <3d/dag_lockSbuffer.h>
-#include <drv/3d/dag_draw.h>
-#include <drv/3d/dag_vertexIndexBuffer.h>
-#include <drv/3d/dag_shaderConstants.h>
-#include <drv/3d/dag_info.h>
 #include <math/dag_Point3.h>
 #include <math/dag_bounds3.h>
 #include <math/dag_bounds2.h>
@@ -26,11 +20,6 @@ constexpr uint32_t SUBPATCHES_DEPTH = 1;
 // Current implementation supports SUBPATCHES_DEPTH not bigger than 3.
 
 CONSOLE_BOOL_VAL("heightmap", use_hw_tesselation, true);
-
-namespace var
-{
-static ShaderVariableInfo hmap_object_tess_factor("hmap_object_tess_factor", true);
-}
 
 enum
 {
@@ -71,17 +60,18 @@ static inline int generate_patch_indices_quads(int dim, It &&indices, int startI
     }
   return index;
 }
+static int hmap_tess_factorVarId = -1;
 
-bool get_hw_tesselation_usage(int hmap_tess_factorVarId, const LodGridCullData &cull_data)
+bool get_hw_tesselation_usage(const LodGridCullData &cull_data)
 {
   return (hmap_tess_factorVarId != -1) && cull_data.useHWTesselation && use_hw_tesselation.get();
 }
 
-static int get_tessellation_var_id(const char *hmap_tess_factor_name)
+static int get_tessellation_var_id()
 {
   if (d3d::get_driver_desc().caps.hasQuadTessellation)
   {
-    int id = ::get_shader_variable_id(hmap_tess_factor_name, /*opt*/ true);
+    int id = ::get_shader_variable_id("hmap_tess_factor", /*opt*/ true);
     if (VariableMap::isGlobVariablePresent(id))
       return id;
   }
@@ -132,7 +122,7 @@ bool LodGridVertexData::createBuffers()
   else
     return false;
 
-  if (d3d::get_driver_desc().caps.hasQuadTessellation)
+  if (hmap_tess_factorVarId != -1)
   {
     quadsIndicesCnt = indicesCnt / 6 * 4;
     G_ASSERT(!quadsIb);
@@ -198,8 +188,7 @@ void HeightmapRenderer::afterResetDevice()
     vdata[i].afterResetDevice();
 }
 
-bool HeightmapRenderer::init(const char *shader_name, const char *mat_script, const char *hmap_tess_factor_name, bool do_fatal,
-  int bits)
+bool HeightmapRenderer::init(const char *shader_name, const char *mat_script, bool do_fatal, int bits)
 {
   dimBits = clamp(bits - VDATA_OFS, 0, MAX_VDATA - 1) + VDATA_OFS;
   heightmap_scale_offset_varId = get_shader_variable_id("heightmap_scale_offset");
@@ -207,7 +196,7 @@ bool HeightmapRenderer::init(const char *shader_name, const char *mat_script, co
   heightmap_scale_offset_c = ShaderGlobal::get_int_fast(heightmap_scale_offset_varId);
   lod0_centerVarId = get_shader_variable_id("lod0_center", true);
   worldToHmapLod0VarId = get_shader_variable_id("worldToHmapLod0", true);
-  hmap_tess_factorVarId = get_tessellation_var_id(hmap_tess_factor_name);
+  hmap_tess_factorVarId = get_tessellation_var_id();
 
   shmat = new_shader_material_by_name(shader_name, mat_script);
   if (!shmat)
@@ -242,7 +231,7 @@ void HeightmapRenderer::setRenderClip(const BBox2 *clip) const
     ShaderGlobal::set_color4_fast(heightmap_region_gvid, Color4(-(128 << 10), -(128 << 10), 128 << 10, 128 << 10));
 }
 
-void HeightmapRenderer::renderPatchesByBatches(dag::ConstSpan<LodGridPatchParams> patches, const int buffer_size, const int vDataIndex,
+void HeightmapRenderer::renderPatchesByBatches(dag::ConstSpan<Point4> patches, const int buffer_size, const int vDataIndex,
   int startFlipped, const bool render_quads, int primitiveCount) const
 {
   int startInd = 0, nextStartInd = 0;
@@ -259,7 +248,7 @@ void HeightmapRenderer::renderPatchesByBatches(dag::ConstSpan<LodGridPatchParams
 
     if (current_batch_size)
     {
-      d3d::set_vs_const(heightmap_scale_offset_c, &patches[patch].params.x, current_batch_size);
+      d3d::set_vs_const(heightmap_scale_offset_c, &patches[patch].x, current_batch_size);
       if (render_quads)
         d3d::drawind_instanced(PRIM_4_CONTROL_POINTS, startInd, primitiveCount, 0, current_batch_size);
       else
@@ -282,9 +271,6 @@ void HeightmapRenderer::render(const LodGrid &lodGrid, const LodGridCullData &cu
 
   ShaderGlobal::set_color4(worldToHmapLod0VarId, cull_data.worldToLod0);
 
-  const bool hwTesselationUsage = get_hw_tesselation_usage(hmap_tess_factorVarId, cull_data);
-  ShaderGlobal::set_real(var::hmap_object_tess_factor, hwTesselationUsage ? 1 : 0);
-
   if (cull_data.patches.size())
   {
     const int maxReqInstances = MAX_HW_INSTANCING;
@@ -294,8 +280,8 @@ void HeightmapRenderer::render(const LodGrid &lodGrid, const LodGridCullData &cu
     d3d::set_vs_const1(heightmap_scale_offset_c - 1, dim, dim + 1, cull_data.scaleX, 0);
 
     G_ASSERT(cull_data.lod0PatchesCount <= cull_data.startFlipped);
-    const bool renderQuads = hwTesselationUsage && cull_data.lod0PatchesCount && lodGrid.lod0SubDiv >= 1;
-    if (hwTesselationUsage)
+    const bool renderQuads = cull_data.lod0PatchesCount && lodGrid.lod0SubDiv >= 1 && get_hw_tesselation_usage(cull_data);
+    if (get_hw_tesselation_usage(cull_data))
     {
       if (cull_data.frustum.has_value())
         set_frustum_planes(cull_data.frustum.value());
@@ -309,7 +295,7 @@ void HeightmapRenderer::render(const LodGrid &lodGrid, const LodGridCullData &cu
       if (!shElem->setStates(0, true))
         return;
       TIME_D3D_PROFILE(lod0_hw_tessellation);
-      dag::ConstSpan<LodGridPatchParams> lod0Patches = make_span_const(cull_data.patches).first(cull_data.lod0PatchesCount);
+      dag::ConstSpan<Point4> lod0Patches = make_span_const(cull_data.patches).first(cull_data.lod0PatchesCount);
       renderPatchesByBatches(lod0Patches, buffer_size, vDataIndex, cull_data.startFlipped, renderQuads,
         renderQuads ? vdataPtr->quadsCnt : vdataPtr->faceCnt);
     }
@@ -319,8 +305,7 @@ void HeightmapRenderer::render(const LodGrid &lodGrid, const LodGridCullData &cu
     ShaderGlobal::set_real_fast(hmap_tess_factorVarId, 1.f);
     if (!shElem->setStates(0, true))
       return;
-    dag::ConstSpan<LodGridPatchParams> otherLodsPatches =
-      make_span_const(cull_data.patches).last(cull_data.getCount() - renderedQuads);
+    dag::ConstSpan<Point4> otherLodsPatches = make_span_const(cull_data.patches).last(cull_data.getCount() - renderedQuads);
     renderPatchesByBatches(otherLodsPatches, buffer_size, vDataIndex, cull_data.startFlipped - renderedQuads, false,
       vdataPtr->faceCnt);
 
@@ -402,8 +387,12 @@ static inline bool cull_node(const Point3_vec4 &pos, const Point3_vec4 &posRB, c
     bool isPlayerSwimming = viewPos->y < waterLevel + SWIMMING_MAX_CAMERA_HEIGHT_ABOVE_WATER;
     if (!isPlayerSwimming)
     {
+      Point3 cornerToEyeAbsDiff = abs(posRB - *viewPos) - abs(pos - *viewPos);
+
+      // Choosing closest to camera corner of a box, checks passing for which will guarantee checks passing for all points on current
+      // heightmap patch:
       Point3 closestPatchPoint =
-        Point3(clamp(viewPos->x, pos.x, posRB.x), clamp(viewPos->y, pos.y, posRB.y), clamp(viewPos->z, pos.z, posRB.z));
+        Point3(cornerToEyeAbsDiff.x > 0 ? pos.x : posRB.x, posRB.y, cornerToEyeAbsDiff.z > 0 ? pos.z : posRB.z);
       Point3 patchToEye = *viewPos - closestPatchPoint;
       float distSquared = patchToEye.lengthSq();
 
@@ -412,15 +401,12 @@ static inline bool cull_node(const Point3_vec4 &pos, const Point3_vec4 &posRB, c
       static constexpr float THRESHOLD_DIST_SQUARED_BY_SINE_SQUARED = 20.f * 20.f * THRESHOLD_INCIDENCE_ANGLE_SINE_SQUARED;
       static constexpr float CAMERA_HEIGHT_FACTOR = 1.f / 3.f;
 
-      // Choosing height difference between camera and the heighest point of the patch guarantees the lowest sine of incidence angle,
-      // and, therefore, lowest incidence angle. That means that we only cull away the patch if all of the points are not visible:
-      float minHeightDifference = max(viewPos->y - posRB.y, 0.f);
       // Angle of incidence with water level surface is greater than the threshold angle and the point is further from the camera than
       // threshold distance:
-      if (THRESHOLD_INCIDENCE_ANGLE_SINE_SQUARED * distSquared >
-            max(minHeightDifference * minHeightDifference, THRESHOLD_DIST_SQUARED_BY_SINE_SQUARED)
-          // Point under water is below certain depth, which is increasing with camera position height:
-          && closestPatchPoint.y < waterLevel - patchToEye.y * CAMERA_HEIGHT_FACTOR)
+      if (
+        THRESHOLD_INCIDENCE_ANGLE_SINE_SQUARED * distSquared > max(patchToEye.y * patchToEye.y, THRESHOLD_DIST_SQUARED_BY_SINE_SQUARED)
+        // Point under water is below certain depth, which is increasing with camera position height:
+        && closestPatchPoint.y < waterLevel - patchToEye.y * CAMERA_HEIGHT_FACTOR)
         return false;
     }
   }
@@ -428,19 +414,16 @@ static inline bool cull_node(const Point3_vec4 &pos, const Point3_vec4 &posRB, c
   return true;
 }
 
-static inline uint32_t bit_pack_ipoint2_to_uint(const IPoint2 &pos)
+static inline float bit_pack_ipoint2_to_float(const IPoint2 &pos)
 {
-  int16_t pp[2]{(int16_t)pos.x, (int16_t)pos.y};
-  uint32_t packed_pos;
-  memcpy(&packed_pos, &pp[0], sizeof(uint32_t));
-  return packed_pos;
+  uint32_t packed_pos = (pos.x << 16) | (pos.y & 0xFFFF);
+  return eastl::bit_cast<float>(packed_pos);
 }
 
-static inline IPoint2 bit_unpack_uint_to_ipoint2(const uint32_t &input)
+static inline IPoint2 bit_unpack_float_to_ipoint2(const float &input)
 {
-  int16_t pp[2];
-  memcpy(&pp[0], &input, sizeof(uint32_t));
-  return IPoint2(pp[0], pp[1]);
+  uint32_t packed_pos = eastl::bit_cast<uint32_t>(input);
+  return IPoint2(int16_t(packed_pos >> 16), int16_t(packed_pos & 0xFFFF));
 }
 
 static inline uint32_t mask_0_LSb(int bits_count) { return ~((1 << bits_count) - 1); }
@@ -460,7 +443,7 @@ static inline float float_pack_edges_tess(int edgeTessOut[4])
 
 void cull_lod_grid(const LodGrid &lodGrid, int maxLod, float originPosX, float originPosY, float scaleX, float scaleY, float alignX,
   float alignY, float hMin, float hMax, const Frustum *frustum, const BBox2 *clip, LodGridCullData &cull_data,
-  const Occlusion *use_occlusion, float &out_lod0_area_radius, int hmap_tess_factorVarId, int dim, bool fight_t_junctions,
+  const Occlusion *use_occlusion, float &out_lod0_area_radius, int dim, bool fight_t_junctions,
   const HeightmapHeightCulling *heightCulling, const HMapTesselationData *hmap_tdata, BBox2 *innerLodsRegion, float waterLevel,
   const Point3 *viewPos)
 {
@@ -490,7 +473,7 @@ void cull_lod_grid(const LodGrid &lodGrid, int maxLod, float originPosX, float o
   ctx.hMax = hMax;
   cull_data.eraseAll();
   int numLods = min<int>(lodGrid.lodsCount, maxLod);
-  int lod0SubDiv = !get_hw_tesselation_usage(hmap_tess_factorVarId, cull_data) ? lodGrid.lod0SubDiv : 0;
+  int lod0SubDiv = !get_hw_tesselation_usage(cull_data) ? lodGrid.lod0SubDiv : 0;
   int flipLod = ((patchesX + patchesY) & 1) ? get_log2w(dim) : 100000;
   cull_data.startFlipped = 1000000;
   out_lod0_area_radius = 0.f;
@@ -616,8 +599,8 @@ void cull_lod_grid(const LodGrid &lodGrid, int maxLod, float originPosX, float o
               if (cull_node_by_clip(pos, posRB, ctx) && cull_node(pos, posRB, ctx, waterLevel, viewPos))
               {
                 IPoint2 patchPos = IPoint2(chunkX, chunkY);
-                cull_data.patches.push_back(
-                  LodGridPatchParams(gridSize, bit_pack_ipoint2_to_uint(IPoint2(chunkX, chunkY)), origin.x, origin.y));
+                // Add patch and pack info needed to find edge tesselation at patch.y
+                cull_data.patches.push_back(Point4(gridSize, bit_pack_ipoint2_to_float(IPoint2(chunkX, chunkY)), origin.x, origin.y));
                 // Add patchPos-LOD pair to hash map.
                 // If software tesselation is used, LOD 0 subpatches have effective LOD of `-subdiv`.
                 posLOD_map[patchPos] = -subdiv;
@@ -716,8 +699,8 @@ void cull_lod_grid(const LodGrid &lodGrid, int maxLod, float originPosX, float o
                   }
                   else
                   {
-                    cull_data.patches.push_back(LodGridPatchParams(newGridSize,
-                      bit_pack_ipoint2_to_uint(patchPos >> (patchLOD + lod0SubDiv)), newCell[0].x, newCell[0].y));
+                    cull_data.patches.push_back(
+                      Point4(newGridSize, bit_pack_ipoint2_to_float(patchPos >> (patchLOD + lod0SubDiv)), newCell[0].x, newCell[0].y));
                     posLOD_map[patchPos] = patchLOD;
                   }
                 }
@@ -728,7 +711,7 @@ void cull_lod_grid(const LodGrid &lodGrid, int maxLod, float originPosX, float o
           {
             int patchStep = 1 << (lod + lod0SubDiv);
             IPoint2 patchPos = IPoint2(x, y) << (lod + lod0SubDiv);
-            cull_data.patches.push_back(LodGridPatchParams(gridSize, bit_pack_ipoint2_to_uint(IPoint2(x, y)), origin.x, origin.y));
+            cull_data.patches.push_back(Point4(gridSize, bit_pack_ipoint2_to_float(IPoint2(x, y)), origin.x, origin.y));
             posLOD_map[patchPos] = lod;
           }
         }
@@ -758,12 +741,12 @@ void cull_lod_grid(const LodGrid &lodGrid, int maxLod, float originPosX, float o
   float scaleXFactor = subDivFactor / scaleX;  // - Turn float division into float multiplication.
   for (auto &patch : cull_data.patches)
   {
-    float gridSize = patch.size;
+    float gridSize = patch.x;
     int patchLOD = get_log2i_of_pow2(round(gridSize * scaleXFactor)) - lod0SubDiv; // - Use `get_log2i_of_pow2` instead of `log2f`.
                                                                                    // Then, remove `lod0SubDiv` bias which was added
                                                                                    // above.
     int patchStep = 1 << (patchLOD + lod0SubDiv);
-    IPoint2 patchPos = bit_unpack_uint_to_ipoint2(patch.tess) << (patchLOD + lod0SubDiv);
+    IPoint2 patchPos = bit_unpack_float_to_ipoint2(patch.y) << (patchLOD + lod0SubDiv);
 
     auto getNeighbourLOD = [&](IPoint2 pos, int baseLOD, int maxLOD) -> int {
       for (int lod = baseLOD; lod <= maxLOD; ++lod)
@@ -796,6 +779,6 @@ void cull_lod_grid(const LodGrid &lodGrid, int maxLod, float originPosX, float o
       }
     }
 
-    patch.params.y = float_pack_edges_tess(edgeTessOut);
+    patch.y = float_pack_edges_tess(edgeTessOut);
   }
 }

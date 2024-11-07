@@ -1,27 +1,18 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
-#define IMGUI_DEFINE_MATH_OPERATORS
-
 #include <de3_interface.h>
 #include <de3_objEntity.h>
 #include <de3_entityFilter.h>
 #include <assets/asset.h>
-#include <assets/assetFolder.h>
 #include <assets/assetMgr.h>
 #include <assets/assetChangeNotify.h>
 #include <assets/assetMsgPipe.h>
 #include <assets/assetHlp.h>
 #include <assets/assetExpCache.h>
 #include <assetsGui/av_selObjDlg.h>
-#include <EditorCore/ec_imguiInitialization.h>
-#include <EditorCore/ec_outliner.h>
 #include <libTools/util/strUtil.h>
 #include <libTools/dagFileRW/textureNameResolver.h>
 #include <libTools/shaderResBuilder/shaderMeshData.h>
 #include <libTools/shaderResBuilder/matSubst.h>
 #include <oldEditor/de_interface.h>
-#include <propPanel/constants.h>
-#include <propPanel/control/panelWindow.h>
 #include <sepGui/wndGlobal.h>
 #include <coolConsole/coolConsole.h>
 #include <workCycle/dag_workCycle.h>
@@ -37,16 +28,6 @@
 
 #include <sepGui/wndPublic.h>
 #include "de_batch_log.h"
-
-#include <imgui/imgui.h>
-#include <gui/dag_imgui.h>
-#include <winGuiWrapper/wgw_input.h>
-
-namespace environment
-{
-bool on_asset_changed(const DagorAsset &asset);
-}
-
 extern BatchLogCB *bl_callback;
 extern DataBlock de3scannedResBlk;
 extern bool dabuild_usage_allowed;
@@ -164,10 +145,7 @@ public:
 
   virtual void onAssetChanged(const DagorAsset &asset, int asset_name_id, int asset_type)
   {
-    bool changed = reload_changed_texture_asset(asset);
-    changed |= environment::on_asset_changed(asset);
-
-    if (changed)
+    if (reload_changed_texture_asset(asset))
     {
       EDITORCORE->updateViewports();
       EDITORCORE->invalidateViewportCache();
@@ -362,17 +340,6 @@ public:
       return NULL;
     }
     return assetMgr.findAsset(name, asset_types);
-  }
-
-  virtual const DataBlock *getAssetProps(const DagorAsset &asset) override { return &asset.props; }
-
-  virtual String getAssetTargetFilePath(const DagorAsset &asset) override { return asset.getTargetFilePath(); }
-
-  virtual const char *getAssetParentFolderName(const DagorAsset &asset) override
-  {
-    const int folderIndex = asset.getFolderIndex();
-    const DagorAssetFolder &folder = asset.getMgr().getFolder(folderIndex);
-    return folder.folderName;
   }
 
   virtual const char *resolveTexAsset(const char *tex_asset_name)
@@ -691,10 +658,10 @@ public:
     dlg.getTreeNodesExpand(tree_exps);
     assetTreeStateCache.setState(tree_exps, types);
 
-    if (ret == PropPanel::DIALOG_ID_CLOSE)
+    if (ret == DIALOG_ID_CLOSE)
       return NULL;
 
-    if (ret == PropPanel::DIALOG_ID_OK)
+    if (ret == DIALOG_ID_OK)
     {
       buf = dlg.getSelObjName();
       return buf;
@@ -706,8 +673,7 @@ public:
 
   virtual void showAssetWindow(bool show, const char *caption, IAssetBaseViewClient *cli, dag::ConstSpan<int> types)
   {
-    static const int DLG_W = 250;
-    static const int DLG_H = 450;
+    static const int DLG_W = 320;
     Tab<bool> tree_exps(midmem);
     static Tab<int> last_filter(midmem);
 
@@ -734,7 +700,16 @@ public:
     {
       IWndManager *_manager = DAGORED2->getWndManager();
       IGenViewportWnd *viewport = DAGORED2->getCurrentViewport();
-      int _x = 0, _y = 0, _w = DLG_W, _h = DLG_H;
+      int _x = 0, _y = 0, _w = DLG_W, _h = 600, _wt = 0;
+
+      if (viewport)
+      {
+        viewport->clientToScreen(_x, _y);
+        viewport->getViewportSize(_wt, _h);
+        if (_wt > 1600)
+          _w = _w * 7 / 4;
+      }
+
 
       assetDlg = new (uimem) SelectAssetDlg(_manager->getMainWindow(), &assetMgr, cli, caption, types, _x, _y, _w, _h);
 
@@ -751,7 +726,6 @@ public:
       last_filter = types;
       assetTreeStateCache.getState(tree_exps, types);
       assetDlg->setTreeNodesExpand(tree_exps);
-      assetDlg->dockTo(DAGORED2->getLeftDockNodeId());
       assetDlg->show();
     }
   }
@@ -793,19 +767,6 @@ public:
     a.props = a_props;
     return texconvcache::get_tex_asset_built_ddsx(a, dest, target, profile, log);
   }
-
-  virtual void imguiBegin(const char *name, bool *open, unsigned window_flags) override
-  {
-    editor_core_imgui_begin(name, open, window_flags);
-  }
-
-  virtual void imguiBegin(PropPanel::PanelWindowPropertyControl &panel_window, bool *open, unsigned window_flags) override
-  {
-    panel_window.beforeImguiBegin();
-    imguiBegin(panel_window.getStringCaption(), open, window_flags);
-  }
-
-  virtual void imguiEnd() override { ImGui::End(); }
 
   void resetInterface()
   {
@@ -853,8 +814,6 @@ public:
     }
     return true;
   }
-
-  virtual Outliner::OutlinerWindow *createOutlinerWindow() override { return new Outliner::OutlinerWindow(); }
 
 protected:
   DagorAssetMgr assetMgr;

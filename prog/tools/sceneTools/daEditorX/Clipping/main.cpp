@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "clippingPlugin.h"
 
 #include <debug/dag_debug.h>
@@ -13,7 +11,7 @@ void init_plugin_clipping()
 {
   if (!DAGORED2->checkVersion())
   {
-    DEBUG_CTX("Incorrect version!");
+    debug_ctx("Incorrect version!");
     return;
   }
 

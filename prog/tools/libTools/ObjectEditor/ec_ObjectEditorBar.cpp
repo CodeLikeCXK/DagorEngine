@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <libTools/util/strUtil.h>
 
 #include <EditorCore/ec_IEditorCore.h>
@@ -8,7 +6,6 @@
 #include <EditorCore/ec_cm.h>
 
 #include <debug/dag_debug.h>
-#include <de3_interface.h>
 
 enum
 {
@@ -31,7 +28,7 @@ ObjectEditorPropPanelBar::ObjectEditorPropPanelBar(ObjectEditor *obj_ed, void *h
   G_ASSERT(manager && "ObjectEditorPropPanelBar ctor: WndManager is NULL!");
   manager->setCaption(hwnd, caption);
 
-  propPanel = IEditorCoreEngine::get()->createPropPanel(this, caption);
+  propPanel = IEditorCoreEngine::get()->createPropPanel(this, hwnd);
 }
 
 
@@ -54,7 +51,7 @@ void ObjectEditorPropPanelBar::getObjects()
 }
 
 
-void ObjectEditorPropPanelBar::onChange(int pcb_id, PropPanel::ContainerPropertyControl *panel)
+void ObjectEditorPropPanelBar::onChange(int pcb_id, PropertyContainerControlBase *panel)
 {
   if (pcb_id == ID_NAME)
   {
@@ -69,7 +66,7 @@ void ObjectEditorPropPanelBar::onChange(int pcb_id, PropPanel::ContainerProperty
 }
 
 
-void ObjectEditorPropPanelBar::onClick(int pcb_id, PropPanel::ContainerPropertyControl *panel)
+void ObjectEditorPropPanelBar::onClick(int pcb_id, PropertyContainerControlBase *panel)
 {
   if (objects.size())
   {
@@ -80,7 +77,7 @@ void ObjectEditorPropPanelBar::onClick(int pcb_id, PropPanel::ContainerPropertyC
 }
 
 
-void ObjectEditorPropPanelBar::onPostEvent(int pcb_id, PropPanel::ContainerPropertyControl *panel)
+void ObjectEditorPropPanelBar::onPostEvent(int pcb_id, PropPanel2 *panel)
 {
   if (pcb_id == ID_CID_REFILL)
     fillPanel();
@@ -97,6 +94,8 @@ void ObjectEditorPropPanelBar::refillPanel()
 void ObjectEditorPropPanelBar::fillPanel()
 {
   G_ASSERT(propPanel && "ObjectEditorPropPanelBar::fillPanel: ppanel is NULL!");
+
+  int curScroll = propPanel->getScrollPos();
 
   if (objects.size() && objects[0].get() && propPanel->getById(ID_NAME))
     objects[0]->onPPClear(*propPanel, mk_slice(objects));
@@ -132,6 +131,8 @@ void ObjectEditorPropPanelBar::fillPanel()
     else
       propPanel->setEnabledById(ID_NAME, false);
   }
+
+  propPanel->setScrollPos(curScroll);
 }
 
 

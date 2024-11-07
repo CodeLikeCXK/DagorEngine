@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "robjDasCanvas.h"
 #include "guiScene.h"
 #include "dasScripts.h"
@@ -23,18 +21,6 @@ using namespace das;
 
 namespace darg
 {
-
-class DasEnvSwitch
-{
-public:
-  DasEnvSwitch(das::daScriptEnvironment *target) : saved(das::daScriptEnvironment::bound) { das::daScriptEnvironment::bound = target; }
-
-  ~DasEnvSwitch() { das::daScriptEnvironment::bound = saved; }
-
-private:
-  das::daScriptEnvironment *saved = nullptr;
-};
-
 
 static bool verify_draw_func(DasScriptsData *das_script_data, FuncInfo *info, das::TypeInfo *data_arg_type)
 {
@@ -65,8 +51,6 @@ static bool verify_draw_func(DasScriptsData *das_script_data, FuncInfo *info, da
 
 bool RobjDasCanvasParams::load(const Element *elem)
 {
-  TIME_PROFILE(RobjDasCanvasParams_load);
-
   GuiScene *scene = GuiScene::get_from_elem(elem);
 
   dasScriptObj.Release();
@@ -98,8 +82,6 @@ bool RobjDasCanvasParams::load(const Element *elem)
   }
   else
   {
-    DasEnvSwitch envSwitch(scene->dasScriptsData->dasEnv);
-
     DasScript *script = scriptObj.Cast<DasScript *>();
     das::Context *ctx = script->ctx.get();
 
@@ -160,10 +142,8 @@ bool RobjDasCanvasParams::load(const Element *elem)
 }
 
 
-void RobjDasCanvas::render(GuiContext &ctx, const Element *elem, const ElemRenderData *rdata, const RenderState &render_state)
+void RobjDasCanvas::renderCustom(GuiContext &ctx, const Element *elem, const ElemRenderData *rdata, const RenderState &render_state)
 {
-  TIME_PROFILE(RobjDasCanvas_render);
-
   if (rdata->size.x < 1 || rdata->size.y < 1)
     return;
 
@@ -178,22 +158,14 @@ void RobjDasCanvas::render(GuiContext &ctx, const Element *elem, const ElemRende
   GuiVertexTransform xf;
   ctx.getViewTm(xf.vtm);
 
-  {
-    GuiScene *scene = GuiScene::get_from_elem(elem);
-    DasEnvSwitch envSwitch(scene->dasScriptsData->dasEnv);
+  vec4f args[4] = {das::cast<GuiContext &>::from(ctx), das::cast<const ElemRenderData &>::from(*rdata),
+    das::cast<const RenderState &>::from(render_state), das::cast<void *>::from(params->data.data())};
+  params->dasCtx->eval(params->drawFunc, args, nullptr);
 
-    vec4f args[4] = {das::cast<GuiContext &>::from(ctx), das::cast<const ElemRenderData &>::from(*rdata),
-      das::cast<const RenderState &>::from(render_state), das::cast<void *>::from(params->data.data())};
-    params->dasCtx->eval(params->drawFunc, args, nullptr);
-
-    params->dasCtx->restart();
-    params->dasCtx->restartHeaps();
-  }
+  params->dasCtx->restart();
+  params->dasCtx->restartHeaps();
 
   ctx.setViewTm(xf.vtm);
-
-  ctx.reset_draw_str_attr();
-  ctx.reset_draw_str_texture();
 }
 
 

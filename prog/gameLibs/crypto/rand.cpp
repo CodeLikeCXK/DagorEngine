@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <crypto/rand.h>
 #include <debug/dag_assert.h>
 #if USE_BCRYPT

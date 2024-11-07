@@ -1,16 +1,16 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
 #include <generic/dag_DObject.h>
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
 #include <math/dag_plane3.h>
 #include <math/dag_Point2.h>
 #include <math/dag_TMatrix4.h>
 #include <3d/dag_texMgr.h>
-#include <3d/dag_resPtr.h>
 class ShaderMaterial;
 class DataBlock;
 
@@ -97,7 +97,6 @@ protected:
 
   Texture *hdrTex[_NUM_TEX];
   TEXTUREID hdrTexId[_NUM_TEX];
-  UniqueTex depthTex;
 
   int reflectionTextureVarId;
   int reflectionPlaneVarId;

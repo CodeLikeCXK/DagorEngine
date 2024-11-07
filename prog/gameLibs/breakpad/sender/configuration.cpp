@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "configuration.h"
 #include "files.h"
 #include "lang.h"
@@ -16,8 +14,7 @@ namespace breakpad
 
 const char *product_name = "ProductName";
 const char *product_title = "ProductTitle";
-const char *param_names[] = {
-  "Version", "BuildID", "Comments", "StartupTime", "CrashTime", "ReleaseChannel", "Hang", "HangID", "D3DDriver", "GPUVendor", NULL};
+const char *param_names[] = {"Version", "BuildID", "Comments", "StartupTime", "CrashTime", "ReleaseChannel", "Hang", "HangID", NULL};
 
 static std::string get_dump_id(const std::string &path)
 {

@@ -17,21 +17,6 @@ MAKE_TYPE_FACTORY(Atomic64, AtomicTT<int64_t>)
 
 namespace das {
 
-    template <typename TT>
-    struct AddReleaseGuard {
-        AddReleaseGuard ( TT * tt, Context * c, LineInfoArg * a ) : t(tt), at(a), context(c) {
-            t->addRef();
-        }
-        ~AddReleaseGuard () {
-            if ( int ref = t->releaseRef() ) {
-                context->throw_error_at(at, "synch primitive deleted while being used (ref=%i)", ref);
-            }
-        }
-        TT * t;
-        LineInfoArg * at;
-        Context * context;
-    };
-
     LockBox::~LockBox() {
         lock_guard<mutex> guard(mCompleteMutex);
         box.clear();
@@ -198,16 +183,23 @@ namespace das {
         if ( !ch ) context->throw_error_at(at, "jobAppend: job is null");
         return ch->append(size);
     }
+
     void withChannel ( const TBlock<void,Channel *> & blk, Context * context, LineInfoArg * at ) {
         Channel ch(context);
-        AddReleaseGuard<Channel> guard(&ch, context, at);
+        ch.addRef();
         das_invoke<void>::invoke<Channel *>(context, at, blk, &ch);
+        if ( ch.releaseRef() ) {
+            context->throw_error_at(at, "channel beeing deleted while being used");
+        }
     }
 
     void withChannelEx ( int32_t count, const TBlock<void,Channel *> & blk, Context * context, LineInfoArg * at ) {
         Channel ch(context,count);
-        AddReleaseGuard<Channel> guard(&ch, context, at);
+        ch.addRef();
         das_invoke<void>::invoke<Channel *>(context, at, blk, &ch);
+        if ( ch.releaseRef() ) {
+            context->throw_error_at(at, "channel beeing deleted while being used");
+        }
     }
 
     Channel * channelCreate( Context * context, LineInfoArg * ) {
@@ -234,18 +226,15 @@ namespace das {
             return TypeDecl::gcFlag_heap | TypeDecl::gcFlag_stringHeap;
         }
         virtual void walk(DataWalker & walker, void * data) override {
-            bool gResolve = daScriptEnvironment::bound->g_resolve_annotations;
-            daScriptEnvironment::bound->g_resolve_annotations = false;
             BasicStructureAnnotation::walk(walker, data);
             Channel * ch = (Channel *) data;
             if ( !ch->isValid() ) {
                 walker.invalidData();
-            } else {
-                ch->for_each_item([&](void * data, TypeInfo * ti, Context *) {
-                    walker.walk((char *)&data, ti);
-                });
+                return;
             }
-            daScriptEnvironment::bound->g_resolve_annotations = gResolve;
+            ch->for_each_item([&](void * data, TypeInfo * ti, Context *) {
+                walker.walk((char *)&data, ti);
+            });
         }
     };
 
@@ -274,8 +263,11 @@ namespace das {
 
     void withLockBox ( const TBlock<void,LockBox *> & blk, Context * context, LineInfoArg * at ) {
         LockBox ch;
-        AddReleaseGuard<LockBox> guard(&ch, context, at);
+        ch.addRef();
         das_invoke<void>::invoke<LockBox *>(context, at, blk, &ch);
+        if ( ch.releaseRef() ) {
+            context->throw_error_at(at, "lock box beeing deleted while being used");
+        }
     }
 
     vec4f lockBoxSet ( Context & context, SimNode_CallBase * call, vec4f * args ) {
@@ -304,18 +296,15 @@ namespace das {
             return TypeDecl::gcFlag_heap | TypeDecl::gcFlag_stringHeap;
         }
         virtual void walk(DataWalker & walker, void * data) override {
-            bool gResolve = daScriptEnvironment::bound->g_resolve_annotations;
-            daScriptEnvironment::bound->g_resolve_annotations = false;
             BasicStructureAnnotation::walk(walker, data);
             LockBox * ch = (LockBox *) data;
             if ( !ch->isValid() ) {
                 walker.invalidData();
-            } else {
-                ch->peek([&](void * data, TypeInfo * ti, Context *) {
-                    walker.walk((char *)&data, ti);
-                });
+                return;
             }
-            daScriptEnvironment::bound->g_resolve_annotations = gResolve;
+            ch->peek([&](void * data, TypeInfo * ti, Context *) {
+                walker.walk((char *)&data, ti);
+            });
         }
     };
 
@@ -348,8 +337,7 @@ namespace das {
         if ( !g_jobQue ) context->throw_error_at(lineinfo, "need to be in 'with_job_que' block");
         shared_ptr<Context> forkContext;
         forkContext.reset(get_clone_context(context, uint32_t(ContextCategory::job_clone)));
-        auto ptr = forkContext->allocate(lambdaSize + 16,lineinfo);
-        if ( !ptr ) context->throw_out_of_memory(false, lambdaSize + 16, lineinfo);
+        auto ptr = forkContext->heap->allocate(lambdaSize + 16);
         forkContext->heap->mark_comment(ptr, "new [[ ]] in new_job");
         memset ( ptr, 0, lambdaSize + 16 );
         ptr += 16;
@@ -374,8 +362,7 @@ namespace das {
     void new_thread_invoke ( Lambda lambda, Func fn, int32_t lambdaSize, Context * context, LineInfoArg * lineinfo ) {
         shared_ptr<Context> forkContext;
         forkContext.reset(get_clone_context(context, uint32_t(ContextCategory::thread_clone)));
-        auto ptr = forkContext->allocate(lambdaSize + 16,lineinfo);
-        if ( !ptr ) context->throw_out_of_memory(false, lambdaSize + 16, lineinfo);
+        auto ptr = forkContext->heap->allocate(lambdaSize + 16);
         forkContext->heap->mark_comment(ptr, "new [[ ]] in new_thread");
         memset ( ptr, 0, lambdaSize + 16 );
         ptr += 16;
@@ -389,36 +376,6 @@ namespace das {
             das_invoke_lambda<void>::invoke(forkContext.get(), lineinfo, flambda);
             das_delete<Lambda>::clear(forkContext.get(), flambda);
             g_jobQueTotalThreads --;
-        }).detach();
-    }
-
-    extern condition_variable debugger_stopped;
-    extern atomic<bool>       debugger_started;
-    extern atomic<bool>       stopped;
-    extern mutex              debugger_mutex;
-    extern atomic<bool>       stop_requested;
-
-    static void stop_debugger() {
-        g_jobQueTotalThreads --;
-        {
-            lock_guard guard{debugger_mutex};
-            stopped.store(true);
-        }
-        debugger_stopped.notify_all();
-    }
-
-    void new_debugger_thread ( const Block & lambda, Context * context, LineInfoArg * lineinfo ) {
-        g_jobQueTotalThreads ++;
-        debugger_started.store(true);
-        shared_ptr<Context> forkContext;
-        forkContext.reset(get_clone_context(context, uint32_t(ContextCategory::thread_clone)));
-        auto bound = daScriptEnvironment::bound;
-        thread([=]() mutable {
-            daScriptEnvironment::bound = bound;
-            das_invoke<void>::invoke(forkContext.get(), lineinfo, lambda);
-            forkContext.reset();
-            stop_debugger();
-            stop_requested = false;
         }).detach();
     }
 
@@ -450,10 +407,13 @@ namespace das {
 
     void withJobStatus ( int32_t total, const TBlock<void,JobStatus *> & block, Context * context, LineInfoArg * lineInfo ) {
         JobStatus status(total);
-        AddReleaseGuard<JobStatus> guard(&status, context, lineInfo);
+        status.addRef();
         vec4f args[1];
         args[0] = cast<JobStatus *>::from(&status);
         context->invoke(block,args,nullptr,lineInfo);
+        if ( int ref = status.releaseRef() ) {
+            context->throw_error_at(lineInfo, "job status beeing deleted while being used (ref %i)", ref);
+        }
     }
 
     JobStatus * jobStatusCreate( Context *, LineInfoArg * ) {
@@ -491,7 +451,7 @@ namespace das {
     }
 
     int getTotalHwThreads () {
-        return JobQue::get_num_threads();
+        return thread::hardware_concurrency();
     }
 
     class Module_JobQue : public Module {
@@ -659,9 +619,6 @@ namespace das {
             addExtern<DAS_BIND_FUN(new_thread_invoke)>(*this, lib,  "new_thread_invoke",
                 SideEffects::modifyExternal, "new_thread_invoke")
                     ->args({"lambda","function","lambdaSize","context","line"});
-            addExtern<DAS_BIND_FUN(new_debugger_thread)>(*this, lib,  "new_debugger_thread",
-                SideEffects::modifyExternal, "new_debugger_thread")
-                    ->args({"block","context","line"});
             addExtern<DAS_BIND_FUN(is_job_que_shutting_down)>(*this, lib,  "is_job_que_shutting_down",
                 SideEffects::modifyExternal, "is_job_que_shutting_down");
         }

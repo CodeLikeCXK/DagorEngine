@@ -1,5 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __GAIJIN_SCRIPTHELPERS_TUNEDPARAMS_H__
+#define __GAIJIN_SCRIPTHELPERS_TUNEDPARAMS_H__
 #pragma once
+
 
 #include <util/dag_globDef.h>
 #include <ioSys/dag_dataBlock.h>
@@ -9,10 +11,7 @@
 #include <libTools/util/makeBindump.h>
 
 
-namespace PropPanel
-{
-class ContainerPropertyControl;
-}
+class PropertyContainerControlBase;
 
 namespace ScriptHelpers
 {
@@ -36,11 +35,11 @@ public:
   virtual TunedElement *getSubElem(int index) const = 0;
 
   virtual void resetPropPanel() {}
-  virtual void fillPropPanel(int &pid, PropPanel::ContainerPropertyControl &panel) = 0;
+  virtual void fillPropPanel(int &pid, PropertyContainerControlBase &panel) = 0;
   virtual bool getPanelArrayItemCaption(String &caption, const TunedElement &array, const TunedElement &array_item) { return false; }
-  virtual void getValues(int &pid, PropPanel::ContainerPropertyControl &panel) = 0;
+  virtual void getValues(int &pid, PropertyContainerControlBase &panel) = 0;
 
-  virtual bool onClick(int pcb_id, PropPanel::ContainerPropertyControl &panel, IPropPanelCB &ppcb)
+  virtual bool onClick(int pcb_id, PropertyContainerControlBase &panel, IPropPanelCB &ppcb)
   {
     int num = subElemCount();
     for (int i = 0; i < num; ++i)
@@ -134,14 +133,14 @@ public:
       if (subElem[i])
         subElem[i]->resetPropPanel();
   }
-  virtual void fillPropPanel(int &pid, PropPanel::ContainerPropertyControl &panel)
+  virtual void fillPropPanel(int &pid, PropertyContainerControlBase &panel)
   {
     for (int i = 0; i < subElem.size(); ++i)
       if (subElem[i])
         subElem[i]->fillPropPanel(pid, panel);
   }
 
-  virtual void getValues(int &pid, PropPanel::ContainerPropertyControl &panel)
+  virtual void getValues(int &pid, PropertyContainerControlBase &panel)
   {
     for (int i = 0; i < subElem.size(); ++i)
       if (subElem[i])
@@ -232,3 +231,6 @@ TunedGroup *create_tuned_struct(const char *name, int version, dag::ConstSpan<Tu
 
 TunedGroup *create_tuned_group(const char *name, int version, dag::ConstSpan<TunedElement *> elems);
 }; // namespace ScriptHelpers
+
+
+#endif

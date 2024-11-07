@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "fileDropHandler.h"
 #include "main.h"
 #include <daRg/dag_guiScene.h>

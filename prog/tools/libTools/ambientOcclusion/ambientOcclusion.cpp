@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <libTools/ambientOcclusion/ambientOcclusion.h>
 #include <math/dag_mesh.h>
 #include <math/dag_SHmath.h>

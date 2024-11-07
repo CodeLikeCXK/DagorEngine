@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "devices/trackIR.h"
 
 namespace trackir
@@ -22,18 +20,4 @@ TrackData &get_data() { return current_track_data; }
 
 void toggle_debug_draw() {}
 void draw_debug(HudPrimitives *) {}
-
 } // namespace trackir
-
-#if _TARGET_C1 | _TARGET_C2
-
-
-
-
-
-
-
-
-
-
-#endif

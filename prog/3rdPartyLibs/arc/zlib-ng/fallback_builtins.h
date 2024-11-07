@@ -90,7 +90,7 @@ static inline __m512i _mm512_zextsi128_si512(__m128i a) {
  */
 #if !defined(ARM_NEON_HASLD4) && (defined(__ARM_FP) || defined(_MSC_VER))
 
-#if defined(_MSC_VER) && (defined(_M_ARM64) || defined(_M_ARM64EC)) && !defined(__clang__)
+#ifdef _M_ARM64
 #  include <arm64_neon.h>
 #else
 #  include <arm_neon.h>

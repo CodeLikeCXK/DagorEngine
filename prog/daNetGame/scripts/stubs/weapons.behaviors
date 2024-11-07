@@ -1,5 +1,0 @@
-return {
-  TurretCrosshair = "TurretCrosshair"
-  VehicleSight = "VehicleSight"
-  Crosshair = "Crosshair"
-}

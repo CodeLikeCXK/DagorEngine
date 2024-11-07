@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <libTools/fastPhysData/fp_edbone.h>
 #include <libTools/fastPhysData/fp_edpoint.h>
 #include <libTools/fastPhysData/fp_edclipper.h>
@@ -9,7 +7,7 @@
 
 #include <debug/dag_debug3d.h>
 
-#include <propPanel/commonWindow/multiListDialog.h>
+#include <propPanel2/comWnd/list_dialog.h>
 
 #include "fastPhysEd.h"
 #include "fastPhysPanel.h"
@@ -138,12 +136,12 @@ FPObjectClipper::FPObjectClipper(FpdObject *obj, FastPhysEditor &editor) : IFPOb
 }
 
 
-void FPObjectClipper::refillPanel(PropPanel::ContainerPropertyControl *panel)
+void FPObjectClipper::refillPanel(PropPanel2 *panel)
 {
   FpdClipper *clipperObject = (FpdClipper *)getObject();
   G_ASSERT(clipperObject);
 
-  PropPanel::ContainerPropertyControl *rgrp = panel->createRadioGroup(PID_CLIPTYPE, "Type:");
+  PropPanel2 *rgrp = panel->createRadioGroup(PID_CLIPTYPE, "Type:");
   rgrp->createRadio(FpdClipper::CLIP_SPHERICAL, "spherical");
   rgrp->createRadio(FpdClipper::CLIP_CYLINDRICAL, "cylindrical");
   panel->setInt(PID_CLIPTYPE, clipperObject->clipType);
@@ -192,7 +190,7 @@ void FPObjectClipper::refillPanel(PropPanel::ContainerPropertyControl *panel)
   */
 }
 
-void FPObjectClipper::onChange(int pcb_id, PropPanel::ContainerPropertyControl *panel)
+void FPObjectClipper::onChange(int pcb_id, PropPanel2 *panel)
 {
   FpdClipper *clipperObject = (FpdClipper *)getObject();
   G_ASSERT(clipperObject);
@@ -235,7 +233,7 @@ void FPObjectClipper::onChange(int pcb_id, PropPanel::ContainerPropertyControl *
 }
 
 
-void FPObjectClipper::onClick(int pcb_id, PropPanel::ContainerPropertyControl *panel)
+void FPObjectClipper::onClick(int pcb_id, PropPanel2 *panel)
 {
   FpdClipper *clipperObject = (FpdClipper *)getObject();
   G_ASSERT(clipperObject);
@@ -262,7 +260,7 @@ void FPObjectClipper::onClick(int pcb_id, PropPanel::ContainerPropertyControl *p
         _names.push_back() = obj->getName();
     }
 
-    PropPanel::MultiListDialog dlg("Select points", _pxScaled(300), _pxScaled(400), _names, _sel_names);
+    MultiListDialog dlg("Select points", _pxScaled(300), _pxScaled(400), _names, _sel_names);
     dlg.showDialog();
 
     if (!_sel_names.size())
@@ -326,7 +324,7 @@ void FPObjectClipper::onClick(int pcb_id, PropPanel::ContainerPropertyControl *p
         _names.push_back() = obj->getName();
     }
 
-    PropPanel::MultiListDialog dlg("Select lines", _pxScaled(300), _pxScaled(400), _names, _sel_names);
+    MultiListDialog dlg("Select lines", _pxScaled(300), _pxScaled(400), _names, _sel_names);
     dlg.showDialog();
 
     if (!_sel_names.size())

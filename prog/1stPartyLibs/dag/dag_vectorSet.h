@@ -1,7 +1,12 @@
-//
-// Dagor Engine 6.5 - 1st party libs
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-//
+/*
+ * Dagor Engine
+ * Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+ *
+ * (for conditions of use see prog/license.txt)
+*/
+
+#ifndef _DAGOR_DAG_VECTOR_SET_H_
+#define _DAGOR_DAG_VECTOR_SET_H_
 #pragma once
 
 #include <dag/dag_vector.h>
@@ -13,3 +18,4 @@ namespace dag
             typename RandomAccessContainer = dag::Vector<Key, Allocator> >
   using VectorSet = eastl::vector_set<Key, Compare, Allocator, RandomAccessContainer>;
 }
+#endif

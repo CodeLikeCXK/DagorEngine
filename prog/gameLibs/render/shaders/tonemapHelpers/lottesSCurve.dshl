@@ -11,14 +11,11 @@ macro LOTTES_TONEMAP_PARAMS(code)
   }
   hlsl(code) {
     #include <tonemapHelpers/lottesSCurve.hlsl>
-    float3 applyLottesCurveDirect(float3 gradedColor)
+    float3 applyLottesCurve(float3 gradedColor)
     {
-      return LottesSCurveDirect( gradedColor, lottesParams.x, lottesParams.y, lottesParams.z, lottesParams.w, tonemapHdrMax ) ;
-    }
-
-    float3 applyLottesCurveLuma(float3 gradedColor)
-    {
-      return LottesSCurveLuma( gradedColor, lottesParams.x, lottesParams.y, lottesParams.z, lottesParams.w, tonemapHdrMax ) ;
+      //todo: use LottesSCurve_optimized with precomputed b,c!
+      return LottesSCurve( gradedColor, lottesParams.x, lottesParams.y, lottesParams.z, lottesParams.w, tonemapHdrMax ) ;
+      //return LottesSCurve( gradedColor, 1., 0.9, 0.5, 0.18, 4 ) ;
     }
   }
 endmacro

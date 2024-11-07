@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <ioSys/dag_dataBlock.h>
 #include <oldEditor/de_interface.h>
 #include <oldEditor/de_workspace.h>
@@ -10,8 +8,7 @@
 #include <ecs/renderEvents.h>
 #include <ecs/delayedAct/actInThread.h>
 #include <EASTL/unique_ptr.h>
-#include <drv/3d/dag_matricesAndPerspective.h>
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
 #include <debug/dag_debug3d.h>
 
 class EcsAdapter;
@@ -36,7 +33,7 @@ public:
       logerr("Failed to register ECS Manager service.");
     }
 
-    ecs::TemplateRefs trefs(*g_entity_mgr);
+    ecs::TemplateRefs trefs;
 
     g_entity_mgr.demandInit();
     G_ASSERT(g_entity_mgr.get());
@@ -45,7 +42,7 @@ public:
     DataBlock entities;
     if (entities_path && entities.load(entities_path))
     {
-      ecs::load_templates_blk_file(*g_entity_mgr, entities_path, entities, trefs, &g_entity_mgr->getMutableTemplateDBInfo());
+      ecs::load_templates_blk_file(entities_path, entities, trefs, &g_entity_mgr->getMutableTemplateDBInfo());
       g_entity_mgr->addTemplates(trefs);
     }
     else if (entities_path)
@@ -54,7 +51,7 @@ public:
     DataBlock scene;
     if (scene_path && scene.load(scene_path))
     {
-      ecs::create_entities_blk(*g_entity_mgr, scene, scene_path);
+      ecs::create_entities_blk(scene, scene_path);
     }
     else if (scene_path)
       DAEDITOR3.conError("failed to create ECS scene from %s", scene_path);

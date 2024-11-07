@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <ioSys/dag_findFiles.h>
 #include <util/dag_string.h>
 #include <generic/dag_sort.h>
@@ -13,7 +11,7 @@
 static void find_real_files_in_folder(Tab<SimpleString> &out_list, const char *dir_path, const char *file_suffix_to_match,
   bool subdirs)
 {
-  String tmpPath(0, "%s%s*%s", dir_path, *dir_path ? "/" : "", file_suffix_to_match);
+  String tmpPath(0, "%s/*%s", dir_path, file_suffix_to_match);
   alefind_t ff;
   if (::dd_find_first(tmpPath, 0, &ff))
   {
@@ -25,7 +23,7 @@ static void find_real_files_in_folder(Tab<SimpleString> &out_list, const char *d
 
   if (subdirs)
   {
-    tmpPath.printf(0, "%s%s*", dir_path, *dir_path ? "/" : "");
+    tmpPath.printf(0, "%s/*", dir_path);
     if (::dd_find_first(tmpPath, DA_SUBDIR, &ff))
     {
       do

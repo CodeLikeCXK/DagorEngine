@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <osApiWrappers/dag_asyncRead.h>
 #include <osApiWrappers/dag_fileIoErr.h>
 #include <osApiWrappers/dag_critSec.h>
@@ -108,7 +106,7 @@ int dfa_alloc_asyncdata()
   if (idx >= 0)
     return idx;
 
-  DEBUG_CTX("no more free handles");
+  debug_ctx("no more free handles");
   return -1;
 }
 
@@ -116,7 +114,7 @@ void dfa_free_asyncdata(int data_handle)
 {
   if (data_handle < 0 || data_handle >= 64)
   {
-    DEBUG_CTX("incorrect handle: %d", data_handle);
+    debug_ctx("incorrect handle: %d", data_handle);
     return;
   }
   if (!critSecInited)
@@ -124,7 +122,7 @@ void dfa_free_asyncdata(int data_handle)
 
   ::enter_critical_section(critSec);
   if (!unuse_bit(data_handle))
-    DEBUG_CTX("already freed handle: %d", data_handle);
+    debug_ctx("already freed handle: %d", data_handle);
   else
   {
     G_ASSERT(ovPool[data_handle].code >= 0);

@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -15,7 +16,7 @@ enum HdrMode
   HDR_MODE_XBLADES = 6, // old postfx used in X-Blades
 };
 
-#include <supp/dag_define_KRNLIMP.h>
+#include <supp/dag_define_COREIMP.h>
 
 extern KRNLIMP int hdr_render_mode;
 extern KRNLIMP unsigned int hdr_render_format;
@@ -26,4 +27,4 @@ extern KRNLIMP float hdr_max_bright_val; // histogram width
 
 inline HdrMode get_hdr_mode() { return (HdrMode)::hdr_render_mode; }
 
-#include <supp/dag_undef_KRNLIMP.h>
+#include <supp/dag_undef_COREIMP.h>

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <scene/dag_frtdumpMgr.h>
 #include <scene/dag_frtdumpInline.h>
 #include <sceneRay/dag_sceneRay.h>

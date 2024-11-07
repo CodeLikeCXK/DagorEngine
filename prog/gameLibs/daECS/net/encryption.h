@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <stdint.h>
@@ -22,11 +21,7 @@ namespace net
 
 class EncryptionCtx final : public IDaNetTrafficEncoder
 {
-public:
-  static constexpr size_t KEY_LEN = 16;
-
-private:
-  static constexpr size_t AUTH_TAG_LEN = 4;
+  static constexpr size_t KEY_LEN = 16, AUTH_TAG_LEN = 4;
   WinCritSec mutex;
   eastl::unique_ptr<crypto::ISymmetricCipher> gcmCipherCtx, cfbCipherCtx;
   uint64_t sessionRand;
@@ -64,17 +59,13 @@ public:
 
   void setPeerKey(SystemIndex peer_id, dag::ConstSpan<uint8_t> key, net::EncryptionKeyBits ebits)
   {
+    G_ASSERT(ebits == net::EncryptionKeyBits::None || key.size() >= KEY_LEN);
     WinAutoLock lock(mutex);
     peerRecords[peer_id].bits = ebits;
-    if (ebits == net::EncryptionKeyBits::None)
+    if (ebits == net::EncryptionKeyBits::None || key.empty())
       mem_set_0(peerRecords[peer_id].key);
-    else if (key.size() >= KEY_LEN)
-      return mem_copy_from(peerRecords[peer_id].key, key.data());
     else
-    {
-      mem_set_0(peerRecords[peer_id].key);
-      memcpy(peerRecords[peer_id].key.data(), key.data(), data_size(key));
-    }
+      mem_copy_from(peerRecords[peer_id].key, key.data());
   }
 
 private:
@@ -96,7 +87,7 @@ private:
       else
       {
         cipher = gcmCipherCtx.get();
-        if (DAGOR_UNLIKELY(packet_size <= AUTH_TAG_LEN))
+        if (EASTL_UNLIKELY(packet_size <= AUTH_TAG_LEN))
           return nullptr;
         packet_size -= AUTH_TAG_LEN;
       }
@@ -180,7 +171,7 @@ private:
 
     if (gcmCipher)
     {
-      if (DAGOR_UNLIKELY(!cipherCtx->finalize(outData + outlen, &outlen))) // check auth tag
+      if (EASTL_UNLIKELY(!cipherCtx->finalize(outData + outlen, &outlen))) // check auth tag
         return 0;
     }
     else

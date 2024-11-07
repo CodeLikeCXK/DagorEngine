@@ -1,7 +1,8 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __GAIJIN_EDITORCORE_START_DIALOG__
+#define __GAIJIN_EDITORCORE_START_DIALOG__
 #pragma once
 
-#include <propPanel/commonWindow/dialogWindow.h>
+#include <propPanel2/comWnd/dialog_window.h>
 
 class EditorWorkspace;
 
@@ -16,26 +17,26 @@ enum
 };
 
 
-class EditorStartDialog : public PropPanel::DialogWindow
+class EditorStartDialog : public CDialogWindow
 {
 public:
-  EditorStartDialog(const char *caption, EditorWorkspace &wsp, const char *wsp_blk, const char *select_wsp);
+  EditorStartDialog(void *phandle, const char *caption, EditorWorkspace &wsp, const char *wsp_blk, const char *select_wsp);
   virtual ~EditorStartDialog();
 
   void editWorkspace();
 
-  // DialogWindow interface
+  // CDialogWindow interface
 
   virtual bool onOk();
   virtual bool onCancel() { return true; };
 
   // ControlEventHandler methods from CDialogWindow
 
-  virtual void onChange(int pcb_id, PropPanel::ContainerPropertyControl *panel);
-  virtual void onClick(int pcb_id, PropPanel::ContainerPropertyControl *panel);
+  virtual void onChange(int pcb_id, PropertyContainerControlBase *panel);
+  virtual void onClick(int pcb_id, PropertyContainerControlBase *panel);
 
-  virtual void onCustomFillPanel(PropPanel::ContainerPropertyControl &panel) {}
-  virtual bool onCustomSettings(PropPanel::ContainerPropertyControl &panel) { return true; }
+  virtual void onCustomFillPanel(PropertyContainerControlBase &panel) {}
+  virtual bool onCustomSettings(PropertyContainerControlBase &panel) { return true; }
 
 protected:
   EditorWorkspace &wsp;
@@ -65,20 +66,20 @@ private:
 };
 
 
-class WorkspaceDialog : public PropPanel::DialogWindow
+class WorkspaceDialog : public CDialogWindow
 {
 public:
-  WorkspaceDialog(EditorStartDialog *esd, const char *caption, EditorWorkspace &wsp, bool is_editing);
+  WorkspaceDialog(void *phandle, EditorStartDialog *esd, const char *caption, EditorWorkspace &wsp, bool is_editing);
 
-  // DialogWindow interface
+  // CDialogWindow interface
 
   virtual bool onOk();
   virtual bool onCancel() { return true; };
 
   // ControlEventHandler methods from CDialogWindow
 
-  virtual void onChange(int pcb_id, PropPanel::ContainerPropertyControl *panel);
-  virtual void onClick(int pcb_id, PropPanel::ContainerPropertyControl *panel);
+  virtual void onChange(int pcb_id, PropertyContainerControlBase *panel);
+  virtual void onClick(int pcb_id, PropertyContainerControlBase *panel);
 
 protected:
   enum
@@ -94,3 +95,6 @@ protected:
   bool mEditing;
   EditorStartDialog *mEsd;
 };
+
+
+#endif //__GAIJIN_EDITORCORE_START_DIALOG__

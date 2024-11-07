@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <daRg/dag_renderObject.h>
 #include <daRg/dag_renderState.h>
 #include <daRg/dag_element.h>
@@ -18,7 +16,7 @@ bool RobjParamsBrowser::load(const Element *elem)
   return true;
 }
 
-void RenderObjectBrowser::render(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *rdata,
+void RenderObjectBrowser::renderCustom(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *rdata,
   const RenderState &render_state)
 {
   G_UNUSED(render_state);

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <devices/dataExport.h>
 #include <ioSys/dag_dataBlock.h>
 #include <debug/dag_debug.h>

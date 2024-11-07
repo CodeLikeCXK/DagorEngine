@@ -1,8 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
-
 #include "common.h"
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
 #include <EASTL/unique_ptr.h>
 #include <3d/dag_sbufferIDHolder.h>
 #include <util/dag_generationReferencedData.h>
@@ -74,7 +72,6 @@ struct BufferPool
 
   int pageSize;
   GenerationReferencedData<PageId, Page> pages;
-  eastl::vector<PageId> pagesToDestroy;
 };
 
 using GpuBufferPool = BufferPool<GpuResourcePtr, Sbuffer>;
@@ -97,9 +94,8 @@ bool init_buffer_pool(T &dst, size_t page_sz)
 
 bool create_gpu_buffer(GpuBufferPool &dst, unsigned int sz, GpuBuffer &out);
 bool create_cpu_buffer(CpuBufferPool &dst, unsigned int sz, CpuBuffer &out);
-void release_gpu_buffer(GpuBufferPool &dst, GpuBuffer &buf, bool delayed_destroy);
+void release_gpu_buffer(GpuBufferPool &dst, GpuBuffer &buf);
 void release_cpu_buffer(CpuBufferPool &dst, CpuBuffer &buf);
-void exec_delayed_page_destroy(GpuBufferPool &dst);
 
 bool create_gpu_rb_res(GpuResourcePtr &res, unsigned int elem_size, unsigned int elem_count, const char *name);
 bool create_gpu_sb_res(GpuResourcePtr &res, unsigned int elem_size, unsigned int elem_count, const char *name);

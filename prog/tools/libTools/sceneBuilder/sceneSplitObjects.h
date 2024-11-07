@@ -1,4 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef _GAIJIN_SHADERS_SCENE_SPLIT_OBJECTS_H
+#define _GAIJIN_SHADERS_SCENE_SPLIT_OBJECTS_H
 #pragma once
 
 #include <math/dag_math3d.h>
@@ -661,3 +662,6 @@ void split_objects(Tab<ObjectType> &objectList, unsigned int trianglesPerObjectT
 
   debug("split_objects finished with %d objects, %d triangles.", objectList.size(), finalTrianglesNum);
 }
+
+
+#endif //_GAIJIN_SHADERS_SCENE_SPLIT_OBJECTS_H

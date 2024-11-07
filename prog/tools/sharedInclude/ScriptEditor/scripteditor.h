@@ -1,4 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __GAIJIN_SCRIPT_EDITOR__
+#define __GAIJIN_SCRIPT_EDITOR__
 #pragma once
 
 #include <util/dag_string.h>
@@ -246,3 +247,5 @@ private:
 
   friend class ScriptObjInteractor;
 };
+
+#endif //__GAIJIN_SCRIPT_EDITOR__

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <shaders/dag_shaderMesh.h>
 #include <shaders/dag_shaders.h>
 #include <math/dag_mesh.h>

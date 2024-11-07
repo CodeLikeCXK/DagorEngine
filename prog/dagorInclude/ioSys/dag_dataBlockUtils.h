@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -22,7 +23,6 @@
 #include <memory/dag_framemem.h>
 #include <math/random/dag_random.h>
 #include <dag_noise/dag_uint_noise.h>
-#include <debug/dag_log.h>
 
 inline void addOverrideParam(DataBlock &dst, const DataBlock &src, int idx, bool override, const char *rename = NULL)
 {
@@ -159,11 +159,7 @@ inline const DataBlock *get_data_block_or_file(const DataBlock &blk, const char 
 {
   if (const char *fileName = blk.getStr(file_name_param, NULL))
     if (file_blk.load(fileName))
-    {
-      if (blk.getBlockByName(blk_name_param) != nullptr)
-        logerr("Both blk file \"%s\" and block %s {} found, file is used", fileName, blk_name_param);
       return &file_blk;
-    }
   return default_dummy ? blk.getBlockByNameEx(blk_name_param) : blk.getBlockByName(blk_name_param);
 }
 
@@ -345,9 +341,6 @@ DECLARE_BLK_PATH_WRITE_FUNCTION(blk_create_path_and_set_int, addBlock, setInt, i
 DECLARE_BLK_PATH_WRITE_FUNCTION(blk_create_path_and_set_str, addBlock, setStr, const char *);
 DECLARE_BLK_PATH_WRITE_FUNCTION(blk_create_path_and_set_float, addBlock, setReal, float);
 DECLARE_BLK_PATH_WRITE_FUNCTION(blk_create_path_and_set_tm, addBlock, setTm, TMatrix);
-DECLARE_BLK_PATH_WRITE_FUNCTION(blk_create_path_and_set_point2, addBlock, setPoint2, Point2);
-DECLARE_BLK_PATH_WRITE_FUNCTION(blk_create_path_and_set_point3, addBlock, setPoint3, Point3);
-DECLARE_BLK_PATH_WRITE_FUNCTION(blk_create_path_and_set_point4, addBlock, setPoint4, Point4);
 
 DECLARE_BLK_PATH_WRITE_FUNCTION(blk_create_path_and_add_bool, addBlock, addBool, bool);
 DECLARE_BLK_PATH_WRITE_FUNCTION(blk_create_path_and_add_int, addBlock, addInt, int);

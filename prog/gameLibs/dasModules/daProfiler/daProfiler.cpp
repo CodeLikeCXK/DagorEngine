@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <folders/folders.h>
 #include <osApiWrappers/basePath.h>
 #include <osApiWrappers/dag_direct.h>

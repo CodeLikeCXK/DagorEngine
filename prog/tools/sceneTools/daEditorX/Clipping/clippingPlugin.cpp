@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <stdio.h>
 
 #include "clippingPlugin.h"
@@ -42,9 +40,7 @@
 
 #include <io.h>
 
-#include <propPanel/control/container.h>
-#include <propPanel/commonWindow/dialogWindow.h>
-#include <propPanel/control/menu.h>
+#include <propPanel2/c_panel_base.h>
 #include <sepGui/wndPublic.h>
 #include <winGuiWrapper/wgw_dialogs.h>
 #include <winGuiWrapper/wgw_input.h>
@@ -181,7 +177,7 @@ void ClippingPlugin::unregistered()
 //==============================================================================
 bool ClippingPlugin::begin(int toolbar_id, unsigned menu_id)
 {
-  PropPanel::IMenu *mainMenu = DAGORED2->getMainMenu();
+  IMenu *mainMenu = DAGORED2->getWndManager()->getMainMenu();
 
   mainMenu->addItem(menu_id, CM_IMPORT, "Add collision from DAG...\tCtrl+O");
   mainMenu->addItem(menu_id, CM_VIEW_DAG_LIST, "View DAG list...");
@@ -193,11 +189,11 @@ bool ClippingPlugin::begin(int toolbar_id, unsigned menu_id)
   mainMenu->addItem(menu_id, CM_COMPILE_GAME_CLIPPING, "Compile collision for game (PC)...");
 
   toolBarId = toolbar_id;
-  PropPanel::ContainerPropertyControl *toolbar = DAGORED2->getCustomPanel(toolbar_id);
+  PropertyContainerControlBase *toolbar = DAGORED2->getCustomPanel(toolbar_id);
   G_ASSERT(toolbar);
 
   toolbar->setEventHandler(this);
-  PropPanel::ContainerPropertyControl *tool = toolbar->createToolbarPanel(CM_TOOL, "");
+  PropertyContainerControlBase *tool = toolbar->createToolbarPanel(CM_TOOL, "");
 
   tool->createButton(CM_IMPORT, "Add collision from DAG (Ctrl+O)");
   tool->setButtonPictures(CM_IMPORT, "import_dag");
@@ -240,16 +236,20 @@ bool ClippingPlugin::end()
 
 //==============================================================================
 
-void *ClippingPlugin::onWmCreateWindow(int type)
+IWndEmbeddedWindow *ClippingPlugin::onWmCreateWindow(void *handle, int type)
 {
   switch (type)
   {
     case PROPBAR_EDITOR_WTYPE:
     {
       if (panelClient->getPanelWindow())
-        return nullptr;
+        return NULL;
 
-      PropPanel::PanelWindowPropertyControl *_panel_window = IEditorCoreEngine::get()->createPropPanel(this, "Properties");
+      IWndManager *manager = IEditorCoreEngine::get()->getWndManager();
+      manager->setCaption(handle, "Properties");
+
+      CPanelWindow *_panel_window = IEditorCoreEngine::get()->createPropPanel(this, handle);
+
       if (_panel_window)
       {
         panelClient->setPanelWindow(_panel_window);
@@ -257,31 +257,31 @@ void *ClippingPlugin::onWmCreateWindow(int type)
         panelClient->setPanelParams();
       }
 
-      PropPanel::ContainerPropertyControl *toolBar = DAGORED2->getCustomPanel(toolBarId);
+      PropertyContainerControlBase *toolBar = DAGORED2->getCustomPanel(toolBarId);
       if (toolBar)
         toolBar->setBool(CM_COLLISION_SHOW_PROPS, panelClient->isVisible());
-      return _panel_window;
+      return panelClient->getPanelWindow();
     }
     break;
   }
 
-  return nullptr;
+  return NULL;
 }
 
 
-bool ClippingPlugin::onWmDestroyWindow(void *window)
+bool ClippingPlugin::onWmDestroyWindow(void *handle)
 {
-  if (window == panelClient->getPanelWindow())
+  if (panelClient->getPanelWindow() && panelClient->getPanelWindow()->getParentWindowHandle() == handle)
   {
     mainPanelState.reset();
     panelClient->getPanelWindow()->saveState(mainPanelState);
 
-    PropPanel::PanelWindowPropertyControl *_panel_window = panelClient->getPanelWindow();
+    CPanelWindow *_panel_window = panelClient->getPanelWindow();
     panelClient->setPanelWindow(NULL);
 
     IEditorCoreEngine::get()->deleteCustomPanel(_panel_window);
 
-    PropPanel::ContainerPropertyControl *toolBar = DAGORED2->getCustomPanel(toolBarId);
+    PropertyContainerControlBase *toolBar = DAGORED2->getCustomPanel(toolBarId);
     if (toolBar)
       toolBar->setBool(CM_COLLISION_SHOW_PROPS, panelClient->isVisible());
 
@@ -289,27 +289,6 @@ bool ClippingPlugin::onWmDestroyWindow(void *window)
   }
 
   return false;
-}
-
-void ClippingPlugin::updateImgui()
-{
-  if (DAGORED2->curPlugin() == this)
-  {
-    PropPanel::PanelWindowPropertyControl *panelWindow = panelClient ? panelClient->getPanelWindow() : nullptr;
-    if (panelWindow)
-    {
-      bool open = true;
-      DAEDITOR3.imguiBegin(*panelWindow, &open);
-      panelWindow->updateImgui();
-      DAEDITOR3.imguiEnd();
-
-      if (!open && panelClient)
-      {
-        panelClient->showPropPanel(false);
-        EDITORCORE->managePropPanels();
-      }
-    }
-  }
 }
 
 //==============================================================================
@@ -723,12 +702,11 @@ void ClippingPlugin::makeGameFrtPreviewCollision(bool force_remake)
 }
 
 
-void ClippingPlugin::onClick(int pcb_id, PropPanel::ContainerPropertyControl *panel) { onPluginMenuClickInternal(pcb_id, panel); }
-bool ClippingPlugin::onPluginMenuClick(unsigned id) { return onPluginMenuClickInternal(id, nullptr); }
+void ClippingPlugin::onClick(int pcb_id, PropPanel2 *panel) { onPluginMenuClick(pcb_id); }
 
 //==============================================================================
 
-bool ClippingPlugin::onPluginMenuClickInternal(unsigned id, PropPanel::ContainerPropertyControl *panel)
+bool ClippingPlugin::onPluginMenuClick(unsigned id)
 {
   switch (id)
   {
@@ -754,10 +732,10 @@ bool ClippingPlugin::onPluginMenuClickInternal(unsigned id, PropPanel::Container
 
     case CM_COMPILE_GAME_CLIPPING:
     {
-      PropPanel::DialogWindow *myDlg = DAGORED2->createDialog(_pxScaled(300), _pxScaled(560), "Compile game collision (PC)");
-      PropPanel::ContainerPropertyControl *myPanel = myDlg->getPanel();
+      CDialogWindow *myDlg = DAGORED2->createDialog(_pxScaled(300), _pxScaled(560), "Compile game collision (PC)");
+      PropertyContainerControlBase *myPanel = myDlg->getPanel();
       fillExportPanel(*myPanel);
-      if (myDlg->showDialog() == PropPanel::DIALOG_ID_OK)
+      if (myDlg->showDialog() == DIALOG_ID_OK)
         if (!compileGameClip(myPanel, _MAKE4C('PC')))
           wingw::message_box(wingw::MBS_EXCL, "Compilation failed", "Failed to compile game collision");
 
@@ -840,7 +818,7 @@ void ClippingPlugin::getClippingFiles(Tab<String> &files, unsigned target_code) 
 
 
 //==============================================================================
-bool ClippingPlugin::validateBuild(int target, ILogWriter &rep, PropPanel::ContainerPropertyControl *params)
+bool ClippingPlugin::validateBuild(int target, ILogWriter &rep, PropPanel2 *params)
 {
   switch (curPhysEngType)
   {
@@ -893,7 +871,7 @@ bool ClippingPlugin::validateBuild(int target, ILogWriter &rep, PropPanel::Conta
 }
 
 //==============================================================================
-bool ClippingPlugin::buildAndWrite(BinDumpSaveCB &cwr, const ITextureNumerator &tn, PropPanel::ContainerPropertyControl *)
+bool ClippingPlugin::buildAndWrite(BinDumpSaveCB &cwr, const ITextureNumerator &tn, PropPanel2 *)
 {
   Tab<String> files(tmpmem);
   getClippingFiles(files, cwr.getTarget());
@@ -943,7 +921,7 @@ bool ClippingPlugin::buildAndWrite(BinDumpSaveCB &cwr, const ITextureNumerator &
 
 
 //==============================================================================
-void ClippingPlugin::fillExportPanel(PropPanel::ContainerPropertyControl &params)
+void ClippingPlugin::fillExportPanel(PropPanel2 &params)
 {
   params.createStatic(-1, "Game collision members:");
 
@@ -1274,7 +1252,7 @@ static void addMeshCollision(IClippingDumpBuilder *rt, StaticGeometryNode &n, bo
     {
       //==fixme: name could be moved to application.blk
       if ((n.flags & StaticGeometryNode::FLG_RENDERABLE) && mi < n.mesh->mats.size() && n.mesh->mats[mi] &&
-          strstr(n.mesh->mats[mi]->className.str(), "land_mesh") && !strstr(n.mesh->mats[mi]->className.str(), "land_mesh_clipmap"))
+          strstr(n.mesh->mats[mi]->className.str(), "land_mesh"))
         used_mats.set(mi, 0); // this mesh was already added to landMesh/landRay, skip it here
       else
         used_mats.set(mi, 1);
@@ -1450,7 +1428,7 @@ bool ClippingPlugin::compileClipping(bool for_game, Tab<int> &plugs, int physeng
 
   if (!rt)
   {
-    DEBUG_CTX("Cannot create physeng collision dump builder: %d", physeng_type);
+    debug_ctx("Cannot create physeng collision dump builder: %d", physeng_type);
     return false;
   }
 
@@ -1743,9 +1721,8 @@ bool ClippingPlugin::compileEditClip()
   if (clipDag.size())
     ++lines;
 
-  eastl::unique_ptr<PropPanel::DialogWindow> myDlg(
-    DAGORED2->createDialog(_pxScaled(300), _pxScaled(70 + lines * 30), "Collision members"));
-  PropPanel::ContainerPropertyControl *myPanel = myDlg->getPanel();
+  CDialogWindow *myDlg = DAGORED2->createDialog(_pxScaled(300), _pxScaled(70 + lines * 30), "Collision members");
+  PropertyContainerControlBase *myPanel = myDlg->getPanel();
 
   int i;
   if (clipDag.size())
@@ -1762,7 +1739,7 @@ bool ClippingPlugin::compileEditClip()
 
   Tab<int> plugs(tmpmem);
 
-  if (myDlg->showDialog() != PropPanel::DIALOG_ID_OK)
+  if (myDlg->showDialog() != DIALOG_ID_OK)
     return false;
   else
   {
@@ -1839,7 +1816,7 @@ void ClippingPlugin::prepareDAGcollision()
 }
 
 //==============================================================================
-bool ClippingPlugin::compileGameClip(PropPanel::ContainerPropertyControl *panel, unsigned target_code)
+bool ClippingPlugin::compileGameClip(PropPanel2 *panel, unsigned target_code)
 {
   if (!panel)
     return false;

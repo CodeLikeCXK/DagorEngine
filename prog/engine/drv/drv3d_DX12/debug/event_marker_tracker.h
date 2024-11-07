@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <EASTL/string.h>
@@ -28,7 +27,6 @@ class Tracker
   };
   dag::Vector<EventPathEntry> pathTable;
   dag::Vector<eastl::string> fullpathTable;
-  eastl::string invalidPath{};
 
   struct EventPathEntryHasher
   {
@@ -86,15 +84,15 @@ public:
     return {nameTable.getName(lastMarker), name.length()};
   }
 
-  const eastl::string &currentEventPath() const
+  eastl::string_view currentEventPath() const
   {
     if (currentPath != INVALID_IDX)
     {
-      return fullpathTable[currentPath];
+      return {fullpathTable[currentPath].data(), fullpathTable[currentPath].length()};
     }
     else
     {
-      return invalidPath;
+      return {};
     }
   }
 
@@ -137,14 +135,11 @@ namespace null
 {
 class Tracker
 {
-private:
-  const eastl::string invalidPath{};
-
 public:
   eastl::string_view beginEvent(eastl::string_view name) { return name; }
   void endEvent() {}
   eastl::string_view marker(eastl::string_view name) { return name; }
-  const eastl::string &currentEventPath() const { return invalidPath; }
+  constexpr eastl::string_view currentEventPath() const { return {}; }
   constexpr eastl::string_view currentEvent() const { return {}; }
   constexpr eastl::string_view currentMarker() const { return {}; }
   constexpr bool isPersistent() const { return false; }

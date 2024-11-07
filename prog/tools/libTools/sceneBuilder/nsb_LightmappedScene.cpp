@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <sceneBuilder/nsb_LightmappedScene.h>
 #include <libTools/staticGeom/matFlags.h>
 #include <libTools/util/prepareBillboardMesh.h>

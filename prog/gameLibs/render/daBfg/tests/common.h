@@ -1,8 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <UnitTest++/UnitTestPP.h>
-#include <backend/resourceScheduling/packer.h>
+#include <resourceScheduling/packer.h>
 #include <math/random/dag_random.h>
 #include <debug/dag_assert.h>
 #include <dag/dag_vector.h>

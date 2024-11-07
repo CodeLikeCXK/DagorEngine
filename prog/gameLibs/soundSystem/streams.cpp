@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <stdio.h> // SNPRINTF
 #include <ioSys/dag_dataBlock.h>
 #include <generic/dag_tab.h>

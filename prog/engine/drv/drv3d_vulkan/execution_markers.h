@@ -1,6 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
-
 #include "driver.h"
 #include "buffer_resource.h"
 #include "util/fault_report.h"

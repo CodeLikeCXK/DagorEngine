@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "de_batch.h"
 
 #include <coolConsole/coolConsole.h>

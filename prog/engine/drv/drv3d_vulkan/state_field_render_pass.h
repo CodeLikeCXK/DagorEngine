@@ -1,13 +1,8 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// fields that define rende pass state
 #pragma once
-
-// fields that define render pass state
-
-#include <drv/3d/dag_decl.h>
-#include <drv/3d/dag_resource.h>
-#include <drv/3d/dag_renderPass.h>
-
+#include <3d/dag_drvDecl.h>
 #include "util/tracked_state.h"
+#include "driver.h"
 
 namespace drv3d_vulkan
 {
@@ -105,13 +100,6 @@ struct StateFieldRenderPassArea : TrackedStateFieldBase<true, false>, TrackedSta
            data.maxZ != v.maxZ;
   }
   const RenderPassArea &getValueRO() const { return data; }
-};
-
-// index of render pass inside frame
-struct StateFieldRenderPassIndex : TrackedStateFieldBase<true, false>, TrackedStateFieldGenericPOD<uint32_t>
-{
-  VULKAN_TRACKED_STATE_FIELD_CB_DEFENITIONS();
-  const uint32_t &getValueRO() const { return data; }
 };
 
 } // namespace drv3d_vulkan

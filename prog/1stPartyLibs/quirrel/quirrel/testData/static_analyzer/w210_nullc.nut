@@ -3,7 +3,7 @@ function bar(_a, _b, _c) {}
 
 let requestedCratesContent = {}
 
-function requestCratesContent(armyId, crates) {
+let function requestCratesContent(armyId, crates) {
     if ((armyId ?? "") == "")
       return
     let requested = foo()
@@ -16,7 +16,7 @@ function requestCratesContent(armyId, crates) {
       return
     toRequest.each(@(c) armyRequested[c] <- true)
     bar(armyId, toRequest, function(res) {
-      toRequest.each(function(c) { if (c in armyRequested) armyRequested.$rawdelete(c) })
+      toRequest.each(function(c) { if (c in armyRequested) delete armyRequested[c] })
       if ("content" in res)
         requestedCratesContent.mutate(@(cc) cc[armyId] <- (cc?[armyId] ?? {}).__merge(res.content))
     })

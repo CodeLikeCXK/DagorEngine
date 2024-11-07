@@ -34,8 +34,8 @@ namespace proto
         TAG_BLOCK_END = SPECIAL | (SPECIAL_BLOCK_END << TAG_BITS_COUNT),
       };
 
-      TNumber number = 0;
-      Type    type = Type::EMPTY;
+      TNumber number;
+      Type    type;
 
       bool isBlockEnded() const
       {

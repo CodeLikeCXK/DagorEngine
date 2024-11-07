@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -212,7 +213,7 @@ struct Capsule
     len = v_extract_x(v_sel(v_set_x(len), tb, hit));
     if (v_extract_xi(v_cast_vec4i(hit)) != 0)
     {
-      norm = v_safediv(nDir, v_sqrt(distSq));
+      norm = v_safediv(nDir, v_sqrt4(distSq));
       pos = v_madd(norm, vRad, pa);
       return true;
     }

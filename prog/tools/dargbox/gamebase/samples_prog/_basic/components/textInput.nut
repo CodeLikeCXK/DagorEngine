@@ -6,7 +6,7 @@ from "string" import regexp, split_by_chars
     - somehow provide result of validation - maybe more complex type of inputState, like Watched({text=text isValid=true}))
     - important to know about language and CapsLock. The easiest way - show last symbol in password for 0.25 seconds before hide it with *
 
-    - replace editor in enlisted with this component (it should be already suitable) // FIXME_BROKEN_DEP
+    - replace editor in enlisted with this component (it should be already suitable)
 */
 let rexInt = regexp(@"[\+\-]?[0-9]+")
 function isStringInt(str){
@@ -170,7 +170,7 @@ function textInput(text_state, options={}, frameCtor=defaultFrame) {
       animations = [failAnim(text_state)]
       margin = [0, sh(0.5)]
     }
-    placeholderObj = isObservable(placeholder)
+    placeholderObj = placeholder instanceof Watched
       ? @() phBase.__update({ watch = placeholder, text = placeholder.value })
       : phBase
   }

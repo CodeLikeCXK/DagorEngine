@@ -1,4 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright 2023 by Gaijin Games KFT, All rights reserved.
+#ifndef _DE2_PLUGIN_ROADS_SPLINEOBJECTS_H_
+#define _DE2_PLUGIN_ROADS_SPLINEOBJECTS_H_
 #pragma once
 
 #include <EditorCore/ec_rendEdObject.h>
@@ -14,11 +16,6 @@
 
 #include <EditorCore/ec_rect.h>
 
-namespace PropPanel
-{
-class ContainerPropertyControl;
-}
-
 class ObjLibMaterialListMgr;
 class DynRenderBuffer;
 class TMatrix4;
@@ -27,6 +24,8 @@ class Point4;
 class SplineObject;
 class LoftObject;
 class HmapLandObjectEditor;
+
+class PropertyContainerControlBase;
 
 class GeomObject;
 
@@ -88,12 +87,10 @@ public:
   virtual bool isSelectedByPointClick(IGenViewportWnd *vp, int x, int y) const;
   virtual bool getWorldBox(BBox3 &box) const;
 
-  virtual void fillProps(PropPanel::ContainerPropertyControl &op, DClassID for_class_id,
-    dag::ConstSpan<RenderableEditableObject *> objects);
-  virtual void onPPChange(int pid, bool edit_finished, PropPanel::ContainerPropertyControl &panel,
-    dag::ConstSpan<RenderableEditableObject *> objects);
-  virtual void onPPBtnPressed(int pid, PropPanel::ContainerPropertyControl &panel, dag::ConstSpan<RenderableEditableObject *> objects);
-  virtual void onPPClose(PropPanel::ContainerPropertyControl &panel, dag::ConstSpan<RenderableEditableObject *> objects);
+  virtual void fillProps(PropertyContainerControlBase &op, DClassID for_class_id, dag::ConstSpan<RenderableEditableObject *> objects);
+  virtual void onPPChange(int pid, bool edit_finished, PropPanel2 &panel, dag::ConstSpan<RenderableEditableObject *> objects);
+  virtual void onPPBtnPressed(int pid, PropPanel2 &panel, dag::ConstSpan<RenderableEditableObject *> objects);
+  virtual void onPPClose(PropertyContainerControlBase &panel, dag::ConstSpan<RenderableEditableObject *> objects);
 
   // restrict rotate/scale transformations to BASIS_Local/selCenter
 
@@ -238,7 +235,7 @@ protected:
   };
   int selObj, targetSelObj;
 
-  PropPanel::ContainerPropertyControl *ppanel_ptr;
+  PropertyContainerControlBase *ppanel_ptr;
 
   class UndoPropsChange : public UndoRedoObject
   {
@@ -261,3 +258,5 @@ protected:
   HmapLandObjectEditor &getObjEd() const { return *(HmapLandObjectEditor *)getObjEditor(); }
   static HmapLandObjectEditor &getObjEd(ObjectEditor *oe) { return *(HmapLandObjectEditor *)oe; }
 };
+
+#endif

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <ioSys/dag_dataBlock.h>
 #include <math/random/dag_random.h>
 #include <math/dag_color.h>

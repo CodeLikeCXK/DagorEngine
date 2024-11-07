@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include "av_tree.h"
@@ -7,11 +6,10 @@
 
 #include <sepGui/wndPublic.h>
 
-#include <propPanel/messageQueue.h>
-#include <propPanel/control/panelWindow.h>
+#include <propPanel2/comWnd/panel_window.h>
+#include <propPanel2/comWnd/tool_window.h>
 
 #include <EditorCore/ec_interface.h>
-#include <EditorCore/ec_interface_ex.h>
 #include <EditorCore/ec_genappwnd.h>
 
 #include <libTools/dagFileRW/textureNameResolver.h>
@@ -33,12 +31,6 @@ enum
 void init_all_editor_plugins();
 
 class ImpostorGenerator;
-
-namespace plod
-{
-class PointCloudGenerator;
-} // namespace plod
-
 struct ImpostorOptions;
 
 class CompositeEditor;
@@ -52,12 +44,10 @@ class AssetViewerApp : public GenericEditorAppWindow,
                        public IEditorCoreEngine,
                        public ITextureNameResolver,
                        public IDagorAssetChangeNotify,
-                       public PropPanel::ControlEventHandler,
-                       public PropPanel::ITreeViewEventHandler,
+                       public ControlEventHandler,
+                       public ITreeViewEventHandler,
                        public IConsoleCmd,
-                       public IWndManagerWindowHandler,
-                       public PropPanel::IDelayedCallbackHandler,
-                       public IMainWindowImguiRenderingService
+                       public IWndManagerWindowHandler
 {
 public:
   AssetViewerApp(IWndManager *manager, const char *open_fname = NULL);
@@ -66,7 +56,8 @@ public:
   static const char *build_version;
 
   inline void repaint();
-  inline PropPanel::ContainerPropertyControl *getPropPanel() const;
+  inline PropertyContainerControlBase *getPropPanel() const;
+  inline void *getAdditinalPropWindow() const;
 
   void fillPropPanel();
   void setScriptChangeFlag() { scriptChangeFlag = true; }
@@ -104,16 +95,17 @@ public:
 
   // UI management
   virtual IWndManager *getWndManager() const;
-  virtual PropPanel::ContainerPropertyControl *getCustomPanel(int id) const;
+  virtual PropPanel2 *getCustomPanel(int id) const;
+  virtual void *addToolbar(hdpi::Px height);
+  virtual CToolWindow *createToolbar(ControlEventHandler *eh, void *hwnd) { return NULL; }
   virtual void addPropPanel(int type, hdpi::Px width);
   virtual void removePropPanel(void *hwnd);
   virtual void managePropPanels() {}
   virtual void skipManagePropPanels(bool skip) {}
-  virtual PropPanel::PanelWindowPropertyControl *createPropPanel(PropPanel::ControlEventHandler *eh, const char *caption) override;
-  virtual PropPanel::IMenu *getMainMenu() override;
-  virtual void deleteCustomPanel(PropPanel::ContainerPropertyControl *panel) {}
-  virtual PropPanel::DialogWindow *createDialog(hdpi::Px w, hdpi::Px h, const char *title) override;
-  virtual void deleteDialog(PropPanel::DialogWindow *dlg) override;
+  virtual CPanelWindow *createPropPanel(ControlEventHandler *eh, void *hwnd) { return NULL; }
+  virtual void deleteCustomPanel(PropPanel2 *panel) {}
+  virtual CDialogWindow *createDialog(hdpi::Px w, hdpi::Px h, const char *caption) { return NULL; }
+  virtual void deleteDialog(CDialogWindow *dlg) {}
 
   // viewport methods
   virtual void updateViewports();
@@ -203,8 +195,8 @@ public:
   virtual void onAssetChanged(const DagorAsset &asset, int asset_name_id, int asset_type);
 
   // IWndManagerWindowHandler
-  virtual void *onWmCreateWindow(int type) override;
-  virtual bool onWmDestroyWindow(void *window) override;
+  virtual IWndEmbeddedWindow *onWmCreateWindow(void *handle, int type);
+  virtual bool onWmDestroyWindow(void *handle);
 
   // IConsoleCmd
   virtual bool onConsoleCommand(const char *cmd, dag::ConstSpan<const char *> params);
@@ -215,6 +207,11 @@ public:
   const DagorAssetMgr &getAssetMgr() const { return assetMgr; }
   bool trackChangesContinuous(int assets_to_check);
   void invalidateAssetIfChanged(DagorAsset &a);
+  virtual IWndManager &getWndManager()
+  {
+    G_ASSERT(mManager);
+    return *mManager;
+  }
 
   const DagorAsset *getCurAsset() const { return curAsset; }
   bool reloadAsset(const DagorAsset &asset, int asset_name_id, int asset_type);
@@ -223,12 +220,9 @@ public:
 
   CompositeEditor &getCompositeEditor() { return compositeEditor; }
   ImpostorGenerator *getImpostorGenerator() const { return impostorApp.get(); }
-  plod::PointCloudGenerator *getPointcloudGenerator() const { return pointCloudGen.get(); }
   bool canRenderEnvi() const { return !skipRenderEnvi; }
   bool isCompositeEditorShown() const;
   void showCompositeEditor(bool show);
-  void setShowMessageAt(int, int, const SimpleString &) {}
-  void showMessageAt() {}
 
 protected:
   virtual bool handleNewProject(bool edit = false) { return false; }
@@ -239,13 +233,11 @@ protected:
   virtual bool loadProject(const char *filename);
   virtual bool saveProject(const char *filename);
 
-  virtual void fillMenu(PropPanel::IMenu *menu) override;
-  virtual void updateMenu(PropPanel::IMenu *menu) override;
+  virtual void fillMenu(IMenu *menu);
+  virtual void updateMenu(IMenu *menu);
 
   virtual void getDocTitleText(String &text);
   virtual bool canCloseScene(const char *title);
-
-  void addAccelerators();
 
   int findPlugin(IGenEditorPlugin *p);
   void sortPlugins() {}
@@ -255,11 +247,11 @@ protected:
   void splitProjectFilename(const char *filename, String &path, String &name);
 
   // ControlEventHandler
-  virtual void onClick(int pcb_id, PropPanel::ContainerPropertyControl *panel);
+  virtual void onClick(int pcb_id, PropertyContainerControlBase *panel);
 
   // ITreeViewEventHandler
-  virtual void onTvSelectionChange(PropPanel::TreeBaseWindow &tree, PropPanel::TLeafHandle new_sel) override;
-  virtual bool onTvContextMenu(PropPanel::TreeBaseWindow &tree_base_window, PropPanel::ITreeInterface &tree) override;
+  virtual void onTvSelectionChange(TreeBaseWindow &tree, TLeafHandle new_sel);
+  virtual bool onTvContextMenu(TreeBaseWindow &tree, TLeafHandle under_mouse, IMenu &menu);
 
   // Menu
   int onMenuItemClick(unsigned id);
@@ -282,18 +274,18 @@ private:
 
   DagorAsset *curAsset;
   String curAssetPackName;
-  String curAssetPkgName;
 
   int allUpToDateFlags;
 
+  void *hwndTree, *hwndPPanel, *hwndToolbar, *hwndViewPort;
+  void *hwndPluginPanel, *hwndPluginToolbar;
   AvTree *mTreeView;
   DataBlock propPanelState;
-  PropPanel::PanelWindowPropertyControl *mPropPanel;
-  PropPanel::ContainerPropertyControl *mToolPanel;
-  PropPanel::ContainerPropertyControl *mPluginTool;
+  CPanelWindow *mPropPanel;
+  CToolWindow *mToolPanel;
+  CToolWindow *mPluginTool;
 
   eastl::unique_ptr<ImpostorGenerator> impostorApp;
-  eastl::unique_ptr<plod::PointCloudGenerator> pointCloudGen;
   eastl::unique_ptr<ColorDialogAppMat> colorPaletteDlg;
   CompositeEditor compositeEditor;
 
@@ -306,7 +298,6 @@ private:
   bool discardAssetTexMode;
   bool skipRenderObjects = false;
   bool skipRenderEnvi = false;
-  bool skipSetViewProj = false;
 
   AssetLightData assetLtData, assetDefaultLtData;
 
@@ -317,6 +308,7 @@ private:
   void blockModifyRoutine(bool block);
 
   void showPropWindow(bool is_show);
+  void showAdditinalPropWindow(bool is_show);
   void showAdditinalToolWindow(bool is_show);
 
   bool runShadersListVars(dag::ConstSpan<const char *> params);
@@ -326,27 +318,8 @@ private:
   void generate_impostors(const ImpostorOptions &options);
   void clear_impostors(const ImpostorOptions &options);
 
-  void generate_point_cloud(DagorAsset *asset);
-
   void createAssetsTree();
   void createToolbar();
-
-  void renderUIViewportSplitter(const Point2 &regionAvailable, float leftWidth, float rightWidth, float topHeight, float bottomHeight,
-    float itemSpacing);
-  void renderUIViewports(bool vr_mode);
-  void renderUI();
-
-  // IMainWindowImguiRenderingService
-  virtual void beforeUpdateImgui() override;
-  virtual void updateImgui() override;
-
-  // PropPanel::IDelayedCallbackHandler
-  virtual void onImguiDelayedCallback(void *user_data) override;
-
-  Point2 viewportSplitRatio = Point2(0.5f, 0.5f);
-  bool dockPositionsInitialized = false;
-  bool imguiDebugWindowsVisible = false;
-  String assetToInitiallySelect;
 };
 
 
@@ -365,4 +338,7 @@ inline void AssetViewerApp::repaint()
 
 
 //=============================================================================
-inline PropPanel::ContainerPropertyControl *AssetViewerApp::getPropPanel() const { return mPropPanel; }
+inline PropertyContainerControlBase *AssetViewerApp::getPropPanel() const { return mPropPanel; }
+
+
+inline void *AssetViewerApp::getAdditinalPropWindow() const { return hwndPluginPanel; }

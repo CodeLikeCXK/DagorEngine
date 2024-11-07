@@ -1,2 +1,0 @@
-gamePulls += daNetGameLibs_verify_ecs_DAS_pull_AOT ;
-UseProgLibs += daNetGameLibs/verify_ecs ;

@@ -1,7 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <libTools/dagFileRW/sceneImpIface.h>
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
 #include <math/dag_mesh.h>
 #include <libTools/dagFileRW/dagFileFormat.h>
 #include <libTools/dagFileRW/splineShape.h>
@@ -41,14 +39,14 @@ public:
   inline bool seekrelSafe(int ofs)
   {
     DAGOR_TRY { seekrel(ofs); }
-    DAGOR_CATCH(const IGenLoad::LoadException &e) { return false; }
+    DAGOR_CATCH(IGenLoad::LoadException e) { return false; }
 
     return true;
   }
   inline bool seektoSafe(int ofs)
   {
     DAGOR_TRY { seekto(ofs); }
-    DAGOR_CATCH(const IGenLoad::LoadException &e) { return false; }
+    DAGOR_CATCH(IGenLoad::LoadException e) { return false; }
 
     return true;
   }
@@ -57,7 +55,7 @@ public:
   {
     int tag = -1;
     DAGOR_TRY { tag = beginTaggedBlock(); }
-    DAGOR_CATCH(const IGenLoad::LoadException &e) { return -1; }
+    DAGOR_CATCH(IGenLoad::LoadException e) { return -1; }
     blkTag.push_back(tag);
     return getBlockLength() - 4;
   }
@@ -65,7 +63,7 @@ public:
   {
     int tag = -1;
     DAGOR_TRY { endBlock(); }
-    DAGOR_CATCH(const IGenLoad::LoadException &e) { return false; }
+    DAGOR_CATCH(IGenLoad::LoadException e) { return false; }
     blkTag.pop_back();
     return true;
   }

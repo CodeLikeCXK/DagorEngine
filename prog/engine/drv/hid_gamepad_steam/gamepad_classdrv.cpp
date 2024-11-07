@@ -1,8 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "gamepad_classdrv.h"
 #include "gamepad_device.h"
-#include <drv/hid/dag_hiGlobals.h>
+#include <humanInput/dag_hiGlobals.h>
 #include <supp/_platform.h>
 #include <debug/dag_debug.h>
 #include <util/dag_watchdog.h>
@@ -66,7 +64,7 @@ void HumanInput::SteamGamepadClassDriver::refreshDeviceList()
 
   enable(false);
 
-  DEBUG_CTX("SteamGamepadClassDriver::refreshDeviceList");
+  debug_ctx("SteamGamepadClassDriver::refreshDeviceList");
 
   deviceStateMask = 0;
   for (i = 0; i < GAMEPAD_MAX; i++)
@@ -80,7 +78,7 @@ void HumanInput::SteamGamepadClassDriver::refreshDeviceList()
     deviceStateMask |= 1;
   }
 
-  DEBUG_CTX("deviceNum=%d", deviceNum);
+  debug_ctx("deviceNum=%d", deviceNum);
 
   if (secDrv)
   {

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "sh_stat.h"
 #include <util/dag_string.h>
 #include "shLog.h"
@@ -31,7 +29,7 @@ void ShaderCompilerStat::printReport(const char *dir)
       "HLSL compilation: %d total;   %d reused cached;   cache hit ratio=%.3f;"
       "   equ. result count=%d;   external cache hit count: %d;   unique compilations: %i",
       hlslCompileCount, hlslCacheHitCount, (float)hlslCacheHitCount / (float)hlslCompileCount, hlslEqResultCount,
-      hlslExternalCacheHitCount.load(), getUniqueCompilationCount());
+      hlslExternalCacheHitCount.load(), hlslCompileCount - hlslCacheHitCount - hlslExternalCacheHitCount.load());
 
 
   unsigned fshSize, fshCount, vprSize, vprCount, stcodeSize;

@@ -1,10 +1,8 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include "shsyn.h"
 #include <generic/dag_tab.h>
-#include <drv/3d/dag_sampler.h>
-#include <ska_hash_map/flat_hash_map2.hpp>
+#include <3d/dag_sampler.h>
 
 namespace ShaderTerminal
 {
@@ -16,7 +14,6 @@ class Sampler
   ShaderTerminal::sampler_decl *mSamplerDecl = nullptr;
 
   Sampler(ShaderTerminal::sampler_decl &smp_decl, ShaderTerminal::ShaderSyntaxParser &parser);
-  friend class SamplerTable;
 
 public:
   Sampler() = default;
@@ -30,21 +27,10 @@ public:
 
   Sampler &operator=(const Sampler &) = default;
   Sampler(const Sampler &) = default;
+
+  static void add(ShaderTerminal::sampler_decl &smp_decl, ShaderTerminal::ShaderSyntaxParser &parser);
+  static void link(const Tab<Sampler> &samplers, Tab<int> &smp_link_table);
+  static const Sampler *get(const char *name);
 };
 
-class SamplerTable
-{
-  Tab<Sampler> mSamplers;
-  ska::flat_hash_map<eastl::string, int> mSamplerIds;
-
-public:
-  SamplerTable() = default;
-  SamplerTable(Tab<Sampler> &&a_samplers) : mSamplers(eastl::move(a_samplers)) {}
-
-  void add(ShaderTerminal::sampler_decl &smp_decl, ShaderTerminal::ShaderSyntaxParser &parser);
-  void link(const Tab<Sampler> &new_samplers, Tab<int> &smp_link_table);
-  Sampler *get(const char *name);
-  Tab<Sampler> releaseSamplers();
-};
-
-extern SamplerTable g_sampler_table;
+extern Tab<Sampler> g_samplers;

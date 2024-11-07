@@ -43,7 +43,6 @@ public:
 	dtQueryFilter();
 	
 #ifdef DT_VIRTUAL_QUERYFILTER
-	dtQueryFilter(const dtQueryFilter&) = default;
 	virtual ~dtQueryFilter() { }
 #endif
 	

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <osApiWrappers/basePath.h>
 
 const char *df_base_path[DF_MAX_BASE_PATH_NUM] = {0};

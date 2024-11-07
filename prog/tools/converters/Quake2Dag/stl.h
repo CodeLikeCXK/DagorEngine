@@ -1,5 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-#pragma once
+#ifndef STL_H
+
+#define STL_H
 
 // ############################################################################
 // ##                                                                        ##
@@ -48,3 +49,6 @@ typedef std::vector<char> CharVector;
 typedef std::vector<short> ShortVector;
 typedef std::vector<unsigned short> UShortVector;
 typedef std::queue<int> IntQueue;
+
+
+#endif

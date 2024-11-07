@@ -1,7 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
-
-#include <drv/hid/dag_hiVrInput.h>
+#include <humanInput/dag_hiVrInput.h>
 
 
 class VrEmulatorInputHandler : public HumanInput::VrInput

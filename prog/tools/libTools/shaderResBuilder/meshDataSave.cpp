@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <libTools/shaderResBuilder/shaderMeshData.h>
 #include <libTools/util/makeBindump.h>
 #include <shaders/dag_shaders.h>

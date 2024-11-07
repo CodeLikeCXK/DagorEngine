@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <EASTL/string.h>
@@ -21,6 +20,5 @@ struct ImpostorOptions
   bool clean = false;
   bool dryMode = false;
   bool skipGen = false;
-  bool forceRebake = false;
   FolderBlkGenMode folderBlkGenMode = FolderBlkGenMode::REPLACE;
 };

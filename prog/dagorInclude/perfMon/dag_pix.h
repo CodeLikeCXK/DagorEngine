@@ -1,20 +1,25 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
-#include <cstdint>
-
 #if _TARGET_XBOX && DAGOR_DBGLEVEL != 0
 
-void PIX_BEGIN_CPU_EVENT(const char *name);
-void PIX_END_CPU_EVENT();
+#ifndef USE_PIX
+#define USE_PIX 1
+#endif
+
+#include <windows.h>
+#include <pix.h>
+#define PIX_BEGIN_CPU_EVENT(name) PIXBeginEvent(0, name)
+#define PIX_END_CPU_EVENT()       PIXEndEvent();
 
 #else
 
-static inline void PIX_BEGIN_CPU_EVENT(const char *) {}
-static inline void PIX_END_CPU_EVENT() {}
+#define PIX_BEGIN_CPU_EVENT(name)
+#define PIX_END_CPU_EVENT()
 
 #endif
 
@@ -75,21 +80,23 @@ typedef enum D3D11X_PIX_CAPTURE_FLAGS
 // ...
 // PIX_GPU_END_CAPTURE()
 
-#include <drv/3d/dag_commands.h>
-#include <util/dag_preprocessor.h>
+#define PIX_GPU_CAT1(a, b) a##b
+#define PIX_GPU_CAT2(a, b) STATE_GUARD_CAT1(a, b)
+
+#include <3d/dag_drv3dCmd.h>
 
 #define PIX_GPU_BEGIN_CAPTURE(flags, output_filename)                                                  \
-  d3d::driver_command(Drv3dCommand::PIX_GPU_BEGIN_CAPTURE, reinterpret_cast<void *>(uintptr_t(flags)), \
-    const_cast<wchar_t *>(output_filename));
+  d3d::driver_command(DRV3D_COMMAND_PIX_GPU_BEGIN_CAPTURE, reinterpret_cast<void *>(uintptr_t(flags)), \
+    const_cast<wchar_t *>(output_filename), NULL);
 
-#define PIX_GPU_END_CAPTURE() d3d::driver_command(Drv3dCommand::PIX_GPU_END_CAPTURE);
+#define PIX_GPU_END_CAPTURE() d3d::driver_command(DRV3D_COMMAND_PIX_GPU_END_CAPTURE, NULL, NULL, NULL);
 
 #define PIX_GPU_CAPTURE_NEXT_FRAME(flags, output_filename)                                                   \
-  d3d::driver_command(Drv3dCommand::PIX_GPU_CAPTURE_NEXT_FRAMES, reinterpret_cast<void *>(uintptr_t(flags)), \
+  d3d::driver_command(DRV3D_COMMAND_PIX_GPU_CAPTURE_NEXT_FRAMES, reinterpret_cast<void *>(uintptr_t(flags)), \
     const_cast<wchar_t *>(output_filename), reinterpret_cast<void *>(uintptr_t(1)));
 
 #define PIX_GPU_CAPTURE_NEXT_FRAMES(flags, output_filename, frame_count)                                     \
-  d3d::driver_command(Drv3dCommand::PIX_GPU_CAPTURE_NEXT_FRAMES, reinterpret_cast<void *>(uintptr_t(flags)), \
+  d3d::driver_command(DRV3D_COMMAND_PIX_GPU_CAPTURE_NEXT_FRAMES, reinterpret_cast<void *>(uintptr_t(flags)), \
     const_cast<wchar_t *>(output_filename), reinterpret_cast<void *>(uintptr_t(frame_count)));
 
 #define PIX_GPU_CAPTURE_NCALLS_IMPL(N, CounterName, flags, output_filename) \
@@ -100,10 +107,10 @@ typedef enum D3D11X_PIX_CAPTURE_FLAGS
   PIX_GPU_END_CAPTURE()
 
 #define PIX_GPU_CAPTURE_NCALLS(N, flags, output_filename) \
-  PIX_GPU_CAPTURE_NCALLS_IMPL(N, DAG_CONCAT(calls_counter, __LINE__), flags, output_filename);
+  PIX_GPU_CAPTURE_NCALLS_IMPL(N, PIX_GPU_CAT2(calls_counter, __LINE__), flags, output_filename);
 
 #define PIX_GPU_CAPTURE_SCOPE(flags, output_filename, enabled) \
-  PixGpuCaptureScope DAG_CONCAT(captureScope, __LINE__)(flags, output_filename, enabled);
+  PixGpuCaptureScope PIX_GPU_CAT2(captureScope, __LINE__)(flags, output_filename, enabled);
 
 struct CaptureAfterLongFrameParams
 {
@@ -127,5 +134,3 @@ struct PixGpuCaptureScope
       PIX_GPU_END_CAPTURE();
   }
 };
-
-#undef THIS // Workaround for Xbox not compiling when this is included in worldRenderer.cpp

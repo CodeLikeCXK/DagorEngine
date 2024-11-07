@@ -1,11 +1,8 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <shaders/dag_shaders.h>
 #include <EASTL/unique_ptr.h>
 #include <render/screenDroplets.h>
-#include <drv/3d/dag_renderTarget.h>
-#include <drv/3d/dag_tex3d.h>
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_tex3d.h>
+#include <3d/dag_drv3d_multi.h>
 #include <perfMon/dag_statDrv.h>
 #include <math/integer/dag_IPoint2.h>
 #include <3d/dag_resourcePool.h>
@@ -15,9 +12,7 @@
   VAR(screen_droplets_setup)     \
   VAR(screen_droplets_intensity) \
   VAR(screen_droplets_has_leaks) \
-  VAR(screen_droplets_grid_x)    \
-  VAR(frame_tex)                 \
-  VAR(frame_tex_samplerstate)
+  VAR(frame_tex)
 
 #define VAR(a) static int a##VarId = -1;
 SCREEN_DROPLETS_VARS
@@ -38,7 +33,6 @@ CONSOLE_FLOAT_VAL_MINMAX("screenDroplets", rainConeMax, 0, -1, 1);
 CONSOLE_FLOAT_VAL_MINMAX("screenDroplets", rainConeOff, 1, -1, 1);
 CONSOLE_BOOL_VAL("screenDroplets", intensityDirectControl, false);
 CONSOLE_FLOAT_VAL_MINMAX("screenDroplets", intensityChangeRate, 1.0 / 6, 0, 10);
-CONSOLE_FLOAT_VAL_MINMAX("screenDroplets", gridX, 5.4, 0.1, 10);
 
 void init_screen_droplets_params(bool has_leaks, float rain_cone_max, float rain_cone_off)
 {
@@ -70,9 +64,6 @@ ScreenDroplets::ScreenDroplets(int w, int h, uint32_t rtFmt)
   mipRenderer.init();
 
   rtTemp = RTargetPool::get(w, h, rtFmt | TEXCF_RTARGET, 2);
-  d3d::SamplerInfo smpInfo;
-  smpInfo.address_mode_u = smpInfo.address_mode_v = smpInfo.address_mode_w = d3d::AddressMode::Clamp;
-  clampSampler = d3d::request_sampler(smpInfo);
 }
 
 
@@ -84,9 +75,6 @@ ScreenDroplets::ScreenDroplets(int w, int h)
 #undef VAR
   mipRenderer.init();
   resolution = IPoint2(w, h);
-  d3d::SamplerInfo smpInfo;
-  smpInfo.address_mode_u = smpInfo.address_mode_v = smpInfo.address_mode_w = d3d::AddressMode::Clamp;
-  clampSampler = d3d::request_sampler(smpInfo);
 }
 
 ScreenDroplets::~ScreenDroplets() { abortDrops(); }
@@ -154,7 +142,6 @@ void ScreenDroplets::updateShaderState() const
   ShaderGlobal::set_color4(screen_droplets_setupVarId, rainStarted, rainEnded, intensity * rainForce, fadeout);
   ShaderGlobal::set_real(screen_droplets_intensityVarId, max(EPS, intensity));
   ShaderGlobal::set_int(screen_droplets_has_leaksVarId, hasLeaks);
-  ShaderGlobal::set_real(screen_droplets_grid_xVarId, gridX);
 }
 
 void ScreenDroplets::update(bool is_underwater, const TMatrix &itm, float dt)
@@ -256,11 +243,9 @@ RTarget::CPtr ScreenDroplets::render(TEXTUREID frame_tex)
   // TODO This is using full resolution current frame.
   // Wanted to use downsampled previous frame, but that doesn't contain transparent objects.
   ShaderGlobal::set_texture(frame_texVarId, frame_tex);
-  ShaderGlobal::set_sampler(frame_tex_samplerstateVarId, clampSampler);
 
   RTarget::Ptr rTargetTemp = rtTemp->acquire();
   render(rTargetTemp->getTex2D());
-  ShaderGlobal::set_sampler(frame_tex_samplerstateVarId, d3d::INVALID_SAMPLER_HANDLE);
 
   return rTargetTemp;
 }
@@ -270,14 +255,12 @@ void ScreenDroplets::render(ManagedTexView rtarget, TEXTUREID frame_tex)
   if (!isVisible())
     return;
   ShaderGlobal::set_texture(frame_texVarId, frame_tex);
-  ShaderGlobal::set_sampler(frame_tex_samplerstateVarId, clampSampler);
   render(rtarget.getTex2D());
-  ShaderGlobal::set_sampler(frame_tex_samplerstateVarId, d3d::INVALID_SAMPLER_HANDLE);
 }
 
 void ScreenDroplets::render(BaseTexture *rtarget)
 {
-  rtarget->texfilter(TEXFILTER_LINEAR);
+  rtarget->texfilter(TEXFILTER_SMOOTH);
   rtarget->texaddr(TEXADDR_CLAMP);
   TIME_D3D_PROFILE(screen_droplets);
   {
@@ -297,5 +280,4 @@ void ScreenDroplets::setConvars(const ConvarParams &convar_params)
   rainConeOff.set(convar_params.rainConeOff);
   intensityDirectControl.set(convar_params.intensityDirectControl);
   intensityChangeRate.set(convar_params.intensityChangeRate);
-  gridX.set(convar_params.gridX);
 }

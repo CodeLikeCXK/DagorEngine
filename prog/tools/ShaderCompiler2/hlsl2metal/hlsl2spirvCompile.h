@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <string_view>
@@ -20,5 +19,5 @@ struct Hlsl2SpirvResult
 };
 
 
-Hlsl2SpirvResult hlsl2spirv(const char *source, const char *profile, const char *entry, bool enable_fp16, bool skip_validation,
+Hlsl2SpirvResult hlsl2spirv(const char *source, const char *profile, const char *entry, bool skip_validation,
   CompileResult &compile_result);

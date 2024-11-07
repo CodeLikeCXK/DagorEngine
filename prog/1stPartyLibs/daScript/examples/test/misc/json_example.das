@@ -45,7 +45,7 @@ def test_reader
 [export]
 def test
     test_reader()
-    for jidx in range(1,9)
+    for jidx in range(1,8)
         let fname = "D:/Work/daScript/examples/test/json/{jidx}.json"
         // let fname = "/Users/borisbatkin/Work/yzg/examples/test/json/{jidx}.json"
         fopen(fname, "rb") <| $ ( f )
@@ -68,11 +68,11 @@ def test
                     print("before collect  {int(heap_bytes_allocated())} {int(string_heap_bytes_allocated())}\n")
                     heap_report()
                     unsafe
-                        heap_collect(true)
+                        string_heap_collect()
                     print("after collect {int(heap_bytes_allocated())} {int(string_heap_bytes_allocated())}\n")
     print("allocated {int(heap_bytes_allocated())} {int(string_heap_bytes_allocated())}\n")
     unsafe
-        heap_collect(true)
+        string_heap_collect()
     print("after collect {int(heap_bytes_allocated())} {int(string_heap_bytes_allocated())}\n")
     return true
 

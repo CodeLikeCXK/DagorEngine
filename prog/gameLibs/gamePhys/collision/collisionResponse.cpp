@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <math/dag_Point3.h>
 #include <math/dag_Quat.h>
 #include <math/dag_mathUtils.h>

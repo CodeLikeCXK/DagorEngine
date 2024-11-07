@@ -1,6 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
-#include <drv/3d/dag_tex3d.h>
+#include <3d/dag_tex3d.h>
 #include <util/dag_texMetaData.h>
 #include <3d/dag_texMgr.h>
 

@@ -1,4 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright 2023 by Gaijin Games KFT, All rights reserved.
+#ifndef _GAIJIN_ANIM_PDL_MGR_H
+#define _GAIJIN_ANIM_PDL_MGR_H
 #pragma once
 
 #include "animBranches.h"
@@ -13,3 +15,5 @@ inline GenericAnimStatesGraph *cloneGraph(GenericAnimStatesGraph *g, IPureAnimSt
 }
 inline void destroyGraph(GenericAnimStatesGraph *&g) { destroy_it(g); }
 } // namespace AnimV20
+
+#endif

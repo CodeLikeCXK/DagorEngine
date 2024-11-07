@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -106,6 +107,14 @@ struct DestroyDeleter
     (((x) >> 16) & 0xFF) ? char((((x) >> 16) & 0xFF)) : ' ', (((x) >> 24) & 0xFF) ? char((((x) >> 24) & 0xFF)) : ' '
 #endif
 
+
+#ifndef UNALIGNED
+#if defined(__SNC__)
+#define UNALIGNED __unaligned
+#else
+#define UNALIGNED
+#endif
+#endif
 
 #define SNPRINTF(buf, buf_size, ...)                                \
   do                                                                \

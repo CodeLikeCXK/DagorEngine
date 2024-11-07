@@ -1,4 +1,5 @@
-from "%darg/ui_imports.nut" import *
+from "daRg" import *
+from "frp" import *
 
 let {addModalWindow, removeModalWindow} = require("modalWindows.nut")
 

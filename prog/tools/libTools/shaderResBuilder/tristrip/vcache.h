@@ -1,5 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-#pragma once
+
+#ifndef VERTEX_CACHE_H
+
+#define VERTEX_CACHE_H
 
 #include "tristrip.h"
 
@@ -75,3 +77,5 @@ private:
 };
 
 }; // namespace TriStripifier
+
+#endif

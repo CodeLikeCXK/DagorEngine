@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "kineticTouch.h"
 #include <perfMon/dag_cpuFreq.h>
 #include <gui/dag_stdGuiRender.h>

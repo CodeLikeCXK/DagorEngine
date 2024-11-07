@@ -7,28 +7,28 @@
 
 namespace das {
 
-char * GetSaveFileDlg ( const char * initialFileName , const char * initialPath, const char * filter, Context * ctx, das::LineInfoArg * at ) {
+char * GetSaveFileDlg ( const char * initialFileName , const char * initialPath, const char * filter, Context * ctx ) {
     auto sf = GetSaveFileFromUser(
         initialFileName ? initialFileName : "",
         initialPath ? initialPath : "",
         filter ? filter : ""
     );
-    return ctx->allocateString(sf, at);
+    return ctx->stringHeap->allocateString(sf);
 }
 
-char * GetOpenFileDlg ( const char * initialPath, const char * filter, Context * ctx, das::LineInfoArg * at ) {
+char * GetOpenFileDlg ( const char * initialPath, const char * filter, Context * ctx ) {
     auto sf = GetOpenFileFromUser(
         initialPath ? initialPath : "",
         filter ? filter : ""
     );
-    return ctx->allocateString(sf, at);
+    return ctx->stringHeap->allocateString(sf);
 }
 
-char * GetOpenFolderDlg ( const char * initialPath, Context * ctx, das::LineInfoArg * at ) {
+char * GetOpenFolderDlg ( const char * initialPath, Context * ctx ) {
     auto sf = GetOpenFolderFromUser(
         initialPath ? initialPath : ""
     );
-    return ctx->allocateString(sf, at);
+    return ctx->stringHeap->allocateString(sf);
 }
 
 class Module_StdDlg : public Module {

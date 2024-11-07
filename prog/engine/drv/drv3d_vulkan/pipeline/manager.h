@@ -1,12 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
-
 #include <generic/dag_tab.h>
 #include <generic/dag_staticTab.h>
 #include <EASTL/type_traits.h>
-#include <ska_hash_map/flat_hash_map2.hpp>
-#include <drv/3d/rayTrace/dag_drvRayTrace.h> // for D3D_HAS_RAY_TRACING
-
 #include "descriptor_set.h"
 #include "render_pass.h"
 #include "pipeline/base_pipeline.h"
@@ -147,21 +142,9 @@ class PipelineManager
 
 #undef PIPE_STORAGE_ENTRY
 
-  using HashedSeenGraphicsPipesMap =
-    ska::flat_hash_map<VariatedGraphicsPipeline::CreationInfo::Hash, GraphicsPipelineShaderSet<spirv::HashValue>>;
-  HashedSeenGraphicsPipesMap seenGraphicsPipes;
-
-  void trackGrPipelineSeenStatus(VariatedGraphicsPipeline::CreationInfo &ci);
+  bool asyncCompileAllowed = false;
 
 public:
-  enum AsyncMask
-  {
-    ASYNC_MASK_NONE = 0,
-    ASYNC_MASK_RENDER = 1,
-    ASYNC_MASK_COMPUTE = 2,
-    ASYNC_MASK_ALL = 3
-  };
-
   template <typename PipelineType>
   PipelineType &get(ProgramID id)
   {
@@ -227,14 +210,8 @@ public:
 #endif
   void unloadAll(VulkanDevice &device);
   void prepareRemoval(ProgramID program);
-  void setAsyncCompile(AsyncMask allowed) { asyncCompileAllowed = allowed; }
-  bool asyncCompileEnabledGR() { return (asyncCompileAllowed & ASYNC_MASK_RENDER) > 0; }
-  bool asyncCompileEnabledCS() { return (asyncCompileAllowed & ASYNC_MASK_COMPUTE) > 0; }
-
-  static VulkanShaderModuleHandle makeVkModule(const ShaderModuleBlob *module);
-
-private:
-  AsyncMask asyncCompileAllowed = ASYNC_MASK_NONE;
+  void setAsyncCompile(bool allowed) { asyncCompileAllowed = allowed; }
+  bool asyncCompileEnabled() { return asyncCompileAllowed; }
 };
 
 } // namespace drv3d_vulkan

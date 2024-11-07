@@ -1,13 +1,14 @@
 //
 // Dagor Tech 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
 #include <generic/dag_tab.h>
 #include <util/dag_simpleString.h>
 #include <util/dag_string.h>
-#include <propPanel/c_control_event_handler.h>
+#include <propPanel2/c_control_event_handler.h>
 #include <winGuiWrapper/wgw_file_update.h>
 
 #include "spw_interface.h"
@@ -25,10 +26,10 @@ enum
 };
 
 
-class CSQPanelWrapper : public PropPanel::ControlEventHandler, public FileUpdateCallback
+class CSQPanelWrapper : public ControlEventHandler, public FileUpdateCallback
 {
 public:
-  CSQPanelWrapper(PropPanel::ContainerPropertyControl *panel);
+  CSQPanelWrapper(PropPanel2 *panel);
   virtual ~CSQPanelWrapper();
 
   bool bindScript(const char script[]);
@@ -57,10 +58,10 @@ protected:
   void init();
 
   // ControlEventHandler
-  virtual long onChanging(int pcb_id, PropPanel::ContainerPropertyControl *panel);
-  virtual void onChange(int pcb_id, PropPanel::ContainerPropertyControl *panel);
-  virtual void onClick(int pcb_id, PropPanel::ContainerPropertyControl *panel);
-  virtual void onPostEvent(int pcb_id, PropPanel::ContainerPropertyControl *panel);
+  virtual long onChanging(int pcb_id, PropPanel2 *panel);
+  virtual void onChange(int pcb_id, PropPanel2 *panel);
+  virtual void onClick(int pcb_id, PropPanel2 *panel);
+  virtual void onPostEvent(int pcb_id, PropPanel2 *panel);
 
   // FileUpdateCallback
   virtual void UpdateFile();
@@ -68,7 +69,7 @@ protected:
   SquirrelVMSys *createCleanVM();
 
 private:
-  PropPanel::ContainerPropertyControl *mPanel;
+  PropPanel2 *mPanel;
   SimpleString mScriptFilename;
   DataBlock *mDataBlock;
   ScriptPanelContainer *mPanelContainer;

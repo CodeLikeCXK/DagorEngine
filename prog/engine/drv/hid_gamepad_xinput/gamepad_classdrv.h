@@ -1,7 +1,9 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright 2023 by Gaijin Games KFT, All rights reserved.
+#ifndef _GAIJIN_DRV_HID_GAMEPAD_XBOX_GAMEPAD_CLASSDRV_H
+#define _GAIJIN_DRV_HID_GAMEPAD_XBOX_GAMEPAD_CLASSDRV_H
 #pragma once
 
-#include <drv/hid/dag_hiJoystick.h>
+#include <humanInput/dag_hiJoystick.h>
 #include <perfMon/dag_cpuFreq.h>
 #include <osApiWrappers/dag_wndProcComponent.h>
 #include <EASTL/unique_ptr.h>
@@ -109,3 +111,5 @@ protected:
   void updateXboxGamepads();
 };
 } // namespace HumanInput
+
+#endif

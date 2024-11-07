@@ -1,7 +1,6 @@
 from "%sqstd/ecs.nut" import *
+from "state.nut" import selectedEntity, selectedEntities, selectedEntitiesSetKeyVal, selectedEntitiesDeleteKey, selectedCompName
 from "%darg/ui_imports.nut" import *
-
-let { selectedEntity, selectedEntities, selectedEntitiesSetKeyVal, selectedEntitiesDeleteKey, selectedCompName} = require("state.nut")
 
 // DO NOT add extra components here as this code is not game specific.
 // if you want extra entity info, use DAS game specific code instead

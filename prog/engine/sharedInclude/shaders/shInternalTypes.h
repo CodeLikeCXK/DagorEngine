@@ -1,4 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright 2023 by Gaijin Games KFT, All rights reserved.
+#ifndef _GAIJIN_SHADERS_SHINTERNALTYPES_H
+#define _GAIJIN_SHADERS_SHINTERNALTYPES_H
 #pragma once
 
 #include <generic/dag_patchTab.h>
@@ -74,3 +76,5 @@ struct Buf
   }
 };
 } // namespace shaders_internal
+
+#endif

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -36,8 +34,7 @@ static bool rename_internal(const char *src, const char *dst)
   int sleepMs = 13;
   do
   {
-    if (MoveFileExW(utf8_to_wcs(src, wsrc, countof(wsrc)), utf8_to_wcs(dst, wdst, countof(wdst)),
-          MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED))
+    if (MoveFileExW(utf8_to_wcs(src, wsrc, countof(wsrc)), utf8_to_wcs(dst, wdst, countof(wdst)), MOVEFILE_REPLACE_EXISTING))
       return true;
     if (GetLastError() != ERROR_ACCESS_DENIED)
       break;
@@ -186,7 +183,7 @@ extern "C" bool dd_file_exist(const char *filename)
   if (const char *asset_fn = get_rom_asset_fpath(filename))
     return RomFileReader::getAssetSize(asset_fn) >= 0;
 
-  if (char c = *filename ? filename[strlen(filename) - 1] : '\0'; !c || c == '\\' || c == '/')
+  if (strchr("\\/", filename[strlen(filename) - 1]))
     return false;
 
   if (vromfs_check_file_exists(filename))
@@ -196,10 +193,11 @@ extern "C" bool dd_file_exist(const char *filename)
   {
     char fn[DAGOR_MAX_PATH];
     strncpy(fn, filename, DAGOR_MAX_PATH - 1);
-    fn[DAGOR_MAX_PATH - 1] = 0;
     dd_simplify_fname_c(fn);
     if (check_file_exists(fn))
       return true;
+    if (*filename != '/')
+      return false;
     return false; // no need in searching abs path using base paths
   }
 
@@ -240,8 +238,7 @@ char *dd_get_fname_location(char *buf, const char *filename)
     *buf = '\0';
     return buf;
   }
-  if (buf != filename)
-    strcpy(buf, filename);
+  strcpy(buf, filename);
   dd_simplify_fname_c(buf);
 
   char *p = strrchr(buf, PATH_DELIM);

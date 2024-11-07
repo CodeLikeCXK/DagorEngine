@@ -1,12 +1,13 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
 #include <util/dag_stdint.h>
 
-#include <supp/dag_define_KRNLIMP.h>
+#include <supp/dag_define_COREIMP.h>
 
 namespace dagor_memory_stat
 {
@@ -23,4 +24,4 @@ KRNLIMP size_t get_memory_allocated(bool with_crt = false);
 KRNLIMP int get_memory_allocated_kb(bool with_crt = false);
 } // namespace dagor_memory_stat
 
-#include <supp/dag_undef_KRNLIMP.h>
+#include <supp/dag_undef_COREIMP.h>

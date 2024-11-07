@@ -1,19 +1,16 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <movie/fullScreenMovie.h>
 #include <videoPlayer/dag_videoPlayer.h>
 #include <sound/dag_genAudio.h>
 #include <workCycle/dag_workCycle.h>
 #include <workCycle/dag_delayedAction.h>
 #include <workCycle/dag_gameSettings.h>
-#include <drv/3d/dag_renderTarget.h>
-#include <drv/3d/dag_matricesAndPerspective.h>
-#include <drv/3d/dag_lock.h>
-#include <drv/3d/dag_resetDevice.h>
-#include <drv/3d/dag_platform.h>
-#include <drv/hid/dag_hiGlobals.h>
-#include <drv/hid/dag_hiJoystick.h>
-#include <drv/hid/dag_hiJoyData.h>
+#include <3d/dag_drv3d.h>
+#include <3d/dag_drv3dCmd.h>
+#include <3d/dag_drv3dReset.h>
+#include <3d/dag_drv3d_platform.h>
+#include <humanInput/dag_hiGlobals.h>
+#include <humanInput/dag_hiJoystick.h>
+#include <humanInput/dag_hiJoyData.h>
 #include <startup/dag_inpDevClsDrv.h>
 #include <ioSys/dag_dataBlock.h>
 #include <osApiWrappers/dag_files.h>
@@ -30,7 +27,7 @@
 #include "playerCreators.h"
 #include <debug/dag_debug.h>
 #include <render/hdrRender.h>
-#include <drv/dag_vr.h>
+#include <drivers/dag_vr.h>
 #include <vr/vrGuiSurface.h>
 
 #if _TARGET_PC_WIN
@@ -130,7 +127,7 @@ static void render_vr_views(VRDevice::FrameData &frameData, TEXTUREID videoTextu
 
   BaseTexture *sa[] = {frameData.frameTargets[0].getBaseTex(), frameData.frameTargets[1].getBaseTex(),
     frameData.frameDepths[0].getBaseTex(), frameData.frameDepths[1].getBaseTex()};
-  d3d::driver_command(Drv3dCommand::PREPARE_TEXTURES_FOR_VR_CONSUMPTION, sa, (void *)4);
+  d3d::driver_command(DRV3D_COMMAND_PREPARE_TEXTURES_FOR_VR_CONSUMPTION, sa, (void *)4, nullptr);
 }
 
 class GameInactivateDetect : public IWndProcComponent
@@ -178,6 +175,7 @@ static void play_movie(const char *fname, const char *audio_fname, const char *s
   float audio_vol = volume;
   int lastPos = 0;
 
+  d3d::driver_command(DRV3D_COMMAND_SUSPEND, 0, 0, 0);
 #if _TARGET_PC | _TARGET_ANDROID | _TARGET_IOS | _TARGET_TVOS | _TARGET_C3
   GameInactivateDetect game_inactivate_detect(movie_sound, audio_vol);
 
@@ -190,6 +188,7 @@ static void play_movie(const char *fname, const char *audio_fname, const char *s
   if (!player || !yuvframerender::init(player->getFrameSize(), true))
   {
     debug(!player ? "cannot create movie player" : "YUV shader not found!");
+    d3d::driver_command(DRV3D_COMMAND_RESUME, 0, 0, 0);
     return;
   }
 
@@ -207,7 +206,7 @@ static void play_movie(const char *fname, const char *audio_fname, const char *s
 
   player->start(10);
 
-  d3d::driver_command(Drv3dCommand::ACQUIRE_OWNERSHIP);
+  d3d::driver_command(DRV3D_COMMAND_ACQUIRE_OWNERSHIP, 0, 0, 0);
   d3d::set_render_target();
 #if _TARGET_PC | _TARGET_C1 | _TARGET_C2 | _TARGET_XBOX
   for (int i = 0; i < 3; ++i)
@@ -224,24 +223,16 @@ static void play_movie(const char *fname, const char *audio_fname, const char *s
   {
     Texture *backBufferTex = d3d::get_backbuffer_tex();
     TextureInfo ti;
-
-    if (backBufferTex)
-      backBufferTex->getinfo(ti);
-    else
-    {
-      int sw, sh;
-      d3d::get_screen_size(sw, sh);
-      ti.w = sw;
-      ti.h = sh;
-      // no need to set ti.cflg, default inited to TEXFMT_DEFAULT
-    }
+    backBufferTex->getinfo(ti);
 
     videoTexture = dag::create_tex(nullptr, ti.w, ti.h, (ti.cflg & TEXFMT_MASK) | TEXCF_RTARGET, 1, "video_texture");
 
     prepare_vr_gui_render();
   }
 
-  d3d::driver_command(Drv3dCommand::RELEASE_OWNERSHIP);
+  d3d::driver_command(DRV3D_COMMAND_RELEASE_OWNERSHIP, 0, 0, 0);
+
+  d3d::driver_command(DRV3D_COMMAND_RESUME, 0, 0, 0);
 
   int startTime = ::get_time_msec();
 
@@ -265,7 +256,7 @@ static void play_movie(const char *fname, const char *audio_fname, const char *s
     }
     lastPos = player->getPosition();
 
-    d3d::driver_command(Drv3dCommand::ACQUIRE_OWNERSHIP);
+    d3d::driver_command(DRV3D_COMMAND_ACQUIRE_OWNERSHIP, 0, 0, 0);
 
     VRDevice::FrameData frameData;
     bool vrActive = prepare_vr_frame(frameData);
@@ -293,19 +284,20 @@ static void play_movie(const char *fname, const char *audio_fname, const char *s
 
       if (vrActive)
       {
-        d3d::stretch_rect(videoTexture.getTex2D(), d3d::get_backbuffer_tex());
+        Texture *backBufferTex = d3d::get_backbuffer_tex();
+        backBufferTex->update(videoTexture.getTex2D());
 
         render_vr_views(frameData, videoTexture.getTexId());
       }
     }
-    d3d::driver_command(Drv3dCommand::RELEASE_OWNERSHIP);
+    d3d::driver_command(DRV3D_COMMAND_RELEASE_OWNERSHIP, 0, 0, 0);
 
     player->advance(6000);
     player->advance(7000);
 
-    d3d::driver_command(Drv3dCommand::ACQUIRE_OWNERSHIP);
+    d3d::driver_command(DRV3D_COMMAND_ACQUIRE_OWNERSHIP, 0, 0, 0);
     d3d::update_screen();
-    d3d::driver_command(Drv3dCommand::RELEASE_OWNERSHIP);
+    d3d::driver_command(DRV3D_COMMAND_RELEASE_OWNERSHIP, 0, 0, 0);
 
     StdGuiRender::reset_per_frame_dynamic_buffer_pos();
     dagor_idle_cycle();
@@ -316,7 +308,7 @@ static void play_movie(const char *fname, const char *audio_fname, const char *s
     }
   }
 
-  d3d::driver_command(Drv3dCommand::ACQUIRE_OWNERSHIP);
+  d3d::driver_command(DRV3D_COMMAND_ACQUIRE_OWNERSHIP, 0, 0, 0);
 
   videoTexture.close();
   reset_vr_gui_render();
@@ -328,7 +320,7 @@ static void play_movie(const char *fname, const char *audio_fname, const char *s
   d3d::enable_vsync(old_vsync);
 #endif
 
-  d3d::driver_command(Drv3dCommand::RELEASE_OWNERSHIP);
+  d3d::driver_command(DRV3D_COMMAND_RELEASE_OWNERSHIP, 0, 0, 0);
 
   if (movie_sound)
   {
@@ -336,7 +328,9 @@ static void play_movie(const char *fname, const char *audio_fname, const char *s
     dagor_audiosys->releaseMusic(movie_sound);
   }
 
+  d3d::driver_command(DRV3D_COMMAND_SUSPEND, 0, 0, 0);
   player->destroy();
+  d3d::driver_command(DRV3D_COMMAND_RESUME, 0, 0, 0);
 }
 
 static void play_movie_ogg(const char *fname, const char *audio_fname, const char *subtitle_prefix, bool loop, bool /*leave_bgm*/,
@@ -350,6 +344,7 @@ static void play_movie_ogg(const char *fname, const char *audio_fname, const cha
   float audio_vol = volume;
   int lastPos = 0;
 
+  d3d::driver_command(DRV3D_COMMAND_SUSPEND, 0, 0, 0);
 #if _TARGET_PC | _TARGET_ANDROID | _TARGET_IOS | _TARGET_TVOS | _TARGET_C3
   GameInactivateDetect game_inactivate_detect(movie_sound, audio_vol);
 
@@ -362,6 +357,7 @@ static void play_movie_ogg(const char *fname, const char *audio_fname, const cha
   if (!player || !yuvframerender::init(player->getFrameSize(), false))
   {
     debug(!player ? "cannot create movie player" : "YUV shader not found!");
+    d3d::driver_command(DRV3D_COMMAND_RESUME, 0, 0, 0);
     return;
   }
 
@@ -394,7 +390,7 @@ static void play_movie_ogg(const char *fname, const char *audio_fname, const cha
 
   player->start(10);
 
-  d3d::driver_command(Drv3dCommand::ACQUIRE_OWNERSHIP);
+  d3d::driver_command(DRV3D_COMMAND_ACQUIRE_OWNERSHIP, 0, 0, 0);
   d3d::set_render_target();
 
 #if _TARGET_PC | _TARGET_C1 | _TARGET_C2 | _TARGET_XBOX
@@ -408,7 +404,8 @@ static void play_movie_ogg(const char *fname, const char *audio_fname, const cha
   d3d::enable_vsync(true);
 
 #endif
-  d3d::driver_command(Drv3dCommand::RELEASE_OWNERSHIP);
+  d3d::driver_command(DRV3D_COMMAND_RELEASE_OWNERSHIP, 0, 0, 0);
+  d3d::driver_command(DRV3D_COMMAND_RESUME, 0, 0, 0);
 
   int startTime = ::get_time_msec();
 
@@ -432,7 +429,7 @@ static void play_movie_ogg(const char *fname, const char *audio_fname, const cha
     }
     lastPos = player->getPosition();
 
-    d3d::driver_command(Drv3dCommand::ACQUIRE_OWNERSHIP);
+    d3d::driver_command(DRV3D_COMMAND_ACQUIRE_OWNERSHIP, 0, 0, 0);
     hdrrender::set_render_target();
     d3d::clearview(CLEAR_TARGET, E3DCOLOR(0, 0, 0, 0), 1, 0);
     if (have_frame)
@@ -451,15 +448,15 @@ static void play_movie_ogg(const char *fname, const char *audio_fname, const cha
     }
     d3d::set_render_target();
     hdrrender::encode();
-    d3d::driver_command(Drv3dCommand::RELEASE_OWNERSHIP);
+    d3d::driver_command(DRV3D_COMMAND_RELEASE_OWNERSHIP, 0, 0, 0);
 
     player->advance(6000);
     player->advance(7000);
     dagor_idle_cycle();
 
-    d3d::driver_command(Drv3dCommand::ACQUIRE_OWNERSHIP);
+    d3d::driver_command(DRV3D_COMMAND_ACQUIRE_OWNERSHIP, 0, 0, 0);
     d3d::update_screen();
-    d3d::driver_command(Drv3dCommand::RELEASE_OWNERSHIP);
+    d3d::driver_command(DRV3D_COMMAND_RELEASE_OWNERSHIP, 0, 0, 0);
 
     if (movieinput::is_movie_interrupted(movie_skippable_by_all_devices))
     {
@@ -468,7 +465,7 @@ static void play_movie_ogg(const char *fname, const char *audio_fname, const cha
     }
   }
 
-  d3d::driver_command(Drv3dCommand::ACQUIRE_OWNERSHIP);
+  d3d::driver_command(DRV3D_COMMAND_ACQUIRE_OWNERSHIP, 0, 0, 0);
 
   StdGuiRender::reset_draw_str_attr();
   yuvframerender::term();
@@ -477,7 +474,7 @@ static void play_movie_ogg(const char *fname, const char *audio_fname, const cha
   d3d::enable_vsync(old_vsync);
 #endif
 
-  d3d::driver_command(Drv3dCommand::RELEASE_OWNERSHIP);
+  d3d::driver_command(DRV3D_COMMAND_RELEASE_OWNERSHIP, 0, 0, 0);
 
   if (movie_sound)
   {
@@ -485,7 +482,9 @@ static void play_movie_ogg(const char *fname, const char *audio_fname, const cha
     dagor_audiosys->releaseMusic(movie_sound);
   }
 
+  d3d::driver_command(DRV3D_COMMAND_SUSPEND, 0, 0, 0);
   player->destroy();
+  d3d::driver_command(DRV3D_COMMAND_RESUME, 0, 0, 0);
 }
 
 static void play_movie_gui(const char *fname, const char *audio_fname, const char *subtitle_prefix, bool /*leave_bgm*/,
@@ -499,6 +498,7 @@ static void play_movie_gui(const char *fname, const char *audio_fname, const cha
   int lastPos = 0;
   bool have_frame = false;
 
+  d3d::driver_command(DRV3D_COMMAND_SUSPEND, 0, 0, 0);
 #if _TARGET_PC | _TARGET_ANDROID | _TARGET_IOS | _TARGET_TVOS | _TARGET_C3
   GameInactivateDetect game_inactivate_detect(movie_sound, audio_vol);
 
@@ -512,6 +512,7 @@ static void play_movie_gui(const char *fname, const char *audio_fname, const cha
   if (!player)
   {
     debug("cannot create movie player");
+    d3d::driver_command(DRV3D_COMMAND_RESUME, 0, 0, 0);
     return;
   }
 
@@ -524,7 +525,7 @@ static void play_movie_gui(const char *fname, const char *audio_fname, const cha
 
   player->start(10);
 
-  d3d::driver_command(Drv3dCommand::ACQUIRE_OWNERSHIP);
+  d3d::driver_command(DRV3D_COMMAND_ACQUIRE_OWNERSHIP, 0, 0, 0);
   d3d::set_render_target();
 #if _TARGET_PC | _TARGET_C1 | _TARGET_C2 | _TARGET_XBOX
   for (int i = 0; i < 3; ++i)
@@ -538,7 +539,9 @@ static void play_movie_gui(const char *fname, const char *audio_fname, const cha
 
 #endif
 
-  d3d::driver_command(Drv3dCommand::RELEASE_OWNERSHIP);
+  d3d::driver_command(DRV3D_COMMAND_RELEASE_OWNERSHIP, 0, 0, 0);
+
+  d3d::driver_command(DRV3D_COMMAND_RESUME, 0, 0, 0);
 
   int startTime = ::get_time_msec();
 
@@ -562,20 +565,20 @@ static void play_movie_gui(const char *fname, const char *audio_fname, const cha
 
     lastPos = player->getPosition();
 
-    d3d::driver_command(Drv3dCommand::ACQUIRE_OWNERSHIP);
+    d3d::driver_command(DRV3D_COMMAND_ACQUIRE_OWNERSHIP, 0, 0, 0);
     d3d::clearview(CLEAR_TARGET, E3DCOLOR(0, 0, 0, 0), 1, 0);
     player->renderFrame(NULL, NULL);
     if (do_force_fx)
       vibroPlayer.update(player->getPosition());
-    d3d::driver_command(Drv3dCommand::RELEASE_OWNERSHIP);
+    d3d::driver_command(DRV3D_COMMAND_RELEASE_OWNERSHIP, 0, 0, 0);
 
     player->advance(6000);
     player->advance(7000);
     dagor_idle_cycle();
 
-    d3d::driver_command(Drv3dCommand::ACQUIRE_OWNERSHIP);
+    d3d::driver_command(DRV3D_COMMAND_ACQUIRE_OWNERSHIP, 0, 0, 0);
     d3d::update_screen();
-    d3d::driver_command(Drv3dCommand::RELEASE_OWNERSHIP);
+    d3d::driver_command(DRV3D_COMMAND_RELEASE_OWNERSHIP, 0, 0, 0);
 
     if (movieinput::is_movie_interrupted(movie_skippable_by_all_devices))
     {
@@ -584,13 +587,13 @@ static void play_movie_gui(const char *fname, const char *audio_fname, const cha
     }
   }
 
-  d3d::driver_command(Drv3dCommand::ACQUIRE_OWNERSHIP);
+  d3d::driver_command(DRV3D_COMMAND_ACQUIRE_OWNERSHIP, 0, 0, 0);
 
 #if _TARGET_PC | _TARGET_C1 | _TARGET_C2 | _TARGET_XBOX
   d3d::enable_vsync(old_vsync);
 #endif
 
-  d3d::driver_command(Drv3dCommand::RELEASE_OWNERSHIP);
+  d3d::driver_command(DRV3D_COMMAND_RELEASE_OWNERSHIP, 0, 0, 0);
 
   if (movie_sound)
   {
@@ -598,7 +601,9 @@ static void play_movie_gui(const char *fname, const char *audio_fname, const cha
     dagor_audiosys->releaseMusic(movie_sound);
   }
 
+  d3d::driver_command(DRV3D_COMMAND_SUSPEND, 0, 0, 0);
   player->destroy();
+  d3d::driver_command(DRV3D_COMMAND_RESUME, 0, 0, 0);
 }
 
 void set_movie_skippable_by_all_devices(bool en) { movie_skippable_by_all_devices = en; }
@@ -616,10 +621,13 @@ void play_fullscreen_movie(const char *fname, const char *audio_fname, const cha
 
   fullScreenMovieSkipped = false;
 
+  int suspend_cnt = d3d::driver_command(DRV3D_COMMAND_RESUME, (void *)1, 0, 0);
+
   if (vr_frame_cancel_callback)
   {
-    d3d::GpuAutoLock gpuLock;
+    d3d::driver_command(DRV3D_COMMAND_ACQUIRE_OWNERSHIP, 0, 0, 0);
     vr_frame_cancel_callback();
+    d3d::driver_command(DRV3D_COMMAND_RELEASE_OWNERSHIP, 0, 0, 0);
   }
 
   movieinput::on_movie_start();
@@ -641,10 +649,13 @@ void play_fullscreen_movie(const char *fname, const char *audio_fname, const cha
 
   if (vr_frame_resume_callback)
   {
-    d3d::GpuAutoLock gpuLock;
+    d3d::driver_command(DRV3D_COMMAND_ACQUIRE_OWNERSHIP, 0, 0, 0);
     vr_frame_resume_callback();
+    d3d::driver_command(DRV3D_COMMAND_RELEASE_OWNERSHIP, 0, 0, 0);
   }
 
+  if (suspend_cnt)
+    d3d::driver_command(DRV3D_COMMAND_SUSPEND, (void *)(intptr_t)suspend_cnt, 0, 0);
   perform_delayed_actions();
   dagor_reset_spent_work_time();
   ::dgs_dont_use_cpu_in_background = dont_use_cpu_in_background;

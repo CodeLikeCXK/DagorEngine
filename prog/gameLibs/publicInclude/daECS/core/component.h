@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -221,7 +222,7 @@ protected:
   {
     return isAttrBoxedType<T>() ? value.data : value.buffer;
   }
-  friend void serialize_child_component(const ChildComponent &comp, class SerializerCb &serializer, ecs::EntityManager &);
+  friend void serialize_child_component(const ChildComponent &comp, class SerializerCb &serializer);
 
   bool isAttrBoxedBySize() const { return is_child_comp_boxed_by_size(componentTypeSize); }
   const void *getRawData() const { return isAttrBoxedBySize() ? value.data : value.buffer; }
@@ -266,7 +267,7 @@ inline ChildComponent::ChildComponent(ChildComponent &&a)
 
 inline ChildComponent &ChildComponent::operator=(ChildComponent &&a)
 {
-  if (DAGOR_UNLIKELY(this == &a))
+  if (EASTL_UNLIKELY(this == &a))
     return *this;
   free();
 #if !_ECS_CODEGEN

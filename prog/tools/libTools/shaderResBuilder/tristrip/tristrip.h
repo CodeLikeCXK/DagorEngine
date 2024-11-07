@@ -1,5 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-#pragma once
+#ifndef __DAGOR_TRISTRIP_H__
+#define __DAGOR_TRISTRIP_H__
 
 #include <generic/dag_tab.h>
 
@@ -132,3 +132,5 @@ public:
 };
 
 extern PublicStripifier basestripifier;
+
+#endif // __DAGOR_TRISTRIP_H__

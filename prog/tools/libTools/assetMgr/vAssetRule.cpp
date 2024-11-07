@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "vAssetRule.h"
 #include <assets/assetMsgPipe.h>
 #include <ioSys/dag_dataBlockUtils.h>

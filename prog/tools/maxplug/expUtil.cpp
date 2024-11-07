@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <max.h>
 #include <max.h>
 #include <plugapi.h>
@@ -35,27 +33,8 @@
 #include <INamedSelectionSetManager.h>
 #endif
 
-#if (__cplusplus >= 201100L) || (defined(_MSVC_LANG) && _MSVC_LANG >= 201100L)
-#define SET_TYPE unordered_set
-#define MAP_TYPE unordered_map
-// #define TIMER
-#include <unordered_set>
-#include <unordered_map>
-#include "Timer.hpp"
-#ifdef TIMER
-#define INTERVAL(name, elapsed, type) TimerInterval timerInterval(name, elapsed, type)
-#else
-#define INTERVAL(name, elapsed, type)
-#endif
-#else
-#define SET_TYPE set
-#define MAP_TYPE map
-#include <set>
-#include <map>
-#define INTERVAL(name, elapsed, type)
-#endif
 #include <string>
-#include <utility>
+#include <set>
 #include <Shobjidl.h>
 #include <Shlobj.h>
 #include <sstream>
@@ -117,11 +96,7 @@ class ExpUtil : public UtilityObj
 {
 public:
   // Warning! This is enum is stored in the Max file.
-#if (__cplusplus >= 201100L) || (defined(_MSVC_LANG) && _MSVC_LANG >= 201100L)
   enum class ExportMode
-#else
-  enum ExportMode
-#endif
   {
     Standard = 0,
     ObjectsAsDags = 1,
@@ -1200,12 +1175,6 @@ struct ExpNoteTrack
 
 const char origin_lin_vel_node_name[] = "origin_lin_vel_node_name";
 const char origin_ang_vel_node_name[] = "origin_ang_vel_node_name";
-static TCHAR filename[MAX_PATH];
-#ifdef TIMER
-static Timer timer;
-static double mtlElapsed = 0., procAddMtl = 0., dagorMatElapsed = 0., dagorMatEarlyExitElapsed = 0.;
-static int mtlCount = 0, procNodeCount = 0;
-#endif
 
 class ExportENCB : public ENodeCB
 {
@@ -1214,7 +1183,7 @@ public:
   Tab<INode *> node;
   Tab<bool> nodeExp; // used in a2d export to denote nodes that should be exported; 'node' contains all nodes
   Tab<ExpMat> mat;
-  std::vector<std::SET_TYPE<Mtl *>> mtls;
+  std::vector<std::set<Mtl *>> mtls;
   Tab<int> matIDtoMatIdx;
   Tab<TCHAR *> tex;
   Tab<TCHAR *> klabel;
@@ -1233,10 +1202,6 @@ public:
   bool hasAbsolutePaths;
   bool a2dExported;
   TCHAR *default_material;
-  CfgShader *cfg;
-  M_STD_STRING value[DAGTEXNUM];
-  M_STD_STRING tex_slot[DAGTEXNUM];
-  std::MAP_TYPE<std::wstring, StringVector> shaderParamsMap;
 
   ExportENCB(TimeValue t, bool a2d)
   {
@@ -1252,30 +1217,13 @@ public:
     hasSubSubMaterials = false;
     hasAbsolutePaths = false;
     nodeOrigin = NULL;
-#if (__cplusplus >= 201100L) || (defined(_MSVC_LANG) && _MSVC_LANG >= 201100L)
     useIdentityTransformForNode = nullptr;
-#else
-    useIdentityTransformForNode = NULL;
-#endif
     a2dExported = a2d;
     default_material = NULL;
-
-
-    CfgShader::GetCfgFilename(_T("DagorShaders.cfg"), filename);
-    cfg = new CfgShader(filename);
-    cfg->GetSettingsParams();
-    for (int i = 0; i < DAGTEXNUM; ++i)
-    {
-      if (i >= cfg->settings_params.size())
-        continue;
-      value[i] = cfg->GetParamValue(CFG_SETTINGS_NAME, cfg->settings_params.at(i));
-      tex_slot[i] = cfg->settings_params.at(i);
-    }
   }
 
   ~ExportENCB()
   {
-    delete cfg;
     int i;
     for (i = 0; i < mat.Count(); ++i)
     {
@@ -1397,23 +1345,18 @@ public:
 
   bool doesScriptMatch(const TCHAR *a, const TCHAR *b)
   {
-#if _UNICODE
     std::wstring propsa(a), propsb(b);
-    wchar_t prop[512];
-#else
-    std::string propsa(a), propsb(b);
-    char prop[512];
-#endif
     if (propsa.length() != propsb.length())
       return false; // No need to check b entries against a
     size_t pos = 0, prevPos = 0;
     pos = propsa.find(_T("\r\n"), pos);
-    while (pos != propsa.npos)
+    wchar_t prop[512];
+    while (pos != std::wstring::npos)
     {
       propsa.copy(prop, pos - prevPos, prevPos);
       prop[pos - prevPos] = L'\0';
       size_t posB = propsb.find(prop);
-      if (posB == propsa.npos)
+      if (posB == std::wstring::npos)
         return false;
       if (pos < propsa.length() - 2)
         pos += 2;
@@ -1427,7 +1370,7 @@ public:
       propsa.copy(prop, propsa.length() - pos, pos);
       prop[propsa.length() - pos] = L'\0';
       size_t posB = propsb.find(prop);
-      if (posB == propsa.npos)
+      if (posB == std::wstring::npos)
         return false;
     }
     return true;
@@ -1435,9 +1378,6 @@ public:
 
   void add_mtl(INode *node, Mtl *mtl, int subm = 0, DWORD wirecolor = 0xFFFFFF)
   {
-#ifdef TIMER
-    ++mtlCount;
-#endif
     if (!mtl)
     {
       int i;
@@ -1458,7 +1398,7 @@ public:
         e.m.texid[i] = DAGBADMATID;
       e.name = validateMatName(e.name);
       mat.Append(1, &e);
-      mtls.push_back(std::SET_TYPE<Mtl *>());
+      mtls.push_back(std::set<Mtl *>());
       return;
     }
     int num = mtl->NumSubMtls();
@@ -1474,19 +1414,9 @@ public:
         add_mtl(node, mtl->GetSubMtl(i), 1);
       return;
     }
-    {
-      INTERVAL("DagorMatEarlyExit", dagorMatEarlyExitElapsed, TimerIntervalType::ACC);
-      for (int i = 0; i < mat.Count(); ++i)
-        if (mat[i].mtl == mtl)
-        {
-          mtls[i].insert(mtl);
-          return;
-        }
-    }
     Class_ID cid = mtl->ClassID();
     if (cid == Class_ID(DMTL_CLASS_ID, 0))
     {
-      INTERVAL("DagorMat", dagorMatElapsed, TimerIntervalType::GATHER);
       explogWarning(_T("'%s' has standard material '%s'\r\n"), node->GetName(), mtl->GetName());
       hasNonDagorMaterials = true;
 
@@ -1536,13 +1466,12 @@ public:
           return;
         }
       }
-      mtls.push_back(std::SET_TYPE<Mtl *>());
+      mtls.push_back(std::set<Mtl *>());
       mtls.back().insert(mtl);
       mat.Append(1, &e);
     }
     else if (cid == DagorMat_CID || cid == DagorMat2_CID)
     {
-      INTERVAL("DagorMat", dagorMatElapsed, TimerIntervalType::GATHER);
       assert(mat.Count() != 0xFFFF);
       if (mat.Count() >= 0xFFFF)
         return;
@@ -1565,31 +1494,28 @@ public:
       e.name = _tcsdup(mtl->GetName());
       e.wirecolor = 0;
 
+      TCHAR filename[MAX_PATH];
+      CfgShader::GetCfgFilename(_T("DagorShaders.cfg"), filename);
+      CfgShader cfg(filename);
+      cfg.GetSettingsParams();
+
       for (int i = 0; i < DAGTEXNUM; ++i)
       {
-        if (i >= cfg->settings_params.size())
+        if (i >= cfg.settings_params.size())
         {
           e.m.texid[i] = DAGBADMATID;
           continue;
         }
+        M_STD_STRING value = cfg.GetParamValue(CFG_SETTINGS_NAME, cfg.settings_params.at(i));
+        M_STD_STRING tex_slot = cfg.settings_params.at(i);
 
-        M_STD_STRING value = this->value[i];
         if (_tcslen(e.classname))
         {
-          std::wstring className = e.classname;
-          auto it = shaderParamsMap.find(className);
-          StringVector *shaderParams;
-          if (it == shaderParamsMap.end())
-          {
-            cfg->GetShaderParams(e.classname);
-            shaderParams = &cfg->shader_params;
-          }
-          else
-            shaderParams = &it->second;
-          for (int j = 0; j < shaderParams->size(); ++j)
-            if (shaderParams->at(j) == tex_slot[i])
+          cfg.GetShaderParams(e.classname);
+          for (int j = 0; j < cfg.shader_params.size(); ++j)
+            if (cfg.shader_params.at(j) == tex_slot)
             {
-              value = cfg->GetParamValue(e.classname, tex_slot[i].c_str());
+              value = cfg.GetParamValue(e.classname, tex_slot.c_str());
               break;
             }
         }
@@ -1609,7 +1535,7 @@ public:
           return;
         }
       }
-      mtls.push_back(std::SET_TYPE<Mtl *>());
+      mtls.push_back(std::set<Mtl *>());
       mtls.back().insert(mtl);
       mat.Append(1, &e);
     }
@@ -1697,17 +1623,9 @@ public:
       if (util.expflg & EXP_SEL)
         if (!n->Selected())
           return ECB_CONT;
-      {
-        INTERVAL("add_mtl", mtlElapsed, TimerIntervalType::ACC);
-#ifdef TIMER
-        ++procNodeCount;
-#endif
-        if ((util.expflg & EXP_MAT) && !(util.expflg & EXP_OBJECTS))
-        {
-          INTERVAL("proc add_mtl", procAddMtl, TimerIntervalType::ACC);
-          add_mtl(n, n->GetMtl(), 0, n->GetWireColor());
-        }
-      }
+
+      if ((util.expflg & EXP_MAT) && !(util.expflg & EXP_OBJECTS))
+        add_mtl(n, n->GetMtl(), 0, n->GetWireColor());
 
       if (!(util.expflg & EXP_OBJECTS))
         return ECB_CONT;
@@ -1763,14 +1681,9 @@ public:
         explogWarning(_T( "'%s' has no material\r\n"), n->GetName());
         hasNonDagorMaterials = true;
       }
-      {
-        INTERVAL("add_mtl", mtlElapsed, TimerIntervalType::ACC);
-        if (util.expflg & EXP_MAT)
-        {
-          INTERVAL("proc add_mtl", procAddMtl, TimerIntervalType::ACC);
-          add_mtl(n, n->GetMtl(), 0, n->GetWireColor());
-        }
-      }
+
+      if (util.expflg & EXP_MAT)
+        add_mtl(n, n->GetMtl(), 0, n->GetWireColor());
     }
 
     assert(node.Count() != 0xFFFF);
@@ -1789,32 +1702,18 @@ public:
         return i;
     return -1;
   }
+
   int getmatid(Mtl *m, DWORD wc = 0xFFFFFF)
   {
     if (!m)
     {
-      for (int i = 0; i < mtls.size(); ++i)
+      for (int i = 0; i < mat.Count(); ++i)
         if (mtls[i].empty() && mat[i].wirecolor == wc)
           return i;
       return -1;
     }
-    for (int i = 0; i < mtls.size(); ++i)
-      if (mtls[i].find(m) != mtls[i].end())
-        return i;
-    return -1;
-  }
-
-  int getusedmatid(Mtl *m, DWORD wc = 0xFFFFFF)
-  {
-    if (!m)
-    {
-      for (int i = 0; i < mat.Count(); ++i)
-        if (mat[i].mtl == NULL && mat[i].wirecolor == wc)
-          return i;
-      return -1;
-    }
     for (int i = 0; i < mat.Count(); ++i)
-      if (mat[i].mtl == m)
+      if (mtls[i].find(m) != mtls[i].end())
         return i;
     return -1;
   }
@@ -1966,7 +1865,7 @@ bool wr_hlp( const void * p, int l, FILE * h )
           size_t pos = scr.find("apex_interior_material:t=\"");
           if (pos != std::string::npos)
           {
-            for (std::SET_TYPE<Mtl *>::iterator mtlIt = mtls[i].begin(); mtlIt != mtls[i].end(); ++mtlIt)
+            for (std::set<Mtl *>::iterator mtlIt = mtls[i].begin(); mtlIt != mtls[i].end(); ++mtlIt)
             {
               std::string matName = wideToStr((*mtlIt)->GetName());
               if (matName == wideToStr(mat[i].name))
@@ -2000,7 +1899,7 @@ bool wr_hlp( const void * p, int l, FILE * h )
         for (int j = 0; j < num; ++j)
         {
           int id = getmatid(mtl->GetSubMtl(j));
-          if (id < 0 || matIDtoMatIdx[id] < 0)
+          if (matIDtoMatIdx[id] < 0)
             continue;
 
           bool found = false;
@@ -2712,11 +2611,7 @@ bool wr_hlp( const void * p, int l, FILE * h )
               if (!ref)
                 continue;
 
-#if defined(MAX_RELEASE_R27) && MAX_RELEASE >= MAX_RELEASE_R27
-              TSTR name = mod->SubAnimName(1 + i, false).data();
-#else
               TSTR name = mod->SubAnimName(1 + i);
-#endif
 
               unsigned char len;
               if (name.Length() >= 255)
@@ -3022,16 +2917,15 @@ bool wr_hlp( const void * p, int l, FILE * h )
     {
       Tab<bool> matUsed;
       int i;
+
       matUsed.SetCount(mat.Count());
       matIDtoMatIdx.SetCount(mat.Count());
-      for (i = 0; i < mat.Count(); ++i)
+      for (i = 0; i < matUsed.Count(); ++i)
       {
         matUsed[i] = false;
         matIDtoMatIdx[i] = -1;
       }
-#ifdef TIMER
-      double start = Timer::NowMs();
-#endif
+
       for (i = 0; i < node.Count(); ++i)
       {
         if (!node[i])
@@ -3051,26 +2945,11 @@ bool wr_hlp( const void * p, int l, FILE * h )
               for (int j = 0; j < m.numFaces; ++j)
               {
                 int mat = m.faces[j].getMatID();
-                if (mat_num == 1)
-#if defined(MAX_RELEASE_R26) && MAX_RELEASE >= MAX_RELEASE_R26
-                  mat = m.GetMtlIndex();
-#else
-                  mat = m.mtlIndex;
-#endif
-                if (mat >= 0)
+                if (mat >= 0 && mat < mat_num)
                 {
-                  mat %= mat_num;
-                  int tempMat = getusedmatid(mtl->GetSubMtl(mat));
-                  if (tempMat >= 0)
-                    matUsed[tempMat] = true;
-                  else
-                  {
-                    tempMat = getmatid(mtl->GetSubMtl(mat));
-                    if (tempMat >= 0)
-                      matUsed[tempMat] = true;
-                    else
-                      matUsed[mat] = true;
-                  }
+                  mat = getmatid(mtl->GetSubMtl(mat));
+                  if (mat >= 0)
+                    matUsed[mat] = true;
                 }
               }
             }
@@ -3078,22 +2957,12 @@ bool wr_hlp( const void * p, int l, FILE * h )
         }
         else
         {
-          int mat = getusedmatid(mtl, node[i]->GetWireColor());
+          int mat = getmatid(mtl, node[i]->GetWireColor());
           if (mat >= 0)
             matUsed[mat] = true;
         }
       }
-#ifdef TIMER
-      double end = Timer::NowMs();
-      explog(_T("matUsed: %g ms\r\n"), end - start);
-      explog(_T("add_mtl: %g ms\r\n"), mtlElapsed);
-      explog(_T("add_mtl count: %d\r\n"), mtlCount);
-      explog(_T("proc node mtl count: %d\r\n"), procNodeCount);
-      explog(_T("proc add mtl: %g\r\n"), procAddMtl);
-      explog(_T("dagorMatElapsed: %g\r\n"), dagorMatElapsed);
-      explog(_T("dagorMatEarlyExitElapsed: %g\r\n"), dagorMatEarlyExitElapsed);
-      explog(_T("mtls: %d mat: %d\r\n"), mtls.size(), mat.Count());
-#endif
+
       Tab<int> tex_remap;
       Tab<TCHAR *> new_tex;
       tex_remap.SetCount(tex.Count());
@@ -4539,7 +4408,6 @@ void ExpUtil::exportLayersAsDagsInternal(const TCHAR *folder, ILayer &layer)
   const bool matchesVisibilityFilter = (util.expflg & EXP_HID) != 0 || !layer.IsHidden();
 #endif
 
-#if defined(MAX_RELEASE_R17) && MAX_RELEASE >= MAX_RELEASE_R17
   const int childLayerCount = layer.GetNumOfChildLayers();
 
   if (childLayerCount > 0)
@@ -4550,9 +4418,7 @@ void ExpUtil::exportLayersAsDagsInternal(const TCHAR *folder, ILayer &layer)
     for (int i = 0; i < childLayerCount; ++i)
       exportLayersAsDagsInternal(folder, *layer.GetChildLayer(i));
   }
-  else
-#endif
-    if (matchesVisibilityFilter)
+  else if (matchesVisibilityFilter)
     exportLayerAsDag(folder, layer);
 }
 
@@ -4578,26 +4444,18 @@ void ExpUtil::exportLayersAsDags()
     const int layerCount = manager->GetLayerCount();
     for (int layerIndex = 0; layerIndex < layerCount; ++layerIndex)
     {
-#if defined(MAX_RELEASE_R14) && MAX_RELEASE >= MAX_RELEASE_R14
       ILayer *layer = manager->GetLayer(layerIndex);
-#else
-      ILayer *layer = manager->GetLayer(manager->GetSavedLayer(layerIndex));
-#endif
 
       // Ignore non-top level layers, we will enumerate them hierarchially.
-#if defined(MAX_RELEASE_R17) && MAX_RELEASE >= MAX_RELEASE_R17
       if (layer->GetParentLayer())
         continue;
-#endif
 
       // The default layer itself is not exported (except when "sel" is enabled and it is the active layer), only its children.
       if (is_default_layer(*layer))
       {
-#if defined(MAX_RELEASE_R17) && MAX_RELEASE >= MAX_RELEASE_R17
         const int childLayerCount = layer->GetNumOfChildLayers();
         for (int childLayerIndex = 0; childLayerIndex < childLayerCount; ++childLayerIndex)
           exportLayersAsDagsInternal(folder, *layer->GetChildLayer(childLayerIndex));
-#endif
       }
       else
         exportLayersAsDagsInternal(folder, *layer);

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "renderList.h"
 
 #include <EASTL/sort.h>

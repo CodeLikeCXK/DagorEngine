@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "waterCommon.h"
 #include <math/dag_mathUtils.h>
 

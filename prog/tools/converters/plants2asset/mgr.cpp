@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "mgr.h"
 #include <image/tiff-4.4.0/tiffio.h>
 #include <image/dag_tga.h>

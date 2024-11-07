@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <dasModules/aotDaphys.h>
 
 struct ResolveContactParamsAnnotation : das::ManagedStructureAnnotation<daphys::ResolveContactParams, false>

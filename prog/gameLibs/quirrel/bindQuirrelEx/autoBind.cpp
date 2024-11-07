@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <bindQuirrelEx/autoBind.h>
 #include <sqModules/sqModules.h>
 #include <debug/dag_assert.h>

@@ -1,4 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright 2023 by Gaijin Games KFT, All rights reserved.
+#ifndef __MAXPLUG_ROLLUP_PANEL_H
+#define __MAXPLUG_ROLLUP_PANEL_H
 #pragma once
 
 #include "datablk.h"
@@ -68,3 +70,5 @@ private:
 
 const char *find_info_by_name(const char *info, const char *name, const char *def);
 const char *find_name_by_info(const char *info, const char *command);
+
+#endif

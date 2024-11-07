@@ -54,15 +54,7 @@ def handle_label_name(value)
 def call_macro_label_name(mod,value)
     return "call-macro-{module_name(mod)}-{value}"
 
-def public function_file_name(value:FunctionPtr|Function?)
-    //! Get the file name for the function.
-    var mn = string(value.name)
-    mn = mn |> replace_multiple([{auto
-        "?" => "_qm_";
-    }])
-    return mn
-
-def function_label_name(value:FunctionPtr|Function?)
+def function_label_name(value:FunctionPtr)
     var mn = get_mangled_name(value)
     mn = mn |> replace_multiple([{auto
         " " => "_";
@@ -74,10 +66,7 @@ def function_label_name(value:FunctionPtr|Function?)
         ">" => "_gr_";
         "`" => "_rq_";
         "!" => "_ex_";
-        "=" => "_eq_";
-        "?" => "_qm_";
-        "[" => "_lb_";
-        "]" => "_rb_";
+        "=" => "_eq_"
     }])
     return "function-{mn}"
 
@@ -131,7 +120,7 @@ def describe_type(td:TypeDeclPtr)
                 write(writer,make_ref(handle_label_name(td.annotation),"{module_name(td.annotation._module)}::{td.annotation.name}"))
         elif baseType==Type tStructure
             write(writer,make_ref(struct_label_name(td.structType),"{module_name(td.structType._module)}::{td.structType.name}"))
-        elif baseType==Type tEnumeration || baseType==Type tEnumeration8 || baseType==Type tEnumeration16 || baseType==Type tEnumeration64
+        elif baseType==Type tEnumeration || baseType==Type tEnumeration8 || baseType==Type tEnumeration16
             write(writer,make_ref(enum_label_name(td.enumType),"{module_name(td.enumType._module)}::{td.enumType.name}"))
         elif baseType==Type tPointer
             if td.flags.smartPtr
@@ -329,15 +318,6 @@ def document_variant(doc_file:file; value:TypeDeclPtr)
         emplace(tab,line)
     fwrite(doc_file,make_table(tab))
 
-def document_tuple(doc_file:file; value:TypeDeclPtr)
-    var tab : array<array<string>>
-    for an,at in value.argNames,value.argTypes
-        var line : array<string>
-        push(line,string(an))
-        push(line,describe_type(at))
-        emplace(tab,line)
-    fwrite(doc_file,make_table(tab))
-
 def document_typedef(doc_file:file;mod:Module?;name:string implicit;value)
     fwrite(doc_file,make_label(alias_label_name(value)))
     fwrite(doc_file,make_domain("das:attribute"))
@@ -348,9 +328,6 @@ def document_typedef(doc_file:file;mod:Module?;name:string implicit;value)
     elif value.baseType==Type tVariant
         fwrite(doc_file," is a variant type\n\n")
         document_variant(doc_file,value)
-    elif value.baseType==Type tTuple
-        fwrite(doc_file," is a tuple type\n\n")
-        document_tuple(doc_file,value)
     else
         var tp = describe(value,false,false,false)
         tp = replace(tp,"$::","")
@@ -777,7 +754,7 @@ def function_name ( name : string )
             return "operator {name}"
     return name
 
-def document_function(doc_file:file;mod:Module?;func:FunctionPtr|Function?)
+def document_function(doc_file:file;mod:Module?;func:FunctionPtr)
     let argNames <- [{for arg in func.arguments; string(arg.name)}]
     let argTypes <- [{for arg in func.arguments; get_ptr(arg._type)}]
     fwrite(doc_file,make_label(function_label_name(func)))
@@ -790,7 +767,7 @@ def document_function(doc_file:file;mod:Module?;func:FunctionPtr|Function?)
     if func.moreFlags.deprecated
         document_warning(doc_file,"This function is deprecated.")
     document_function_arguments(doc_file,argNames,argTypes)
-    document_topic(doc_file,topic("function",mod,"{function_file_name(func)}"))
+    document_topic(doc_file,topic("function",mod,"{func.name}"))
 
 def document_functions(doc_file:file;mod:Module?;groups:array<DocGroup>)
     var tab : table<Function?;bool>
@@ -805,15 +782,15 @@ def document_functions(doc_file:file;mod:Module?;groups:array<DocGroup>)
                     document_warning(doc_file,"This group of functions is hidden. It will not be in the final documentation.")
                 for func in grp.func
                     if !key_exists(tab,func)
-                        let descr = describe_function_short(func)
-                        var labn = function_label_name(func)
+                        let descr = describe_function_short(FunctionPtr(func))
+                        var labn = function_label_name(FunctionPtr(func))
                         fwrite(doc_file,"  * {make_ref(labn,descr)}\n")
                 fwrite(doc_file,"\n")
                 for func in grp.func
                     if tab[func]
                         continue
                     tab[func] = true
-                    document_function(doc_file,mod,func)
+                    document_function(doc_file,mod,FunctionPtr(func))
     var first_function = true
     for_each_function(mod, "") <| $(func)
         if !function_needs_documenting(func)
@@ -847,7 +824,7 @@ struct public DocGroup
 def debug_group(var group:DocGroup)
     to_log(LOG_DEBUG, "Group {group.name}\n")
     for func in group.func
-        to_log(LOG_DEBUG, "\t{describe_function_short(func)}\n")
+        to_log(LOG_DEBUG, "\t{describe_function_short(FunctionPtr(func))}\n")
     return <- group
 
 def append_to_group_by_regex(var group:DocGroup; mod:Module?; var reg:Regex)
@@ -903,10 +880,10 @@ def private generate_substitute_stub(mod:Module?;substname:string)
                     generate_topic_stub(tab,stub_file,topic("structure",mod,string(value.name)))
             for_each_function(mod, "") <| $(func)
                 if function_needs_documenting(func)
-                    generate_topic_stub(tab,stub_file,topic("function",mod,"{function_file_name(func)}"))
+                    generate_topic_stub(tab,stub_file,topic("function",mod,"{func.name}"))
             for_each_generic(mod) <| $(func)
                 if function_needs_documenting(func)
-                    generate_topic_stub(tab,stub_file,topic("function",mod,"{function_file_name(func)}"))
+                    generate_topic_stub(tab,stub_file,topic("function",mod,"{func.name}"))
             // annotations
             module_for_each_annotation(mod) <| $(value)
                 if value.isBasicStructureAnnotation

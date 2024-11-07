@@ -16,11 +16,11 @@ AddIncludes =
 
 Sources += src/dasStdDlg.cpp ;
 
-if $(Platform) in windows {
+if $(Platform) in win32 win64 {
   Sources += src/dasStdDlgWin.cpp ;
-} else if $(Platform) = linux {
+} else if $(Platform) = linux64 {
   Sources += src/dasStdDlgGtk.cpp ;
-} else if $(Platform) = macOS {
+} else if $(Platform) = macosx {
   Sources += src/dasStdDlgOsx.mm ;
 } else {
   Sources += src/dasStdDlgNotImplemented.cpp ;

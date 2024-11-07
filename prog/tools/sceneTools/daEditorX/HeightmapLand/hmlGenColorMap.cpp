@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "hmlPlugin.h"
 #include "landClassSlotsMgr.h"
 
@@ -8,9 +6,7 @@
 #include <de3_assetService.h>
 #include <de3_hmapDetLayerProps.h>
 #include <assets/asset.h>
-#include <drv/3d/dag_texture.h>
-#include <drv/3d/dag_driver.h>
-#include <drv/3d/dag_info.h>
+#include <3d/dag_drv3d.h>
 
 #include <sqplus.h>
 #include <generic/dag_tab.h>
@@ -19,18 +15,15 @@
 #include <osApiWrappers/dag_direct.h>
 #include <perfMon/dag_cpuFreq.h>
 #include <coolConsole/coolConsole.h>
-#include <EditorCore/ec_IEditorCore.h>
+#include <dllPluginCore/core.h>
 #include <winGuiWrapper/wgw_dialogs.h>
-#include <propPanel/commonWindow/dialogWindow.h>
+#include <propPanel2/comWnd/dialog_window.h>
 #include <util/dag_oaHashNameMap.h>
 #include <debug/dag_debug.h>
 #include <stdio.h>
 #include <windows.h>
 #include <tchar.h>
 #undef ERROR
-
-using editorcore_extapi::dagGeom;
-using editorcore_extapi::dagRender;
 
 using hdpi::_pxScaled;
 
@@ -134,13 +127,13 @@ public:
 
   ScriptParamInt(const char *name, int val) : ScriptParam(name), value(val), paramPid(-1) {}
 
-  virtual void fillParams(PropPanel::ContainerPropertyControl &panel, int &pid)
+  virtual void fillParams(PropPanel2 &panel, int &pid)
   {
     paramPid = pid++;
     panel.createEditInt(paramPid, paramName, value);
   }
 
-  virtual void onPPChange(int pid, PropPanel::ContainerPropertyControl &panel)
+  virtual void onPPChange(int pid, PropPanel2 &panel)
   {
     if (pid != paramPid)
       return;
@@ -170,13 +163,13 @@ public:
 
   ScriptParamReal(const char *name, real val) : ScriptParam(name), value(val), paramPid(-1) {}
 
-  virtual void fillParams(PropPanel::ContainerPropertyControl &panel, int &pid)
+  virtual void fillParams(PropPanel2 &panel, int &pid)
   {
     paramPid = pid++;
     panel.createEditFloat(paramPid, paramName, value);
   }
 
-  virtual void onPPChange(int pid, PropPanel::ContainerPropertyControl &panel)
+  virtual void onPPChange(int pid, PropPanel2 &panel)
   {
     if (pid != paramPid)
       return;
@@ -206,13 +199,13 @@ public:
 
   ScriptParamColor(const char *name, E3DCOLOR val) : ScriptParam(name), value(val), paramPid(-1) {}
 
-  virtual void fillParams(PropPanel::ContainerPropertyControl &panel, int &pid)
+  virtual void fillParams(PropPanel2 &panel, int &pid)
   {
     paramPid = pid++;
     panel.createColorBox(paramPid, paramName, value);
   }
 
-  virtual void onPPChange(int pid, PropPanel::ContainerPropertyControl &panel)
+  virtual void onPPChange(int pid, PropPanel2 &panel)
   {
     if (pid != paramPid)
       return;
@@ -255,7 +248,7 @@ public:
 
   virtual void *get_interface(int id) { return id == 'Mask' ? this : NULL; }
 
-  virtual void fillParams(PropPanel::ContainerPropertyControl &panel, int &pid)
+  virtual void fillParams(PropPanel2 &panel, int &pid)
   {
     bool isEditImage = HmapLandPlugin::self->getEditedScriptImage() == this;
     buttonPid = pid++;
@@ -268,9 +261,9 @@ public:
     panel.createButton(editButtonPid, isEditImage ? "Done" : "Edit", true, false);
   }
 
-  virtual void onPPChange(int pid, PropPanel::ContainerPropertyControl &panel) {}
+  virtual void onPPChange(int pid, PropPanel2 &panel) {}
 
-  virtual void onPPBtnPressed(int pid, PropPanel::ContainerPropertyControl &panel)
+  virtual void onPPBtnPressed(int pid, PropPanel2 &panel)
   {
     if (pid == buttonPid)
     {
@@ -305,7 +298,7 @@ public:
     sq_pop(vm, 1);
   }
 
-  virtual void finishEdit(PropPanel::ContainerPropertyControl &panel) { panel.setCaption(editButtonPid, "Edit"); }
+  virtual void finishEdit(PropPanel2 &panel) { panel.setCaption(editButtonPid, "Edit"); }
 
   float sampleMask1();
   float sampleMask8();
@@ -384,10 +377,10 @@ public:
 
   virtual void *get_interface(int id) { return (id == 'Mask' || id == 'Img') ? this : NULL; }
 
-  virtual void fillParams(PropPanel::ContainerPropertyControl &panel, int &pid)
+  virtual void fillParams(PropPanel2 &panel, int &pid)
   {
 
-    PropPanel::ContainerPropertyControl *op = panel.createGroup(pid++, paramName);
+    PropertyContainerControlBase *op = panel.createGroup(pid++, paramName);
 
     bool isEditImage = HmapLandPlugin::self->getEditedScriptImage() == this;
     buttonPid = pid++;
@@ -413,7 +406,7 @@ public:
     op->createEditInt(detailTypePid, "Detail type", detailType);
 
     mappingTypePid = pid++;
-    PropPanel::ContainerPropertyControl *rg = op->createRadioGroup(mappingTypePid, "Mapping type", mappingType);
+    PropertyContainerControlBase *rg = op->createRadioGroup(mappingTypePid, "Mapping type", mappingType);
     rg->createRadio(pid++, "match heightmap");
     rg->createRadio(pid++, "heightmap percent");
     rg->createRadio(pid++, "world units");
@@ -437,7 +430,7 @@ public:
     op->setBoolValue(true);
   }
 
-  virtual void onPPChange(int pid, PropPanel::ContainerPropertyControl &panel)
+  virtual void onPPChange(int pid, PropPanel2 &panel)
   {
     if (pid == detailTypePid)
       detailType = panel.getInt(detailTypePid);
@@ -463,7 +456,7 @@ public:
       showMask = panel.getBool(pid);
   }
 
-  virtual void onPPBtnPressed(int pid, PropPanel::ContainerPropertyControl &panel)
+  virtual void onPPBtnPressed(int pid, PropPanel2 &panel)
   {
     if (pid == buttonPid)
     {
@@ -533,7 +526,7 @@ public:
     sq_pop(vm, 1);
   }
 
-  virtual void finishEdit(PropPanel::ContainerPropertyControl &panel)
+  virtual void finishEdit(PropPanel2 &panel)
   {
     panel.setCaption(editButtonPid, "Edit");
     panel.setEnabledById(channelsComboPid, true);
@@ -612,7 +605,7 @@ public:
     LandClassSlotsManager::unsubscribeLandClassUpdateNotify(this);
   }
 
-  virtual void fillParams(PropPanel::ContainerPropertyControl &panel, int &pid)
+  virtual void fillParams(PropPanel2 &panel, int &pid)
   {
     buttonPid = pid;
     panel.createIndent();
@@ -624,9 +617,9 @@ public:
     pid += 2;
   }
 
-  virtual void onPPChange(int pid, PropPanel::ContainerPropertyControl &panel) {}
+  virtual void onPPChange(int pid, PropPanel2 &panel) {}
 
-  virtual void onPPBtnPressed(int pid, PropPanel::ContainerPropertyControl &panel)
+  virtual void onPPBtnPressed(int pid, PropPanel2 &panel)
   {
     if (pid == buttonPid)
     {
@@ -798,10 +791,10 @@ public:
     return ::dd_file_exist(in);
   }
 
-  virtual void fillParams(PropPanel::ContainerPropertyControl &panel, int &pid)
+  virtual void fillParams(PropPanel2 &panel, int &pid)
   {
     String btn_name;
-    PropPanel::ContainerPropertyControl *op = panel.createGroup(pid++, String(64, "%s: slot %d", (char *)paramName, p.detailSlot));
+    PropertyContainerControlBase *op = panel.createGroup(pid++, String(64, "%s: slot %d", (char *)paramName, p.detailSlot));
 
     basePid = pid;
     pid += IPID__NUM;
@@ -813,9 +806,9 @@ public:
     op->setBoolValue(true);
   }
 
-  virtual void onPPChange(int pid, PropPanel::ContainerPropertyControl &panel) {}
+  virtual void onPPChange(int pid, PropPanel2 &panel) {}
 
-  virtual void onPPBtnPressed(int pid, PropPanel::ContainerPropertyControl &panel)
+  virtual void onPPBtnPressed(int pid, PropPanel2 &panel)
   {
     if (pid >= basePid + IPID_LANDCLASS && pid < basePid + IPID__NUM)
     {
@@ -947,7 +940,7 @@ public:
   float writeDetTexThres, writeLand1Thres, writeLand2Thres;
   bool editableLandClass;
 
-  struct PropsDlg : public PropPanel::ControlEventHandler
+  struct PropsDlg : public ControlEventHandler
   {
     enum
     {
@@ -991,10 +984,11 @@ public:
     };
 
   public:
-    PropsDlg(PostScriptParamLandLayer &_gl) : gl(_gl), windowPosition(0, 0), windowSize(0, 0)
+    PropsDlg(PostScriptParamLandLayer &_gl) : gl(_gl)
     {
       dlg = EDITORCORE->createDialog(_pxScaled(290), _pxScaled(460),
         String(0, gl.paramName.empty() ? "Layer #%d" : "Layer #%d: %s", gl.slotIdx + 1, gl.paramName));
+      ::GetWindowRect((HWND)dlg->getHandle(), &wr);
       dlg->setCloseHandler(this);
       dlg->showButtonPanel(false);
     }
@@ -1007,14 +1001,9 @@ public:
     bool isVisible() const { return dlg->isVisible(); }
     void show()
     {
-      if (windowSize.x > 0 && windowSize.y > 0)
-      {
-        dlg->setWindowPosition(windowPosition);
-        dlg->setWindowSize(windowSize);
-      }
-
+      ::SetWindowPos((HWND)dlg->getHandle(), NULL, wr.left, wr.top, 0, 0, SWP_SHOWWINDOW | SWP_NOSIZE);
       dlg->show();
-      PropPanel::ContainerPropertyControl &panel = *dlg->getPanel();
+      PropertyContainerControlBase &panel = *dlg->getPanel();
       panel.setEventHandler(this);
 
       Tab<String> wtConv(tmpmem);
@@ -1031,8 +1020,8 @@ public:
       panel.createCombo(PID_WTR_AREA, "", areaConv, gl.areaSelect, true, false);
       panel.setEnabledById(PID_WTR_AREA, HmapLandPlugin::self->hasDetaledRect());
 
-      PropPanel::ContainerPropertyControl &pCalc = *panel.createGroup(PID_LAYER_WEIGHTCALC, "Weight formula");
-      PropPanel::ContainerPropertyControl &pOut = *panel.createGroup(PID_LAYER_OUTPUT, "Output and thresholds");
+      PropertyContainerControlBase &pCalc = *panel.createGroup(PID_LAYER_WEIGHTCALC, "Weight formula");
+      PropertyContainerControlBase &pOut = *panel.createGroup(PID_LAYER_OUTPUT, "Output and thresholds");
 
       pCalc.createCheckBox(PID_LAYER_SUMWT, "Sum weights (instead of multiply)", gl.sumWeights);
       pCalc.createSeparator(0);
@@ -1084,11 +1073,9 @@ public:
           int base = PID_BASE + i * PID_ELC__CNT;
           int idx = HmapLandPlugin::hmlService->resolveDetLayerClassName(b.getStr("lName", ""));
 
-          PropPanel::ContainerPropertyControl &pElc =
-            *panel.createExtGroup(base + PID_ELC_GRP, String(0, "Land detail layer #%d", i + 1));
-          panel.setInt(base + PID_ELC_GRP, (1 << PropPanel::EXT_BUTTON_INSERT) | (1 << PropPanel::EXT_BUTTON_REMOVE) |
-                                             (i > 0 ? (1 << PropPanel::EXT_BUTTON_UP) : 0) |
-                                             (i + 1 < gl.elcLayers.blockCount() ? (1 << PropPanel::EXT_BUTTON_DOWN) : 0));
+          PropertyContainerControlBase &pElc = *panel.createExtGroup(base + PID_ELC_GRP, String(0, "Land detail layer #%d", i + 1));
+          panel.setInt(base + PID_ELC_GRP, (1 << EXT_BUTTON_INSERT) | (1 << EXT_BUTTON_REMOVE) | (i > 0 ? (1 << EXT_BUTTON_UP) : 0) |
+                                             (i + 1 < gl.elcLayers.blockCount() ? (1 << EXT_BUTTON_DOWN) : 0));
 
           pElc.createStatic(-1, "Detail class");
           pElc.createCombo(base + PID_ELC_PRESET, "", clsList, b.getStr("lName", ""), true, false);
@@ -1163,10 +1150,11 @@ public:
     }
     void updateTitle()
     {
-      dlg->setCaption(String(0, gl.paramName.empty() ? "Layer #%d" : "Layer #%d: %s", gl.slotIdx + 1, gl.paramName));
+      ::SetWindowText((HWND)dlg->getHandle(),
+        String(0, gl.paramName.empty() ? "Layer #%d" : "Layer #%d: %s", gl.slotIdx + 1, gl.paramName));
     }
 
-    virtual void onChange(int pid, PropPanel::ContainerPropertyControl *panel)
+    virtual void onChange(int pid, PropertyContainerControlBase *panel)
     {
       if (pid == PID_LAYER_SUMWT)
         gl.sumWeights = panel->getBool(pid);
@@ -1181,7 +1169,7 @@ public:
         gl.maskConv = panel->getInt(pid);
         panel->setEnabledById(PID_MASK_REFSYS, HmapLandPlugin::self->hasDetaledRect() && gl.maskConv);
         panel->setEnabledById(PID_SEL_MASK, gl.maskConv);
-        if (PropPanel::ContainerPropertyControl *pp = HmapLandPlugin::self->getPropPanel())
+        if (PropPanel2 *pp = HmapLandPlugin::self->getPropPanel())
         {
           pp->setEnabledById(gl.pidBase + gl.PID_SEL_MASK, true);
           pp->setEnabledById(gl.pidBase + gl.PID_EDIT_MASK, gl.maskConv);
@@ -1282,14 +1270,12 @@ public:
         }
       }
     }
-    virtual void onClick(int pid, PropPanel::ContainerPropertyControl *panel)
+    virtual void onClick(int pid, PropertyContainerControlBase *panel)
     {
-      if (pid == -PropPanel::DIALOG_ID_CLOSE)
+      if (pid == -DIALOG_ID_CLOSE)
       {
-        windowPosition = dlg->getWindowPosition();
-        windowSize = dlg->getWindowSize();
-
-        if (PropPanel::ContainerPropertyControl *pp = HmapLandPlugin::self->getPropPanel())
+        ::GetWindowRect((HWND)dlg->getHandle(), &wr);
+        if (PropPanel2 *pp = HmapLandPlugin::self->getPropPanel())
           gl.onPPBtnPressed(pid, *pp);
         if (dlg->getPanel()->getChildCount())
         {
@@ -1320,7 +1306,7 @@ public:
           panel->setEnabledById(PID_MASK_REFSYS, HmapLandPlugin::self->hasDetaledRect() && gl.maskConv);
           panel->setEnabledById(PID_SEL_MASK, gl.maskConv);
           panel->setCaption(pid, *name ? name : "-- no mask --");
-          if (PropPanel::ContainerPropertyControl *pp = HmapLandPlugin::self->getPropPanel())
+          if (PropPanel2 *pp = HmapLandPlugin::self->getPropPanel())
           {
             pp->setCaption(gl.pidBase + gl.PID_SEL_MASK, *name ? name : "-- no mask --");
             pp->setEnabledById(gl.pidBase + gl.PID_SEL_MASK, true);
@@ -1361,7 +1347,7 @@ public:
 
         switch (panel->getInt(pid))
         {
-          case PropPanel::EXT_BUTTON_REMOVE:
+          case EXT_BUTTON_REMOVE:
             if (wingw::message_box(wingw::MBS_YESNO | wingw::MBS_QUEST, "Confirmation",
                   "Do you really want to delete land detail layer #%d (%s)?", lidx + 1,
                   gl.elcLayers.getBlock(lidx)->getStr("lName")) != wingw::MB_ID_YES)
@@ -1369,7 +1355,7 @@ public:
             gl.elcLayers.removeBlock(lidx);
             break;
 
-          case PropPanel::EXT_BUTTON_INSERT:
+          case EXT_BUTTON_INSERT:
             for (int i = 0; i < gl.elcLayers.blockCount(); i++)
             {
               if (i == lidx)
@@ -1399,7 +1385,7 @@ public:
             gl.elcLayers = bc;
             break;
 
-          case PropPanel::EXT_BUTTON_UP:
+          case EXT_BUTTON_UP:
             for (int i = 0; i < gl.elcLayers.blockCount(); i++)
             {
               if (i == lidx - 1)
@@ -1412,7 +1398,7 @@ public:
             gl.elcLayers = bc;
             break;
 
-          case PropPanel::EXT_BUTTON_DOWN:
+          case EXT_BUTTON_DOWN:
             for (int i = 0; i < gl.elcLayers.blockCount(); i++)
             {
               if (i == lidx)
@@ -1473,17 +1459,16 @@ public:
         }
       }
     }
-    virtual void onDoubleClick(int pid, PropPanel::ContainerPropertyControl *panel) {}
-    virtual void onPostEvent(int pid, PropPanel::ContainerPropertyControl *panel)
+    virtual void onDoubleClick(int pid, PropertyContainerControlBase *panel) {}
+    virtual void onPostEvent(int pid, PropPanel2 *panel)
     {
       if (pid == 1)
         refillPanel();
     }
 
     PostScriptParamLandLayer &gl;
-    PropPanel::DialogWindow *dlg;
-    IPoint2 windowPosition;
-    IPoint2 windowSize;
+    CDialogWindow *dlg;
+    RECT wr;
     DataBlock panelState;
   };
   PropsDlg *dlg;
@@ -1525,14 +1510,13 @@ public:
   }
   virtual void *get_interface(int id) { return id == 'Layr' ? this : NULL; }
 
-  virtual void fillParams(PropPanel::ContainerPropertyControl &_panel, int &pid)
+  virtual void fillParams(PropPanel2 &_panel, int &pid)
   {
     pidBase = pid;
-    PropPanel::ContainerPropertyControl &panel = *_panel.createExtGroup(pidBase + PID_LAYER_CAPTION,
+    PropertyContainerControlBase &panel = *_panel.createExtGroup(pidBase + PID_LAYER_CAPTION,
       String(0, paramName.empty() ? "Layer #%d" : "Layer #%d: %s", slotIdx + 1, paramName));
-    _panel.setInt(pidBase + PID_LAYER_CAPTION, (1 << PropPanel::EXT_BUTTON_INSERT) | (1 << PropPanel::EXT_BUTTON_REMOVE) |
-                                                 (1 << PropPanel::EXT_BUTTON_RENAME) | (1 << PropPanel::EXT_BUTTON_UP) |
-                                                 (1 << PropPanel::EXT_BUTTON_DOWN));
+    _panel.setInt(pidBase + PID_LAYER_CAPTION,
+      (1 << EXT_BUTTON_INSERT) | (1 << EXT_BUTTON_REMOVE) | (1 << EXT_BUTTON_RENAME) | (1 << EXT_BUTTON_UP) | (1 << EXT_BUTTON_DOWN));
 
     panel.createCheckBox(pidBase + PID_LAYER_ENABLED, "Layer enabled", enabled);
     panel.createButton(pidBase + PID_EDIT_PROPS, "Props...", true, false);
@@ -1619,13 +1603,13 @@ public:
   void updateDrdTex() {}
 
 
-  virtual void onPPChange(int pid, PropPanel::ContainerPropertyControl &panel)
+  virtual void onPPChange(int pid, PropPanel2 &panel)
   {
     if (pid == pidBase + PID_LAYER_ENABLED)
       enabled = panel.getBool(pid);
   }
 
-  virtual void onPPBtnPressed(int pid, PropPanel::ContainerPropertyControl &panel)
+  virtual void onPPBtnPressed(int pid, PropPanel2 &panel)
   {
     if (pid == pidBase + PID_SEL_LC1)
     {
@@ -1669,7 +1653,7 @@ public:
         dlg->show();
       }
     }
-    else if (pid == -PropPanel::DIALOG_ID_CLOSE)
+    else if (pid == -DIALOG_ID_CLOSE)
     {
       panel.setCaption(pidBase + PID_EDIT_PROPS, "Props...");
     }
@@ -1745,7 +1729,7 @@ public:
     {
       switch (panel.getInt(pid))
       {
-        case PropPanel::EXT_BUTTON_REMOVE:
+        case EXT_BUTTON_REMOVE:
           if (wingw::message_box(wingw::MBS_YESNO | wingw::MBS_QUEST, "Confirmation",
                 "Do you really want to delete generation layer #%d %s?", slotIdx + 1, paramName) == wingw::MB_ID_YES)
             if (HmapLandPlugin::self->delGenLayer(this))
@@ -1759,16 +1743,16 @@ public:
             }
           break;
 
-        case PropPanel::EXT_BUTTON_INSERT:
+        case EXT_BUTTON_INSERT:
         {
-          PropPanel::DialogWindow *dialog = DAGORED2->createDialog(_pxScaled(250), _pxScaled(125), "Insert generation layer");
-          dialog->setInitialFocus(PropPanel::DIALOG_ID_NONE);
-          PropPanel::ContainerPropertyControl *panel = dialog->getPanel();
+          CDialogWindow *dialog = DAGORED2->createDialog(_pxScaled(250), _pxScaled(125), "Insert generation layer");
+          dialog->setInitialFocus(DIALOG_ID_NONE);
+          PropPanel2 *panel = dialog->getPanel();
           panel->createEditBox(0, "Enter generation layer name:");
           panel->setFocusById(0);
 
           int ret = dialog->showDialog();
-          if (ret == PropPanel::DIALOG_ID_OK)
+          if (ret == DIALOG_ID_OK)
           {
             HmapLandPlugin::self->addGenLayer(panel->getText(0), slotIdx);
             if (wingw::message_box(wingw::MBS_YESNO | wingw::MBS_QUEST, "Confirmation",
@@ -1782,7 +1766,7 @@ public:
         }
         break;
 
-        case PropPanel::EXT_BUTTON_UP:
+        case EXT_BUTTON_UP:
           if (HmapLandPlugin::self->moveGenLayer(this, true))
           {
             if (wingw::message_box(wingw::MBS_YESNO | wingw::MBS_QUEST, "Confirmation",
@@ -1794,7 +1778,7 @@ public:
           }
           break;
 
-        case PropPanel::EXT_BUTTON_DOWN:
+        case EXT_BUTTON_DOWN:
           if (HmapLandPlugin::self->moveGenLayer(this, false))
           {
             if (wingw::message_box(wingw::MBS_YESNO | wingw::MBS_QUEST, "Confirmation",
@@ -1806,16 +1790,16 @@ public:
           }
           break;
 
-        case PropPanel::EXT_BUTTON_RENAME:
+        case EXT_BUTTON_RENAME:
         {
-          PropPanel::DialogWindow *dialog = DAGORED2->createDialog(_pxScaled(250), _pxScaled(125), "Rename generation layer");
-          dialog->setInitialFocus(PropPanel::DIALOG_ID_NONE);
-          PropPanel::ContainerPropertyControl *panel = dialog->getPanel();
+          CDialogWindow *dialog = DAGORED2->createDialog(_pxScaled(250), _pxScaled(125), "Rename generation layer");
+          dialog->setInitialFocus(DIALOG_ID_NONE);
+          PropPanel2 *panel = dialog->getPanel();
           panel->createEditBox(0, "Change generation layer name:", paramName);
           panel->setFocusById(0);
 
           int ret = dialog->showDialog();
-          if (ret == PropPanel::DIALOG_ID_OK)
+          if (ret == DIALOG_ID_OK)
           {
             paramName = panel->getText(0);
             HmapLandPlugin::self->refillPanel();
@@ -1843,7 +1827,7 @@ public:
         HmapLandPlugin::self->setSelectMode();
     }
   }
-  virtual bool onPPChangeEx(int pid, PropPanel::ContainerPropertyControl &p)
+  virtual bool onPPChangeEx(int pid, PropPanel2 &p)
   {
     if (pid < pidBase || pid >= pidBase + PID__COUNT)
       return false;
@@ -1851,7 +1835,7 @@ public:
     ;
     return true;
   }
-  virtual bool onPPBtnPressedEx(int pid, PropPanel::ContainerPropertyControl &p)
+  virtual bool onPPBtnPressedEx(int pid, PropPanel2 &p)
   {
     if (pid < pidBase || pid >= pidBase + PID__COUNT)
       return false;
@@ -1859,7 +1843,7 @@ public:
     return true;
   }
 
-  virtual void finishEdit(PropPanel::ContainerPropertyControl &panel)
+  virtual void finishEdit(PropPanel2 &panel)
   {
     if (elcMaskCurIdx < 0)
       panel.setCaption(pidBase + PID_EDIT_MASK, "Edit");
@@ -2946,7 +2930,7 @@ bool HmapLandPlugin::compileAndRunColorGenScript(bool &was_inited, SQPRINTFUNCTI
 
     if (!f)
     {
-      LOGERR_CTX("failed to open script file %s", scriptFilename.str());
+      logerr_ctx("failed to open script file %s", scriptFilename.str());
       return false;
     }
 

@@ -1,5 +1,0 @@
-return {
-  apply_audio_settings = @(_changedfileds) null
-  sound_set_fixed_time_speed = @(_time) null
-  sound_get_listener_pos = @() null
-}

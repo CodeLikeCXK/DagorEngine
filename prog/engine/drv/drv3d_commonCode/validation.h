@@ -1,6 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
-
 // Contains common validation routines
 
 // Usually its best to align stuff to 16 bytes - eg one float4

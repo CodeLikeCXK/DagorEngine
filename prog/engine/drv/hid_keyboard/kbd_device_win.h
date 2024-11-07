@@ -1,7 +1,9 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright 2023 by Gaijin Games KFT, All rights reserved.
+#ifndef _GAIJIN_DRV_HID_KEYBOARD_KBD_DEVICE_WIN_H
+#define _GAIJIN_DRV_HID_KEYBOARD_KBD_DEVICE_WIN_H
 #pragma once
 
-#include <drv/hid/dag_hiKeyboard.h>
+#include <humanInput/dag_hiKeyboard.h>
 #include <osApiWrappers/dag_wndProcComponent.h>
 #include "kbd_device_common.h"
 
@@ -47,7 +49,6 @@ public:
 #endif
 
 private:
-  unsigned locksDownMask;
 #if _TARGET_PC_WIN | _TARGET_XBOX
   void OnChar(uintptr_t wParam);
   void OnKeyUpKeyDown(unsigned msg, uintptr_t wParam, intptr_t lParam);
@@ -56,3 +57,5 @@ private:
   void updateLocks(bool notify_when_not_changed = false);
 };
 } // namespace HumanInput
+
+#endif

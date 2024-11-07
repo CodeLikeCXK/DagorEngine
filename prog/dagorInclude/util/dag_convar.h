@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -14,13 +15,6 @@ enum ConVarFlags
   CVF_DEFAULT = 0,
   // This convar won't be added to linked list (i.e. can't be discovered or changed)
   CVF_UNREGISTERED = 1 << 0
-};
-
-enum class ConVarType
-{
-  CVT_BOOL,
-  CVT_INT,
-  CVT_FLOAT
 };
 
 class ConVarBase
@@ -41,9 +35,6 @@ public:
   virtual void describeValue(char *buf, size_t buf_size) const = 0;
   virtual void parseString(const char *input) = 0;
   virtual bool imguiWidget(const char *label_override = nullptr) = 0;
-
-  virtual ConVarType getType() const = 0;
-  virtual float getBaseValue() const = 0;
 
 private:
   const char *name;
@@ -71,8 +62,6 @@ public:
   void describeValue(char *buf, size_t buf_size) const override;
   void parseString(const char *input) override;
   bool imguiWidget(const char *label_override) override;
-  ConVarType getType() const override;
-  float getBaseValue() const override { return static_cast<float>(value); }
 
   virtual void set(T val) { value = val; }
   T get() const { return value; }
@@ -113,8 +102,6 @@ public:
   void describeValue(char *buf, size_t buf_size) const override;
   void parseString(const char *input) override;
   bool imguiWidget(const char *label_override) override;
-  ConVarType getType() const override;
-  float getBaseValue() const override { return static_cast<float>(this->value); }
 
   void set(T val) override { this->value = min(max(val, minValue), maxValue); }
   T getMin() const { return minValue; }
@@ -162,32 +149,6 @@ bool ConVarT<float, false>::imguiWidget(const char *label_override);
 template <>
 bool ConVarT<bool, false>::imguiWidget(const char *label_override);
 
-template <>
-inline ConVarType ConVarT<int, true>::getType() const
-{
-  return ConVarType::CVT_INT;
-}
-template <>
-inline ConVarType ConVarT<int, false>::getType() const
-{
-  return ConVarType::CVT_INT;
-}
-template <>
-inline ConVarType ConVarT<float, true>::getType() const
-{
-  return ConVarType::CVT_FLOAT;
-}
-template <>
-inline ConVarType ConVarT<float, false>::getType() const
-{
-  return ConVarType::CVT_FLOAT;
-}
-template <>
-inline ConVarType ConVarT<bool, false>::getType() const
-{
-  return ConVarType::CVT_BOOL;
-}
-
 extern template class ConVarT<int, false>;
 extern template class ConVarT<int, true>;
 extern template class ConVarT<float, false>;
@@ -208,15 +169,9 @@ typedef ConVarT<bool, false> ConVarB;
 typedef ConVarT<float, true> ConVarF;
 typedef ConVarT<int, true> ConVarI;
 
-#define CONSOLE_BOOL_VAL(domain, name, defVal)          ConVarT<bool, false> name(domain "." #name, defVal, nullptr)
-#define CONSOLE_BOOL_VAL_TIP(domain, name, defVal, tip) ConVarT<bool, false> name(domain "." #name, defVal, tip)
+#define CONSOLE_BOOL_VAL(domain, name, defVal) ConVarT<bool, false> name(domain "." #name, defVal, nullptr)
 #define CONSOLE_INT_VAL(domain, name, defVal, minVal, maxVal) \
   ConVarT<int, true> name(domain "." #name, defVal, minVal, maxVal, nullptr)
-#define CONSOLE_INT_VAL_TIP(domain, name, defVal, minVal, maxVal, tip) \
-  ConVarT<int, true> name(domain "." #name, defVal, minVal, maxVal, tip)
 #define CONSOLE_FLOAT_VAL_MINMAX(domain, name, defVal, minVal, maxVal) \
   ConVarT<float, true> name(domain "." #name, defVal, minVal, maxVal, nullptr)
-#define CONSOLE_FLOAT_VAL_MINMAX_TIP(domain, name, defVal, minVal, maxVal, tip) \
-  ConVarT<float, true> name(domain "." #name, defVal, minVal, maxVal, tip)
-#define CONSOLE_FLOAT_VAL(domain, name, defVal)          ConVarT<float, false> name(domain "." #name, defVal, nullptr)
-#define CONSOLE_FLOAT_VAL_TIP(domain, name, defVal, tip) ConVarT<float, false> name(domain "." #name, defVal, tip)
+#define CONSOLE_FLOAT_VAL(domain, name, defVal) ConVarT<float, false> name(domain "." #name, defVal, nullptr)

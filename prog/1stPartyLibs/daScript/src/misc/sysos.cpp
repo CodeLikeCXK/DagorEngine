@@ -17,39 +17,6 @@
             dw = (dw & ~(mask << lowBit)) | (DWORD(newValue) << lowBit);
         }
 
-#if !defined(_M_ARM64)
-        int GetLogicalProcessorCountInWindows() {
-            DWORD returnLength = 0;
-            vector<unsigned char> buffer;
-            PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX info = nullptr;
-            // First, call to get the size of the data needed.
-            GetLogicalProcessorInformationEx(RelationAll, NULL, &returnLength);
-            buffer.resize(returnLength);
-            // Now retrieve the data.
-            if (GetLogicalProcessorInformationEx(RelationAll, reinterpret_cast<SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *>(buffer.data()), &returnLength)) {
-                int logicalProcessorCount = 0;
-                DWORD offset = 0;
-                // Parse the returned buffer for processor information
-                while (offset < returnLength) {
-                    info = reinterpret_cast<SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *>(buffer.data() + offset);
-                    if (info->Relationship == RelationProcessorCore) {
-                        // For each core, count the number of set bits in the GroupMask
-                        for (int i = 0; i < info->Processor.GroupCount; ++i) {
-                            auto mask = info->Processor.GroupMask[i].Mask;
-                            // Count bits set to 1 in the processor mask
-                            while (mask) {
-                                logicalProcessorCount += (mask & 1);
-                                mask >>= 1;
-                            }
-                        }
-                    }
-                    offset += info->Size;
-                }
-                return logicalProcessorCount;
-            }
-            return 0;
-        }
-
         bool g_isVHSet = false;
         void ( * g_HwBpHandler ) ( int, void * ) = nullptr;
 
@@ -110,11 +77,6 @@
             if (!SetThreadContext(thisThread, &cxt)) return false;
             return true;
         }
-#else
-        void hwSetBreakpointHandler(void (*) (int, void *)) {}
-        int hwBreakpointSet(void *, int, int) { return -1; }
-        bool hwBreakpointClear(int) { return false; }
-#endif
 
         size_t getExecutablePathName(char* pathName, size_t pathNameCapacity) {
             return GetModuleFileNameA(NULL, pathName, (DWORD)pathNameCapacity);
@@ -123,7 +85,7 @@
             return LoadLibraryA(fileName);
         }
         void * getFunctionAddress ( void * module, const char * func ) {
-            return (void*)GetProcAddress(HMODULE(module),func);
+            return GetProcAddress(HMODULE(module),func);
         }
         void * getLibraryHandle ( const char * moduleName ) {
             return GetModuleHandleA(moduleName);
@@ -132,9 +94,6 @@
             char buffer[MAX_PATH ];
             auto ret = GetFullPathNameA(fileName,MAX_PATH,buffer,nullptr);
             return ret ? buffer : "";
-        }
-        bool closeLibrary ( void * module ) {
-            return FreeLibrary(HMODULE(module));
         }
     }
 #elif defined(__linux__) || defined(_EMSCRIPTEN_VER)
@@ -165,9 +124,6 @@
         string normalizeFileName ( const char * fileName ) {
             // TODO: implement
             return "";
-        }
-        bool closeLibrary ( void * module ) {
-            return dlclose(module) == 0;
         }
     }
 #elif defined(__APPLE__)
@@ -442,9 +398,6 @@
             // TODO: implement
             return "";
         }
-        bool closeLibrary ( void * module ) {
-            return dlclose(module) == 0;
-        }
     }
 #elif defined __HAIKU__
     #include <unistd.h>
@@ -481,10 +434,6 @@
             // TODO: implement
             return "";
         }
-        bool closeLibrary ( void * ) {
-            // TODO: implement
-            return false;
-        }
     }
 #else
     namespace das {
@@ -514,10 +463,6 @@
         string normalizeFileName ( const char * fileName ) {
             // TODO: implement
             return "";
-        }
-        bool closeLibrary ( void * ) {
-            // TODO: implement
-            return false;
         }
     }
 #endif

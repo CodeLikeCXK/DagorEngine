@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <gamePhys/common/fixed_dt.h>
 
 #if DAGOR_DBGLEVEL > 0

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <heightmap/heightmapHandler.h>
 #include <math/dag_bounds2.h>
 #include <math/dag_mathUtils.h>

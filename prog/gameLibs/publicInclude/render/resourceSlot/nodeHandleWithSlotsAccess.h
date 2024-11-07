@@ -1,16 +1,7 @@
-//
-// Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-//
 #pragma once
 
 #include <render/daBfg/nameSpace.h>
 
-
-namespace das
-{
-class Context;
-} // namespace das
 
 namespace resource_slot
 {
@@ -43,10 +34,6 @@ struct NodeHandleWithSlotsAccess
    */
   void reset();
 
-  /** Check, if handle is valid
-   */
-  bool valid() const;
-
   /** Destructor; calls reset()
    */
   ~NodeHandleWithSlotsAccess();
@@ -58,13 +45,11 @@ struct NodeHandleWithSlotsAccess
    */
   NodeHandleWithSlotsAccess(dabfg::NameSpace ns, int handle_id, unsigned generation_number);
 
-  void _noteContext(const das::Context *context) const;
-
 private:
   dabfg::NameSpace nameSpace;
   int id;
   unsigned generation : 31;
-  unsigned isValid : 1;
+  unsigned valid : 1;
 };
 
 static_assert(sizeof(NodeHandleWithSlotsAccess) == sizeof(unsigned) * 3);

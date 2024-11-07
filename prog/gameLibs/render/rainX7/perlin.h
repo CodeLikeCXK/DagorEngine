@@ -1,4 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef _GAIJIN_GAMELIB_PERLIN_H
+#define _GAIJIN_GAMELIB_PERLIN_H
 #pragma once
 
 template <int prime0, int prime1, int prime2>
@@ -79,3 +80,5 @@ inline float PerlinNoise<prime0, prime1, prime2>::SoftNoise1D(int x)
 
 // some default primes
 typedef PerlinNoise<19379, 819233, 1266122899> PerlinNoiseDefault;
+
+#endif

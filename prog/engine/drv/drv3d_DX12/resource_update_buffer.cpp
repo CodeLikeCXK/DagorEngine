@@ -1,7 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
-#include <drv/3d/dag_tex3d.h>
-#include <drv/3d/dag_resUpdateBuffer.h>
+#include <3d/dag_drv3d.h>
+#include <3d/dag_tex3d.h>
 
 #include "device.h"
 #include "driver.h"
@@ -80,7 +78,7 @@ d3d::ResUpdateBuffer *d3d::allocate_update_buffer_for_tex_region(BaseTexture *de
   Image *image = texture->getDeviceImage();
   if (!image)
   {
-    D3D_ERROR("DX12: Texture %p <%s> doesn't have device image", texture, texture->getResName());
+    logerr("DX12: Texture %p <%s> doesn't have device image", texture, texture->getResName());
     return nullptr;
   }
 
@@ -96,7 +94,7 @@ d3d::ResUpdateBuffer *d3d::allocate_update_buffer_for_tex(BaseTexture *dest_base
   Image *image = texture->getDeviceImage();
   if (!image)
   {
-    D3D_ERROR("DX12: Texture %p <%s> doesn't have device image", texture, texture->getResName());
+    logerr("DX12: Texture %p <%s> doesn't have device image", texture, texture->getResName());
     return nullptr;
   }
   auto mipIndex = MipMapIndex::make(dest_mip);
@@ -149,8 +147,8 @@ bool d3d::update_texture_and_release_update_buffer(d3d::ResUpdateBuffer *&rub)
   STORE_RETURN_ADDRESS();
   ResUpdateBufferImp *&rubImp = reinterpret_cast<ResUpdateBufferImp *&>(rub);
   rubImp->stagingBuffer.flush();
-  DX12_UPLOAD_TO_IMAGE_AND_CHECK_DEST(drv3d_dx12::get_device().getContext(), "d3d::update_texture_and_release_update_buffer",
-    rubImp->destTex->getDeviceImage(), &rubImp->uploadInfo, 1, rubImp->stagingBuffer, DeviceQueueType::UPLOAD, false);
+  drv3d_dx12::get_device().getContext().uploadToImage(rubImp->destTex->getDeviceImage(), &rubImp->uploadInfo, 1, rubImp->stagingBuffer,
+    DeviceQueueType::UPLOAD, false);
   d3d::release_update_buffer(rub);
   return true;
 }

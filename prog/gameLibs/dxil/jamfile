@@ -13,7 +13,6 @@ Sources =
 
 AddIncludes =
   $(Root)/prog/gameLibs/publicInclude
-  $(Root)/prog/dagorInclude
 ;
 
 include $(Root)/prog/_jBuild/build.jam ;

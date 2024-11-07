@@ -1,13 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <render/gpuBenchmark.h>
 #include <math/dag_adjpow2.h>
 #include <3d/dag_quadIndexBuffer.h>
-#include <drv/3d/dag_renderTarget.h>
-#include <drv/3d/dag_draw.h>
-#include <drv/3d/dag_vertexIndexBuffer.h>
-#include <drv/3d/dag_matricesAndPerspective.h>
-#include <drv/3d/dag_info.h>
 #include <math/dag_math3d.h>
 #include <math/random/dag_random.h>
 #include <perfMon/dag_statDrv.h>
@@ -149,7 +142,7 @@ GpuBenchmark::GpuBenchmark()
     randomTex->unlockimg();
   }
   randomTex->texaddr(TEXADDR_WRAP);
-  randomTex->texfilter(TEXFILTER_LINEAR);
+  randomTex->texfilter(TEXFILTER_SMOOTH);
 
   gpu_benchmark_hmapVarId = get_shader_variable_id("gpu_benchmark_hmap");
 }
@@ -171,45 +164,22 @@ void GpuBenchmark::update(float dt)
 void GpuBenchmark::render(Texture *target_tex, Texture *depth_tex)
 {
   TIME_D3D_PROFILE(gpu_benchmark);
-  if (d3d::get_driver_code().is(d3d::metal))
-  {
-    d3d::driver_command(Drv3dCommand::TIMESTAMPGET, 0, 0, &lastGpuTime);
-  }
+  uint64_t gpuTimeMs;
+  timingIdx = (timingIdx + 1) % timings.size();
+  if (timings[timingIdx].read(gpuTimeMs, 1000000))
+    lastGpuTime = gpuTimeMs;
   else
-  {
-    uint64_t gpuTimeMs;
-    timingIdx = (timingIdx + 1) % timings.size();
-    if (timings[timingIdx].read(gpuTimeMs, 1000000))
-      lastGpuTime = gpuTimeMs;
-    else
-      lastGpuTime = 0;
-    timings[timingIdx].start();
-  }
+    lastGpuTime = 0;
+  timings[timingIdx].start();
 
   SCOPE_VIEW_PROJ_MATRIX;
   SCOPE_RENDER_TARGET;
 
   d3d::set_render_target(target_tex, 0);
-
-  Texture *depthRT = depth_tex;
-
-  if (!depthRT)
-  {
-    if (!benchmarkDepthTex)
-    {
-      TextureInfo tInfo;
-      target_tex->getinfo(tInfo, 0);
-      int flags = TEXCF_RTARGET;
-      if (d3d::check_texformat(TEXFMT_DEPTH24))
-        flags |= TEXFMT_DEPTH24;
-      else if (d3d::check_texformat(TEXFMT_DEPTH16))
-        flags |= TEXFMT_DEPTH16;
-      benchmarkDepthTex = dag::create_tex(nullptr, tInfo.w, tInfo.h, flags, 1, "benchmark_depth");
-    }
-    depthRT = benchmarkDepthTex.getTex2D();
-  }
-
-  d3d::set_depth(depthRT, DepthAccess::RW);
+  if (depth_tex)
+    d3d::set_depth(depth_tex, DepthAccess::RW);
+  else
+    d3d::set_backbuf_depth();
   d3d::clearview(CLEAR_TARGET | CLEAR_ZBUFFER, E3DCOLOR(159, 159, 255, 255), 0.0f, 0);
 
   d3d::settm(TM_WORLD, TMatrix::IDENT);
@@ -240,13 +210,7 @@ void GpuBenchmark::render(Texture *target_tex, Texture *depth_tex)
     return;
   d3d_err(d3d::drawind(PRIM_TRILIST, 0, TRI_COUNT_CUBE, 0));
 
-  if (!d3d::get_driver_code().is(d3d::metal))
-    timings[timingIdx].stop();
-  else
-  {
-    // flushing with par3 non null would flush and save gpu time of current command buffer
-    d3d::driver_command(Drv3dCommand::FLUSH_STATES, 0, 0, (void *)1);
-  }
+  timings[timingIdx].stop();
 }
 
 void GpuBenchmark::resetTimings()

@@ -1,11 +1,13 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright 2023 by Gaijin Games KFT, All rights reserved.
+#ifndef _GAIJIN_DRV_HID_GAMEPAD_XBOX_GAMEPAD_DEVICE_H
+#define _GAIJIN_DRV_HID_GAMEPAD_XBOX_GAMEPAD_DEVICE_H
 #pragma once
 
 #include <util/dag_globDef.h>
-#include <drv/hid/dag_hiJoystick.h>
-#include <drv/hid/dag_hiDeclDInput.h>
-#include <drv/hid/dag_hiXInputMappings.h>
-#include <drv/hid/dag_hiGlobals.h>
+#include <humanInput/dag_hiJoystick.h>
+#include <humanInput/dag_hiDeclDInput.h>
+#include <humanInput/dag_hiXInputMappings.h>
+#include <humanInput/dag_hiGlobals.h>
 #include <ioSys/dag_dataBlock.h>
 #include <string.h>
 
@@ -204,3 +206,5 @@ protected:
   unsigned short rumbleRightMotor = (unsigned short)-1;
 };
 } // namespace HumanInput
+
+#endif

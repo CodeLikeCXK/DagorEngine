@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <gameRes/dag_gameResSystem.h>
 #include <gameRes/dag_stdGameRes.h>
 #include <gameRes/dag_gameResHooks.h>
@@ -95,9 +93,8 @@ template <class T, unsigned CLS>
 struct StubGameResFactory : public GameResourceFactory
 {
   Ptr<T> stubRes;
-  bool reportAsLoaded = false;
 
-  explicit StubGameResFactory(bool report_as_loaded) : reportAsLoaded(report_as_loaded) { stubRes = stubgameres::makeStubRes<T>(); }
+  StubGameResFactory() { stubRes = stubgameres::makeStubRes<T>(); }
   virtual ~StubGameResFactory() { reset(); }
 
   virtual unsigned getResClassId() { return CLS; }
@@ -106,7 +103,7 @@ struct StubGameResFactory : public GameResourceFactory
   virtual bool isResLoaded(int res_id)
   {
     G_UNREFERENCED(res_id);
-    return reportAsLoaded;
+    return false;
   }
   virtual bool checkResPtr(GameResource *res) { return isStubRes(res); }
   virtual GameResource *getGameResource(int res_id)
@@ -156,9 +153,8 @@ struct StubGameResArrayFactory : public GameResourceFactory
   PtrTab<T> stubRes;
   OAHashNameMap<false> nameMap;
   const DataBlock &desc;
-  bool reportAsLoaded = false;
 
-  explicit StubGameResArrayFactory(const DataBlock &b, bool report_as_loaded) : desc(b), reportAsLoaded(report_as_loaded)
+  StubGameResArrayFactory(const DataBlock &b) : desc(b)
   {
     stub_types.addInt(CLS);
     for (int i = 0, res_id = 0; i < desc.blockCount(); i++)
@@ -172,7 +168,7 @@ struct StubGameResArrayFactory : public GameResourceFactory
   virtual bool isResLoaded(int res_id)
   {
     G_UNREFERENCED(res_id);
-    return reportAsLoaded;
+    return false;
   }
   virtual bool checkResPtr(GameResource *res) { return isStubRes(res); }
   virtual GameResource *getGameResource(int res_id)
@@ -358,7 +354,7 @@ static void ri_stub_on_load_res_packs(const char *pack_list_blk_fname, bool load
     stub_resolve_res_handle((GameResHandle)gameres_rendinst_desc.getBlock(i)->getBlockName(), RendInstGameResClassId, res_id);
 }
 
-void register_stub_gameres_factories(dag::ConstSpan<unsigned> stubbed_types, bool report_stubs_as_loaded)
+void register_stub_gameres_factories(dag::ConstSpan<unsigned> stubbed_types)
 {
   using namespace stubgameres;
   for (int i = 0; i < stubbed_types.size(); i++)
@@ -366,24 +362,17 @@ void register_stub_gameres_factories(dag::ConstSpan<unsigned> stubbed_types, boo
     switch (stubbed_types[i])
     {
       case DynModelGameResClassId:
-        stub_gameres_factories.push_back(
-          new StubGameResFactory<DynamicRenderableSceneLodsResource, DynModelGameResClassId>(report_stubs_as_loaded));
+        stub_gameres_factories.push_back(new StubGameResFactory<DynamicRenderableSceneLodsResource, DynModelGameResClassId>);
         break;
       case RendInstGameResClassId:
-        stub_gameres_factories.push_back(new StubGameResArrayFactory<RenderableInstanceLodsResource, RendInstGameResClassId>(
-          gameres_rendinst_desc, report_stubs_as_loaded));
+        stub_gameres_factories.push_back(
+          new StubGameResArrayFactory<RenderableInstanceLodsResource, RendInstGameResClassId>(gameres_rendinst_desc));
         chained_on_load_res_packs_from_list_complete = gamereshooks::on_load_res_packs_from_list_complete;
         gamereshooks::on_load_res_packs_from_list_complete = &ri_stub_on_load_res_packs;
         break;
-      case EffectGameResClassId:
-        stub_gameres_factories.push_back(new StubGameResFactory<Effect, EffectGameResClassId>(report_stubs_as_loaded));
-        break;
-      case PhysSysGameResClassId:
-        stub_gameres_factories.push_back(new StubGameResFactory<PhysSys, PhysSysGameResClassId>(report_stubs_as_loaded));
-        break;
-      case PhysObjGameResClassId:
-        stub_gameres_factories.push_back(new StubGameResFactory<PhysObj, PhysObjGameResClassId>(report_stubs_as_loaded));
-        break;
+      case EffectGameResClassId: stub_gameres_factories.push_back(new StubGameResFactory<Effect, EffectGameResClassId>); break;
+      case PhysSysGameResClassId: stub_gameres_factories.push_back(new StubGameResFactory<PhysSys, PhysSysGameResClassId>); break;
+      case PhysObjGameResClassId: stub_gameres_factories.push_back(new StubGameResFactory<PhysObj, PhysObjGameResClassId>); break;
       // case CharacterGameResClassId:    break;
       // case FastPhysDataGameResClassId: break;
       // case Anim2DataGameResClassId:    break;

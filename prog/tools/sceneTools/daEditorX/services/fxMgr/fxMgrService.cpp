@@ -1,12 +1,9 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <de3_interface.h>
 #include <de3_objEntity.h>
 #include <de3_entityPool.h>
 #include <de3_entityFilter.h>
 #include <de3_baseInterfaces.h>
 #include <de3_writeObjsToPlaceDump.h>
-#include <de3_effectController.h>
 #include <de3_entityUserData.h>
 #include <de3_editorEvents.h>
 #include <oldEditor/de_common_interface.h>
@@ -19,7 +16,7 @@
 #include <perfMon/dag_cpuFreq.h>
 #include <gameRes/dag_gameResSystem.h>
 #include <gameRes/dag_stdGameRes.h>
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
 #include <3d/dag_render.h>
 #include <render/dag_cur_view.h>
 #include <math/dag_TMatrix.h>
@@ -30,18 +27,9 @@
 #include <EASTL/unique_ptr.h>
 #include <dafxToolsHelper/dafxToolsHelper.h>
 
-#include "fxRenderer.h"
-
-
-enum
-{
-  HUID_ACES_IS_ACTIVE = 0xD6872FCEu
-};
-
 static bool dafx_enabled = false, haze_enabled = false;
 dafx::ContextId g_dafx_ctx;
 dafx::CullingId g_dafx_cull;
-dafx::CullingId g_dafx_fom_cull;
 dafx::Stats g_dafx_stats;
 float g_dafx_dt_mul = 1.f;
 
@@ -49,8 +37,6 @@ static int fxEntityClassId = -1;
 static int rendEntGeomMask = -1;
 static IEffectRayTracer *fxRayTracer = NULL;
 static OAHashNameMap<true> fxNames;
-
-int particles_resolution_preview = 1;
 
 class FxEntity;
 typedef SingleEntityPool<FxEntity> FxEntityPool;
@@ -104,7 +90,7 @@ public:
   int nameId;
 };
 
-class FxEntity : public VirtualFxEntity, public IObjEntityUserDataHolder, public IEffectController
+class FxEntity : public VirtualFxEntity, public IObjEntityUserDataHolder
 {
 public:
   FxEntity(int cls) : VirtualFxEntity(cls), idx(MAX_ENTITIES), userDataBlk(NULL) { tm.identity(); }
@@ -130,7 +116,7 @@ public:
 
       fx->setParam(HUID_RAYTRACER, fxRayTracer);
       if (dafx_enabled)
-        set_up_dafx_effect(g_dafx_ctx, fx, false, true, &tm, false);
+        set_up_dafx_effect(g_dafx_ctx, fx, false, true, &tm);
     }
 
     /*== this code is designed for emitter-editing mode
@@ -159,7 +145,6 @@ public:
   virtual void *queryInterfacePtr(unsigned huid)
   {
     RETURN_INTERFACE(huid, IObjEntityUserDataHolder);
-    RETURN_INTERFACE(huid, IEffectController);
     return NULL;
   }
 
@@ -171,21 +156,6 @@ public:
     return userDataBlk;
   }
   virtual void resetUserDataBlock() { del_it(userDataBlk); }
-
-  // IEffectController
-  virtual bool isActive() const override
-  {
-    bool active = false;
-    if (fx)
-      fx->getParam(HUID_ACES_IS_ACTIVE, &active);
-    return active;
-  }
-
-  virtual void setSpawnRate(float rate) override
-  {
-    if (fx)
-      fx->setSpawnRate(&rate);
-  }
 
   void copyFrom(const VirtualFxEntity &e)
   {
@@ -228,7 +198,7 @@ public:
     visible = true;
 
     if (dafx_enabled)
-      set_up_dafx_context(g_dafx_ctx, g_dafx_cull, g_dafx_fom_cull);
+      set_up_dafx_context(g_dafx_ctx, g_dafx_cull);
     if (!g_dafx_ctx)
       dafx_enabled = false;
   }
@@ -252,7 +222,7 @@ public:
         ent[i]->fx->update(dt * g_dafx_dt_mul);
 
     if (dafx_enabled)
-      act_dafx(g_dafx_ctx, dt * g_dafx_dt_mul);
+      act_dafx(g_dafx_ctx, g_dafx_cull, g_dafx_stats, dt * g_dafx_dt_mul, globtmPrev);
   }
   virtual void beforeRenderService() {}
   virtual void renderService() {}
@@ -285,93 +255,52 @@ public:
     if ((st_mask & rendEntGeomMask) != rendEntGeomMask)
       return;
 
-    IGenViewportWnd *wnd = EDITORCORE->getRenderViewport();
-    if (!wnd)
-      return;
-
-    bool forceLowres = particles_resolution_preview == 0;
-    bool forceHighres = particles_resolution_preview == 2;
     dag::ConstSpan<FxEntity *> ent = fxPool.getEntities();
-    auto renderFxCb = [&]() -> void {
-      switch (stage)
-      {
-        case STG_BEFORE_RENDER:
-          for (int i = 0; i < ent.size(); i++)
-            if (ent[i] && ent[i]->fx && ent[i]->isNonVirtual() && ent[i]->checkSubtypeAndLayerHiddenMasks(st_mask, lh_mask))
-              ent[i]->fx->render(FX_RENDER_BEFORE, ::grs_cur_view.itm);
 
-          if (dafx_enabled)
-          {
-            dafx::remap_culling_state_tag(g_dafx_ctx, g_dafx_cull, "lowres", forceHighres ? "highres" : "lowres");
-            dafx::remap_culling_state_tag(g_dafx_ctx, g_dafx_cull, "highres", forceLowres ? "lowres" : "highres");
-            before_render_dafx(g_dafx_ctx, g_dafx_cull, g_dafx_stats, globtmPrev);
-          }
-          break;
+    switch (stage)
+    {
+      case STG_BEFORE_RENDER:
+        for (int i = 0; i < ent.size(); i++)
+          if (ent[i] && ent[i]->fx && ent[i]->isNonVirtual() && ent[i]->checkSubtypeAndLayerHiddenMasks(st_mask, lh_mask))
+            ent[i]->fx->render(FX_RENDER_BEFORE, ::grs_cur_view.itm);
+        break;
 
-        case STG_RENDER_DYNAMIC_OPAQUE:
-          for (int i = 0; i < ent.size(); i++)
-            if (ent[i] && ent[i]->fx && ent[i]->isNonVirtual() && ent[i]->checkSubtypeAndLayerHiddenMasks(st_mask, lh_mask))
-              ent[i]->fx->render(FX_RENDER_SOLID, ::grs_cur_view.itm);
-          break;
+      case STG_RENDER_DYNAMIC_OPAQUE:
+        for (int i = 0; i < ent.size(); i++)
+          if (ent[i] && ent[i]->fx && ent[i]->isNonVirtual() && ent[i]->checkSubtypeAndLayerHiddenMasks(st_mask, lh_mask))
+            ent[i]->fx->render(FX_RENDER_SOLID, ::grs_cur_view.itm);
+        break;
 
-        case STG_RENDER_FX_LOWRES:
-          if (dafx_enabled)
-          {
-            if (!forceHighres)
-              dafx::render(g_dafx_ctx, g_dafx_cull, "lowres", 0.f);
+      case STG_RENDER_FX:
+        if (dafx_enabled)
+        {
+          dafx::render(g_dafx_ctx, g_dafx_cull, "lowres");
+          dafx::render(g_dafx_ctx, g_dafx_cull, "highres");
+          dafx::render(g_dafx_ctx, g_dafx_cull, "underwater");
+        }
 
-            calc_dafx_stats(g_dafx_ctx, g_dafx_stats);
-          }
+        for (int i = 0; i < ent.size(); i++)
+          if (ent[i] && ent[i]->fx && ent[i]->isNonVirtual() && ent[i]->checkSubtypeAndLayerHiddenMasks(st_mask, lh_mask))
+            ent[i]->fx->render(FX_RENDER_TRANS, ::grs_cur_view.itm);
 
-          break;
-        case STG_RENDER_FX:
-          if (dafx_enabled)
-          {
-            if (!forceLowres)
-              dafx::render(g_dafx_ctx, g_dafx_cull, "highres", 0.f);
+        if (dafx_enabled)
+          calc_dafx_stats(g_dafx_ctx, g_dafx_stats);
 
-            dafx::render(g_dafx_ctx, g_dafx_cull, "underwater", 0.f);
-          }
+        break;
 
-          for (int i = 0; i < ent.size(); i++)
-            if (ent[i] && ent[i]->fx && ent[i]->isNonVirtual() && ent[i]->checkSubtypeAndLayerHiddenMasks(st_mask, lh_mask))
-              ent[i]->fx->render(FX_RENDER_TRANS, ::grs_cur_view.itm);
+      case STG_RENDER_FX_DISTORTION:
+        if (dafx_enabled)
+          dafx::render(g_dafx_ctx, g_dafx_cull, "distortion");
 
-          if (dafx_enabled)
-            calc_dafx_stats(g_dafx_ctx, g_dafx_stats);
+        for (int i = 0; i < ent.size(); i++)
+          if (ent[i] && ent[i]->fx && ent[i]->isNonVirtual() && ent[i]->checkSubtypeAndLayerHiddenMasks(st_mask, lh_mask))
+            ent[i]->fx->render(FX_RENDER_DISTORTION, ::grs_cur_view.itm);
 
-          break;
+        if (dafx_enabled)
+          calc_dafx_stats(g_dafx_ctx, g_dafx_stats);
 
-        case STG_RENDER_FX_DISTORTION:
-          if (dafx_enabled)
-            dafx::render(g_dafx_ctx, g_dafx_cull, "distortion", 0.f);
-
-          for (int i = 0; i < ent.size(); i++)
-            if (ent[i] && ent[i]->fx && ent[i]->isNonVirtual() && ent[i]->checkSubtypeAndLayerHiddenMasks(st_mask, lh_mask))
-              ent[i]->fx->render(FX_RENDER_DISTORTION, ::grs_cur_view.itm);
-
-          if (dafx_enabled)
-            calc_dafx_stats(g_dafx_ctx, g_dafx_stats);
-
-          break;
-
-        case STG_RENDER_SHADOWS_FOM:
-          if (dafx_enabled)
-          {
-            render_dafx_fom(g_dafx_ctx, g_dafx_fom_cull);
-            calc_dafx_stats(g_dafx_ctx, g_dafx_stats);
-          }
-          break;
-      }
-    };
-
-    // This is a dirty workaround because the post fx with the base rendering looks different from the original
-    bool useDebugRendering = ShaderGlobal::get_int(get_shader_variable_id("fx_debug_editor_mode", true)) != 0;
-
-    if (useDebugRendering && stage == STG_RENDER_FX)
-      fxRenderer.render(*wnd, renderFxCb);
-    else
-      renderFxCb();
+        break;
+    }
   }
 
   // IObjEntityMgr interface
@@ -410,7 +339,7 @@ public:
   }
 
   // IBinaryDataBuilder interface
-  virtual bool validateBuild(int target, ILogWriter &log, PropPanel::ContainerPropertyControl *params)
+  virtual bool validateBuild(int target, ILogWriter &log, PropPanel2 *params)
   {
     if (!fxPool.calcEntities(IObjEntityFilter::getSubTypeMask(IObjEntityFilter::STMASK_TYPE_EXPORT)))
       log.addMessage(log.WARNING, "No fx entities for export");
@@ -419,7 +348,7 @@ public:
 
   virtual bool addUsedTextures(ITextureNumerator &tn) { return true; }
 
-  virtual bool buildAndWrite(BinDumpSaveCB &cwr, const ITextureNumerator &tn, PropPanel::ContainerPropertyControl *)
+  virtual bool buildAndWrite(BinDumpSaveCB &cwr, const ITextureNumerator &tn, PropPanel2 *)
   {
     dag::Vector<SrcObjsToPlace> objs;
 
@@ -486,8 +415,6 @@ protected:
   FxEntityPool fxPool;
   bool visible;
 
-  FxRenderer fxRenderer;
-
   TMatrix4 globtmPrev = TMatrix4::IDENT;
 };
 
@@ -495,7 +422,7 @@ void init_fxmgr_service(const DataBlock &app_blk)
 {
   if (!IDaEditor3Engine::get().checkVersion())
   {
-    DEBUG_CTX("Incorrect version!");
+    debug_ctx("Incorrect version!");
     return;
   }
 

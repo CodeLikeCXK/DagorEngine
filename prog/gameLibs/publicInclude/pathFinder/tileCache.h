@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -51,8 +52,6 @@ struct TileCacheMeshProcess : public dtTileCacheMeshProcess
 
   inline void setLadders(const scene::TiledScene *scn) { ladders = scn; }
   static void calcQueryLaddersBBox(BBox3 &out_box, const float *bmin, const float *bmax);
-
-  const scene::TiledScene *getLadders() const { return ladders; }
 
   bool checkOverLink(const float *from, const float *to, unsigned int &user_id) const;
 

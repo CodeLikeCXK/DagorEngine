@@ -1,6 +1,3 @@
-if (__name__ == "__analysis__")
-  return
-
 //expect:w203
 local condition1 = ::x
 local condition2 = ::y

@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -235,14 +236,11 @@ public:
   ReflectionVarMeta *next; // next var
 
   const char *getVarName() const { return name; }
-  void *getValueRaw(size_t align) const
-  {
-    return (void *)(reinterpret_cast<const uint8_t *>(this) + ((sizeof(ReflectionVarMeta) + align - 1) / align) * align);
-  }
+  void *getValueRaw() const { return (void *)(this + 1); }
   template <class T>
   T &getValue() const
   {
-    return *(T *)getValueRaw(alignof(T));
+    return *(T *)getValueRaw();
   }
   void setChanged(bool f) { flags = f ? (flags | RVF_CHANGED) : (flags & ~RVF_CHANGED); }
 };
@@ -581,7 +579,7 @@ public:
   ReflectionVarBase(const ReflectionVarBase &other) :
     ReflectionVarBase(other.get()) {} // trivial copy ctor in order to make class non trivially copyable
 
-  void markAsChanged(void *new_val = NULL) { EventListener::OnStateChanged(this, new_val ? new_val : getValueRaw(alignof(T))); }
+  void markAsChanged(void *new_val = NULL) { EventListener::OnStateChanged(this, new_val ? new_val : getValueRaw()); }
 
   T &getForModify()
   {

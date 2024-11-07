@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <vecmath/dag_vecMathDecl.h>
@@ -29,15 +28,10 @@ struct RiGridObject
     v_mat43_transpose_to_mat44(tm, pool.riTm.data()[riInstance]);
     bbox3f bbox;
     v_bbox3_init(bbox, tm, pool.collBb);
-    // optimize by world sphere. box from sphere can be smaller for rotated objects.
-    vec4f wbsph = getWBSph();
-    bbox3f sphBox;
-    v_bbox3_init_by_bsph(sphBox, wbsph, v_bsph_radius(wbsph));
-    return v_bbox3_get_box_intersection(sphBox, bbox);
+    return bbox;
   }
   uint64_t getHandle() const { return handle; }
   static RiGridObject null() { return rendinst::RIEX_HANDLE_NULL; }
-  const char *getDebugName() const;
 };
 
 template <typename ObjectType>

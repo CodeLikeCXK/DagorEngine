@@ -1,9 +1,10 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __GAIJIN_DAGORED_PLUGIN_DLG_H__
+#define __GAIJIN_DAGORED_PLUGIN_DLG_H__
 #pragma once
 
 #include <oldEditor/de_workspace.h>
 
-#include <propPanel/commonWindow/dialogWindow.h>
+#include <propPanel2/comWnd/dialog_window.h>
 
 #include <libTools/containers/dag_StrMap.h>
 
@@ -13,11 +14,7 @@ class IGenEditorPlugin;
 enum
 {
   SELECT_TAG_RADIO_GROUP_ID = 800,
-  PLUGIN_PANEL_LEFT_ID,
-  PLUGIN_PANEL_CENTER_ID,
-  PLUGIN_PANEL_RIGHT_ID,
-  SPACE_STATIC_ID,
-  PLUGIN_STATIC_ID,
+  CHECK_COMBO_GROUP_ID,
   HOTKEY_STATIC_ID,
 
   SELECT_ALL_RADIO_BUTTON_ID,
@@ -26,7 +23,7 @@ enum
 };
 
 //==============================================================================
-class PluginShowDialog : public PropPanel::DialogWindow
+class PluginShowDialog : public CDialogWindow
 {
 public:
   PluginShowDialog(void *phandle, const Tab<String> &tags, const StriMap<DeWorkspace::TabInt> &plugins);
@@ -34,13 +31,17 @@ public:
 
   void addPlugin(IGenEditorPlugin *plgn, int *hotkey, int menu_id);
 
-  virtual void onChange(int pcb_id, PropPanel::ContainerPropertyControl *panel);
-  virtual void onClick(int pcb_id, PropPanel::ContainerPropertyControl *panel);
+  virtual void onChange(int pcb_id, PropPanel2 *panel);
+  virtual void onClick(int pcb_id, PropPanel2 *panel);
+
+  virtual void autoSize(bool auto_center = true) override;
 
 private:
   void createHotkey(int idx, bool disable = false);
   void setHotkeys();
   void unsetHotkey(int hotkey);
+  void resizeTable();
+  void resizeLine(int index);
 
   int needRehideIdx;
   Tab<IGenEditorPlugin *> plugins;
@@ -52,7 +53,10 @@ private:
   const Tab<String> &tagStr;
   const StriMap<DeWorkspace::TabInt> &plugTags;
 
-  PropPanel::ContainerPropertyControl *mPanel, *mPanelLeft, *mPanelCenter, *mPanelRight;
+  PropertyContainerControlBase *mPanel, *mCheckComboPanel;
 
   bool mByRadio;
 };
+
+
+#endif

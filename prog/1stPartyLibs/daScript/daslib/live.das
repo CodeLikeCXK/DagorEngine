@@ -43,10 +43,7 @@ def saveLiveContext
 def restoreLiveContext
     to_log(LOG_TRACE, "LIVE: restoreLiveContext\n");
     if length(decsLiveData) > 0
-        try
-            decsLiveData |> mem_archive_load(decsState)
-        recover
-            to_log(LOG_ERROR, "exception during restoreLiveContext\n")
+        decsLiveData |> mem_archive_load(decsState)
 
 [finalize]
 def private go_offline
@@ -147,8 +144,7 @@ def public watch_files
                 appTime[fname] = st.mtime
     return any
 
-[export]
-def set_new_context ( var ptr : smart_ptr<Context>; full_restart:bool = false )
+def private set_new_context ( var ptr : smart_ptr<Context>; full_restart:bool = false )
     to_log(LOG_TRACE, "LIVE: set new context {intptr(get_ptr(ptr))}\n")
     invoke_live("shutdown")
     if appPtr != null
@@ -166,7 +162,6 @@ def set_new_context ( var ptr : smart_ptr<Context>; full_restart:bool = false )
     appPtr := ptr
     delete liveFunctionLookup
     if appPtr != null
-        appPtr.alwaysErrorOnException = true
         appPtr.alwaysStackWalkOnException = true
         unsafe
             // fixup decs if its there

@@ -1,4 +1,6 @@
-output:t ="../../../tools/dargbox/dargbox.vromfs.bin"
+output_PC:t ="../../../tools/dargbox/darg.vromfs.bin"
+output_and:t ="../../../tools/dargbox/darg.and.vromfs.bin"
+output_iOS:t ="../../../tools/dargbox/darg.iOS.vromfs.bin"
 pack:b=true
 
 allowMkDir:b=yes
@@ -7,6 +9,7 @@ rootFolder:t="."
 
 sign_private_key:t=""
 sign_digest:t="sha256"
+
 
 
 folder {
@@ -18,11 +21,11 @@ folder {
 }
 
 folder {
-  path:t="../../../prog/scripts/sq/std"
-  dest_path:t="sq/std"
+  path:t="gamebase/samples"
+  dest_path:t="samples_prog"
   scan_folder:b=true
   scan_subfolders:b=true
-  wildcard:t=*.nut
+  wildcard:t=*
 }
 
 folder {
@@ -31,6 +34,14 @@ folder {
   scan_folder:b=true
   scan_subfolders:b=false
   wildcard:t=init.nut
+}
+
+folder {
+  path:t="../../../prog/scripts/sq/std"
+  dest_path:t="sq/std"
+  scan_folder:b=true
+  scan_subfolders:b=true
+  wildcard:t=*.nut
 }
 
 exclude {

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "combinedNodesProcessing.h"
 #include "collisionUtils.h"
 #include "propPanelPids.h"
@@ -7,7 +5,7 @@
 #include <render/debug3dSolid.h>
 #include <math/dag_color.h>
 
-void CombinedNodesProcessing::init(CollisionResource *collision_res, PropPanel::ContainerPropertyControl *prop_panel)
+void CombinedNodesProcessing::init(CollisionResource *collision_res, PropertyContainerControlBase *prop_panel)
 {
   collisionRes = collision_res;
   panel = prop_panel;

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <util/dag_safeArg.h>
 #include <util/dag_string.h>
 #include <util/dag_simpleString.h>

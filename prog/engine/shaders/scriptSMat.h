@@ -1,6 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-#pragma once
-
 /************************************************************************
   scripted shader material class
 ************************************************************************/
@@ -53,7 +50,7 @@ public:
 
   int execInitCode();
 
-  __forceinline const ScriptedShadersBinDump &shBinDump() const { return ::shBinDumpEx(!secondDump); }
+  __forceinline const ScriptedShadersBinDump &shBinDump() const { return ::shBinDump(!secondDump); }
 
 protected:
   ShaderMaterialProperties(const shaderbindump::ShaderClass *sc, const MaterialData &m, bool sec_dump_for_exp);
@@ -96,8 +93,6 @@ public:
   const shaderbindump::ShaderCode *find_variant() const;
 
   bool enum_channels(ShaderChannelsEnumCB &cb, int &ret_code_flags) const override;
-
-  bool isPositionPacked() const override;
 
   ShaderElement *make_elem(bool acq_tex_refs, const char *info) override;
 

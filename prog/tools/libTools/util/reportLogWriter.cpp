@@ -1,12 +1,10 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <libTools/util/reportLogWriter.h>
 
 #include <util/dag_globDef.h>
 #include <stdio.h>
 
 #include <util/dag_string.h>
-#include <propPanel/commonWindow/listDialog.h>
+#include <propPanel2/comWnd/list_dialog.h>
 
 
 void ReportLogWriter::addMessageFmt(MessageType type, const char *fmt, const DagorSafeArg *arg, int anum)
@@ -67,7 +65,7 @@ bool ReportLogWriter::showReport(const char *title, const char *error_msg, const
   else
     strs.push_back() = ok_msg;
 
-  PropPanel::ListDialog dlg(title, strs, hdpi::_pxScaled(800), hdpi::_pxScaled(600));
+  ListDialog dlg(0, title, strs, hdpi::_pxScaled(800), hdpi::_pxScaled(600));
 
-  return dlg.showDialog() == PropPanel::DIALOG_ID_OK;
+  return dlg.showDialog() == DIALOG_ID_OK;
 }

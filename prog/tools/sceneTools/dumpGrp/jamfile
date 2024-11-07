@@ -1,3 +1,4 @@
+ReproducibleExeBuild = yes ;
 Root    ?= ../../../.. ;
 Location = prog/tools/sceneTools/dumpGrp ;
 include $(Root)/prog/tools/tools_setup.jam ;
@@ -6,7 +7,13 @@ ProjectAllowsOodle = yes ;
 
 TargetType  = exe ;
 Target      = tools/dumpGrp ;
-include $(Root)/prog/tools/tools_setup_outdir_util.jam ;
+
+include $(Root)/prog/_jBuild/defaults.jam ;
+
+OutDir = $(Root)/tools/dagor3_cdk/util ;
+if $(Platform) = win64 { OutDir = $(OutDir)64 ; }
+if $(Platform) in linux64 macosx { OutDir = $(OutDir)-$(Platform) ; }
+#CopyTo = $(Root)/$(Location) ;
 
 AddIncludes =
   $(Root)/prog/tools/sharedInclude
@@ -49,6 +56,6 @@ UseProgLibs =
 #  engine/phys/physCommon
 #  engine/phys/fastPhys
 ;
-if $(Platform) = linux { UseProgLibs += engine/osApiWrappers/messageBox ; }
+if $(Platform) = linux64 { UseProgLibs += engine/osApiWrappers/messageBox ; }
 
 include $(Root)/prog/_jBuild/build.jam ;

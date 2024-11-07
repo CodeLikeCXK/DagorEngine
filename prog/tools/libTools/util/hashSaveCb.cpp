@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <libTools/util/hash.h>
 #include <ioSys/dag_genIo.h>
 #include <hash/crc32.h>

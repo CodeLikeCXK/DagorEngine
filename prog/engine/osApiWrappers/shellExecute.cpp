@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <osApiWrappers/dag_shellExecute.h>
 #include <osApiWrappers/dag_progGlobals.h>
 
@@ -11,7 +9,6 @@
 #endif
 
 #include <osApiWrappers/dag_cpuJobs.h>
-#include <osApiWrappers/dag_threads.h>
 #include <debug/dag_debug.h>
 #include <string.h>
 #include <stdlib.h>
@@ -103,7 +100,7 @@ int get_win_execute_mgr_id()
   if (win_execute_mgr_id < 0)
   {
     G_ASSERT(cpujobs::is_inited());
-    win_execute_mgr_id = cpujobs::create_virtual_job_manager(128 << 10, WORKER_THREADS_AFFINITY_MASK, "WinShellExecute");
+    win_execute_mgr_id = cpujobs::create_virtual_job_manager(128 << 10, -1, "WinShellExecute");
   }
   return win_execute_mgr_id;
 }

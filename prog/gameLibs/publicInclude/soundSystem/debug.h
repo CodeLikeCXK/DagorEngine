@@ -1,10 +1,9 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
-
-#include <EASTL/functional.h>
 
 class TMatrix4;
 
@@ -15,8 +14,7 @@ void debug_trace_warn(const char *format, ...);
 void debug_trace_err(const char *format, ...);
 void debug_trace_log(const char *format, ...);
 
-void debug_draw();
+void debug_draw(const TMatrix4 &glob_tm);
 void set_draw_audibility(bool enable);
 void debug_enum_events();
-void debug_enum_events(const char *bank_name, eastl::function<void(const char *)> &&fun);
 }; // namespace sndsys

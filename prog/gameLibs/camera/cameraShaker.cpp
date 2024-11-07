@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <camera/cameraShaker.h>
 
 #include <math/dag_mathUtils.h>

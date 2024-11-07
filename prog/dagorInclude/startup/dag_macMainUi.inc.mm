@@ -1,12 +1,13 @@
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 
 #pragma once
 
 #import <Cocoa/Cocoa.h>
 #import <Appkit/AppKit.h>
 #import <objc/runtime.h>
-#include <drv/3d/dag_commands.h>
+#include <3d/dag_drv3dCmd.h>
 #include <debug/dag_hwExcept.h>
 #include <debug/dag_except.h>
 #include <memory/dag_mem.h>
@@ -24,7 +25,7 @@
 #include "dag_loadSettings.h"
 #include <mach-o/dyld.h>
 #include <osApiWrappers/dag_progGlobals.h>
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
 #include <osApiWrappers/dag_atomic.h>
 
 NSWindow* dagMainWnd = nullptr;
@@ -130,8 +131,10 @@ namespace workcycle_internal
 -(void) scrollWheel: (NSEvent*) theEvent
 {
   //debug("View: scrollWheel (%.2f, %.2f, %.2f)", [theEvent deltaX], [theEvent deltaY], [theEvent deltaZ]);
-  float delta = [theEvent scrollingDeltaY] ? [theEvent scrollingDeltaY] : [theEvent scrollingDeltaX];
-  workcycle_internal::main_window_proc(dagMainWnd, GPCM_MouseWheel, intptr_t(delta * -100.f), 0);
+  if ([theEvent deltaY])
+    workcycle_internal::main_window_proc(dagMainWnd, GPCM_MouseWheel, [theEvent deltaY] * -100, 0);
+  else
+    workcycle_internal::main_window_proc(dagMainWnd, GPCM_MouseWheel, [theEvent deltaX] * -100, 0);
 }
 @end
 
@@ -150,6 +153,7 @@ namespace workcycle_internal
   bool isActive;
   bool isBkgModeSupported;
 }
+- (void)applicationDidChangeScreenParameters:(NSNotification *)notification;
 + (Dagor2_AppDelegate *)sharedAppDelegate;
 @end 
 
@@ -171,7 +175,7 @@ NSWindow* macosx_create_dagor_window(const char* title, int scr_w, int scr_h, NS
                                           backing: NSBackingStoreBuffered
                                             defer: YES];
 
-  [dagMainWnd setLevel:(windowed ? NSNormalWindowLevel : NSMainMenuWindowLevel+2)];
+  [dagMainWnd setLevel:(windowed ? NSNormalWindowLevel : NSMainMenuWindowLevel+1)];
   [dagMainWnd setTitle:[[NSString alloc] initWithUTF8String:title]];
   [dagMainWnd setOpaque:YES];
 
@@ -238,7 +242,7 @@ void macosx_hide_windows_on_alert()
   }
 
   // release GPU lock and disable future locks from non-main thread
-  int refc = d3d::driver_command(Drv3dCommand::RELEASE_OWNERSHIP, 0, (void*)1, (void*)1);
+  int refc = d3d::driver_command(DRV3D_COMMAND_RELEASE_OWNERSHIP, 0, (void*)1, (void*)1);
   debug("macosx_hide_windows_on_alert, releaseGPU=%d", refc);
 }
 
@@ -273,6 +277,8 @@ extern void macosx_hide_windows_on_alert();
 extern "C" const char *dagor_exe_build_date;
 extern "C" const char *dagor_exe_build_time;
 
+extern void clear_shortcuts_keyboard();
+
 extern void messagebox_report_fatal_error(const char *title, const char *msg, const char *call_stack);
 
 static bool stop_event_processing = false;
@@ -280,15 +286,12 @@ static bool stop_event_processing = false;
 static void messagebox_win_report_fatal_error(const char *title, const char *msg, const char *call_stack)
 {
   debug("messagebox_win_report_fatal_error, title=%s, msg=%s, call_stack=%s", title, msg, call_stack);
-  if (!::dgs_execute_quiet)
-  {
-    macosx_hide_windows_on_alert();
-    stop_event_processing = true;
-    os_message_box(msg, title, GUI_MB_OK|GUI_MB_ICON_ERROR);
+  macosx_hide_windows_on_alert();
+  stop_event_processing = true;
+  os_message_box(msg, title, GUI_MB_OK|GUI_MB_ICON_ERROR);
 
-    int refc = d3d::driver_command(Drv3dCommand::RELEASE_OWNERSHIP, 0, 0, (void*)1);
-    debug("messagebox_win_report_fatal_error, releaseGPU=%d", refc);
-  }
+  int refc = d3d::driver_command(DRV3D_COMMAND_RELEASE_OWNERSHIP, 0, 0, (void*)1);
+  debug("messagebox_win_report_fatal_error, releaseGPU=%d", refc);
 }
 
 bool mbox_user_allows_abort(const char *msg, const char *call_stack)
@@ -301,7 +304,7 @@ bool mbox_user_allows_abort(const char *msg, const char *call_stack)
     return true;
 
   dagor_suppress_d3d_update(true);
-  int refc = d3d::driver_command(Drv3dCommand::RELEASE_OWNERSHIP, 0, (void*)1, (void*)1);
+  int refc = d3d::driver_command(DRV3D_COMMAND_RELEASE_OWNERSHIP, 0, (void*)1, (void*)1);
   debug("mbox_user_allows_abort, releaseGPU=%d", refc);
   // failed to release owner ship, exit
   if (refc < 0)
@@ -319,7 +322,7 @@ bool mbox_user_allows_abort(const char *msg, const char *call_stack)
 
   dagor_suppress_d3d_update(false);
   stop_event_processing = false;
-  refc = d3d::driver_command(Drv3dCommand::RELEASE_OWNERSHIP, 0, 0, (void*)1);
+  refc = d3d::driver_command(DRV3D_COMMAND_RELEASE_OWNERSHIP, 0, 0, (void*)1);
   debug("mbox_user_allows_abort, releaseGPU=%d", refc);
 
   return result == GUI_MB_BUTTON_1;
@@ -353,7 +356,6 @@ extern "C" int main(int argc, char *argv[])
   dgs_init_argv(argc, argv);
   dgs_report_fatal_error = messagebox_win_report_fatal_error;
   apply_hinstance ( NULL, NULL );
-  ::dgs_execute_quiet = ::dgs_get_argv("quiet");
 
   DagorHwException::setHandler( "main" );
 
@@ -395,7 +397,7 @@ DAGOR_TRY
 } DAGOR_CATCH(...)
 {
   flush_debug_file();
-  DEBUG_CTX("\nUnhandled exception:\n");
+  debug_ctx("\nUnhandled exception:\n");
   flush_debug_file();
   _exit(2);
 }
@@ -533,7 +535,7 @@ namespace workcycle_internal { intptr_t main_window_proc(void*,unsigned,uintptr_
 -(id)init
 {
   self = [super init];
-  DEBUG_CP();
+  debug_cp();
   isActive = FALSE;
   isBkgModeSupported = NO;
   return self;
@@ -541,39 +543,40 @@ namespace workcycle_internal { intptr_t main_window_proc(void*,unsigned,uintptr_
 
 -(void)main
 {
-  DEBUG_CP();
+  debug_cp();
   int res = DagorWinMain(0,0);
-  DEBUG_CP();
+  debug_cp();
   quit_game(res);
-  DEBUG_CP();
+  debug_cp();
 }
 
 -(void)applicationWillFinishLaunching: (NSNotification*)application
 {
-  DEBUG_CP();
+  debug_cp();
 }
 
 -(void)applicationDidFinishLaunching: (NSNotification*)application
 {
-  DEBUG_CP();
+  debug_cp();
   [NSTimer scheduledTimerWithTimeInterval:(0) target:self selector:@selector(main) userInfo:nil repeats:NO];
 }
 
 -(void)applicationWillTerminate:(NSNotification *)application
 {
-  DEBUG_CP();
+  debug_cp();
 }
 
 
 -(void)applicationWillResignActive:(NSNotification*)application
 {
-  DEBUG_CP();
+  debug_cp();
   workcycle_internal::main_window_proc(NULL, GPCM_Activate, GPCMP1_Inactivate, 0);
 }
 
 -(void)applicationDidBecomeActive:(NSNotification *)application
 {
-  DEBUG_CP();
+  debug_cp();
+  clear_shortcuts_keyboard();
   macosx_on_app_activated();
   workcycle_internal::main_window_proc(NULL, GPCM_Activate, GPCMP1_Activate, 0);
 }
@@ -588,29 +591,41 @@ namespace workcycle_internal { intptr_t main_window_proc(void*,unsigned,uintptr_
     snprintf(out_str_buf + i * 2, sizeof(out_str_buf) - i*2, "%.2X", token_bytes[i]);
   
   NSString *preferredLang = [[NSLocale preferredLanguages] objectAtIndex:0];
+  const char *langStr = [preferredLang UTF8String];
   NSLog(@"DEVICE TOKEN: %@ locale %@", [NSString stringWithUTF8String: out_str_buf], preferredLang);
 }
 
 -(void)application: (NSApplication*)application didFailToRegisterForRemoteNotificationsWithError: (NSError*)error
 {
-  DEBUG_CP();
+  debug_cp();
 }
 
 -(void)application: (NSApplication*)application didReceiveRemoteNotification: (NSDictionary*)userInfo
 {
-  DEBUG_CP();
+  debug_cp();
 }
 
 -(BOOL)application: (NSNotification*)application didFinishLaunchingWithOptions: (NSDictionary*)launchOptions
 {
-  DEBUG_CP();
+  debug_cp();
   [self applicationDidFinishLaunching:application];
   return YES;
 }
 
 -(void)dealloc
 {
-  DEBUG_CP();
+  debug_cp();
   [super dealloc];
+}
+
+-(void)applicationDidChangeScreenParameters:(NSNotification *)notification
+{
+  NSScreen *screen = [NSScreen mainScreen];
+  static bool startup = true;
+  if (!startup)
+    return;
+  startup = false;
+  bool enable = screen.maximumExtendedDynamicRangeColorComponentValue > 1.f;
+  d3d::driver_command(DRV3D_COMMAND_SET_HDR, &enable, 0, 0);
 }
 @end

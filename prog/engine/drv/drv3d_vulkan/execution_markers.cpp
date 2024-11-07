@@ -1,21 +1,16 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "execution_markers.h"
-#include "globals.h"
-#include "debug_naming.h"
-#include "device_context.h"
-#include "device_queue.h"
+#include "device.h"
 
 using namespace drv3d_vulkan;
 
 void ExecutionMarkers::init()
 {
 #if VK_AMD_buffer_marker
-  if (Globals::VK::dev.hasExtension<BufferMarkerAMD>())
+  if (get_device().getVkDevice().hasExtension<BufferMarkerAMD>())
   {
-    executionMarkerBuffer = Buffer::create(MAX_DEBUG_MARKER_BUFFER_ENTRIES * sizeof(uint32_t),
+    executionMarkerBuffer = get_device().createBuffer(MAX_DEBUG_MARKER_BUFFER_ENTRIES * sizeof(uint32_t),
       DeviceMemoryClass::HOST_RESIDENT_HOST_READ_ONLY_BUFFER, 1, BufferMemoryFlags::DEDICATED);
-    Globals::Dbg::naming.setBufName(executionMarkerBuffer, "amd marker buffer");
+    get_device().setBufName(executionMarkerBuffer, "amd marker buffer");
   }
 #endif
 }
@@ -24,8 +19,7 @@ void ExecutionMarkers::shutdown()
 {
 #if VK_AMD_buffer_marker
   if (executionMarkerBuffer)
-    Globals::ctx.destroyBuffer(executionMarkerBuffer);
-  executionMarkerBuffer = nullptr;
+    get_device().getContext().destroyBuffer(executionMarkerBuffer);
 #endif
 }
 
@@ -80,10 +74,10 @@ void ExecutionMarkers::check()
   }
 #endif
 #if VK_NV_device_diagnostic_checkpoints
-  VulkanDevice &vkDev = Globals::VK::dev;
+  VulkanDevice &vkDev = get_device().getVkDevice();
   if (vkDev.hasExtension<DiagnosticCheckpointsNV>())
   {
-    VulkanQueueHandle grQueue = Globals::VK::que[DeviceQueueType::GRAPHICS].getHandle();
+    VulkanQueueHandle grQueue = get_device().getQueue(DeviceQueueType::GRAPHICS).getHandle();
 
     debug("Checking execution makers - VK_NV_device_diagnostic_checkpoints:");
     debug("Next id would be: %08lX", commandIndex);
@@ -167,7 +161,7 @@ void ExecutionMarkers::write(VulkanCommandBufferHandle cb, VkPipelineStageFlagBi
   G_UNUSED(stage);
 
 #if VK_AMD_buffer_marker | VK_NV_device_diagnostic_checkpoints
-  VulkanDevice &vkDev = Globals::VK::dev;
+  VulkanDevice &vkDev = get_device().getVkDevice();
 #endif
 
 #if VK_AMD_buffer_marker

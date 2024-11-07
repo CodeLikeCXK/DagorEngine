@@ -1,10 +1,11 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
-#include <supp/dag_define_KRNLIMP.h>
+#include <supp/dag_define_COREIMP.h>
 
 //! creates named inter-process mutex
 KRNLIMP void *global_mutex_create(const char *mutex_name);
@@ -36,4 +37,4 @@ inline int global_mutex_leave_destroy(void *mutex, const char *mutex_name)
   return global_mutex_destroy(mutex, mutex_name);
 }
 
-#include <supp/dag_undef_KRNLIMP.h>
+#include <supp/dag_undef_COREIMP.h>

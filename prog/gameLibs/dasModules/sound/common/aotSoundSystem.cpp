@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <dasModules/aotSoundSystem.h>
 
 #define SND_BIND_FUN_EX(FUN, NAME, SIDE_EFFECTS) \
@@ -28,9 +26,8 @@ public:
     SND_BIND_FUN(sound_banks_enable_preset, das::SideEffects::modifyExternal);
     SND_BIND_FUN(sound_banks_enable_preset_starting_with, das::SideEffects::modifyExternal);
     SND_BIND_FUN(sound_banks_is_preset_enabled, das::SideEffects::accessExternal);
-    SND_BIND_FUN(sound_banks_is_preset_exist, das::SideEffects::accessExternal);
     SND_BIND_FUN(sound_debug_enum_events, das::SideEffects::accessExternal);
-    SND_BIND_FUN(sound_debug_enum_events_in_bank, das::SideEffects::modifyArgumentAndAccessExternal);
+    SND_BIND_FUN(sound_update, das::SideEffects::modifyExternal);
 
     verifyAotReady();
   }

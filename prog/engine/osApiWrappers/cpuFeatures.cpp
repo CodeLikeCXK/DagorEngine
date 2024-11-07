@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "osApiWrappers/dag_cpuFeatures.h"
 #include "osApiWrappers/dag_xstateFeatures.h"
 #include <cstdint>

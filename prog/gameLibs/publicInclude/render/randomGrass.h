@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -41,6 +42,7 @@ class BaseTexture;
 typedef BaseTexture Texture;
 class DataBlock;
 class RenderableInstanceLodsResource;
+class Clipmap;
 class LandMeshManager;
 class LandMeshRenderer;
 class PostFxRenderer;
@@ -49,7 +51,6 @@ class Occlusion;
 class LandMask;
 class ComputeShaderElement;
 class IEditableVariablesNotifications;
-struct BVHConnection;
 
 struct ColorRange
 {
@@ -209,18 +210,17 @@ public:
   eastl::unique_ptr<IEditableVariablesNotifications> varNotification;
 
 
-  void updateGrassColorLayer(Tab<carray<float4, MAX_COLOR_MASKS>> colors);
-  void initWebTools();
-#endif
-
   GrassLayer *getGrassLayerAt(int idx) { return layers[idx]; }
   int getGrassLayerCount() const { return layers.size(); }
+  void updateGrassColorLayer(Tab<carray<float4, MAX_COLOR_MASKS>> colors);
+  void initWebTools();
+
+
+#endif
 
   static void reset_mask_number();
 
   void setAlphaToCoverage(bool alpha_to_coverage);
-
-  static void setBVHConnection(BVHConnection *bvh_connection) { bvhConnection = bvh_connection; }
 
   bool isDissolve;
   bool isColorDebug;
@@ -290,6 +290,4 @@ protected:
 
   Tab<int> shaderVars;
   shaders::UniqueOverrideStateId afterPrepassOverride;
-
-  static BVHConnection *bvhConnection;
 };

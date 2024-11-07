@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "boolVar.h"
 #include "globVarSem.h"
 #include <EASTL/string.h>

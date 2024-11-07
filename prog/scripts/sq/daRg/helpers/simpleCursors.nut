@@ -12,20 +12,9 @@ let tooltipBox = @(content) {
 
 let tooltipGen = Watched(0)
 let tooltipComp = {value = null}
-
 function setTooltip(val){
-  const id = "tooltip"
-  if (val != null) {
-    gui_scene.resetTimeout(0.6, function() {
-      tooltipComp.value = val
-      tooltipGen.modify(@(v) v+1)
-    }, id)
-  }
-  else {
-    tooltipGen.modify(@(v) v+1)
-    tooltipComp.value = val
-    gui_scene.clearTimer(id)
-  }
+  tooltipComp.value = val
+  tooltipGen(tooltipGen.value+1)
 }
 let getTooltip = @() tooltipComp.value
 

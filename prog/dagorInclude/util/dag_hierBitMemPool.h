@@ -1,13 +1,14 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
 #include <string.h>
 
 
-#include <supp/dag_define_KRNLIMP.h>
+#include <supp/dag_define_COREIMP.h>
 
 KRNLIMP extern void *hierbit_allocmem(int sz);
 KRNLIMP extern void hierbit_freemem(void *p, int sz);
@@ -60,4 +61,4 @@ void hb_delete(T *_p, int cnt)
   hierbit_freemem(p, sizeof(T) * cnt);
 }
 
-#include <supp/dag_undef_KRNLIMP.h>
+#include <supp/dag_undef_COREIMP.h>

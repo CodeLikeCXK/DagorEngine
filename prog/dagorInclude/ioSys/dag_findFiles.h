@@ -1,13 +1,14 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
 #include <generic/dag_tab.h>
 #include <util/dag_simpleString.h>
 
-#include <supp/dag_define_KRNLIMP.h>
+#include <supp/dag_define_COREIMP.h>
 
 //! fills 'out_list' with filepathes of files in 'dir_path' with matching 'file_ext_to_match';
 //! 'vromfs' controls search through loaded VROMFS data, 'realfs' controls search through ordinary filesystem;
@@ -21,4 +22,4 @@ KRNLIMP int find_files_in_folder(Tab<SimpleString> &out_list, const char *dir_pa
 KRNLIMP int find_file_in_vromfs(Tab<SimpleString> &out_list, const char *filename);
 
 
-#include <supp/dag_undef_KRNLIMP.h>
+#include <supp/dag_undef_COREIMP.h>

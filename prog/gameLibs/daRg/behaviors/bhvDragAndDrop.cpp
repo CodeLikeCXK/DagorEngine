@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "bhvDragAndDrop.h"
 
 #include <daRg/dag_element.h>
@@ -458,12 +456,11 @@ int BhvDragAndDrop::update(UpdateStage /*stage*/, Element *elem, float /*dt*/)
 
   if (ddState->needDelayedRecalcAfterWheel)
   {
-    G_ASSERT(ddState->activeDeviceId != DEVID_NONE);
     // Assume that there is only one mouse maximum
     // If parent was scrolled, refresh relative positions
     Point2 mousePos = GuiScene::get_from_elem(elem)->getMousePos();
     ElementTree *etree = elem->etree;
-    int activeStateFlag = active_state_flags_for_device(ddState->activeDeviceId);
+    int activeStateFlag = active_state_flags_for_device(DEVID_MOUSE);
 
     applyPointerMove(mousePos, ddState, elem, etree, activeStateFlag);
 

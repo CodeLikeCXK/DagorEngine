@@ -1,14 +1,11 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <scene/dag_loadLevel.h>
 #include <scene/dag_loadLevelVer.h>
 #include <shaders/dag_renderScene.h>
 #include <shaders/dag_shaderMeshTexLoadCtrl.h>
 #include <3d/dag_texMgr.h>
-#include <drv/3d/dag_texture.h>
-#include <drv/3d/dag_driver.h>
-#include <drv/3d/dag_info.h>
-#include <drv/3d/dag_tex3d.h>
+#include <3d/dag_drv3d.h>
+#include <3d/dag_drv3dCmd.h>
+#include <3d/dag_tex3d.h>
 #include <3d/dag_texPackMgr2.h>
 #include <ioSys/dag_fileIo.h>
 #include <ioSys/dag_asyncIo.h>
@@ -27,7 +24,7 @@
 
 static bool auto_load_pending_tex = true;
 
-#define debug(...) logmessage(_MAKE4C('LOAD'), __VA_ARGS__)
+#define LOGLEVEL_DEBUG _MAKE4C('LOAD')
 
 void disable_auto_load_tex_after_binary_dump_loaded(bool dis) { auto_load_pending_tex = !dis; }
 
@@ -63,7 +60,7 @@ static TEXTUREID load_tex(BinaryDump &bin_dump, IGenLoad &crd)
 {
   String name;
   crd.readString(name);
-  DEBUG_CTX("load bin tex: %s", (char *)name);
+  debug_ctx("load bin tex: %s", (char *)name);
 
   BaseTexture *tex = NULL;
 
@@ -188,7 +185,7 @@ static bool load_binary_dump(BinaryDump &bin_dump, String originalName, IGenLoad
 
             if (texMap[i] == BAD_TEXTUREID)
             {
-              LOGERR_CTX("tex <%s> not found", str.str());
+              logerr_ctx("tex <%s> not found", str.str());
               SimpleString original_str(str.str());
 
               str = TextureMetaData::decodeFileName(dd_get_fname(str), &stor);
@@ -204,7 +201,7 @@ static bool load_binary_dump(BinaryDump &bin_dump, String originalName, IGenLoad
               if (texMap[i] == BAD_TEXTUREID)
               {
                 if (strcmp(original_str, str) != 0)
-                  LOGERR_CTX("even tex <%s> not found", str.str());
+                  logerr_ctx("even tex <%s> not found", str.str());
                 continue;
               }
             }
@@ -230,12 +227,12 @@ static bool load_binary_dump(BinaryDump &bin_dump, String originalName, IGenLoad
           FullFileLoadCB crdInclude(nm);
           if (!crdInclude.fileHandle)
           {
-            DEBUG_CTX("invalid include : file %s", (const char *)nm);
+            debug_ctx("invalid include : file %s", (const char *)nm);
             return false;
           }
           else
           {
-            DEBUG_CTX("loading include : file %s", (const char *)nm);
+            debug_ctx("loading include : file %s", (const char *)nm);
           }
           if (!load_binary_dump(bin_dump, originalName, crdInclude, texMap, client, bindump_id))
             return false;
@@ -246,7 +243,7 @@ static bool load_binary_dump(BinaryDump &bin_dump, String originalName, IGenLoad
           scn = load_rscene(crd, texMap, false);
           if (!scn)
           {
-            DEBUG_CTX("error loading envi scene");
+            debug_ctx("error loading envi scene");
             return false;
           }
           if (scn->obj.empty())
@@ -262,7 +259,7 @@ static bool load_binary_dump(BinaryDump &bin_dump, String originalName, IGenLoad
           scn = load_rscene(crd, texMap, true);
           if (!scn)
           {
-            DEBUG_CTX("error loading scene (%s)", (char *)nm);
+            debug_ctx("error loading scene (%s)", (char *)nm);
             return false;
           }
           if (scn->obj.empty())
@@ -277,7 +274,7 @@ static bool load_binary_dump(BinaryDump &bin_dump, String originalName, IGenLoad
           /*?
           case _MAKE4C('OPLS'):
             if ( !::place_objects( crd )) {
-              DEBUG_CTX("OPLS not loaded");
+              debug_ctx ( "OPLS not loaded" );
               return false;
             }
             break;
@@ -314,7 +311,7 @@ static bool load_binary_dump(BinaryDump &bin_dump, String originalName, IGenLoad
         default:
           if (!client.bdlCustomLoad(bindump_id, tag, crd, texMap))
           {
-            DEBUG_CTX("error loading custom field %c%c%c%c (%08X)", _DUMP4C(tag), tag);
+            debug_ctx("error loading custom field %c%c%c%c (%08X)", _DUMP4C(tag), tag);
             return false;
           }
           break;
@@ -387,7 +384,7 @@ BinaryDump *load_binary_dump(const char *fname, IBinaryDumpLoaderClient &client,
     debug("End of actual loading... bin_dump=%p", bin_dump);
     dbg = 1;
   }
-  DAGOR_CATCH(const IGenLoad::LoadException &exc)
+  DAGOR_CATCH(IGenLoad::LoadException exc)
   {
 #ifdef DAGOR_EXCEPTIONS_ENABLED
     debug("exception: can't load binary dump '%s'", fname);
@@ -498,7 +495,7 @@ public:
       }
     if (i && !initProxy(proxy + ".pak.bin"))
     {
-      DEBUG_CTX("no proxy %s for %s", (char *)proxy, fname);
+      debug_ctx("no proxy %s for %s", (char *)proxy, fname);
     }
     if (files)
     {
@@ -623,7 +620,7 @@ BinaryDump *load_binary_dump_async(const char *fname, IBinaryDumpLoaderClient &c
   sync_crd = new (tmpmem) FastSeqReadCB;
   if (!sync_crd->open(fname, 32 << 10))
   {
-    DEBUG_CTX("invalid file %s", fname);
+    debug_ctx("invalid file %s", fname);
     return NULL;
   }
 
@@ -636,13 +633,13 @@ BinaryDump *load_binary_dump_async(const char *fname, IBinaryDumpLoaderClient &c
   {
     if (crd.readInt() != _MAKE4C('DBLD'))
     {
-      DEBUG_CTX("invalid file mark");
+      debug_ctx("invalid file mark");
       delete sync_crd;
       return NULL;
     }
     if (crd.readInt() != DBLD_Version)
     {
-      DEBUG_CTX("invalid version");
+      debug_ctx("invalid version");
       delete sync_crd;
       return NULL;
     }
@@ -668,7 +665,7 @@ BinaryDump *load_binary_dump_async(const char *fname, IBinaryDumpLoaderClient &c
 
     dbg = 1;
   }
-  DAGOR_CATCH(const IGenLoad::LoadException &exc)
+  DAGOR_CATCH(IGenLoad::LoadException exc)
   {
 #ifdef DAGOR_EXCEPTIONS_ENABLED
     debug("exception: can't load binary dump '%s'", fname);

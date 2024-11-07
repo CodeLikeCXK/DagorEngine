@@ -1,5 +1,6 @@
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 
 #pragma once
 
@@ -10,7 +11,6 @@
 #endif //_TARGET_PC_WIN
 
 #include <stdlib.h>
-#include <locale.h>
 #include <util/dag_string.h>
 #include <util/dag_globDef.h>
 #include <startup/dag_restart.h>
@@ -56,8 +56,6 @@ int __cdecl main(int argc, char **argv)
   setvbuf(stdout, NULL, _IONBF, 0);
   setvbuf(stderr, NULL, _IONBF, 0);
 
-  setlocale(LC_NUMERIC, "C");
-
 #ifdef __SUPPRESS_BLK_VALIDATION
   DataBlock::fatalOnMissingFile = false;
   DataBlock::fatalOnLoadFailed = false;
@@ -88,7 +86,7 @@ int __cdecl main(int argc, char **argv)
     DAGOR_CATCH(DagorException e)
     {
       retcode = 13;
-      DEBUG_CP();
+      debug_cp();
       flush_debug_file();
 #ifdef DAGOR_EXCEPTIONS_ENABLED
       DagorHwException::reportException(e, true);
@@ -105,7 +103,7 @@ int __cdecl main(int argc, char **argv)
     DAGOR_CATCH(...)
     {
       retcode = 13;
-      DEBUG_CP();
+      debug_cp();
       flush_debug_file();
       DAGOR_RETHROW();
     }

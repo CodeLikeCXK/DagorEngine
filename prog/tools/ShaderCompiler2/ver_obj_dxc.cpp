@@ -1,13 +1,11 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "ver_obj_dxc.h"
 
 #include "util/dag_baseDef.h"
 
-extern const int VER_OBJ_DXC_VAL = _MAKE4C('12.4');
+extern const int VER_OBJ_DXC_VAL = _MAKE4C('11.2');
 
 #if _CROSS_TARGET_DX12
-#include <drv/shadersMetaData/dxil/compiled_shader_header.h>
+#include <dxil/compiled_shader_header.h>
 
 //
 // Assertions made to make sure cache version is up to date

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <ioSys/dag_roDataBlock.h>
 #include <ioSys/dag_genIo.h>
 

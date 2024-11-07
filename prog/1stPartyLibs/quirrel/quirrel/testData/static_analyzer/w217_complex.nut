@@ -1,6 +1,3 @@
-if (__name__ == "__analysis__")
-  return
-
 #allow-switch-statement
 
 const MB = 3

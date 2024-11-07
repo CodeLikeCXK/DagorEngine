@@ -176,8 +176,7 @@ void LooseGridObject::setOwnerGrid(LooseGrid *owner_)
   gridPtr_LB = uintptr_t(owner_) | (gridPtr_LB & 1);
 }
 
-// NOTE: static analysis cannot understand that ownerGrid == grid_
-void LooseGridIterator::init(const LooseGrid *grid_) DAG_TS_NO_THREAD_SAFETY_ANALYSIS
+void LooseGridIterator::init(const LooseGrid *grid_)
 {
   ownerGrid = grid_;
   cur = NULL;
@@ -210,9 +209,7 @@ inline void LooseGridIterator::nextCell()
 
 #define STI(var) var = l##var // store back to inst
 
-// NOTE: static analysis cannot understand that ownerGrid == grid_
-void LooseGridBoxIterator::init(const LooseGrid *grid_, int bminX, int bminZ, int bmaxX, int bmaxZ,
-  const bool cutLimit) DAG_TS_NO_THREAD_SAFETY_ANALYSIS
+void LooseGridBoxIterator::init(const LooseGrid *grid_, int bminX, int bminZ, int bmaxX, int bmaxZ, const bool cutLimit)
 {
   ownerGrid = grid_;
   cur = NULL;

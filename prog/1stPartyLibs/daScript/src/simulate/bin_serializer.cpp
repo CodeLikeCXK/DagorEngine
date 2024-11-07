@@ -12,20 +12,17 @@ namespace das {
 
     struct BinDataSerialize : DataWalker {
         char * bytesAt = nullptr;
-        LineInfo * debugInfo = nullptr;
         uint32_t bytesAllocated = 0;
         uint32_t bytesWritten = 0;
         uint32_t bytesGrow = 1024;
     // writer
-        BinDataSerialize ( Context & ctx, LineInfo * at ) {
+        BinDataSerialize ( Context & ctx ) {
             DEBUG_BIN_DATA("writing\n");
             context = &ctx;
-            debugInfo = at;
             reading = false;
         }
-        BinDataSerialize ( Context & ctx, LineInfo * at, char * b, uint32_t l ) {
+        BinDataSerialize ( Context & ctx, char * b, uint32_t l ) {
             context = &ctx;
-            debugInfo = at;
             reading = true;
             bytesAt = b;
             bytesAllocated = l;
@@ -43,7 +40,7 @@ namespace das {
         __forceinline void write ( void * data, uint32_t size ) {
             if ( bytesWritten + size > bytesAllocated ) {
                 uint32_t newSize = das::max ( bytesAllocated + bytesGrow, bytesWritten + size );
-                bytesAt = context->reallocate(bytesAt, bytesAllocated, newSize, debugInfo);
+                bytesAt = context->heap->reallocate(bytesAt, bytesAllocated, newSize);
                 context->heap->mark_comment(bytesAt, "binary serializer write");
                 bytesAllocated = newSize;
             }
@@ -96,7 +93,7 @@ namespace das {
         void close () {
             if ( !reading && bytesAt ) {
                 DEBUG_BIN_DATA("close at %i bytes\n\n", bytesWritten);
-                bytesAt = context->reallocate(bytesAt, bytesAllocated, bytesWritten, debugInfo);
+                bytesAt = context->heap->reallocate(bytesAt, bytesAllocated, bytesWritten);
             }
         }
     // data structures
@@ -135,7 +132,7 @@ namespace das {
                 load ( length );
                 char * temp = new char[length+1];
                 read ( temp, length );
-                data = (char *) context->allocateString(temp,length, debugInfo);
+                data = (char *) context->stringHeap->allocateString(temp,length);
                 delete [] temp;
             } else {
                 uint32_t length = stringLengthSafe(*context, data);
@@ -233,10 +230,6 @@ namespace das {
             verify_hash(ei->hash);
             serialize(data);
         }
-        virtual void WalkEnumeration64 ( int64_t & data, EnumInfo * ei ) override {
-            verify_hash(ei->hash);
-            serialize(data);
-        }
         virtual void Null ( TypeInfo * ) override {
             error("binary serialization of null pointers is not supported");
         }
@@ -267,8 +260,7 @@ namespace das {
                 info = context->debugInfo->lookup[hash];    // TODO: verify if there is capture, all that
                 DAS_ASSERTF(info,"type info not found. how did we get type, which is not in the typeinfo hash?");
                 uint32_t size = getTypeSize(info) + 16;
-                char * ptr = context->allocate(size);
-                if ( !ptr ) context->throw_out_of_memory(false, size);
+                char * ptr = context->heap->allocate(size);
                 context->heap->mark_comment(ptr, "lambda (via bin serializer)");
                 memset ( ptr, 0, size );
                 *((TypeInfo **)ptr) = info;
@@ -283,7 +275,7 @@ namespace das {
 
     // save ( obj, block<(bytesAt)> )
     vec4f _builtin_binary_save ( Context & context, SimNode_CallBase * call, vec4f * args ) {
-        BinDataSerialize writer(context, &call->debugInfo);
+        BinDataSerialize writer(context);
         // args
         Block * block = cast<Block *>::to(args[1]);
         auto info = call->types[0];
@@ -301,16 +293,16 @@ namespace das {
     }
 
     // load ( obj, bytesAt )
-    void _builtin_binary_load ( Context & context, LineInfo * at, TypeInfo* info, const char *data, uint32_t len, char *to) {
+    void _builtin_binary_load ( Context & context, TypeInfo* info, const char *data, uint32_t len, char *to) {
         if ( !(info->flags&(TypeInfo::flag_refType | TypeInfo::flag_ref)) )
             return;
-        BinDataSerialize reader(context, at, const_cast<char*>(data), len);
+        BinDataSerialize reader(context, const_cast<char*>(data), len);
         reader.walk(to, info);
     }
 
     vec4f _builtin_binary_load ( Context & context, SimNode_CallBase * call, vec4f * args ) {
         Array * ba = cast<Array *>::to(args[1]);
-        _builtin_binary_load(context, &call->debugInfo, call->types[0], ba->data, ba->size, cast<char *>::to(args[0]));
+        _builtin_binary_load(context, call->types[0], ba->data, ba->size, cast<char *>::to(args[0]));
         return v_zero();
     }
 

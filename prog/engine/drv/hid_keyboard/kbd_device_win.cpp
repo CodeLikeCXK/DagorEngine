@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <supp/_platform.h>
 #include "kbd_device_win.h"
 #include <debug/dag_fatal.h>
@@ -8,7 +6,7 @@
 #include <debug/dag_traceInpDev.h>
 #include <osApiWrappers/dag_progGlobals.h>
 #include <osApiWrappers/dag_wndProcCompMsg.h>
-#include <drv/hid/dag_hiKeybIds.h>
+#include <humanInput/dag_hiKeybIds.h>
 #include <startup/dag_inpDevClsDrv.h>
 
 #if _TARGET_PC_MACOSX
@@ -197,11 +195,11 @@ static void kbd_allow_accessibility_shortcut_keys(bool allow_accessibility)
 
 using namespace HumanInput;
 
-WinKeyboardDevice::WinKeyboardDevice() : pendingKeyDownCode(0), layoutChangeTracked(false), locksChangeTracked(false), locksDownMask(0)
+WinKeyboardDevice::WinKeyboardDevice() : pendingKeyDownCode(0), layoutChangeTracked(false), locksChangeTracked(false)
 {
   add_wnd_proc_component(this);
 
-  DEBUG_CTX("init start");
+  debug_ctx("init start");
 #if _TARGET_PC_WIN
   dgs_inpdev_rawinput_kbd_inited = false;
   if (dgs_inpdev_allow_rawinput && !win32_rdp_compatible_mode)
@@ -213,13 +211,8 @@ WinKeyboardDevice::WinKeyboardDevice() : pendingKeyDownCode(0), layoutChangeTrac
     GetRegisteredRawInputDevices(rid, &ridNum, sizeof(RAWINPUTDEVICE));
 
     for (int i = 0; i < ridNum; i++)
-    {
       if (rid[i].usUsagePage == 0x01 && rid[i].usUsage == 0x06)
-      {
-        delete[] rid;
         return; // keyboard device already registered
-      }
-    }
 
     // add HID keyboard
     rid[ridNum].usUsagePage = 0x01;
@@ -239,8 +232,6 @@ WinKeyboardDevice::WinKeyboardDevice() : pendingKeyDownCode(0), layoutChangeTrac
   enableIme(false);
   kbd_allow_accessibility_shortcut_keys(false);
 
-  locks =
-    ::GetKeyState(VK_CAPITAL) & 0x0001 | ((::GetKeyState(VK_NUMLOCK) & 0x0001) << 1) | ((::GetKeyState(VK_SCROLL) & 0x0001) << 2);
 #elif _TARGET_PC_LINUX
   display = ::XOpenDisplay((char *)0);
   if (display)
@@ -268,7 +259,7 @@ WinKeyboardDevice::WinKeyboardDevice() : pendingKeyDownCode(0), layoutChangeTrac
 #if !_TARGET_PC_WIN
   dgs_inpdev_rawinput_kbd_inited = true;
 #endif
-  DEBUG_CTX("init done");
+  debug_ctx("init done");
 }
 WinKeyboardDevice::~WinKeyboardDevice()
 {
@@ -363,16 +354,11 @@ void WinKeyboardDevice::updateLayout(bool notify_when_not_changed)
     onLayoutChanged();
 }
 
-static unsigned get_locks_down_mask()
-{
-  return ((::GetAsyncKeyState(VK_CAPITAL) & 0x8000) >> 15) | ((::GetAsyncKeyState(VK_NUMLOCK) & 0x8000) >> 14) |
-         ((::GetAsyncKeyState(VK_SCROLL) & 0x8000) >> 13);
-}
-
 void WinKeyboardDevice::updateLocks(bool notify_when_not_changed)
 {
-  unsigned prevLocksDownMask = eastl::exchange(locksDownMask, get_locks_down_mask());
-  unsigned newLocks = locks ^ (~prevLocksDownMask & locksDownMask);
+  unsigned newLocks =
+    (::GetKeyState(VK_CAPITAL) & 0x0001) | ((::GetKeyState(VK_NUMLOCK) & 0x0001) * 2) | ((::GetKeyState(VK_SCROLL) & 0x0001) * 4);
+
   bool changed = locks != newLocks;
   if (changed)
     locks = newLocks;
@@ -650,8 +636,6 @@ IWndProcComponent::RetCode WinKeyboardDevice::process(void *hwnd, unsigned msg, 
     {
       DEBUG_TRACE_INPDEV("onKeyUp: %X", ri.data.keyboard.MakeCode);
       onKeyUp(ri.data.keyboard.MakeCode);
-      if (locksChangeTracked)
-        locksDownMask = get_locks_down_mask();
     }
     else
       pendingKeyDownCode = ri.data.keyboard.MakeCode;

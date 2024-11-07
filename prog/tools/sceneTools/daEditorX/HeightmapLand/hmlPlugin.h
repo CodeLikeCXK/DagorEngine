@@ -1,5 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __GAIJIN_HEIGHTMAPLAND_PLUGIN__
+#define __GAIJIN_HEIGHTMAPLAND_PLUGIN__
 #pragma once
+
 
 #include "Brushes/hmlBrush.h"
 #include <squirrel.h>
@@ -16,7 +18,6 @@
 #include <de3_roadsProvider.h>
 #include <de3_genObjHierMask.h>
 #include <de3_fileTracker.h>
-#include <de3_landmesh.h>
 #include <coolConsole/iConsoleCmd.h>
 #include <math/dag_color.h>
 
@@ -34,17 +35,11 @@
 #include <de3_waterProjFxSrv.h>
 #include <de3_cableSrv.h>
 #include "gpuGrassPanel.h"
-#include "navmeshAreasProcessing.h"
 
 #define DECAL_BITMAP_SZ          32
 #define KERNEL_RAD               2
 #define EXTENDED_DECAL_BITMAP_SZ (DECAL_BITMAP_SZ + 2 * 2 * KERNEL_RAD)
 #define MAX_NAVMESHES            2
-
-namespace PropPanel
-{
-class DialogWindow;
-}
 
 class CoolConsole;
 class IObjectCreator;
@@ -64,6 +59,7 @@ class IDagorPhys;
 class Bitarray;
 
 class DebugPrimitivesVbuffer;
+
 
 namespace mkbindump
 {
@@ -107,16 +103,16 @@ public:
   String layerName;
   int grass_layer_i;
 
-  PropPanel::ContainerPropertyControl *newLayerGrp;
+  PropertyContainerControlBase *newLayerGrp;
   int pidBase;
   bool remove_this_layer;
 
   GrassLayerPanel(const char *name, int layer_i);
 
-  void fillParams(PropPanel::ContainerPropertyControl *parent_panel, int &pid);
-  void onClick(int pid, PropPanel::ContainerPropertyControl &p);
-  bool onPPChangeEx(int pid, PropPanel::ContainerPropertyControl &p);
-  void onPPChange(int pid, PropPanel::ContainerPropertyControl &panel);
+  void fillParams(PropertyContainerControlBase *parent_panel, int &pid);
+  void onClick(int pid, PropPanel2 &p);
+  bool onPPChangeEx(int pid, PropPanel2 &p);
+  void onPPChange(int pid, PropPanel2 &panel);
 
   void saveLayer(DataBlock &blk);
 };
@@ -130,14 +126,13 @@ class HmapLandPlugin : public IGenEditorPlugin,
                        public IDagorEdCustomCollider,
                        public IHmapBrushImage,
                        public IHeightmap,
-                       public ILandmesh,
                        public IRoadsProvider,
                        public ILightingChangeClient,
                        public IGatherStaticGeometry,
                        public IRenderingService,
                        public IOnExportNotify,
                        public IPluginAutoSave,
-                       public PropPanel::ControlEventHandler,
+                       public ControlEventHandler,
                        public IWndManagerWindowHandler,
                        public IPostProcessGeometry,
 #if defined(USE_HMAP_ACES)
@@ -164,8 +159,6 @@ public:
   static bool defMipOrdRev;
   static bool preferZstdPacking;
   static bool allowOodlePacking;
-  static bool pcPreferASTC;
-  static bool useASTC(unsigned tc) { return tc == _MAKE4C('iOS') || (tc == _MAKE4C('PC') && pcPreferASTC); }
 
   static IHmapService *hmlService;
   static IBitMaskImageMgr *bitMaskImgMgr;
@@ -175,7 +168,6 @@ public:
 
   static bool prepareRequiredServices();
   static void processTexName(SimpleString &out_name, const char *in_name);
-  void buildAndWritePhysMap(BinDumpSaveCB &cwr);
 
 
   static IGrassService *grassService;
@@ -205,8 +197,6 @@ public:
 
   virtual void registered();
   virtual void unregistered();
-  virtual void loadSettings(const DataBlock &global_settings) override;
-  virtual void saveSettings(DataBlock &global_settings) override;
   virtual void beforeMainLoop();
 
   void registerMenuAccelerators() override;
@@ -234,7 +224,6 @@ public:
   virtual void beforeRenderObjects(IGenViewportWnd *vp);
   virtual void renderObjects();
   virtual void renderTransObjects();
-  virtual void updateImgui() override;
   virtual void renderGrass(Stage stage);
   virtual void renderGPUGrass(Stage stage);
   virtual void renderWater(Stage stage);
@@ -248,16 +237,15 @@ public:
   virtual void *queryInterfacePtr(unsigned huid);
 
   virtual bool onPluginMenuClick(unsigned id);
-  virtual void handleViewportAcceleratorCommand(unsigned id) override;
 
   // ControlEventHandler
-  virtual void onClick(int pcb_id, PropPanel::ContainerPropertyControl *panel);
-  virtual void onChange(int pcb_id, PropPanel::ContainerPropertyControl *panel);
-  virtual void onChangeFinished(int pcb_id, PropPanel::ContainerPropertyControl *panel);
+  virtual void onClick(int pcb_id, PropPanel2 *panel);
+  virtual void onChange(int pcb_id, PropPanel2 *panel);
+  virtual void onChangeFinished(int pcb_id, PropPanel2 *panel);
 
   // IWndManagerWindowHandler
-  virtual void *onWmCreateWindow(int type) override;
-  virtual bool onWmDestroyWindow(void *window) override;
+  virtual IWndEmbeddedWindow *onWmCreateWindow(void *handle, int type);
+  virtual bool onWmDestroyWindow(void *handle);
 
   // IRenderingService
   virtual void renderGeometry(Stage stage);
@@ -281,9 +269,9 @@ public:
     int key_modif);
 
   // IBinaryDataBuilder
-  virtual bool validateBuild(int target, ILogWriter &rep, PropPanel::ContainerPropertyControl *params);
+  virtual bool validateBuild(int target, ILogWriter &rep, PropPanel2 *params);
   virtual bool addUsedTextures(ITextureNumerator &tn);
-  virtual bool buildAndWrite(BinDumpSaveCB &cwr, const ITextureNumerator &tn, PropPanel::ContainerPropertyControl *pp);
+  virtual bool buildAndWrite(BinDumpSaveCB &cwr, const ITextureNumerator &tn, PropPanel2 *pp);
   virtual bool checkMetrics(const DataBlock &metrics_blk) { return true; }
 
   // IWriteAddLtinputData
@@ -299,9 +287,6 @@ public:
   virtual void getHeightmapData(int x0, int y0, int step, int x_size, int y_size, real *data, int stride_bytes);
 
   virtual bool isLandPreloadRequestComplete();
-
-  // ILandmesh
-  virtual BBox3 getBBoxWithHMapWBBox() const;
 
   void updateLandDetailTexture(unsigned i);
 
@@ -430,21 +415,21 @@ public:
 
     ScriptParam(const char *name) : paramName(name) {}
 
-    virtual void fillParams(PropPanel::ContainerPropertyControl &panel, int &pid) = 0;
-    virtual void onPPChange(int pid, PropPanel::ContainerPropertyControl &panel) = 0;
-    virtual void onPPBtnPressed(int pid, PropPanel::ContainerPropertyControl &panel) {}
+    virtual void fillParams(PropPanel2 &panel, int &pid) = 0;
+    virtual void onPPChange(int pid, PropPanel2 &panel) = 0;
+    virtual void onPPBtnPressed(int pid, PropPanel2 &panel) {}
 
     virtual void save(DataBlock &blk) = 0;
     virtual void load(const DataBlock &blk) = 0;
 
     virtual void setToScript(HSQUIRRELVM vm) = 0;
 
-    virtual bool onPPChangeEx(int pid, PropPanel::ContainerPropertyControl &panel)
+    virtual bool onPPChangeEx(int pid, PropPanel2 &panel)
     {
       onPPChange(pid, panel);
       return false;
     }
-    virtual bool onPPBtnPressedEx(int pid, PropPanel::ContainerPropertyControl &panel)
+    virtual bool onPPBtnPressedEx(int pid, PropPanel2 &panel)
     {
       onPPBtnPressed(pid, panel);
       return false;
@@ -612,7 +597,7 @@ public:
   }
 
   bool usesGenScript() const { return !colorGenScriptFilename.empty(); }
-  PropPanel::ContainerPropertyControl *getPropPanel() const;
+  PropPanel2 *getPropPanel() const;
 
   bool insideDetRectC(int x, int y) const
   {
@@ -626,9 +611,7 @@ public:
 
   void onLayersDlgClosed();
   void selectLayerObjects(int lidx, bool sel = true);
-  void moveObjectsToLayer(int lidx, dag::Span<RenderableEditableObject *> objects);
-
-  void onObjectsRemove();
+  void moveObjectsToLayer(int lidx);
 
 private:
   // Caches datailed textures for LandMesh
@@ -850,7 +833,7 @@ private:
   void loadGPUGrassFromLevelBlk();
   bool loadGPUGrassFromBlk(const DataBlock &level_blk);
 
-  PropPanel::ContainerPropertyControl *grass_panel;
+  PropertyContainerControlBase *grass_panel;
   PtrTab<GrassLayerPanel> grassLayers;
   struct
   {
@@ -887,8 +870,7 @@ private:
   } grass;
 
 
-  PropPanel::DialogWindow *brushDlg;
-  int brushDlgHideRequestFrameCountdown = 0;
+  CDialogWindow *brushDlg;
 
 
   Point3 calcSunLightDir() const;
@@ -901,9 +883,8 @@ private:
   void createPropPanel();
   void createMenu(unsigned menu_id);
   void refillBrush();
-  void fillPanel(PropPanel::ContainerPropertyControl &panel);
-  void updateLightGroup(PropPanel::ContainerPropertyControl &panel);
-  void fillAreatypeRectPanel(PropPanel::ContainerPropertyControl &panel, int navmesh_idx, int base_ofs);
+  void fillPanel(PropPanel2 &panel);
+  void updateLightGroup(PropPanel2 &panel);
 
   void createHeightmap();
   void importHeightmap();
@@ -913,7 +894,7 @@ private:
   void eraseHeightmap();
   void importWaterHeightmap(bool det);
   void eraseWaterHeightmap();
-  void autocenterHeightmap(PropPanel::ContainerPropertyControl *panel, bool reset_render = true);
+  void autocenterHeightmap(PropPanel2 *panel, bool reset_render = true);
 
   void exportHeightmap();
   bool exportHeightmap(String &filename, real min_height, real height_range, bool exp_det_hmap);
@@ -951,7 +932,6 @@ private:
   void delayedResetRenderer();
   void rebuildLandmeshDump();
   void rebuildLandmeshManager();
-  void rebuildLandmeshPhysMap();
 
   template <class T>
   void loadMapFile(MapStorage<T> &map, const char *filename, CoolConsole &con);
@@ -1129,10 +1109,7 @@ private:
   DebugPrimitivesVbuffer *coversBuf;
   DebugPrimitivesVbuffer *contoursBuf;
   DebugPrimitivesVbuffer *obstaclesBuf;
-
-  Tab<PhysMap *> physMaps;
-
-  bool bothPropertiesAndObjectPropertiesWereOpenLastTime = false;
-
-  Tab<NavmeshAreasProcessing> navmeshAreasProcessing;
 };
+
+
+#endif //__GAIJIN_HEIGHTMAPLAND_PLUGIN__

@@ -1,6 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
-
 #include <hash/BLAKE3/blake3.h>
 struct CryptoHash
 {

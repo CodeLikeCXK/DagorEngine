@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "rayCarDamping.h"
 #include "rayCar.h"
 #include <debug/dag_debug.h>

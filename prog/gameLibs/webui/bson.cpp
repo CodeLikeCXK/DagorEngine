@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "webui/bson.h"
 #include <memory/dag_memBase.h>
 

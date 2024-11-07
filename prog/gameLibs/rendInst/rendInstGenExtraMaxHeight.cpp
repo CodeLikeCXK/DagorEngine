@@ -1,8 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "riGen/riGenExtraMaxHeight.h"
 #include "riGen/riGenExtra.h"
-#include <shaders/dag_rendInstRes.h>
 
 #include <EASTL/vector_map.h>
 

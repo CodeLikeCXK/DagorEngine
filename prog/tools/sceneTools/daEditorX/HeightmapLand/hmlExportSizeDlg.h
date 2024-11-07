@@ -1,9 +1,10 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __GAIJIN_HMAP_EXPORT_SIZE_DLG__
+#define __GAIJIN_HMAP_EXPORT_SIZE_DLG__
 #pragma once
 
-#include <propPanel/commonWindow/dialogWindow.h>
+#include <propPanel2/comWnd/dialog_window.h>
 
-class HmapExportSizeDlg : public PropPanel::ControlEventHandler
+class HmapExportSizeDlg : public ControlEventHandler
 {
 public:
   HmapExportSizeDlg(float &min_height, float &height_range, float min_height_hm, float height_range_hm);
@@ -11,7 +12,7 @@ public:
   ~HmapExportSizeDlg();
 
   virtual bool execute();
-  virtual void onClick(int pcb_id, PropPanel::ContainerPropertyControl *panel);
+  virtual void onClick(int pcb_id, PropPanel2 *panel);
 
 private:
   float &minHeight;
@@ -20,5 +21,8 @@ private:
   float minHeightHm;
   float heightRangeHm;
 
-  PropPanel::DialogWindow *mDialog;
+  CDialogWindow *mDialog;
 };
+
+
+#endif //__GAIJIN_HMAP_EXPORT_SIZE_DLG__

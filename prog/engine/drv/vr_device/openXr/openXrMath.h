@@ -1,9 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
-
 #include <openxr/openxr.h>
 
-#include <drv/dag_vr.h>
+#include <drivers/dag_vr.h>
 #include <math/dag_Point3.h>
 #include <math/dag_Quat.h>
 

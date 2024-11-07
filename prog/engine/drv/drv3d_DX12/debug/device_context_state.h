@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include "device_context_state_null.h"
@@ -8,7 +7,9 @@
 #include "device_context_state_xbox.h"
 #endif
 
-namespace drv3d_dx12::debug
+namespace drv3d_dx12
+{
+namespace debug
 {
 #if _TARGET_PC_WIN
 #if COMMAND_BUFFER_DEBUG_INFO_DEFINED
@@ -19,4 +20,5 @@ using DeviceContextState = null::DeviceContextState;
 #else
 using DeviceContextState = xbox::DeviceContextState;
 #endif
-} // namespace drv3d_dx12::debug
+} // namespace debug
+} // namespace drv3d_dx12

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <EditorCore/ec_workspace.h>
 #include <EditorCore/ec_interface.h>
 
@@ -311,8 +309,6 @@ const char *EditorWorkspace::getPlatformNameFromId(unsigned plt)
 //==================================================================================================
 bool EditorWorkspace::save()
 {
-  if (blkPath.empty())
-    return false;
   DataBlock blk;
 
   if (!blk.load(blkPath))

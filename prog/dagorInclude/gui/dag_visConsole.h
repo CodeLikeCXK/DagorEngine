@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -93,9 +94,6 @@ public:
   virtual void setFontId(int fId) { fontId = fId; }
 
   virtual const char *getEditTextBeforeModify() const override { return editTextBeforeModify.c_str(); }
-
-public:
-  int handleInputButton;
 
 protected:
   bool isVisible;

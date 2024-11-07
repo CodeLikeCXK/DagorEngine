@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "scriptHelpersPanelUserData.h"
 #include <util/dag_string.h>
 #include <ioSys/dag_dataBlock.h>
@@ -13,7 +11,7 @@
 
 #include <debug/dag_debug.h>
 
-#include <propPanel/control/container.h>
+#include <propPanel2/c_panel_base.h>
 
 using namespace ScriptHelpers;
 
@@ -38,9 +36,9 @@ public:
       if (subElem[i])
         subElem[i]->resetPropPanel();
   }
-  virtual void fillPropPanel(int &pid, PropPanel::ContainerPropertyControl &panel)
+  virtual void fillPropPanel(int &pid, PropertyContainerControlBase &panel)
   {
-    PropPanel::ContainerPropertyControl *op = panel.createGroup(++pid, getName());
+    PropertyContainerControlBase *op = panel.createGroup(++pid, getName());
 
     for (int i = 0; i < subElem.size(); ++i)
     {
@@ -53,7 +51,7 @@ public:
   }
 
 
-  virtual void getValues(int &pid, PropPanel::ContainerPropertyControl &panel)
+  virtual void getValues(int &pid, PropertyContainerControlBase &panel)
   {
     ++pid;
 
@@ -103,9 +101,9 @@ public:
   virtual int subElemCount() const { return 0; }
   virtual TunedElement *getSubElem(int index) const { return NULL; }
 
-  virtual void fillPropPanel(int &pid, PropPanel::ContainerPropertyControl &panel) {}
+  virtual void fillPropPanel(int &pid, PropertyContainerControlBase &panel) {}
 
-  virtual void getValues(int &pid, PropPanel::ContainerPropertyControl &panel) {}
+  virtual void getValues(int &pid, PropertyContainerControlBase &panel) {}
 
 
   virtual void saveData(mkbindump::BinDumpSaveCB &cwr, SaveDataCB *save_cb)
@@ -146,8 +144,8 @@ public:
   virtual int subElemCount() const { return 0; }
   virtual TunedElement *getSubElem(int index) const { return NULL; }
 
-  virtual void fillPropPanel(int &pid, PropPanel::ContainerPropertyControl &panel){};
-  virtual void getValues(int &pid, PropPanel::ContainerPropertyControl &panel){};
+  virtual void fillPropPanel(int &pid, PropertyContainerControlBase &panel){};
+  virtual void getValues(int &pid, PropertyContainerControlBase &panel){};
 
   virtual void saveData(mkbindump::BinDumpSaveCB &cwr, SaveDataCB *save_cb) = 0;
 
@@ -165,53 +163,53 @@ public:
 #define WRITE_DATA_E3DCOLOR cwr.write32ex(&value, sizeof(value))
 
 
-#define SIMPLE_PARAM(type, add_method, get_method, blk_set, blk_get, write_stmnt)    \
-                                                                                     \
-  namespace ScriptHelpers                                                            \
-  {                                                                                  \
-  class TunedParam_##type : public TunedParam                                        \
-  {                                                                                  \
-  public:                                                                            \
-    type value;                                                                      \
-                                                                                     \
-    TunedParam_##type(const char *nm, const type &val) : TunedParam(nm), value(val)  \
-    {}                                                                               \
-                                                                                     \
-    virtual void fillPropPanel(int &pid, PropPanel::ContainerPropertyControl &panel) \
-    {                                                                                \
-      panel.add_method(++pid, getName(), value);                                     \
-    }                                                                                \
-                                                                                     \
-    virtual void getValues(int &pid, PropPanel::ContainerPropertyControl &panel)     \
-    {                                                                                \
-      value = panel.get_method(++pid);                                               \
-    }                                                                                \
-                                                                                     \
-    virtual void saveData(mkbindump::BinDumpSaveCB &cwr, SaveDataCB *save_cb)        \
-    {                                                                                \
-      write_stmnt;                                                                   \
-    }                                                                                \
-                                                                                     \
-    virtual void saveValues(DataBlock &blk, SaveValuesCB *save_cb)                   \
-    {                                                                                \
-      blk.blk_set("value", value);                                                   \
-    }                                                                                \
-                                                                                     \
-    virtual void loadValues(const DataBlock &blk)                                    \
-    {                                                                                \
-      value = blk.blk_get("value", value);                                           \
-    }                                                                                \
-                                                                                     \
-    virtual TunedElement *cloneElem()                                                \
-    {                                                                                \
-      return new TunedParam_##type(*this);                                           \
-    }                                                                                \
-  };                                                                                 \
-                                                                                     \
-  TunedElement *create_tuned_##type##_param(const char *name, const type &val)       \
-  {                                                                                  \
-    return new TunedParam_##type(name, val);                                         \
-  }                                                                                  \
+#define SIMPLE_PARAM(type, add_method, get_method, blk_set, blk_get, write_stmnt)   \
+                                                                                    \
+  namespace ScriptHelpers                                                           \
+  {                                                                                 \
+  class TunedParam_##type : public TunedParam                                       \
+  {                                                                                 \
+  public:                                                                           \
+    type value;                                                                     \
+                                                                                    \
+    TunedParam_##type(const char *nm, const type &val) : TunedParam(nm), value(val) \
+    {}                                                                              \
+                                                                                    \
+    virtual void fillPropPanel(int &pid, PropertyContainerControlBase &panel)       \
+    {                                                                               \
+      panel.add_method(++pid, getName(), value);                                    \
+    }                                                                               \
+                                                                                    \
+    virtual void getValues(int &pid, PropertyContainerControlBase &panel)           \
+    {                                                                               \
+      value = panel.get_method(++pid);                                              \
+    }                                                                               \
+                                                                                    \
+    virtual void saveData(mkbindump::BinDumpSaveCB &cwr, SaveDataCB *save_cb)       \
+    {                                                                               \
+      write_stmnt;                                                                  \
+    }                                                                               \
+                                                                                    \
+    virtual void saveValues(DataBlock &blk, SaveValuesCB *save_cb)                  \
+    {                                                                               \
+      blk.blk_set("value", value);                                                  \
+    }                                                                               \
+                                                                                    \
+    virtual void loadValues(const DataBlock &blk)                                   \
+    {                                                                               \
+      value = blk.blk_get("value", value);                                          \
+    }                                                                               \
+                                                                                    \
+    virtual TunedElement *cloneElem()                                               \
+    {                                                                               \
+      return new TunedParam_##type(*this);                                          \
+    }                                                                               \
+  };                                                                                \
+                                                                                    \
+  TunedElement *create_tuned_##type##_param(const char *name, const type &val)      \
+  {                                                                                 \
+    return new TunedParam_##type(name, val);                                        \
+  }                                                                                 \
   }
 
 
@@ -249,9 +247,9 @@ public:
 
   virtual TunedElement *cloneElem() { return new TunedEnumParam(*this); }
 
-  virtual void fillPropPanel(int &pid, PropPanel::ContainerPropertyControl &panel)
+  virtual void fillPropPanel(int &pid, PropertyContainerControlBase &panel)
   {
-    PropPanel::ContainerPropertyControl *rgrp = panel.createRadioGroup(++pid, getName());
+    PropertyContainerControlBase *rgrp = panel.createRadioGroup(++pid, getName());
     int selPid = 0;
 
     for (int i = 0; i < enumList.size(); ++i)
@@ -265,7 +263,7 @@ public:
   }
 
 
-  virtual void getValues(int &pid, PropPanel::ContainerPropertyControl &panel)
+  virtual void getValues(int &pid, PropertyContainerControlBase &panel)
   {
     int index = panel.getInt(++pid);
     if ((index > -1) && (index < enumList.size()))
@@ -440,12 +438,12 @@ public:
     return subElem[index].elem;
   }
 
-  virtual void fillPropPanel(int &pid, PropPanel::ContainerPropertyControl &panel)
+  virtual void fillPropPanel(int &pid, PropertyContainerControlBase &panel)
   {
     if (!baseElement)
       return;
 
-    PropPanel::ContainerPropertyControl *op = panel.createGroup(++pid, getName());
+    PropertyContainerControlBase *op = panel.createGroup(++pid, getName());
     // op->minimize();
 
     op->createButton(++pid, String("add ") + baseElement->getName());
@@ -459,7 +457,7 @@ public:
       String caption(100, "%d", i + 1);
       const bool useCustomCaption = !memberToShowInCaption.empty() && getPanelArrayItemCaptionUsingIndex(caption, *subElem[i].elem, i);
 
-      PropPanel::ContainerPropertyControl *eop = op->createGroup(++pid, caption);
+      PropertyContainerControlBase *eop = op->createGroup(++pid, caption);
       G_ASSERT(eop && "fillPropPanel: Create group failed");
       // eop->minimize();
 
@@ -524,7 +522,7 @@ public:
     return false;
   }
 
-  virtual void getValues(int &pid, PropPanel::ContainerPropertyControl &panel)
+  virtual void getValues(int &pid, PropertyContainerControlBase &panel)
   {
     if (!baseElement)
       return;
@@ -549,7 +547,7 @@ public:
   }
 
 
-  virtual bool onClick(int pcb_id, PropPanel::ContainerPropertyControl &panel, IPropPanelCB &ppcb)
+  virtual bool onClick(int pcb_id, PropertyContainerControlBase &panel, IPropPanelCB &ppcb)
   {
     if (TunedElement::onClick(pcb_id, panel, ppcb))
       return true;

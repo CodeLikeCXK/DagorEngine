@@ -1,4 +1,0 @@
-if $(HaveRenderer) = yes {
-  gamePulls += framework_bloom_pull ;
-  UseProgLibs += daNetGameLibs/bloom ;
-}

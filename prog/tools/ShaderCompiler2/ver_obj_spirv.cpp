@@ -1,13 +1,11 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "ver_obj_spirv.h"
 
 #include "util/dag_baseDef.h"
 
-extern const int VER_OBJ_SPIRV_VAL = _MAKE4C('12.9');
+extern const int VER_OBJ_SPIRV_VAL = _MAKE4C('12.2');
 
 #if _CROSS_TARGET_SPIRV
-#include <drv/shadersMetaData/spirv/compiled_meta_data.h>
+#include <spirv/compiled_meta_data.h>
 
 //
 // Assertions made to make sure cache version is up to date

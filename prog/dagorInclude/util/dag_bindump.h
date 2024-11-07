@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -14,7 +15,6 @@
 #include <EASTL/algorithm.h>
 #include <EASTL/unique_ptr.h>
 #include <EASTL/shared_ptr.h>
-#include <util/dag_preprocessor.h>
 
 // The `bindump` library is designed for easy serialization and deserialization of binary dumps
 // This library has the following features:
@@ -112,15 +112,6 @@
 #pragma warning(disable : 4505) // unreferenced local function has been removed
 #endif
 
-
-#ifdef _MSC_VER
-#define MASTER_LAYOUT_PRAGMA_PACK_PUSH __pragma(pack(push, 4)) // MASTER alignment must not be greater than natural
-#define MASTER_LAYOUT_PRAGMA_PACK_POP  __pragma(pack(pop))     // MAPPER alignment to avoid streamed size mismatches.
-#else
-#define MASTER_LAYOUT_PRAGMA_PACK_PUSH _Pragma("pack(push, 4)")
-#define MASTER_LAYOUT_PRAGMA_PACK_POP  _Pragma("pack(pop)")
-#endif
-
 namespace bindump
 {
 struct IWriter
@@ -166,13 +157,6 @@ constexpr uint64_t sizeOf()
 {
   return sizeof(RetargetType<Type, MAPPER>);
 }
-
-template <typename Type>
-constexpr bool isAlignmentValid()
-{
-  return alignof(RetargetType<Type, MASTER>) == alignof(RetargetType<Type, MAPPER>);
-}
-
 } // namespace traits
 
 namespace master
@@ -264,7 +248,6 @@ struct Context
   template <typename LayoutType>
   void endLayoutImpl(uint64_t begin_layout_offset, uint64_t end_layout_offset)
   {
-    static_assert(traits::isAlignmentValid<LayoutType>());
     uint64_t expected_offset = begin_layout_offset + traits::sizeOf<LayoutType>();
     streamUnmanagedData(expected_offset, end_layout_offset);
 
@@ -284,32 +267,17 @@ struct Context
   }
 
   template <typename WrapperType>
-  uint64_t preStreamData(const WrapperType &wrapper)
+  void preStreamData(const WrapperType &wrapper)
   {
     const uint8_t *address = (const uint8_t *)&wrapper;
     streamUnmanagedData((uint64_t)address, (uint64_t)current_props.wrapper_address);
     current_props.wrapper_address = (WrapperAddressType)address;
-    return current_props.stream_offset;
   }
 
   template <typename WrapperType>
   void postStreamData(const WrapperType &wrapper)
   {
     current_props.wrapper_address = (WrapperAddressType)&wrapper + sizeof(WrapperType);
-  }
-
-  template <typename MappedType, typename WrapperType>
-  void streamPadding(const WrapperType &wrapper, uint64_t begin_offset)
-  {
-    uint64_t expected_offset = begin_offset + traits::sizeOf<MappedType>();
-    uint64_t actual_offset = current_props.stream_offset;
-    G_ASSERT(expected_offset >= actual_offset);
-    uint64_t delta = expected_offset - actual_offset;
-    if (delta)
-    {
-      const auto padding_address = (WrapperAddressType)&wrapper + sizeof(WrapperType) - delta;
-      stream(padding_address, delta);
-    }
   }
 };
 } // namespace master
@@ -363,9 +331,9 @@ static void hash()
 template <typename UserDataType, uint32_t random_number>
 struct DataHasher
 {
-  // A dummy dword is added to suppress empty base optimization,
+  // A dummy byte is added to suppress empty base optimization,
   // because it is necessary that the sizeof(DataHasher) be the same regardless of whether it is base type or not
-  uint32_t __dummy = 0;
+  uint8_t __dummy = 0;
   DataHasher &operator=(const DataHasher &other)
   {
     context().preStreamData(other);
@@ -591,7 +559,6 @@ struct ListElementAddress
   }
 };
 
-MASTER_LAYOUT_PRAGMA_PACK_PUSH
 template <typename Type>
 class ListWrapper
 {
@@ -618,9 +585,8 @@ public:
   }
   void resize(uint64_t count) { mData.resize(count); }
 };
-MASTER_LAYOUT_PRAGMA_PACK_POP
 
-template <typename UserDataType, uint64_t alignment, typename MappedType>
+template <typename UserDataType, uint64_t alignment>
 class ListMaster : public ListWrapper<UserDataType>
 {
   static_assert(eastl::is_trivially_destructible<UserDataType>::value,
@@ -628,23 +594,21 @@ class ListMaster : public ListWrapper<UserDataType>
 
   void write() const
   {
-    uint64_t begin_offset = writer::context().preStreamData(*this);
+    writer::context().preStreamData(*this);
     uint64_t offset = writer::writeList<UserDataType, alignment>(this->getDataPtr(), this->getCount());
     if (this->mListOffset)
       *this->mListOffset = offset;
-    writer::context().streamPadding<MappedType>(*this, begin_offset);
     writer::context().postStreamData(*this);
   }
 
   void read()
   {
-    uint64_t begin_offset = reader::context().preStreamData(*this);
+    reader::context().preStreamData(*this);
     auto offset_count = reader::readList(true);
     uint64_t offset = offset_count.first;
     this->resize(offset_count.second);
     reader::context().offset_to_lists[offset] = (uint8_t *)this->mData.data();
     reader::context().worker->read(offset, this->getDataPtr(), this->getCount() * sizeof(UserDataType));
-    reader::context().streamPadding<MappedType>(*this, begin_offset);
     reader::context().postStreamData(*this);
   }
 
@@ -652,15 +616,15 @@ public:
   DECLARE_ASSIGNMENT_OPERATOR(ListMaster, ListWrapper<UserDataType>)
 };
 
-template <typename LayoutType, bool is_layout_list, typename MappedType>
+template <typename LayoutType, bool is_layout_list>
 class LayoutsMaster : public ListWrapper<LayoutType>
 {
   using LayoutMapper = traits::RetargetType<LayoutType, MAPPER>;
 
   void write() const
   {
-    uint64_t begin_offset = writer::context().preStreamData(*this);
-    uint64_t offset = writer::template writeList<LayoutMapper, 4, is_layout_list>(nullptr, this->getCount());
+    writer::context().preStreamData(*this);
+    uint64_t offset = writer::template writeList<LayoutMapper, 1, is_layout_list>(nullptr, this->getCount());
     if (this->mListOffset)
       *this->mListOffset = offset;
 
@@ -671,13 +635,12 @@ class LayoutsMaster : public ListWrapper<LayoutType>
       layout = *this->getDataPtr(i);
       writer::context().endLayout<const LayoutType>();
     }
-    writer::context().streamPadding<MappedType>(*this, begin_offset);
     writer::context().postStreamData(*this);
   }
 
   void read()
   {
-    uint64_t begin_offset = reader::context().preStreamData(*this);
+    reader::context().preStreamData(*this);
     auto offset_count = reader::readList(is_layout_list);
     uint64_t offset = offset_count.first;
     this->resize(offset_count.second);
@@ -690,7 +653,6 @@ class LayoutsMaster : public ListWrapper<LayoutType>
       *this->getDataPtr(i) = layout;
       reader::context().endLayout<LayoutType>();
     }
-    reader::context().streamPadding<MappedType>(*this, begin_offset);
     reader::context().postStreamData(*this);
   }
 
@@ -698,25 +660,24 @@ public:
   DECLARE_ASSIGNMENT_OPERATOR(LayoutsMaster, ListWrapper<LayoutType>)
 };
 
-template <typename LayoutType, typename MappedType>
+template <typename LayoutType>
 struct LayoutMaster
   // Protected inheritance is used here so that public methods from the `LayoutsMaster` class
   // do not become public for `LayoutMaster` and the `PtrMaster` classes,
   // because `resize()` and `getElementAddress()` doesn't make sense for these classes
-  : protected LayoutsMaster<LayoutType, false, MappedType>
+  : protected LayoutsMaster<LayoutType, false>
 {
   LayoutMaster() { this->mData.resize(1); }
 };
 
-template <typename LayoutType, typename MappedType>
-struct PtrMaster : protected LayoutsMaster<LayoutType, false, MappedType>
+template <typename LayoutType>
+struct PtrMaster : protected LayoutsMaster<LayoutType, false>
 {
   void create() { this->mData.resize(1); }
   explicit operator bool() const { return this->getCount() != 0; }
 };
 
-MASTER_LAYOUT_PRAGMA_PACK_PUSH
-template <typename UserDataType, typename MappedType>
+template <typename UserDataType>
 class AddressMaster : public DeferredAction
 {
   ListElementAddress<UserDataType> mAddress;
@@ -729,24 +690,21 @@ class AddressMaster : public DeferredAction
     // because, for example, this List will be serialized after us.
     // Therefore, we will just reserve a place for offset,
     // and we will write the actual offset in the `apply()` method, which will be called at the end
-    uint64_t begin_offset = writer::context().preStreamData(*this);
+    writer::context().preStreamData(*this);
     mOffset = writer::context().current_props.stream_offset;
     writer::writeOffset(mOffset);
     writer::context().deferred_actions.emplace_back(this);
-    writer::context().streamPadding<MappedType>(*this, begin_offset);
     writer::context().postStreamData(*this);
   }
 
   void read()
   {
-    uint64_t begin_offset = reader::context().preStreamData(*this);
+    reader::context().preStreamData(*this);
     mAddress = {};
     mDataPtr = nullptr;
     mOffset = reader::readOffset();
     if (mOffset)
       reader::context().deferred_actions.emplace_back(this);
-
-    reader::context().streamPadding<MappedType>(*this, begin_offset);
     reader::context().postStreamData(*this);
   }
 
@@ -788,7 +746,6 @@ public:
   }
   explicit operator bool() const { return getDataPtr() != nullptr; }
 };
-MASTER_LAYOUT_PRAGMA_PACK_POP
 
 class CurrentSizeMaster
 {
@@ -1051,12 +1008,12 @@ template <typename UserDataType>
 struct WrapHolder<UserDataType, MASTER>
 {
   using Hash = master::HashWrapper<UserDataType>;
-  using Address = master::AddressMaster<UserDataType, typename WrapHolder<UserDataType, MAPPER>::Address>;
+  using Address = master::AddressMaster<UserDataType>;
   template <uint64_t alignment>
-  using List = master::ListMaster<UserDataType, alignment, typename WrapHolder<UserDataType, MAPPER>::template List<alignment>>;
-  using LayoutList = master::LayoutsMaster<UserDataType, true, typename WrapHolder<UserDataType, MAPPER>::LayoutList>;
-  using Layout = master::LayoutMaster<UserDataType, typename WrapHolder<UserDataType, MAPPER>::Layout>;
-  using Ptr = master::PtrMaster<UserDataType, typename WrapHolder<UserDataType, MAPPER>::Ptr>;
+  using List = master::ListMaster<UserDataType, alignment>;
+  using LayoutList = master::LayoutsMaster<UserDataType, true>;
+  using Layout = master::LayoutMaster<UserDataType>;
+  using Ptr = master::PtrMaster<UserDataType>;
   using CurrentSize = master::CurrentSizeMaster;
 };
 
@@ -1171,7 +1128,7 @@ public:
   uint64_t size() const { return this->getCount(); }
 };
 
-MASTER_LAYOUT_PRAGMA_PACK_PUSH
+#pragma pack(push, 1)
 template <template <enum detail::Target> class LayoutClass, enum detail::Target target>
 struct EnableHash : public LayoutClass<target>
 {
@@ -1183,7 +1140,7 @@ struct EnableHash : public LayoutClass<target>
 private:
   typename traits::WrapHolder<MyLayout<target>, target>::Hash mHash;
 };
-MASTER_LAYOUT_PRAGMA_PACK_POP
+#pragma pack(pop)
 
 template <typename LayoutType>
 const LayoutType *map_base(const uint8_t *dump)
@@ -1207,7 +1164,7 @@ const EnableHash<LayoutClass, MAPPER> *map(const uint8_t *dump, const EnableHash
   using HashableType = EnableHash<LayoutClass, HASHER>;
   if (mapped_data->getLayoutHash() != getHash<HashableType>())
   {
-    LOGWARN_CTX("The layout format does not match the dump format");
+    logwarn_ctx("The layout format does not match the dump format");
     return nullptr;
   }
   return mapped_data;
@@ -1350,11 +1307,20 @@ bool streamRead(Master<LayoutClass> &layout, IReader &reader)
 #pragma warning(pop)
 #endif
 
+#ifdef _MSC_VER
+#define BINDUMP_PRAGMA_PACK_PUSH __pragma(pack(push, 1))
+#define BINDUMP_PRAGMA_PACK_POP  __pragma(pack(pop))
+#else
+#define BINDUMP_PRAGMA_PACK_PUSH _Pragma("pack(push, 1)")
+#define BINDUMP_PRAGMA_PACK_POP  _Pragma("pack(pop)")
+#endif
+
 #define BINDUMP_FORWARD_LAYOUT(LayoutName)       \
   template <enum bindump::detail::Target target> \
   struct LayoutName
 
 #define BINDUMP_BEGIN_LAYOUT_BASE(LayoutName, ...)                                                \
+  BINDUMP_PRAGMA_PACK_PUSH                                                                        \
   template <enum bindump::detail::Target target = bindump::detail::MASTER>                        \
   struct LayoutName __VA_ARGS__                                                                   \
   {                                                                                               \
@@ -1366,7 +1332,7 @@ bool streamRead(Master<LayoutClass> &layout, IReader &reader)
     using Field = LayoutClass<target>;                                                            \
                                                                                                   \
     template <typename UserDataType>                                                              \
-    using List = typename bindump::detail::traits::List<UserDataType, 4, target>;                 \
+    using List = typename bindump::detail::traits::List<UserDataType, 1, target>;                 \
                                                                                                   \
     template <template <enum bindump::detail::Target> class LayoutClass>                          \
     using LayoutList = typename bindump::detail::traits::LayoutList<LayoutClass<target>, target>; \
@@ -1388,7 +1354,8 @@ bool streamRead(Master<LayoutClass> &layout, IReader &reader)
   public:
 #define BINDUMP_END_LAYOUT() \
   }                          \
-  ;
+  ;                          \
+  BINDUMP_PRAGMA_PACK_POP
 
 #define BINDUMP_BEGIN_LAYOUT(LayoutName) BINDUMP_BEGIN_LAYOUT_BASE(LayoutName, )
 #define BINDUMP_BEGIN_EXTEND_LAYOUT(LayoutName, Base) \
@@ -1452,8 +1419,12 @@ bool streamRead(Master<LayoutClass> &layout, IReader &reader)
   }                                                          \
   BINDUMP_DECLARE_ASSIGNMENT_OPERATOR(Class, BaseClass::operator=(other))
 
-#define BINDUMP_BEGIN_NON_SERIALIZABLE() bindump::detail::streamer::BeginNonSerializable DAG_CONCAT(__begin_non_serializable, __LINE__)
-#define BINDUMP_END_NON_SERIALIZABLE()   bindump::detail::streamer::EndNonSerializable DAG_CONCAT(__end_non_serializable, __LINE__)
+#define BINDUMP_CONCAT_HELPER(x, y) x##y
+#define BINDUMP_CONCAT(x, y)        BINDUMP_CONCAT_HELPER(x, y)
+
+#define BINDUMP_BEGIN_NON_SERIALIZABLE() \
+  bindump::detail::streamer::BeginNonSerializable BINDUMP_CONCAT(__begin_non_serializable, __LINE__)
+#define BINDUMP_END_NON_SERIALIZABLE() bindump::detail::streamer::EndNonSerializable BINDUMP_CONCAT(__end_non_serializable, __LINE__)
 #define BINDUMP_NON_SERIALIZABLE(var_list) \
   BINDUMP_BEGIN_NON_SERIALIZABLE();        \
   var_list;                                \

@@ -1,3 +1,0 @@
-
-gamePulls += framework_ground_holes_pull ;
-UseProgLibs += daNetGameLibs/ground_holes ;

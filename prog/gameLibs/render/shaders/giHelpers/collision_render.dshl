@@ -8,6 +8,8 @@ include "giHelpers/common_collision_render.dshl"
 shader render_collision
 {
   //cull_mode = none;
+  cull_mode = cw;
+
   hlsl {
     struct VsOutput
     {
@@ -31,6 +33,7 @@ shader render_collision
 
   COMMON_COLLISION_RENDER()
 
+  DISABLE_ASSERT_STAGE(vs)
   hlsl(vs) {
     VsOutput gi_collision_vs(VsInput input, uint id : SV_InstanceID)
     {

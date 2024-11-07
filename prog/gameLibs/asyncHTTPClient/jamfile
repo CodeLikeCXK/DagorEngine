@@ -26,10 +26,8 @@ if $(Platform) in nswitch {
   UseProgLibs += gameLibs/nswitch/network ;
 }
 else {
-  if $(UseGDK) != no {
+  if $(Platform) in xboxOne scarlett {
     CPPopt += -DUSE_XCURL=1 ;
-    AddIncludes += $(GDK_XCURL_INC_PATH) ;
-    AddLibs += $(GDK_XCURL_LIB_PATH) Crypt32.lib winhttp.lib ;
   } else {
     AddIncludes += $(Root)/prog/3rdPartyLibs/libcurl/include ;
     UseProgLibs += 3rdPartyLibs/libcurl ;

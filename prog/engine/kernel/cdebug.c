@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <debug/dag_debug.h>
 
 #if DAGOR_DBGLEVEL < 1 && !DAGOR_FORCE_LOGS

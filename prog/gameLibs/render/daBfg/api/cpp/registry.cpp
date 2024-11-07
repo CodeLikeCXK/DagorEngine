@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <render/daBfg/registry.h>
 #include <frontend/internalRegistry.h>
 
@@ -8,12 +6,6 @@ namespace dabfg
 {
 
 Registry::Registry(NodeNameId node, InternalRegistry *reg) : NameSpaceRequest(reg->knownNames.getParent(node), node, reg) {}
-
-Registry Registry::allowAsyncPipelines()
-{
-  registry->nodes[nodeId].allowAsyncPipelines = true;
-  return *this;
-}
 
 Registry Registry::orderMeBefore(const char *name)
 {
@@ -77,7 +69,7 @@ StateRequest Registry::requestState() { return {registry, nodeId}; }
 
 VirtualPassRequest Registry::requestRenderPass() { return {nodeId, registry}; }
 
-NameSpaceRequest Registry::root() const { return {registry->knownNames.root(), nodeId, registry}; }
+NameSpaceRequest Registry::root() { return {registry->knownNames.root(), nodeId, registry}; }
 
 VirtualResourceCreationSemiRequest Registry::create(const char *name, History history)
 {
@@ -90,34 +82,6 @@ VirtualResourceCreationSemiRequest Registry::create(const char *name, History hi
   registry->nodes[nodeId].resourceRequests.emplace(resId, ResourceRequest{ResourceUsage{Access::READ_WRITE}});
 
   return {{resId, false}, nodeId, registry};
-}
-
-Registry::VirtualTextureRequest<Registry::NewRwRequestPolicy> Registry::registerBackBuffer(const char *name)
-{
-  const auto resId = registry->knownNames.addNameId<ResNameId>(nameSpaceId, name);
-  auto &res = registry->resources.get(resId);
-
-  res.creationInfo = DriverDeferredTexture{};
-  res.type = ResourceType::Texture;
-
-  registry->nodes[nodeId].createdResources.insert(resId);
-  registry->nodes[nodeId].resourceRequests.emplace(resId, ResourceRequest{ResourceUsage{Access::READ_WRITE}});
-
-  return {{resId, false}, nodeId, registry};
-}
-
-detail::ResUid Registry::registerBufferImpl(const char *name, dabfg::ExternalResourceProvider &&p)
-{
-  const auto resId = registry->knownNames.addNameId<ResNameId>(nameSpaceId, name);
-  auto &res = registry->resources.get(resId);
-
-  res.creationInfo = eastl::move(p);
-  res.type = ResourceType::Buffer;
-
-  registry->nodes[nodeId].createdResources.insert(resId);
-  registry->nodes[nodeId].resourceRequests.emplace(resId, ResourceRequest{ResourceUsage{Access::READ_WRITE}});
-
-  return {resId, false};
 }
 
 detail::ResUid Registry::registerTexture2dImpl(const char *name, dabfg::ExternalResourceProvider &&p)

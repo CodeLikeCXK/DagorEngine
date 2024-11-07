@@ -1,6 +1,7 @@
 //
 // Dagor Tech 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -22,15 +23,8 @@ enum
   V_SHIFT = 0x10,
   V_CONTROL,
   V_ALT,
-  V_CAPSLOCK = 0x14,
 
   V_ESC = 0x1B,
-  V_SPACE = 0x20,
-
-  V_PAGE_UP = 0x21,
-  V_PAGE_DOWN = 0x22,
-  V_END = 0x23,
-  V_HOME = 0x24,
 
   V_LEFT = 0x25,
   V_UP,

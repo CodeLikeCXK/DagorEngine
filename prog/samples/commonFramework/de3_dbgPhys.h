@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 /** \addtogroup de3Common
@@ -6,8 +5,8 @@
 */
 
 #include "de3_debugObject.h"
-#include "dag_cur_view.h"
 #include <phys/dag_physDebug.h>
+#include <render/dag_cur_view.h>
 
 /**
 \brief Initialize/terminate debug physics rendering.

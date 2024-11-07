@@ -66,20 +66,14 @@ public:
         //nothing to iterate anymore
         return -1;
     }
-    SQArray *Clone(){SQArray *anew=Create(_opt_ss(this),0); anew->_values.copy(_values); VT_CLONE_FROM_TO(this, anew); return anew; }
+    SQArray *Clone(){SQArray *anew=Create(_opt_ss(this),0); anew->_values.copy(_values); VT_CLONE_TO(anew); return anew; }
     SQInteger Size() const {return _values.size();}
-    void Resize(SQInteger size, SQBool shrink = SQTrue)
+    void Resize(SQInteger size)
     {
         SQObjectPtr _null;
-        Resize(size,_null, shrink);
+        Resize(size,_null);
     }
-    void Resize(SQInteger size,SQObjectPtr &fill, SQBool shrink = SQTrue)
-    {
-      _values.resize(size,fill);
-      VT_RESIZE(size);
-      if (shrink)
-        ShrinkIfNeeded();
-    }
+    void Resize(SQInteger size,SQObjectPtr &fill) { _values.resize(size,fill); VT_RESIZE(size); ShrinkIfNeeded(); }
     void Reserve(SQInteger size) { _values.reserve(size); VT_RESERVE(size); }
     void Append(const SQObject &o){_values.push_back(o); VT_PUSHBACK(o, _ss(this)->_root_vm); }
     void Extend(const SQArray *a);
@@ -110,7 +104,6 @@ public:
         SQAllocContext ctx = _values._alloc_ctx;
         sq_delete(ctx, this, SQArray);
     }
-    bool IsBinaryEqual(const SQArray *o);
 
     SQObjectPtrVec _values;
     VT_DECL_VEC;

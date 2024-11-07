@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -46,7 +47,7 @@ public:
 
     if (used + 1 >= size)
     {
-      DEBUG_CTX("%s [queue=%p] size=%d used=%d wrPos=%d rdPos=%d", name, this, size, used, wrPos, rdPos);
+      mt_debug_ctx("%s [queue=%p] size=%d used=%d wrPos=%d rdPos=%d", name, this, size, used, wrPos, rdPos);
       return false;
     }
 

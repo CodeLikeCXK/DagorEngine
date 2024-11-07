@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <EASTL/hash_map.h>
 
 #include <shaders/dag_renderScene.h>
@@ -9,10 +7,8 @@
 
 namespace shaderbindump
 {
-ScriptedShadersBinDumpOwner shadersBinDump;
-#ifdef SHADERS_ALLOW_2_BINDUMP
-static ScriptedShadersBinDumpOwner shadersBinDumpExp;
-#endif
+ScriptedShadersBinDumpOwner shBinDump;
+ScriptedShadersBinDumpOwner shBinDumpExp;
 ScriptedShadersBinDump emptyDump;
 
 static const ScriptedShadersBinDump *null_dump()
@@ -40,13 +36,19 @@ const ShaderClass &null_shader_class(bool with_code) { return null_dump()->class
 const ShaderCode &null_shader_code() { return null_shader_class(true).code[0]; }
 } // namespace shaderbindump
 
-ScriptedShadersBinDumpOwner &shBinDumpExOwner(bool main)
+ScriptedShadersBinDumpOwner &shBinDumpOwner(bool main)
 {
-#ifdef SHADERS_ALLOW_2_BINDUMP
-  return main ? shaderbindump::shadersBinDump : shaderbindump::shadersBinDumpExp;
-#else
-  G_FAST_ASSERT(main); // Validate sec shdump
-  G_UNUSED(main);
-  return shaderbindump::shadersBinDump;
+#if _TARGET_STATIC_LIB && !SHADERS_ALLOW_2_BINDUMP
+  G_ASSERT(main); // Validate sec shdump
+  return shaderbindump::shBinDump;
 #endif
+  return main ? shaderbindump::shBinDump : shaderbindump::shBinDumpExp;
 }
+
+ScriptedShadersBinDump &shBinDumpRW(bool main)
+{
+  auto d = shBinDumpOwner(main).getDump();
+  return d ? *d : shaderbindump::emptyDump;
+}
+
+const ScriptedShadersBinDump &shBinDump(bool main) { return shBinDumpRW(main); }

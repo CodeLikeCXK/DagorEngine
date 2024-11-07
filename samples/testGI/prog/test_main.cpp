@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <shaders/dag_shaders.h>
 #include <shaders/dag_shaderBlock.h>
 #include <startup/dag_restart.h>
@@ -13,11 +11,9 @@
 #include <workCycle/dag_workCycle.h>
 #include <workCycle/dag_gameScene.h>
 #include <3d/dag_texPackMgr2.h>
-#include <drv/hid/dag_hiJoystick.h>
+#include <humanInput/dag_hiJoystick.h>
 #include <ioSys/dag_dataBlock.h>
 #include <perfMon/dag_cpuFreq.h>
-#include <util/dag_threadPool.h>
-#include <osApiWrappers/dag_threads.h>
 #include <osApiWrappers/dag_progGlobals.h>
 #include <osApiWrappers/dag_files.h>
 #include <osApiWrappers/dag_cpuJobs.h>
@@ -28,17 +24,14 @@
 #include <de3_guiManager.h>
 #include <de3_ICamera.h>
 #include <de3_loghandler.h>
-#include <perfMon/dag_daProfilerSettings.h>
 
-#if _TARGET_PC_WIN
-#include <windows.h>
-#include <startup/dag_leakDetector.inc.cpp>
-#endif
-
-#if _TARGET_C1 | _TARGET_C2
-
-#elif _TARGET_XBOX
+#if _TARGET_XBOX360
 #include <startup/dag_xboxMain.inc.cpp>
+#elif _TARGET_C0
+
+
+#elif _TARGET_C1
+
 #elif _TARGET_APPLE
 #include <osApiWrappers/dag_basePath.h>
 #elif _TARGET_ANDROID
@@ -63,51 +56,11 @@ static void post_shutdown_handler()
 {
   dagor_select_game_scene(NULL);
   quitted = true;
-  DEBUG_CTX("shutdown!");
+  debug_ctx("shutdown!");
   reset_game_resources();
   ddsx::shutdown_tex_pack2_data();
   shutdown_game(RESTART_INPUT);
   shutdown_game(RESTART_ALL);
-  threadpool::shutdown();
-  del_it(global_settings_blk);
-  dgs_get_settings = nullptr;
-  cpujobs::term(true, 1000);
-}
-
-
-static void init_threads(const DataBlock &cfg)
-{
-  int coreCount = cpujobs::get_core_count();
-#if _TARGET_XBOX
-  int num_workers = coreCount - 1;
-#else
-  bool freeMainThreadHT = coreCount > 4;                      // for main thread's hyper-threading neighbour
-  int defNumWorkers = coreCount - (freeMainThreadHT ? 3 : 2); // 1 for main & 1 for IO threads
-  int num_workers = max(cfg.getInt("numWorkThreads", defNumWorkers), 0);
-#endif
-  int stack_size = cfg.getInt("workThreadsStackSize", 128 << 10);
-#if DAGOR_DBGLEVEL > 1
-  stack_size *= 2;
-#endif
-  threadpool::init(num_workers, 2048, stack_size);
-  debug("threadpool inited for %d workers", num_workers);
-#if _TARGET_PC_WIN || _TARGET_XBOX
-  if (cfg.getBool("boostMainThreadPriority", true)) // boost main thread priority in order to overrule loading threads (resources,
-                                                    // textures, etc...)
-    DaThread::applyThisThreadPriority(THREAD_PRIORITY_ABOVE_NORMAL); // we increase main thread priority by one step. We only support
-                                                                     // two priorities: high and low
-  G_VERIFY(SetThreadAffinityMask(GetCurrentThread(), MAIN_THREAD_AFFINITY));
-#endif
-#if _TARGET_C1
-
-#endif
-}
-static int log_callback(int lev_tag, const char * /*fmt*/, const void * /*arg*/, int /*anum*/, const char * /*ctx_file*/,
-  int /*ctx_line*/)
-{
-  if (lev_tag == LOGLEVEL_ERR || lev_tag == LOGLEVEL_FATAL)
-    debug_dump_stack();
-  return 1;
 }
 
 int DagorWinMain(int nCmdShow, bool /*debugmode*/)
@@ -115,8 +68,7 @@ int DagorWinMain(int nCmdShow, bool /*debugmode*/)
   dd_add_base_path(df_get_real_folder_name("./"));
 
   ::measure_cpu_freq();
-  ::dgs_dont_use_cpu_in_background = false;
-  //::dgs_limit_fps = true;
+  ::dgs_dont_use_cpu_in_background = true;
   ::dgs_post_shutdown_handler = post_shutdown_handler;
 
   // prepare global settings datablock
@@ -145,15 +97,12 @@ int DagorWinMain(int nCmdShow, bool /*debugmode*/)
   ::dagor_init_mouse_win();
   ::dagor_init_joystick();
 #else
-#if _TARGET_C1 == 0 && _TARGET_C2 == 0
   ::dagor_init_mouse_null();
   ::dagor_init_keyboard_null();
-#endif
   ::dagor_init_joystick();
   if (global_cls_drv_joy)
     global_cls_drv_joy->enableAutoDefaultJoystick(true);
 #endif
-  init_threads(*::dgs_get_settings());
   ::startup_game(RESTART_ALL);
   shaders_register_console(true);
 
@@ -161,10 +110,9 @@ int DagorWinMain(int nCmdShow, bool /*debugmode*/)
   ::startup_shaders(sh_bindump_prefix);
   ::startup_game(RESTART_ALL);
   dagor_use_reversed_depth(true);
-  // ShaderGlobal::enableAutoBlockChange(true);
+  ShaderGlobal::enableAutoBlockChange(true);
   ShaderGlobal::set_int(get_shader_variable_id("in_editor", true), 0);
   ShaderGlobal::set_vars_from_blk(*global_settings_blk->getBlockByNameEx("shaderVar"), true);
-  da_profiler::set_profiling_settings(*global_settings_blk->getBlockByNameEx("debug"));
 
   ::dagor_common_startup();
 
@@ -184,7 +132,6 @@ int DagorWinMain(int nCmdShow, bool /*debugmode*/)
 #if _TARGET_PC
   ::win32_set_window_title("testGI");
 #endif
-  debug_set_log_callback(&log_callback);
   game_demo_init();
 
   ::dagor_reset_spent_work_time();

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "daProfilerInternal.h"
 #include "daProfilePlatform.h"
 #include "daProfilerDumpServer.h"

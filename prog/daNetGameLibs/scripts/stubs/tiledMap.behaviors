@@ -1,4 +1,0 @@
-return {
-  TiledMap = "TiledMap"
-  TiledMapInput = "TiledMapInput"
-}

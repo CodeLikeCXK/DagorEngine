@@ -1,5 +1,0 @@
-if $(HaveRenderer) = yes {
-  gamePulls += framework_blood_puddles_pull ;
-}
-
-UseProgLibs += daNetGameLibs/blood_puddles ;

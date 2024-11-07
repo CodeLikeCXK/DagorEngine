@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -12,12 +13,12 @@
 #include <anim/dag_animBlend.h>
 #include <util/dag_simpleString.h>
 #include <util/dag_string.h>
-#include <math/dag_bounds3.h>
 #include <EASTL/unique_ptr.h>
-#include <math/dag_geomTree.h>
+#include <shaders/dag_dynSceneRes.h>
 #include <math/dag_geomTreeMap.h>
 
 // forward declarations for external classes and structures
+class GeomNodeTree;
 class DynamicRenderableSceneLodsResource;
 class DynamicSceneWithTreeResource;
 class FastPhysSystem;
@@ -25,10 +26,10 @@ class PhysicsResource;
 class DynamicRenderableSceneInstance;
 class DataBlock;
 class Occlusion;
-class CharacterGameResFactory;
 struct RoDataBlock;
 struct Point3_vec4;
 struct Frustum;
+class CharacterGameResFactory;
 
 struct AnimCharData
 {
@@ -143,11 +144,7 @@ public:
   } //< set explicit wofs
   vec3f getWtmOfs() const { return nodeTree.getWtmOfs(); }
 
-  void setTm(const mat44f &tm, bool setup_wofs = false)
-  {
-    nodeTree.setRootTm(tm, setup_wofs);
-    nodeTree.invalidateWtm();
-  }
+  void setTm(const mat44f &tm, bool setup_wofs = false);
   void setTm(const TMatrix &tm, bool setup_wofs = false);
   void setTm(const Point3 &pos, const Point3 &dir, const Point3 &up);
   void setTm(vec4f pos, vec3f dir, vec3f up); // pos should has 1 in .w
@@ -249,7 +246,7 @@ public:
   const DataBlock *getDebugBlenderState(bool dump_tm = false);
   const DataBlock *getDebugNodemasks();
 
-  void setTraceContext(int64_t ctx) { traceContext = ctx; }
+  void setTraceContext(intptr_t ctx) { traceContext = ctx; }
   void setAlwaysUpdateAnimMode(bool on) { forceAnimUpdate = on; }
 
   static intptr_t irq(int type, intptr_t p1, intptr_t p2, intptr_t p3, void *arg);
@@ -280,7 +277,7 @@ public:
 
     const mat44f &wtm = nodeTree.getNodeWtmRel(centerNodeIdx);
     vec4f max_scl_sq = v_max(v_max(v_length3_sq(wtm.col0), v_length3_sq(wtm.col1)), v_length3_sq(wtm.col2));
-    return finalWtm.bsph = v_perm_xyzd(v_add(wtm.col3, finalWtm.wofs), v_mul(v_splats(centerNodeBsphRad), v_sqrt(max_scl_sq)));
+    return finalWtm.bsph = v_perm_xyzd(v_add(wtm.col3, finalWtm.wofs), v_mul(v_splat4(&centerNodeBsphRad), v_sqrt4(max_scl_sq)));
   }
 
 protected:
@@ -300,7 +297,7 @@ protected:
   static constexpr unsigned MAGIC_BITS = 13, MAGIC_VALUE = 1511;
   G_STATIC_ASSERT(MAGIC_VALUE < (1 << MAGIC_BITS));
   uint16_t magic : MAGIC_BITS;
-  int64_t traceContext = 0;
+  intptr_t traceContext = 0;
   real totalDeltaTime;
   real centerNodeBsphRad;
   dag::Index16 centerNodeIdx;
@@ -380,9 +377,9 @@ public:
   bool isVisibleInMainCamera() const { return (visBits & VISFLG_MAIN) != 0; }
 
   // computes visibility and returns visBits
-  uint16_t beforeRenderLegacy(const AnimcharFinalMat44 &finalWtm, vec4f &out_rendBsph, bbox3f &out_rendBbox, float lodDistMul);
+  uint16_t beforeRenderLegacy(const AnimcharFinalMat44 &finalWtm, vec4f &out_rendBsph, bbox3f &out_rendBbox);
   uint16_t beforeRender(const AnimcharFinalMat44 &finalWtm, vec4f &out_rendBsph, bbox3f &out_rendBbox, const Frustum &f,
-    float inv_wk_sq, Occlusion *occl, const Point3 &cameraPos, float lodDistMul = 1.0f);
+    float inv_wk_sq, Occlusion *occl, const Point3 &cameraPos);
   Point3 getNodePosForBone(uint32_t bone_id) const;
 
   void render(const Point3 &view_pos, real tr = 1.f);
@@ -401,7 +398,7 @@ public:
   DynamicRenderableSceneInstance *getSceneInstance() { return scene; }
   const DynamicRenderableSceneInstance *getSceneInstance() const { return scene; }
   void setSceneInstance(DynamicRenderableSceneInstance *instance);
-  void updateLodResFromSceneInstance();
+  void updateLodResFromSceneInstance() { lodres = scene->getLodsResource(); };
 
   void setOwnerTm(const TMatrix &tm)
   {
@@ -557,7 +554,7 @@ public:
 
   void registerIrqHandler(int irq, IGenericIrq *handler) { base.registerIrqHandler(irq, handler); }
   void unregisterIrqHandler(int irq, IGenericIrq *handler) { base.unregisterIrqHandler(irq, handler); }
-  void setTraceContext(int64_t ctx) { base.setTraceContext(ctx); }
+  void setTraceContext(intptr_t ctx) { base.setTraceContext(ctx); }
   void setOriginVelStorage(Point3 *linvel, Point3 *angvel) { base.setOriginVelStorage(linvel, angvel); }
 
   bool applyCharDepScale(float scale) { return base.applyCharDepScale(scale); }
@@ -595,10 +592,7 @@ public:
     rendBbox.bmax = v_ldu(&in_bbox[1].x);
   }
 
-  bool beforeRender(float lodDistMul = 1.0f)
-  {
-    return (rend.beforeRenderLegacy(finalWtm, rendBsph, rendBbox, lodDistMul) & rend.VISFLG_MAIN) != 0;
-  }
+  bool beforeRender() { return (rend.beforeRenderLegacy(finalWtm, rendBsph, rendBbox) & rend.VISFLG_MAIN) != 0; }
   bool beforeRender(const Frustum &f, float inv_wk_sq, Occlusion *occl, const Point3 &cam_pos)
   {
     return (rend.beforeRender(finalWtm, rendBsph, rendBbox, f, inv_wk_sq, occl, cam_pos) & rend.VISFLG_MAIN) != 0;
@@ -649,17 +643,8 @@ void prepareFrustum(bool is_main_camera, const Frustum &culling_frustum, const P
 int getSlotId(const char *slot_name);
 int addSlotId(const char *slot_name);
 
-struct alignas(16) LegsIkRay
-{
-  Point3 pos;
-  float t;
-  Point3 dir;
-  float legsDiff;
-  Point3 footP1;
-  bool moveFoot;
-};
-
-extern bool (*trace_static_multiray)(dag::Span<LegsIkRay> traces, bool down, intptr_t ctx);
+extern bool (*trace_static_ray_down)(const Point3_vec4 &from, float max_t, float &out_t, intptr_t ctx);
+extern bool (*trace_static_ray_dir)(const Point3_vec4 &from, Point3_vec4 dir, float max_t, float &out_t, intptr_t ctx);
 
 // registers factory for loading statesGraph from compiled-in source code
 void registerGraphCppFactory();

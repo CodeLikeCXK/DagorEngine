@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "de_appwnd.h"
 
 #include <oldEditor/de_clipping.h>
@@ -471,7 +469,7 @@ void DagorPhys::init_clipping_binary(StaticSceneRayTracer *rt)
 
 
   rtdump = new (midmem) FastRtDump(rt);
-  DEBUG_CTX("binary rtdump: %p", rt);
+  debug_ctx("binary rtdump: %p", rt);
 }
 
 
@@ -479,10 +477,9 @@ void DagorPhys::init_clipping_binary(StaticSceneRayTracer *rt)
 FastRtDump *DagorPhys::getFastRtDump() { return rtdump; }
 
 
-bool fill_custom_colliders_list(PropPanel::ContainerPropertyControl &panel, const char *grp_caption, int grp_pid, int collider_pid,
-  bool shadow, bool open_grp)
+bool fill_custom_colliders_list(PropPanel2 &panel, const char *grp_caption, int grp_pid, int collider_pid, bool shadow, bool open_grp)
 {
-  PropPanel::ContainerPropertyControl *grp = panel.createGroup(grp_pid, grp_caption);
+  PropertyContainerControlBase *grp = panel.createGroup(grp_pid, grp_caption);
 
   if (!grp)
     return false;
@@ -507,7 +504,7 @@ bool fill_custom_colliders_list(PropPanel::ContainerPropertyControl &panel, cons
 }
 
 
-bool on_pp_collider_check(int pid, const PropPanel::ContainerPropertyControl &panel, int collider_pid, bool shadow)
+bool on_pp_collider_check(int pid, const PropPanel2 &panel, int collider_pid, bool shadow)
 {
   if (pid < collider_pid)
     return false;

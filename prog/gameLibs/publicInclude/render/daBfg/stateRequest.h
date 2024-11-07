@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -60,14 +61,12 @@ public:
   StateRequest allowWireframe() &&;
 
   /**
-   * \brief Configures VRS settings for this node.
-   * \details The default settings correspond to no VRS.
-   * \note VRS will only work if it is supported and enabled
-   * through dabfg::update_external_state.
+   * \brief Requests VRS to be enabled for this node with the specified
+   * settings, if VRS is supported and currently enabled.
    *
    * \param vrs The VRS settings to use.
    */
-  StateRequest vrs(VrsSettings vrs) &&;
+  StateRequest allowVrs(VrsRequirements vrs) &&;
 
   /**
    * \brief Requests a shader pipeline state override to be active

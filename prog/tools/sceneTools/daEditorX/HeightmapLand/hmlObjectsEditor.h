@@ -1,5 +1,8 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright 2023 by Gaijin Games KFT, All rights reserved.
+#ifndef _DE2_PLUGIN_ROADS_ROADOBJECTSEDITOR_H_
+#define _DE2_PLUGIN_ROADS_ROADOBJECTSEDITOR_H_
 #pragma once
+
 
 #include <assetsGui/av_client.h>
 #include <oldEditor/de_interface.h>
@@ -11,18 +14,11 @@
 #include <de3_pixelPerfectSelectionService.h>
 #include <shaders/dag_overrideStateId.h>
 #include <ioSys/dag_dataBlock.h>
-#include <physMap/physMap.h>
-
-namespace Outliner
-{
-class OutlinerWindow;
-}
 
 class StaticGeometryContainer;
 class GeomObject;
 class Node;
 class LandscapeEntityLibWindowHelper;
-class HeightmapLandOutlinerInterface;
 class HmapLandHoleObject;
 class SplineObject;
 class SplinePointObject;
@@ -39,9 +35,7 @@ public:
   virtual ~HmapLandObjectEditor();
 
   // ObjectEditor interface implementation
-  virtual void fillToolBar(PropPanel::ContainerPropertyControl *toolbar);
-  virtual void addButton(PropPanel::ContainerPropertyControl *tb, int id, const char *bmp_name, const char *hint,
-    bool check = false) override;
+  virtual void fillToolBar(PropertyContainerControlBase *toolbar);
   virtual void updateToolbarButtons();
   virtual bool pickObjects(IGenViewportWnd *wnd, int x, int y, Tab<RenderableEditableObject *> &objs) override;
 
@@ -62,11 +56,9 @@ public:
   virtual void update(real dt);
 
   virtual void setEditMode(int cm);
-  virtual bool canSelectObj(RenderableEditableObject *o) override;
   virtual void createObjectBySample(RenderableEditableObject *sample);
-  virtual void registerViewportAccelerators(IWndManager &wndManager) override;
 
-  virtual void onClick(int pcb_id, PropPanel::ContainerPropertyControl *panel);
+  virtual void onClick(int pcb_id, PropPanel2 *panel);
   void autoAttachSplines();
   void makeBottomSplines();
 
@@ -122,8 +114,6 @@ public:
 
   void exportAsComposit();
   void splitComposits();
-  bool splitComposits(const PtrTab<RenderableEditableObject> &sel, PtrTab<LandscapeEntityObject> &compObj,
-    PtrTab<LandscapeEntityObject> &decompObj, DataBlock &splitSplinesBlk, PtrTab<RenderableEditableObject> &otherObj);
   void instantiateGenToEntities();
 
   void exportToDag();
@@ -167,31 +157,11 @@ public:
   GeomObject &getClearedWaterGeom();
   void removeWaterGeom();
 
-  PropPanel::PanelWindowPropertyControl *getCurrentPanelFor(RenderableEditableObject *obj);
-  PropPanel::PanelWindowPropertyControl *getObjectPropertiesPanel();
+  CPanelWindow *getCurrentPanelFor(RenderableEditableObject *obj);
 
   bool usesRendinstPlacement() const override;
 
   bool isSelectOnlyIfEntireObjectInRect() const { return selectOnlyIfEntireObjectInRect; }
-
-  void setPhysMap(PhysMap *phys_map) { physMap = phys_map; }
-
-  bool isSampleObject(const RenderableEditableObject &object) const { return &object == sample; }
-
-  // Called when an object's name has changed. Only called for objects that are supported by the Outliner, and are added
-  // (registered) into Object Editor.
-  void onRegisteredObjectNameChanged(RenderableEditableObject &object);
-
-  // When the name of the asset within the object (Props::entityName) changes.
-  void onObjectEntityNameChanged(RenderableEditableObject &object);
-
-  // When an object has been moved to a different edit layer.
-  void onObjectEditLayerChanged(RenderableEditableObject &object);
-
-  void loadOutlinerSettings(const DataBlock &settings);
-  void saveOutlinerSettings(DataBlock &settings);
-
-  virtual void updateImgui() override;
 
 public:
   class LoftAndGeomCollider : public IDagorEdCustomCollider
@@ -224,16 +194,37 @@ public:
   static int geomBuildCntLoft, geomBuildCntPoly, geomBuildCntRoad;
   static int waterSurfSubtypeMask;
 
-  bool shouldShowPhysMatColors() const { return showPhysMatColors; }
+  struct LayersDlg : public ControlEventHandler
+  {
+  public:
+    LayersDlg();
+    ~LayersDlg();
+
+    bool isVisible() const;
+    void show();
+    void hide();
+    void refillPanel();
+
+    virtual void onChange(int pid, PropertyContainerControlBase *panel);
+    virtual void onClick(int pid, PropertyContainerControlBase *panel);
+    virtual void onDoubleClick(int pid, PropertyContainerControlBase *panel);
+    virtual void onPostEvent(int pid, PropPanel2 *panel)
+    {
+      if (pid == 1)
+        refillPanel();
+    }
+
+    CDialogWindow *dlg;
+    DataBlock panelState;
+    bool firstShow = true;
+  };
+  LayersDlg layersDlg;
 
 protected:
   PlacementRotation buttonIdToPlacementRotation(int id);
-  virtual void onRemoveObject(RenderableEditableObject &obj) override;
   virtual void _removeObjects(RenderableEditableObject **obj, int num, bool use_undo);
-  virtual void onAddObject(RenderableEditableObject &obj) override;
   virtual void _addObjects(RenderableEditableObject **obj, int num, bool use_undo);
-  virtual void onObjectFlagsChange(RenderableEditableObject *obj, int changed_flags) override;
-  virtual void updateSelection() override;
+  virtual bool canSelectObj(RenderableEditableObject *o);
 
   bool findTargetPos(IGenViewportWnd *wnd, int x, int y, Point3 &out, bool place_on_ri_collision = false);
   void selectNewObjEntity(const char *name);
@@ -245,11 +236,6 @@ protected:
 
   void getPixelPerfectHits(IPixelPerfectSelectionService &selection_service, IGenViewportWnd &wnd, int x, int y,
     Tab<RenderableEditableObject *> &hits);
-
-  bool isOutlinerWindowOpen() const { return outlinerWindow.get() != nullptr; }
-  void showOutlinerWindow(bool show);
-
-  static RenderableEditableObject &getMainObjectForOutliner(RenderableEditableObject &object);
 
   Point3 *debugP1, *debugP2;
 
@@ -281,16 +267,11 @@ protected:
   bool hideSplines;
   bool usePixelPerfectSelection;
   bool selectOnlyIfEntireObjectInRect;
-  bool showPhysMat, showPhysMatColors;
 
   dag::Vector<IPixelPerfectSelectionService::Hit> pixelPerfectSelectionHitsCache;
   Tab<NearSnowSource> nearSources;
 
   shaders::OverrideStateId zFuncLessStateId;
-
-  PhysMap *physMap = nullptr;
-
-  eastl::unique_ptr<Outliner::OutlinerWindow> outlinerWindow;
-  eastl::unique_ptr<HeightmapLandOutlinerInterface> outlinerInterface;
-  DataBlock outlinerSettings;
 };
+
+#endif

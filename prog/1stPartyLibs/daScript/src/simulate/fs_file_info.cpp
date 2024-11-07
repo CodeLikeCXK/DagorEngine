@@ -7,10 +7,6 @@
 #define DASLIB_MODULE_NAME  "daslib"
 #define DASTEST_MODULE_NAME "dastest"
 
-#if defined(_WIN32) && defined(__clang__)
-    #define fileno _fileno
-#endif
-
 #if !defined(DAS_NO_FILEIO)
 #include <sys/stat.h>
 #endif

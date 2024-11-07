@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <osApiWrappers/dag_virtualMem.h>
 #include <util/dag_globDef.h>
 

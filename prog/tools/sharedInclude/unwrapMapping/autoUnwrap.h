@@ -1,5 +1,8 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+
+#ifndef __DAGOR_LTMPMAP_H
+#define __DAGOR_LTMPMAP_H
 #pragma once
+
 
 #include <libTools/util/progressInd.h>
 
@@ -55,3 +58,5 @@ int num_lightmaps();
 //! returns size of lightmap
 void get_lightmap_size(int i, int &w, int &h);
 } // namespace AutoUnwrapMapping
+
+#endif

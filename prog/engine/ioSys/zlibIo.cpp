@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <util/dag_globDef.h>
 #include <ioSys/dag_genIo.h>
 #include <ioSys/dag_zlibIo.h>
@@ -240,12 +238,6 @@ void ZlibSaveCB::write(const void *ptr, int size)
   zlibWriter->pack((void *)ptr, size, false);
 }
 
-
-void ZlibSaveCB::syncFlush()
-{
-  G_ASSERT(!isFinished);
-  zlibWriter->packZflush(NULL, 0, Z_SYNC_FLUSH);
-}
 
 void ZlibSaveCB::finish()
 {

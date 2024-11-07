@@ -1,4 +1,0 @@
-if $(HaveRenderer) = yes {
-  gamePulls += framework_blood_decals_pull daNetGameLibs_blood_decals_DAS_pull_AOT ;
-  UseProgLibs += daNetGameLibs/blood_decals ;
-}

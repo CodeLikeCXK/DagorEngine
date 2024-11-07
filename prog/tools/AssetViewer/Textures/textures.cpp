@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "textures.h"
 #include "tex_util.h"
 
@@ -9,7 +7,7 @@
 #include <assets/assetHlp.h>
 #include <shaders/dag_shaders.h>
 
-#include <propPanel/control/container.h>
+#include <propPanel2/c_panel_base.h>
 #include <winGuiWrapper/wgw_input.h>
 
 #include <libTools/util/strUtil.h>
@@ -21,10 +19,7 @@
 #include <3d/dag_render.h>
 #include <3d/dag_texMgr.h>
 #include <3d/dag_texPackMgr2.h>
-#include <drv/3d/dag_renderStates.h>
-#include <drv/3d/dag_viewScissor.h>
-#include <drv/3d/dag_matricesAndPerspective.h>
-#include <drv/3d/dag_platform_pc.h>
+#include <3d/dag_drv3d_pc.h>
 #include <3d/ddsxTex.h>
 #include <3d/ddsFormat.h>
 #include <3d/ddsxTexMipOrder.h>
@@ -294,20 +289,23 @@ void TexturesPlugin::renderObjects()
       ti.w *= 2;
     }
 
-    StdGuiRender::start_render(vp_w, vp_h);
+    int w, h;
+    EDITORCORE->getRenderViewport()->getViewportSize(w, h);
+
+    StdGuiRender::start_render(w, h);
 
     if (colorModeSVId != -1)
       StdGuiRender::set_shader(&shader);
 
     StdGuiRender::set_color(e3dcolor(color4(mColor) * powf(10, cScaleDb / 10)));
 
-    StdGuiRender::set_texture(texId, d3d::INVALID_SAMPLER_HANDLE); // TODO: Use actual sampler IDs
+    StdGuiRender::set_texture(texId);
     StdGuiRender::set_ablend(false);
 
     if (!forceStretch)
       ti.w *= texScale, ti.h *= texScale;
-    real wk = float(vp_w - 8) / ti.w;
-    real hk = float(vp_h - 8) / ti.h;
+    real wk = float(w - 8) / ti.w;
+    real hk = float(h - 8) / ti.h;
 
     real k = wk < hk ? wk : hk;
 
@@ -316,7 +314,7 @@ void TexturesPlugin::renderObjects()
 
     Point2 tc0 = Point2(0, 0);
     Point2 tc1 = viewTile;
-    int l = (vp_w - ti.w) / 2, t = (vp_h - ti.h) / 2;
+    int l = (w - ti.w) / 2, t = (h - ti.h) / 2;
 
     int x0 = l;
     int y0 = t;
@@ -332,8 +330,8 @@ void TexturesPlugin::renderObjects()
       {
         if (l + texMove.x > TEX_PADDING)
           texMove.x = TEX_PADDING - l;
-        else if (l + texMove.x + ti.w < vp_w - TEX_PADDING)
-          texMove.x = vp_w - TEX_PADDING - l - ti.w;
+        else if (l + texMove.x + ti.w < w - TEX_PADDING)
+          texMove.x = w - TEX_PADDING - l - ti.w;
 
         l += texMove.x;
         x0 += texMove.x;
@@ -344,8 +342,8 @@ void TexturesPlugin::renderObjects()
       {
         if (t + texMove.y > TEX_PADDING)
           texMove.y = TEX_PADDING - t;
-        else if (t + texMove.y + ti.h < vp_h - TEX_PADDING)
-          texMove.y = vp_h - TEX_PADDING - t - ti.h;
+        else if (t + texMove.y + ti.h < h - TEX_PADDING)
+          texMove.y = h - TEX_PADDING - t - ti.h;
 
         t += texMove.y;
         y0 += texMove.y;
@@ -407,7 +405,7 @@ bool TexturesPlugin::supportAssetType(const DagorAsset &asset) const { return st
 
 //=============================================================================
 
-void TexturesPlugin::fillPropPanel(PropPanel::ContainerPropertyControl &panel)
+void TexturesPlugin::fillPropPanel(PropertyContainerControlBase &panel)
 {
   panel.setEventHandler(this);
 
@@ -452,7 +450,7 @@ void TexturesPlugin::fillPropPanel(PropPanel::ContainerPropertyControl &panel)
     break;
   }
 
-  PropPanel::ContainerPropertyControl *igrp = panel.createGroupBox(ID_INFO_GRP, "Texture info");
+  PropPanel2 *igrp = panel.createGroupBox(ID_INFO_GRP, "Texture info");
 
   igrp->createStatic(0, "Type:");
   igrp->createStatic(0, _tex_type, false);
@@ -586,7 +584,7 @@ void TexturesPlugin::fillPropPanel(PropPanel::ContainerPropertyControl &panel)
   {
     int stub_idx = GET_PROP(Int, "stubTexIdx", 0);
     bool ext_tex = (curAsset->isVirtual() && !curAsset->getSrcFileName());
-    PropPanel::ContainerPropertyControl *rgrp = igrp->createRadioGroup(ID_SHOW_TEXQ_GRP, "Show tex quality");
+    PropPanel2 *rgrp = igrp->createRadioGroup(ID_SHOW_TEXQ_GRP, "Show tex quality");
     bool valid_stub = curTqAsset != nullptr || stub_idx >= 0;
 
     if (curAsset && curUhqAsset == curAsset)
@@ -631,7 +629,7 @@ void TexturesPlugin::fillPropPanel(PropPanel::ContainerPropertyControl &panel)
 
   if (iesTexture)
   {
-    PropPanel::ContainerPropertyControl *pgrp = panel.createGroupBox(ID_IES_INFO_GRP, "Photometry info");
+    PropPanel2 *pgrp = panel.createGroupBox(ID_IES_INFO_GRP, "Photometry info");
     pgrp->createStatic(0, "Blur radius:");
     pgrp->createStatic(0, String(32, "%3.4f", iesParams.blurRadius * RAD_TO_DEG), false);
     pgrp->createStatic(0, "Horizontal range:");
@@ -674,7 +672,7 @@ void TexturesPlugin::fillPropPanel(PropPanel::ContainerPropertyControl &panel)
     if (!hasAlpha && (targetViewMode == ID_COLOR_MODE_A || targetViewMode == ID_COLOR_MODE_RGBA))
       targetViewMode = ID_COLOR_MODE_RGB;
 
-    PropPanel::ContainerPropertyControl *rgrp = panel.createRadioGroup(ID_COLOR_MODE_GRP, "Color channels");
+    PropPanel2 *rgrp = panel.createRadioGroup(ID_COLOR_MODE_GRP, "Color channels");
     switch (chanelsRGB)
     {
       case 1:
@@ -724,7 +722,7 @@ void TexturesPlugin::fillPropPanel(PropPanel::ContainerPropertyControl &panel)
 
 
 //=============================================================================
-void TexturesPlugin::onChange(int pid, PropPanel::ContainerPropertyControl *panel)
+void TexturesPlugin::onChange(int pid, PropertyContainerControlBase *panel)
 {
   switch (pid)
   {
@@ -1101,6 +1099,7 @@ void export_texture_as_dds(const char *fn, DagorAsset &a)
     {32, 0x00000000, 0xff0000, 0xff00, 0xff, D3DFMT_X8B8G8R8, DDPF_RGB},
     {16, 0x00000000, 0x0000ff, 0xff00, 0x00, D3DFMT_V8U8, DDPF_BUMPDUDV},
     {16, 0x0000ff00, 0x0000ff, 0x0000, 0x00, D3DFMT_A8L8, DDPF_LUMINANCE | DDPF_ALPHAPIXELS},
+    {32, 0x00000000, 0xFFFF, 0xFFFF0000, 0, D3DFMT_V16U16, DDPF_BUMPDUDV},
     {16, 0x00000000, 0xFFFF, 0x00000000, 0, D3DFMT_L16, DDPF_LUMINANCE},
   };
 
@@ -1194,7 +1193,7 @@ void export_texture_as_dds(const char *fn, DagorAsset &a)
   cwr.write(data.data(), data_size(data));
 }
 
-void TexturesPlugin::onClick(int pid, PropPanel::ContainerPropertyControl *panel)
+void TexturesPlugin::onClick(int pid, PropertyContainerControlBase *panel)
 {
   if (pid == ID_EXPORT_TEXTURE)
   {

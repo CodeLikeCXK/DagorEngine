@@ -1,4 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __GAIJIN_PROPERTY_DIALOG__
+#define __GAIJIN_PROPERTY_DIALOG__
 #pragma once
 
 #include <generic/dag_tab.h>
@@ -23,3 +24,5 @@ private:
   void addStrInput(const HWND &group_hwnd, int idc, const char *name, const char *val, bool enable);
   void addCheck(const HWND &group_hwnd, int idc, const char *name, bool val, bool enable);
 };
+
+#endif //__GAIJIN_PROPERTY_DIALOG__

@@ -85,7 +85,7 @@ WheelWV::WheelWV(const WheelSettingsWV &inSettings) :
 	JPH_ASSERT(inSettings.mMaxHandBrakeTorque >= 0.0f);
 }
 
-void WheelWV::Update(uint inWheelIndex, float inDeltaTime, const VehicleConstraint &inConstraint)
+void WheelWV::Update(float inDeltaTime, const VehicleConstraint &inConstraint)
 {
 	const WheelSettingsWV *settings = GetSettings();
 
@@ -122,9 +122,8 @@ void WheelWV::Update(uint inWheelIndex, float inDeltaTime, const VehicleConstrai
 
 		// Tire friction
 		VehicleConstraint::CombineFunction combine_friction = inConstraint.GetCombineFriction();
-		mCombinedLongitudinalFriction = longitudinal_slip_friction;
-		mCombinedLateralFriction = lateral_slip_friction;
-		combine_friction(inWheelIndex, mCombinedLongitudinalFriction, mCombinedLateralFriction, *mContactBody, mContactSubShapeID);
+		mCombinedLongitudinalFriction = combine_friction(longitudinal_slip_friction, *mContactBody, mContactSubShapeID);
+		mCombinedLateralFriction = combine_friction(lateral_slip_friction, *mContactBody, mContactSubShapeID);
 	}
 	else
 	{
@@ -176,7 +175,6 @@ WheeledVehicleController::WheeledVehicleController(const WheeledVehicleControlle
 	static_cast<VehicleEngineSettings &>(mEngine) = inSettings.mEngine;
 	JPH_ASSERT(inSettings.mEngine.mMinRPM >= 0.0f);
 	JPH_ASSERT(inSettings.mEngine.mMinRPM <= inSettings.mEngine.mMaxRPM);
-	mEngine.SetCurrentRPM(mEngine.mMinRPM);
 
 	// Copy transmission settings
 	static_cast<VehicleTransmissionSettings &>(mTransmission) = inSettings.mTransmission;
@@ -267,10 +265,10 @@ void WheeledVehicleController::PostCollide(float inDeltaTime, PhysicsSystem &inP
 	Wheels &wheels = mConstraint.GetWheels();
 
 	// Update wheel angle, do this before applying torque to the wheels (as friction will slow them down again)
-	for (uint wheel_index = 0, num_wheels = (uint)wheels.size(); wheel_index < num_wheels; ++wheel_index)
+	for (Wheel *w_base : wheels)
 	{
-		WheelWV *w = static_cast<WheelWV *>(wheels[wheel_index]);
-		w->Update(wheel_index, inDeltaTime, mConstraint);
+		WheelWV *w = static_cast<WheelWV *>(w_base);
+		w->Update(inDeltaTime, mConstraint);
 	}
 
 	// In auto transmission mode, don't accelerate the engine when switching gears
@@ -431,7 +429,7 @@ void WheeledVehicleController::PostCollide(float inDeltaTime, PhysicsSystem &inP
 		// TW(i) is the torque applied to the wheel outside of the engine (brake + torque due to friction with the ground)
 		// F(i) is the fraction of the engine torque applied from engine to wheel i
 		//
-		// Because the angular acceleration and torque are connected through: Torque = I * dw/dt
+		// Because the angular accelaration and torque are connected through: Torque = I * dw/dt
 		//
 		// We have the angular acceleration of the engine at time t:
 		//
@@ -653,21 +651,14 @@ bool WheeledVehicleController::SolveLongitudinalAndLateralConstraints(float inDe
 {
 	bool impulse = false;
 
-	float *max_lateral_friction_impulse = (float *)JPH_STACK_ALLOC(mConstraint.GetWheels().size() * sizeof(float));
-
-	uint wheel_index = 0;
 	for (Wheel *w_base : mConstraint.GetWheels())
-	{
 		if (w_base->HasContact())
 		{
 			WheelWV *w = static_cast<WheelWV *>(w_base);
 			const WheelSettingsWV *settings = w->GetSettings();
 
 			// Calculate max impulse that we can apply on the ground
-			float max_longitudinal_friction_impulse;
-			mTireMaxImpulseCallback(wheel_index,
-				max_longitudinal_friction_impulse, max_lateral_friction_impulse[wheel_index], w->GetSuspensionLambda(),
-				w->mCombinedLongitudinalFriction, w->mCombinedLateralFriction, w->mLongitudinalSlip, w->mLateralSlip, inDeltaTime);
+			float max_longitudinal_friction_impulse = w->mCombinedLongitudinalFriction * w->GetSuspensionLambda();
 
 			// Calculate relative velocity between wheel contact point and floor in longitudinal direction
 			Vec3 relative_velocity = mConstraint.GetVehicleBody()->GetPointVelocity(w->GetContactPosition()) - w->GetContactPointVelocity();
@@ -702,32 +693,26 @@ bool WheeledVehicleController::SolveLongitudinalAndLateralConstraints(float inDe
 				float linear_impulse = (w->GetAngularVelocity() - desired_angular_velocity) * settings->mInertia / settings->mRadius;
 
 				// Limit the impulse by max tire friction
-				float prev_lambda = w->GetLongitudinalLambda();
-				min_longitudinal_impulse = max_longitudinal_impulse = Clamp(prev_lambda + linear_impulse, -max_longitudinal_friction_impulse, max_longitudinal_friction_impulse);
+				min_longitudinal_impulse = max_longitudinal_impulse = w->GetLongitudinalLambda() + Sign(linear_impulse) * min(abs(linear_impulse), max_longitudinal_friction_impulse);
 
 				// Longitudinal impulse
+				float prev_lambda = w->GetLongitudinalLambda();
 				impulse |= w->SolveLongitudinalConstraintPart(mConstraint, min_longitudinal_impulse, max_longitudinal_impulse);
 
 				// Update the angular velocity of the wheels according to the lambda that was applied
 				w->SetAngularVelocity(w->GetAngularVelocity() - (w->GetLongitudinalLambda() - prev_lambda) * settings->mRadius / settings->mInertia);
 			}
 		}
-		++wheel_index;
-	}
 
-	wheel_index = 0;
 	for (Wheel *w_base : mConstraint.GetWheels())
-	{
 		if (w_base->HasContact())
 		{
 			WheelWV *w = static_cast<WheelWV *>(w_base);
 
 			// Lateral friction
-			float max_lateral_impulse = max_lateral_friction_impulse[wheel_index];
-			impulse |= w->SolveLateralConstraintPart(mConstraint, -max_lateral_impulse, max_lateral_impulse);
+			float max_lateral_friction_impulse = w->mCombinedLateralFriction * w->GetSuspensionLambda();
+			impulse |= w->SolveLateralConstraintPart(mConstraint, -max_lateral_friction_impulse, max_lateral_friction_impulse);
 		}
-		++wheel_index;
-	}
 
 	return impulse;
 }
@@ -793,11 +778,6 @@ void WheeledVehicleController::Draw(DebugRenderer *inRenderer) const
 		inRenderer->DrawLine(wheel_pos, wheel_pos + wheel_up, Color::sGreen);
 		inRenderer->DrawLine(wheel_pos, wheel_pos + wheel_right, Color::sBlue);
 		inRenderer->DrawLine(wheel_pos, wheel_pos + steering_axis, Color::sYellow);
-
-		// Draw wheel
-		RMat44 wheel_transform(Vec4(wheel_up, 0.0f), Vec4(wheel_right, 0.0f), Vec4(wheel_forward, 0.0f), wheel_pos);
-		wheel_transform.SetRotation(wheel_transform.GetRotation() * Mat44::sRotationY(-w->GetRotationAngle()));
-		inRenderer->DrawCylinder(wheel_transform, settings->mWidth * 0.5f, settings->mRadius, w->GetSuspensionLength() <= settings->mSuspensionMinLength? Color::sRed : Color::sGreen, DebugRenderer::ECastShadow::Off, DebugRenderer::EDrawMode::Wireframe);
 
 		if (w->HasContact())
 		{

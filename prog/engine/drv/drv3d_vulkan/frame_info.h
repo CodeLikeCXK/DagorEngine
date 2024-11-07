@@ -1,10 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-#pragma once
-
 // gpu work item aka frame info
-
-#include <drv/3d/rayTrace/dag_drvRayTrace.h> // for D3D_HAS_RAY_TRACING
-
+#pragma once
 #include "buffer_resource.h"
 #include "driver.h"
 #include "fence_manager.h"
@@ -16,8 +11,6 @@
 #include "query_pools.h"
 #include "async_completion_state.h"
 #include "cleanup_queue.h"
-#include "timestamp_queries.h"
-#include "device_execution_tracker.h"
 
 namespace drv3d_vulkan
 {
@@ -32,19 +25,21 @@ struct FrameInfo
   Tab<VulkanCommandBufferHandle> pendingCommandBuffers;
   ThreadedFence *frameDone = nullptr;
   Tab<VulkanSemaphoreHandle> readySemaphores;
-  int pendingSemaphoresRingIdx = 0;
-  Tab<VulkanSemaphoreHandle> pendingSemaphores[GPU_TIMELINE_HISTORY_SIZE];
+  Tab<VulkanSemaphoreHandle> pendingSemaphores;
   Tab<VulkanCommandBufferHandle> pendingDmaBuffers;
-  TimestampQueryBlock *pendingTimestamps = nullptr;
+  eastl::vector<TimestampQueryRef> pendingTimestamps;
+  eastl::vector<AsyncCompletionState *> signalRecivers;
   eastl::vector<eastl::unique_ptr<ShaderModule>> deletedShaderModules;
-  DeviceExecutionTracker execTracker;
+
+  void sendSignal();
+  void addSignalReciver(AsyncCompletionState &reciver);
 
   void init();
   VulkanCommandBufferHandle allocateCommandBuffer(VulkanDevice &device);
-  VulkanSemaphoreHandle allocSemaphore(VulkanDevice &device);
-  void addPendingSemaphore(VulkanSemaphoreHandle sem);
+  VulkanSemaphoreHandle allocSemaphore(VulkanDevice &device, bool auto_track);
 
   void finishShaderModules();
+  void finishTimeStamps();
   void finishDescriptorSetReset();
   void finishSemaphores();
   void finishGpuWork();
@@ -53,7 +48,6 @@ struct FrameInfo
 
   // internal state
 
-  size_t replayId = -1;
   size_t index = -1;
   bool initialized = false;
 

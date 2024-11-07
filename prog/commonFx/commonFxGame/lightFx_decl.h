@@ -69,7 +69,6 @@ class LightFxParams
 public:
   real phaseTime;
   bool burstMode;
-  bool cloudLight;
   LightFxColor color;
   LightFxSize size;
 
@@ -79,11 +78,10 @@ public:
   void load(const char *&ptr, int &len, BaseParamScriptLoadCB *load_cb)
   {
     G_UNREFERENCED(load_cb);
-    CHECK_FX_VERSION(ptr, len, 3);
+    CHECK_FX_VERSION(ptr, len, 2);
 
     phaseTime = readType<real>(ptr, len);
     burstMode = readType<int>(ptr, len);
-    cloudLight = readType<int>(ptr, len);
     color.load(ptr, len, load_cb);
     size.load(ptr, len, load_cb);
   }

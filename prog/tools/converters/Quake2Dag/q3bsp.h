@@ -1,5 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-#pragma once
+#ifndef Q3BSP_H
+
+#define Q3BSP_H
 
 // ############################################################################
 // ##                                                                        ##
@@ -56,3 +57,5 @@ private:
   Rect3d<float> mBound;
   VertexMesh *mMesh; // organized mesh
 };
+
+#endif

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "hmlBrush.h"
 #include "../hmlPlugin.h"
 #include "../hmlCm.h"
@@ -37,7 +35,7 @@ HmapLandBrush::HmapLandBrush(IBrushClient *client, IHmapBrushImage &height_map) 
   }
 }
 
-void HmapLandBrush::fillParams(PropPanel::ContainerPropertyControl &panel)
+void HmapLandBrush::fillParams(PropPanel2 &panel)
 {
   fillCommonParams(panel, PID_BRUSH_RADIUS, PID_BRUSH_OPACITY, PID_BRUSH_HARDNESS, PID_BRUSH_AUTOREPEAT, PID_BRUSH_SPACING);
 
@@ -55,7 +53,7 @@ void HmapLandBrush::fillParams(PropPanel::ContainerPropertyControl &panel)
 }
 
 
-void HmapLandBrush::updateToPanel(PropPanel::ContainerPropertyControl &panel)
+void HmapLandBrush::updateToPanel(PropPanel2 &panel)
 {
   Brush::updateToPanel(panel);
 
@@ -78,7 +76,7 @@ bool HmapLandBrush::updateMask(const char *newMask)
   return false;
 }
 
-bool HmapLandBrush::updateFromPanelRef(PropPanel::ContainerPropertyControl &panel, int pid)
+bool HmapLandBrush::updateFromPanelRef(PropPanel2 &panel, int pid)
 {
   String maskName2(panel.getText(PID_BRUSH_MASK));
   maskInd = panel.getInt(PID_BRUSH_MASK);
@@ -130,7 +128,7 @@ void HmapLandBrush::brushStartEnd()
 }
 
 
-void HmapLandBrush::dynamicItemChange(PropPanel::ContainerPropertyControl &panel)
+void HmapLandBrush::dynamicItemChange(PropPanel2 &panel)
 {
   if (useAutoAngle)
   {

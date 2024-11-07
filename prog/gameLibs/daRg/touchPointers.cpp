@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "touchPointers.h"
 
 namespace darg
@@ -18,7 +16,7 @@ void TouchPointers::updateState(InputEvent event, int touch_idx, const HumanInpu
       else
       {
         it->pos = Point2(touch.x, touch.y);
-        LOGWARN_CTX("Touch #%d is already started", touch_idx);
+        logwarn_ctx("Touch #%d is already started", touch_idx);
       }
       break;
     }

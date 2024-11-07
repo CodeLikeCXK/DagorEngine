@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <libTools/pageAsg/asg_nodes.h>
 #include <libTools/pageAsg/asg_node_mgr.h>
 #include <libTools/pageAsg/asg_data.h>

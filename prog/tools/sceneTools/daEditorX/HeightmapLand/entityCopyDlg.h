@@ -1,15 +1,9 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __GAIJIN_PREFABS_CLONE_DLG__
+#define __GAIJIN_PREFABS_CLONE_DLG__
 #pragma once
 
-#include <util/dag_string.h>
+#include <propPanel2/comWnd/dialog_window.h>
 
-namespace PropPanel
-{
-class DialogWindow;
-}
-
-namespace heightmapland
-{
 class CopyDlg
 {
 public:
@@ -23,6 +17,8 @@ private:
   int &cloneCount;
   bool &cloneSeed;
 
-  PropPanel::DialogWindow *mDialog;
+  CDialogWindow *mDialog;
 };
-} // namespace heightmapland
+
+
+#endif //__GAIJIN_PREFABS_CLONE_DLG__

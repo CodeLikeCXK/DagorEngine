@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <daNet/reflection.h>
 #include <daNet/idFieldSerializer.h>
 #include <math/dag_TMatrix.h>
@@ -10,7 +8,7 @@
 #include <math/dag_adjpow2.h>
 #include <util/dag_stlqsort.h>
 
-#define debug(...) logmessage(_MAKE4C('DNET'), __VA_ARGS__)
+#define LOGLEVEL_DEBUG _MAKE4C('DNET')
 
 #define DEBUG_BORDERS_REFLECTION  0
 #define DEBUG_BORDERS_REPLICATION 0
@@ -569,8 +567,8 @@ int default_fvec_coder(DANET_ENCODER_SIGNATURE)
   }
   else if (op == DANET_REFLECTION_OP_DECODE)
   {
-    Point4 p4;
-
+    Point4 dummy;
+    Point4 &p4 = (meta->flags & RVF_NEED_DESERIALIZE) ? meta->getValue<Point4>() : dummy;
     if (meta->flags & RVF_NORMALIZED)
     {
       short x, y, z, w;
@@ -596,26 +594,13 @@ int default_fvec_coder(DANET_ENCODER_SIGNATURE)
           p4.normalize();
         }
         else
-          reinterpret_cast<Point3 *>(&p4.x)->normalize();
+          meta->getValue<Point3>().normalize();
       }
       else
-        reinterpret_cast<Point2 *>(&p4.x)->normalize();
+        meta->getValue<Point2>().normalize();
     }
     else
-    {
-      if (!bs->ReadBits((uint8_t *)&p4.x, meta->numBits))
-        return 0;
-    }
-    if (!(meta->flags & RVF_NEED_DESERIALIZE))
-      return 1;
-
-    Point4 &val = meta->getValue<Point4>();
-    if (memcmp(&val.x, &p4.x, numBytes) != 0)
-    {
-      if (meta->flags & (RVF_CALL_HANDLER | RVF_CALL_HANDLER_FORCE))
-        const_cast<ReflectableObject *>(ro)->onReflectionVarChanged(meta, &p4.x);
-      memcpy(&val.x, &p4.x, numBytes);
-    }
+      return (int)bs->ReadBits(&meta->getValue<uint8_t>(), meta->numBits);
   }
   return 1;
 }

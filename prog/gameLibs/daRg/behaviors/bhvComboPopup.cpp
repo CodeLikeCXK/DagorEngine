@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "bhvComboPopup.h"
 
 #include <daRg/dag_element.h>

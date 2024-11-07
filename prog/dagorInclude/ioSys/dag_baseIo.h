@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -8,7 +9,7 @@
 #include <debug/dag_except.h>
 #include <generic/dag_tab.h>
 
-#include <supp/dag_define_KRNLIMP.h>
+#include <supp/dag_define_COREIMP.h>
 
 /// @addtogroup utility_classes
 /// @{
@@ -31,10 +32,6 @@ class IBaseSave : public IGenSave
 {
 public:
   KRNLIMP IBaseSave();
-  IBaseSave(const IBaseSave &) = default;
-  IBaseSave(IBaseSave &&) = default;
-  IBaseSave &operator=(const IBaseSave &) = default;
-  IBaseSave &operator=(IBaseSave &&) = default;
   KRNLIMP virtual ~IBaseSave();
 
   KRNLIMP virtual void beginBlock();
@@ -63,10 +60,6 @@ class IBaseLoad : public IGenLoad
 {
 public:
   KRNLIMP IBaseLoad();
-  IBaseLoad(const IBaseLoad &) = default;
-  IBaseLoad(IBaseLoad &&) = default;
-  IBaseLoad &operator=(const IBaseLoad &) = default;
-  IBaseLoad &operator=(IBaseLoad &&) = default;
   KRNLIMP virtual ~IBaseLoad();
 
   KRNLIMP virtual int beginBlock(unsigned *out_block_flags = nullptr);
@@ -90,4 +83,4 @@ protected:
 
 /// @}
 
-#include <supp/dag_undef_KRNLIMP.h>
+#include <supp/dag_undef_COREIMP.h>

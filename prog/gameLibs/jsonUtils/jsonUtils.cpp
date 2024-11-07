@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <ioSys/dag_fileIo.h>
 #include <jsonUtils/jsonUtils.h>
 #include <jsonUtils/decodeJwt.h>

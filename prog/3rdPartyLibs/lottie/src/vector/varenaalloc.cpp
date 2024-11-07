@@ -39,9 +39,6 @@ VArenaAlloc::~VArenaAlloc() {
 }
 
 void VArenaAlloc::reset() {
-    const uint32_t fFirstSize = this->fFirstSize;
-    const uint32_t fFirstHeapAllocationSize = this->fFirstHeapAllocationSize;
-    char* const    fFirstBlock = this->fFirstBlock;
     this->~VArenaAlloc();
     new (this) VArenaAlloc{fFirstBlock, fFirstSize, fFirstHeapAllocationSize};
 }

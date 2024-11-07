@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "jobSharedMem.h"
 #include <osApiWrappers/dag_atomic.h>
 #include <osApiWrappers/dag_miscApi.h>

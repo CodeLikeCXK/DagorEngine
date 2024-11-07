@@ -1,10 +1,11 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
-#include <supp/dag_define_KRNLIMP.h>
+#include <supp/dag_define_COREIMP.h>
 
 //! size of ordinary page (typically 4K)
 static inline size_t os_virtual_mem_get_page_size() { return 4 << 10; }
@@ -33,4 +34,4 @@ KRNLIMP bool os_virtual_mem_decommit(void *ptr_region_start, size_t region_sz);
 //! reset memory subregion (content of phys pages is no more needed)
 KRNLIMP bool os_virtual_mem_reset(void *ptr_region_start, size_t region_sz);
 
-#include <supp/dag_undef_KRNLIMP.h>
+#include <supp/dag_undef_COREIMP.h>

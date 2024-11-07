@@ -1,8 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <de3_interface.h>
 #include <de3_objEntity.h>
-#include <de3_effectController.h>
 #include <de3_entityPool.h>
 #include <de3_entityFilter.h>
 #include <de3_baseInterfaces.h>
@@ -13,7 +10,7 @@
 #include <assets/assetMgr.h>
 #include <libTools/util/makeBindump.h>
 #include <libTools/util/iLogWriter.h>
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
 #include <3d/dag_render.h>
 #include <render/dag_cur_view.h>
 #include <math/dag_TMatrix.h>
@@ -73,7 +70,7 @@ public:
   int nameId;
 };
 
-class ExtFxEntity : public VirtualExtFxEntity, public IObjEntityUserDataHolder, public IEffectController
+class ExtFxEntity : public VirtualExtFxEntity, public IObjEntityUserDataHolder
 {
 public:
   ExtFxEntity(int cls) : VirtualExtFxEntity(cls), idx(MAX_ENTITIES), userDataBlk(NULL) { tm.identity(); }
@@ -102,7 +99,6 @@ public:
   virtual void *queryInterfacePtr(unsigned huid)
   {
     RETURN_INTERFACE(huid, IObjEntityUserDataHolder);
-    RETURN_INTERFACE(huid, IEffectController);
     return NULL;
   }
 
@@ -114,26 +110,6 @@ public:
     return userDataBlk;
   }
   virtual void resetUserDataBlock() { del_it(userDataBlk); }
-
-  // IEffectController
-  virtual bool isActive() const override
-  {
-    if (!fx)
-      return false;
-
-    IEffectController *effectController = fx->queryInterface<IEffectController>();
-    return effectController && effectController->isActive();
-  }
-
-  virtual void setSpawnRate(float rate) override
-  {
-    if (!fx)
-      return;
-
-    IEffectController *effectController = fx->queryInterface<IEffectController>();
-    if (effectController)
-      effectController->setSpawnRate(rate);
-  }
 
   void copyFrom(const VirtualExtFxEntity &e)
   {
@@ -243,7 +219,7 @@ public:
   }
 
   // IBinaryDataBuilder interface
-  virtual bool validateBuild(int target, ILogWriter &log, PropPanel::ContainerPropertyControl *params)
+  virtual bool validateBuild(int target, ILogWriter &log, PropPanel2 *params)
   {
     if (!efxPool.calcEntities(IObjEntityFilter::getSubTypeMask(IObjEntityFilter::STMASK_TYPE_EXPORT)))
       log.addMessage(log.WARNING, "No ext.fx entities for export");
@@ -252,7 +228,7 @@ public:
 
   virtual bool addUsedTextures(ITextureNumerator &tn) { return true; }
 
-  virtual bool buildAndWrite(BinDumpSaveCB &cwr, const ITextureNumerator &tn, PropPanel::ContainerPropertyControl *)
+  virtual bool buildAndWrite(BinDumpSaveCB &cwr, const ITextureNumerator &tn, PropPanel2 *)
   {
     dag::Vector<SrcObjsToPlace> objs;
 
@@ -327,7 +303,7 @@ void init_efxmgr_service()
 {
   if (!IDaEditor3Engine::get().checkVersion())
   {
-    DEBUG_CTX("Incorrect version!");
+    debug_ctx("Incorrect version!");
     return;
   }
 

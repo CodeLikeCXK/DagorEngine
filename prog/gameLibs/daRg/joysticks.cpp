@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <daRg/dag_joystick.h>
 #include "guiScene.h"
 
@@ -67,7 +65,7 @@ int JoystickHandler::dispatchJoystickStateChanged(dag::ConstSpan<IGuiScene *> sc
 
 int JoystickHandler::processPendingBtnStack(dag::ConstSpan<IGuiScene *> scenes)
 {
-  if (DAGOR_LIKELY(global_cls_drv_update_cs.tryLock()))
+  if (EASTL_LIKELY(global_cls_drv_update_cs.tryLock()))
     ;
   else if (!lastProcessSkipped) // lock failed, wait a bit in hope that it will be unlocked soon
   {

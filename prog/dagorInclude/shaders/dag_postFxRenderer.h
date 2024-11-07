@@ -1,11 +1,12 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
 #include <generic/dag_DObject.h>
-#include <drv/3d/dag_consts.h>
+#include <3d/dag_drv3dConsts.h>
 
 class ShaderMaterial;
 class ShaderElement;

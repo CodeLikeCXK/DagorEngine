@@ -27,9 +27,13 @@ typedef sqvector<SQClassMember> SQClassMemberVec;
 
 struct SQClass : public CHAINABLE_OBJ
 {
-    SQClass(SQVM *v,SQClass *base);
+    SQClass(SQSharedState *ss,SQClass *base);
 public:
-    static SQClass* Create(SQVM *v,SQClass *base);
+    static SQClass* Create(SQSharedState *ss,SQClass *base) {
+        SQClass *newclass = (SQClass *)SQ_MALLOC(ss->_alloc_ctx, sizeof(SQClass));
+        new (newclass) SQClass(ss, base);
+        return newclass;
+    }
     ~SQClass();
     bool NewSlot(SQSharedState *ss, const SQObjectPtr &key,const SQObjectPtr &val,bool bstatic);
     bool Get(const SQObjectPtr &key,SQObjectPtr &val) const {
@@ -53,7 +57,7 @@ public:
         }
         return false;
     }
-    bool Lock(SQVM *v);
+    void Lock() { _lockedTypeId = currentHint(); if(_base) _base->Lock(); }
     void Release() {
         if (_hook) { _hook(_typetag,0);}
         SQAllocContext ctx = _methods._alloc_ctx;
@@ -79,12 +83,12 @@ public:
     SQObjectType GetType() {return OT_CLASS;}
 #endif
     SQInteger Next(const SQObjectPtr &refpos, SQObjectPtr &outkey, SQObjectPtr &outval);
-    SQInstance *CreateInstance(SQVM *v);
+    SQInstance *CreateInstance();
     SQTable *_members;
     SQClass *_base;
     SQClassMemberVec _defaultvalues;
     SQClassMemberVec _methods;
-    SQObjectPtr _metamethods[MT_NUM_METHODS];
+    SQObjectPtr _metamethods[MT_LAST];
     SQUserPointer _typetag;
     SQRELEASEHOOK _hook;
     SQInteger _constructoridx;

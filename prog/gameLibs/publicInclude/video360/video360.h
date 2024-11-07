@@ -1,16 +1,17 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
+#include <math/dag_Point3.h>
 #include <math/dag_TMatrix.h>
 #include <3d/dag_texMgr.h>
+#include <3d/dag_textureIDHolder.h>
 #include <EASTL/unique_ptr.h>
 #include <EASTL/optional.h>
 #include <ecs/camera/getActiveCameraSetup.h>
-#include <3d/dag_resPtr.h>
-#include <shaders/dag_postFxRenderer.h>
 
 class PostFxRenderer;
 class BaseTexture;
@@ -28,30 +29,49 @@ struct CameraSetupPerspPair
 class Video360
 {
 public:
-  Video360(int cube_size, int convergence_frames, float z_near, float z_far, TMatrix view_itm);
-  void update(ManagedTexView tex);
-  bool isFinished();
+  Video360();
+
+  void init(int cube_size);
+
+  // enabled state means that we are ready to write 360 video or make screenshot
+  void enable(bool enable_video360);
+  bool isEnabled();
+
+  // active state means that we are writing, processing frame now
+  void activate(float z_near, float z_far, Texture *render_target_tex, TEXTUREID render_target_tex_id, TMatrix view_itm);
+  bool isActive();
+
+  void beginFrameRender(int frame_id);
+  void endFrameRender(int frame_id);
+  void renderResultOnScreen();
+  void finishRendering();
+
   eastl::optional<CameraSetupPerspPair> getCamera() const;
-  dag::Span<UniqueTex> getFaces();
+  bool useFixedDt();
+  float getFixedDt();
   int getCubeSize();
-  void renderSphericalProjection();
 
 private:
-  void copyFrame(TEXTUREID renderTargetTexId, int cube_face);
+  void copyFrame(int cube_face);
+  void renderSphericalProjection();
 
-  int cubemapFace;
-  int stabilityFrameIndex;
+  bool enabled;
+  bool captureFrame;
+  int frameIndex;
+  int fixedFramerate;
 
   TMatrix savedCameraTm;
 
-  PostFxRenderer copyTargetRenderer;
-  PostFxRenderer cubemapToSphericalProjectionRenderer;
+  TextureIDHolderWithVar envCubeTex;
+
+  eastl::unique_ptr<PostFxRenderer> copyTargetRenderer;
+  eastl::unique_ptr<PostFxRenderer> cubemapToSphericalProjectionRenderer;
 
   float zNear;
   float zFar;
   int cubeSize;
-  int convergenceFrames;
+  TMatrix curViewItm;
 
-  UniqueTexHolder envCubeTex;
-  UniqueTex faces[6];
+  Texture *renderTargetTex;
+  TEXTUREID renderTargetTexId;
 };

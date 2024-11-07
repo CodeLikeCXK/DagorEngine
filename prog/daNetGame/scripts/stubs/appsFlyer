@@ -1,8 +1,0 @@
-
-return {
-  logEvent = @(_, __) null
-  getAppsFlyerUID = @() ""
-  setAppsFlyerCUID = @(_) null
-  setAppsFlyerConsent = @(_,__,___) null
-  startAppsFlyer = @() null
-}

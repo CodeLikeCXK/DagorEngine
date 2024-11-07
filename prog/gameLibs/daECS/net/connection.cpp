@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <daECS/net/serialize.h>
 #include <daECS/net/connection.h>
 #include <daECS/net/object.h>
@@ -17,6 +15,8 @@
 #include "utils.h"
 #include "encryption.h"
 #include <daECS/core/template.h>
+
+#define SCOPE_QUERYING_ENABLED 0 // Currently not used, hence disabled
 
 #define REPL_VER(x) \
   if (!(x))         \
@@ -126,11 +126,12 @@ struct PendingReplicationPacketInfo
   PendingReplicationPacketInfo(sequence_t seq) : waitSequence(seq) {}
 };
 
-Connection::Connection(ecs::EntityManager &mgr, ConnectionId id_, scope_query_cb_t &&scope_query) :
-  mgr(mgr), id(id_), scopeQuery(eastl::move(scope_query)), reliabilitySys(grnd()) // randomize initial local sequence in order to avoid
-                                                                                  // relying on lack of sequence oveflowing
+Connection::Connection(ConnectionId id_, scope_query_cb_t &&scope_query) :
+  id(id_), scopeQuery(eastl::move(scope_query)), reliabilitySys(grnd()) // randomize initial local sequence in order to avoid relying
+                                                                        // on lack of sequence oveflowing
 {
   G_ASSERT(id != net::INVALID_CONNECTION_ID);
+  G_ASSERT(SCOPE_QUERYING_ENABLED || !scopeQuery);
 }
 
 Connection::~Connection()
@@ -175,8 +176,8 @@ ObjectReplica *Connection::addObjectInScope(Object &obj)
   repl = replicas[numReplicas++];
   G_ASSERT(repl->isFree());
   repl->eidStorage = (ecs::entity_id_t)obj.getEid();
-  repl->cmp = MAX_OBJ_CREATION_SEQ - (lastCreationSeq++ & MAX_OBJ_CREATION_SEQ); // Inverted for reverse iteration
-  repl->flags = ObjectReplica::Allocated | ObjectReplica::InScope | ObjectReplica::NotYetReplicated;
+  repl->cmp = uint32_t(MAX_OBJ_CREATION_SEQ - (lastCreationSeq++ & MAX_OBJ_CREATION_SEQ)) | // Inverted for reverse iteration
+              (uint32_t(ObjectReplica::InScope | ObjectReplica::NotYetReplicated) << 24);   // Note: 'flags' is union with MSB of cmp
   repl->remoteCompVers.assign(obj.compVers.begin(), obj.compVers.end());
 
   // attach to list of all replicas for this object
@@ -195,12 +196,11 @@ ObjectReplica *Connection::addObjectInScope(Object &obj)
   return repl;
 }
 
-void Connection::killObjectReplica(ObjectReplica *repl, Object *obj)
+void Connection::killObjectReplica(ObjectReplica *repl, Object &obj)
 {
   if (!isReplicatingFrom())
     return;
-  if (obj)
-    repl->detachFromObj(*obj);
+  repl->detachFromObj(obj);
   repl->flags |= ObjectReplica::ToKill;
   G_VERIFY(entityIndexToReplicaIndex.erase(repl->getEid().index()));
   repl->prevRepl = repl->nextRepl = NULL;
@@ -267,19 +267,16 @@ ecs::entity_id_t Connection::setObjectInScopeAlways(Object &obj)
     return ecs::ECS_INVALID_ENTITY_ID_VAL;
 }
 
-void Connection::doClearObjectInScope(Object &obj, uint8_t flag)
+void Connection::clearObjectInScopeAlways(Object &obj)
 {
   if (!isReplicatingFrom())
     return;
   if (ObjectReplica *repl = getReplicaByObj(obj))
   {
-    repl->flags &= ~flag;
+    repl->flags &= ~ObjectReplica::AlwaysInScope;
     pushToDirty(repl); // object might need to be killed
   }
 }
-
-void Connection::clearObjectInScopeAlways(Object &obj) { doClearObjectInScope(obj, ObjectReplica::AlwaysInScope); }
-void Connection::clearObjectInScope(Object &obj) { doClearObjectInScope(obj, ObjectReplica::InScope); }
 
 void Connection::setReplicatingFrom()
 {
@@ -332,9 +329,10 @@ int Connection::prepareWritePackets()
   if (!isReplicatingFrom() || !numDirtyReplicas)
     return PWR_NONE;
 
-  if (DAGOR_UNLIKELY(scopeQuery))
+  if (SCOPE_QUERYING_ENABLED && scopeQuery)
   {
-    for (ObjectReplica *repl : dag::Span<ObjectReplica *>(replicas.data(), numDirtyReplicas))
+    dag::Span<ObjectReplica *> dirtyReplicas(replicas.data(), numDirtyReplicas);
+    for (ObjectReplica *repl : dirtyReplicas)
       if (!(repl->flags & ObjectReplica::AlwaysInScope))
         repl->flags &= ~ObjectReplica::InScope;
 
@@ -348,7 +346,7 @@ int Connection::prepareWritePackets()
 
     // mark for kill replicas that wasn't added in scope
     if (!(repl->flags & ObjectReplica::InScope))
-      killObjectReplica(replicas[i], net::Object::getByEid(replicas[i]->getEid()));
+      killObjectReplica(replicas[i], *net::Object::getByEid(replicas[i]->getEid()));
 
     // free replicas that already marked for kill but not yet replicated
     if ((repl->flags & (ObjectReplica::ToKill | ObjectReplica::NotYetReplicated)) ==
@@ -496,78 +494,6 @@ void Connection::writeReplayKeyFrame(danet::BitStream &bs, danet::BitStream &tmp
   for (ecs::template_t i = 0, serverTemplateSize = serverIdxToTemplates.size(); i < serverTemplateSize; ++i)
   {
     serializeTemplate(bs, i, componentsSyncedTmp);
-    ++serializeBlockCount;
-  }
-  bs.WriteAt(serializeBlockCount, blockSizePos);
-
-  // Step 5. Serialize string to index
-  serializeBlockCount = 0;
-  blockSizePos = bs.GetWriteOffset();
-  bs.Write(serializeBlockCount);
-  for (auto const &it : objectKeys.index)
-  {
-    bs.Write(it.second);
-    bs.Write((uint16_t)it.first.length());
-    bs.Write(it.first.c_str(), it.first.length());
-    ++serializeBlockCount;
-  }
-  bs.WriteAt(serializeBlockCount, blockSizePos);
-}
-
-// This is used in WT only right now, run it only for server connection.
-// It snapshots given entities (must be replicated from server) and also writes all templates,
-// that were replicated from server at the moment. Note, that loading entities cannot be handled
-// properly (because we cant serialize them) and not written to the snapshot. Right now WT handles
-// it by capturing snapshots only when nothing is loading.
-void Connection::writeClientReplayKeyFrame(danet::BitStream &bs, danet::BitStream &tmpbs, dag::ConstSpan<ecs::EntityId> eids)
-{
-  // Step 1. Save current network state
-  SmallTab<ecs::template_t> serverTemplatesIdxSaved;
-  SmallTab<ecs::template_t> serverIdxToTemplatesSaved;
-  eastl::bitvector<> componentsSyncedSaved;
-  eastl::vector<uint16_t> serverTemplateComponentsCountSaved;
-  ecs::template_t syncedTemplateSaved = 0;
-  InternedStrings objectKeysSaved;
-
-  serverTemplatesIdx.swap(serverTemplatesIdxSaved);
-  serverIdxToTemplates.swap(serverIdxToTemplatesSaved);
-  componentsSynced.swap(componentsSyncedSaved);
-  serverTemplateComponentsCount.swap(serverTemplateComponentsCountSaved);
-  eastl::swap(objectKeys, objectKeysSaved);
-  eastl::swap(syncedTemplate, syncedTemplateSaved);
-
-  // Step 2. Sync all entities as fresh entities
-  BitSize_t blockSizePos = bs.GetWriteOffset();
-  uint16_t serializeBlockCount = 0;
-  bs.Write(serializeBlockCount);
-  for (ecs::EntityId eid : eids)
-  {
-    if (g_entity_mgr->isLoadingEntity(eid))
-      continue;
-    ++serializeBlockCount;
-    bs.Write(uint8_t(0));
-    net::write_server_eid((ecs::entity_id_t)eid, bs);
-    write_block(bs, tmpbs,
-      [this, eid](danet::BitStream &bs2) { serializeConstruction(eid, bs2, net::Connection::CanSkipInitial::No); });
-  }
-  bs.WriteAt(serializeBlockCount, blockSizePos);
-
-  // Step 3. Restore network state
-  serverTemplatesIdx.swap(serverTemplatesIdxSaved);
-  serverIdxToTemplates.swap(serverIdxToTemplatesSaved);
-  componentsSynced.swap(componentsSyncedSaved);
-  serverTemplateComponentsCount.swap(serverTemplateComponentsCountSaved);
-  eastl::swap(objectKeys, objectKeysSaved);
-  eastl::swap(syncedTemplate, syncedTemplateSaved);
-
-  // Step 4. Serialize exist network templates
-  eastl::bitvector<> componentsSyncedTmp;
-  blockSizePos = bs.GetWriteOffset();
-  serializeBlockCount = 0;
-  bs.Write(serializeBlockCount);
-  for (size_t i = 0, serverTemplateSize = serverTemplates.size(); i < serverTemplateSize; ++i)
-  {
-    serializeTemplateForClientReplay(bs, ecs::template_t(i), componentsSyncedTmp);
     ++serializeBlockCount;
   }
   bs.WriteAt(serializeBlockCount, blockSizePos);
@@ -821,9 +747,9 @@ bool Connection::readDestructionPacket(const danet::BitStream &bs, const on_obje
     REPL_VER(read_server_eid(serverEid, bs));
     const ecs::EntityId resolvedEid(serverEid);
 #if DAECS_EXTENSIVE_CHECKS
-    if (DAGOR_LIKELY(g_entity_mgr->doesEntityExist(resolvedEid)))
+    if (EASTL_LIKELY(g_entity_mgr->doesEntityExist(resolvedEid)))
 #else
-    if (DAGOR_LIKELY(g_entity_mgr->destroyEntity(resolvedEid)))
+    if (EASTL_LIKELY(g_entity_mgr->destroyEntity(resolvedEid)))
 #endif
     {
       if (Object *obj = Object::getByEid(resolvedEid)) // entity destruction is always deferred, so this get after destroy is fine
@@ -873,7 +799,7 @@ bool Connection::readConstructionPacket(const danet::BitStream &bs, float compre
     REPL_VER(bs.ReadCompressed(blockSizeBytes));
     G_ASSERT(blockSizeBytes > 0);
     BitSize_t startPos = bs.GetReadOffset();
-    if (DAGOR_LIKELY(g_entity_mgr->getEntityTemplateId(resolvedEid) == ecs::INVALID_TEMPLATE_INDEX))
+    if (EASTL_LIKELY(g_entity_mgr->getEntityTemplateId(resolvedEid) == ecs::INVALID_TEMPLATE_INDEX))
     {
       ecs::EntityId eid = deserializeConstruction(bs, serverEid, blockSizeBytes, compression_ratio,
         [this, obj_constructed_cb, serverEid](ecs::EntityId) { obj_constructed_cb(*this, serverEid); });
@@ -990,7 +916,7 @@ void Connection::onReplicationAckPacketNotify(sequence_t seq, bool lost)
   for (auto &curPendInfo : pendingReplInfo)
     if (curPendInfo.waitSequence == seq)
     {
-      if (DAGOR_UNLIKELY(lost))
+      if (EASTL_UNLIKELY(lost))
       {
         uint32_t curOffs = 0;
         for (auto &pendRepl : curPendInfo.pendingReplicas)

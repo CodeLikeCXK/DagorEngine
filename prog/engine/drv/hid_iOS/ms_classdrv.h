@@ -1,7 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright 2023 by Gaijin Games KFT, All rights reserved.
 #pragma once
 
-#include <drv/hid/dag_hiPointing.h>
+#include <humanInput/dag_hiPointing.h>
 #include "ms_device.h"
 
 namespace HumanInput

@@ -1,5 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-#pragma once
+#ifndef _BASE_PAR_H_
+#define _BASE_PAR_H_
 
 #include <memory/dag_mem.h>
 #include <util/dag_globDef.h>
@@ -100,3 +100,5 @@ struct Nonterminal : Symbol
   int number() { return num; }
 };
 } // namespace BaseParNamespace
+
+#endif // _BASE_PAR_H_

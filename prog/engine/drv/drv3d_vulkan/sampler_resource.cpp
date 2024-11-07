@@ -1,22 +1,18 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "sampler_resource.h"
-#include "globals.h"
-#include "resource_manager.h"
-#include "sampler_cache.h"
+
+#include "device.h"
 
 using namespace drv3d_vulkan;
 
 void SamplerResource::createVulkanObject()
 {
-  samplerInfo = Globals::samplers.create(desc.state);
+  samplerInfo = drv3d_vulkan::get_device().createSampler(desc.state);
   setHandle(generalize(samplerInfo.sampler[0]));
 }
 
 void SamplerResource::destroyVulkanObject()
 {
-  auto &VkDevice = drv3d_vulkan::Globals::VK::dev;
+  auto &VkDevice = drv3d_vulkan::get_device().getVkDevice();
   VkDevice.vkDestroySampler(VkDevice.get(), samplerInfo.sampler[0], nullptr);
   VkDevice.vkDestroySampler(VkDevice.get(), samplerInfo.sampler[1], nullptr);
-  setHandle(generalize(Handle()));
 }

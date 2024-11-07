@@ -1,8 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
-#include <drv/3d/dag_driver.h>
-#include <drv/3d/dag_renderStates.h>
+#include <3d/dag_drv3d.h>
+#include <3d/dag_renderStates.h>
 #include <3d/dag_texMgr.h>
 #include <generic/dag_patchTab.h>
 #include <generic/dag_smallTab.h>
@@ -162,16 +161,8 @@ struct ShaderStatistics
 uint32_t get_dynvariant_collection_id(const shaderbindump::ShaderCode &code);
 void build_dynvariant_collection_cache(dag::Vector<int, framemem_allocator> &cache);
 void build_dynvariant_collection_cache(dag::Vector<int> &cache);
-
-extern ScriptedShadersBinDumpOwner shadersBinDump;
-extern ScriptedShadersBinDump emptyDump;
-inline ScriptedShadersBinDump &get_dump_safe(ScriptedShadersBinDump *d) { return d ? *d : shaderbindump::emptyDump; }
 } // namespace shaderbindump
 
-inline ScriptedShadersBinDumpOwner &shBinDumpOwner() { return shaderbindump::shadersBinDump; }
-inline ScriptedShadersBinDump &shBinDumpRW() { return shaderbindump::get_dump_safe(shBinDumpOwner().getDump()); }
-inline const ScriptedShadersBinDump &shBinDump() { return shBinDumpRW(); }
-
-ScriptedShadersBinDumpOwner &shBinDumpExOwner(bool main);
-inline ScriptedShadersBinDump &shBinDumpExRW(bool main) { return shaderbindump::get_dump_safe(shBinDumpExOwner(main).getDump()); }
-inline const ScriptedShadersBinDump &shBinDumpEx(bool main) { return shBinDumpExRW(main); }
+ScriptedShadersBinDump &shBinDumpRW(bool main = true);
+const ScriptedShadersBinDump &shBinDump(bool main = true);
+ScriptedShadersBinDumpOwner &shBinDumpOwner(bool main = true);

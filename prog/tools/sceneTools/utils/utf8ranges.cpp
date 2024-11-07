@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <util/dag_hierBitArray.h>
 #include <osApiWrappers/dag_unicode.h>
 #include <debug/dag_logSys.h>

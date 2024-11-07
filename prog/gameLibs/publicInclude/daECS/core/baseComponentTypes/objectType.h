@@ -1,13 +1,12 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
 #include <daECS/core/ecsHash.h>
 #include <daECS/core/component.h>
-#include <debug/dag_assert.h>
-#include <daECS/core/internal/asserts.h>
 #include <EASTL/vector_map.h>
 #include <generic/dag_smallTab.h>
 
@@ -49,14 +48,10 @@ public:
     if (hashIt == hashContainer.end() || *hashIt != str.hash)
       return end();
 
-    if (DAGOR_LIKELY(noCollisions))
+    if (EASTL_LIKELY(noCollisions))
     {
       const_iterator it = container.begin() + (hashIt - hashContainer.begin());
-      // Assume that no collisions in searched / instance string
-      // return (!str.str || strcmp(it->first.c_str(), str.str) == 0) ? it : container.end();
-      DAECS_EXT_ASSERTF(!str.str || !strcmp(it->first.c_str(), str.str), "Search key hash collision %#x: '%s' != '%s'", str.hash,
-        str.str, it->first.c_str());
-      return it;
+      return (!str.str || strcmp(it->first.c_str(), str.str) == 0) ? it : container.end();
     }
     else
       return findAsWithCollision(hashIt, str);
@@ -246,8 +241,7 @@ protected:
   void changeGen() { gen++; }
   container_t container;
   hash_container_t hashContainer;
-  // TODO: remove this in release (i.e. assume that there is no collisions) with validation in dev
-  bool noCollisions = true;
+  bool noCollisions = true; // I don't know if there are really any collisions, and so this path hadn't been checked yet!
   uint32_t gen = 0;
 
   bool slowIsEqual(const ecs::Object &a) const;
@@ -271,7 +265,7 @@ inline bool Object::operator==(const Object &a) const
 {
   if (size() != a.size() || noCollisions != a.noCollisions)
     return false;
-  if (DAGOR_LIKELY(noCollisions))
+  if (EASTL_LIKELY(noCollisions))
   {
     auto ahi = a.hashContainer.begin();
     auto bhi = hashContainer.begin();

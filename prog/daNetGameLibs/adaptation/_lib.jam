@@ -1,4 +1,0 @@
-if $(HaveRenderer) = yes {
-  gamePulls += framework_adaptation_pull ;
-  UseProgLibs += daNetGameLibs/adaptation ;
-}

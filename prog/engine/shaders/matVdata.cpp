@@ -1,11 +1,9 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <shaders/dag_shaderMesh.h>
 #include <shaders/dag_shaders.h>
 #include <3d/fileTexFactory.h>
 #include "scriptSMat.h"
 
-ShaderMatVdata::ShaderMatVdata(int tex_num, int mat_num, int vdata_num, int mvhdr_sz, unsigned model_type)
+ShaderMatVdata::ShaderMatVdata(int tex_num, int mat_num, int vdata_num, int mvhdr_sz)
 {
   char *base = ((char *)this) + sizeof(ShaderMatVdata);
 
@@ -23,7 +21,6 @@ ShaderMatVdata::ShaderMatVdata(int tex_num, int mat_num, int vdata_num, int mvhd
   matVdataHdrSz = mvhdr_sz;
   vdataFullCount = vdata_num;
   lodsAreSplit = 0;
-  modelType = model_type;
   G_ASSERTF(vdataFullCount == vdata_num, "vdataFullCount=%d vdata_num=%d", vdataFullCount, vdata_num);
 }
 ShaderMatVdata::~ShaderMatVdata()
@@ -53,13 +50,13 @@ void ShaderMatVdata::preloadTex()
     }
 }
 
-ShaderMatVdata *ShaderMatVdata::create(int tex_num, int mat_num, int vdata_num, int mvhdr_sz, unsigned model_type)
+ShaderMatVdata *ShaderMatVdata::create(int tex_num, int mat_num, int vdata_num, int mvhdr_sz)
 {
   ShaderMatVdata *smv = NULL;
   void *mem = memalloc(
     sizeof(ShaderMatVdata) + elem_size(smv->tex) * tex_num + elem_size(smv->mat) * mat_num + elem_size(smv->vdata) * vdata_num,
     midmem);
-  smv = new (mem, _NEW_INPLACE) ShaderMatVdata(tex_num, mat_num, vdata_num, mvhdr_sz, model_type);
+  smv = new (mem, _NEW_INPLACE) ShaderMatVdata(tex_num, mat_num, vdata_num, mvhdr_sz);
   return smv;
 }
 
@@ -77,7 +74,7 @@ ShaderMatVdata *ShaderMatVdata::make_tmp_copy(ShaderMatVdata *src_smv, int apply
 
   ShaderMatVdata *smv = NULL;
   void *mem = memalloc(sizeof(ShaderMatVdata) + elem_size(src_smv->vdata) * src_smv->vdataFullCount, midmem);
-  smv = new (mem, _NEW_INPLACE) ShaderMatVdata(0, 0, src_smv->vdataFullCount, src_smv->matVdataHdrSz, src_smv->modelType);
+  smv = new (mem, _NEW_INPLACE) ShaderMatVdata(0, 0, src_smv->vdataFullCount, src_smv->matVdataHdrSz);
   smv->_resv = 0;
   smv->lodsAreSplit = src_smv->lodsAreSplit;
   smv->matVdataSrcRef = src_smv->matVdataSrcRef;

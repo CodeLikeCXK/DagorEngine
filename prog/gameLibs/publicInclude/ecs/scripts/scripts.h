@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -23,7 +24,6 @@ extern void sq_register_native_component(ecs::component_type_t type, SqPushCB cb
   sq_register_native_component(ECS_HASH(#T).hash, \
     [](HSQUIRRELVM vm, const void *p) { Sqrat::PushVar(vm, ecs::ComponentTypeInfo<T>::is_boxed ? *(const T **)p : (const T *)p); })
 
-ECS_BROADCAST_EVENT_TYPE(EventScriptBeforeReload);
 ECS_BROADCAST_EVENT_TYPE(EventScriptReloaded);
 ECS_BROADCAST_EVENT_TYPE(CmdRequireUIScripts);
 

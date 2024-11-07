@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <assets/daBuildExpPluginChain.h>
 #include <assets/assetPlugin.h>
 #include "../asset_ref_hlp.h"

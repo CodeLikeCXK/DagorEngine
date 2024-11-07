@@ -1,6 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-#pragma once
-
 #include <max.h>
 #include <assert.h>
 

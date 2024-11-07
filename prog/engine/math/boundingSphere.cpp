@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <math/dag_boundingSphere.h>
 #include <vecmath/dag_vecMath.h>
 #include <debug/dag_debug.h>

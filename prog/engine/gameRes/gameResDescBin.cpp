@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <gameRes/dag_stdGameRes.h>
 #include <util/dag_fileMd5Validate.h>
 #include <ioSys/dag_chainedMemIo.h>

@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -25,12 +26,11 @@ class DistanceReadbackLights
   int lastNonOptId;
   bool processing;
 
-  using RenderStaticCallback = void(mat44f_cref globTm, const TMatrix &viewItm, int updateIndex, int frustumIndex,
-    DynamicShadowRenderGPUObjects render_gpu_objects);
+  using RenderStaticCallback = void(mat44f_cref globTm, const TMatrix &viewItm, DynamicShadowRenderGPUObjects render_gpu_objects);
   void dispatchQuery(eastl::fixed_function<sizeof(void *) * 2, RenderStaticCallback> render_static);
   void completeQuery();
 
 public:
-  DistanceReadbackLights(ShadowSystem *shadowSystem, SpotLightsManager *spotLights, const char *name_suffix);
+  DistanceReadbackLights(ShadowSystem *shadowSystem, SpotLightsManager *spotLights);
   void update(eastl::fixed_function<sizeof(void *) * 2, RenderStaticCallback> render_static);
 };

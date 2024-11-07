@@ -1,9 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <util/dag_texMetaData.h>
 #include <util/dag_string.h>
-#include <drv/3d/dag_consts.h>
-#include <drv/3d/dag_tex3d.h>
+#include <3d/dag_drv3dConsts.h>
+#include <3d/dag_tex3d.h>
 #include <ioSys/dag_dataBlock.h>
 #include <math/dag_e3dColor.h>
 #include <osApiWrappers/dag_localConv.h>
@@ -187,14 +185,9 @@ const char *TextureMetaData::decode(const char *fstring, String *storage)
   if (decodeData(p, true))
   {
     String &buf = storage ? *storage : buf0;
-    int nl = p - fstring;
-    buf.resize(nl + 1);
-    memcpy(buf.c_str(), fstring, nl);
-    buf.c_str()[nl] = '\0';
+    buf.printf(0, "%.*s", (int)(p - fstring), fstring);
     return buf;
   }
-
-  logerr("error while decoding string %s", fstring);
   return NULL;
 }
 bool TextureMetaData::decodeData(const char *fstring, bool dec_bt_name)
@@ -559,7 +552,7 @@ void TextureMetaData::read(const DataBlock &_blk, const char *spec_target_str)
   if (lqMip < mqMip)
     lqMip = mqMip;
 
-  anisoFunc = getAniFunc(GET_PROP(Str, "aniFunc", NULL), GET_PROP(Int, "anisotropy", -1) < 0 ? anisoFunc : AFUNC_ABS);
+  anisoFunc = getAniFunc(GET_PROP(Str, "aniFunc", NULL), anisoFunc);
   anisoFactor = GET_PROP(Int, "anisotropy", anisoFactor);
 
   texFilterMode = getFilter(GET_PROP(Str, "texFilterMode", NULL), texFilterMode, false);
@@ -639,7 +632,7 @@ void TextureMetaData::write(DataBlock &blk)
   if (lqMip != 2)
     blk.setInt("lqMip", lqMip);
 
-  if (anisoFunc != AFUNC_MUL || anisoFactor != 1)
+  if (anisoFunc != AFUNC_MUL)
     blk.setStr("aniFunc", s_aniFunc[anisoFunc]);
   if (anisoFactor != 1)
     blk.setInt("anisotropy", anisoFactor);
@@ -684,7 +677,7 @@ int TextureMetaData::d3dTexAddr(unsigned addr)
 }
 int TextureMetaData::d3dTexFilter() const
 {
-  int d3d_filt[] = {0, TEXFILTER_LINEAR, TEXFILTER_BEST, TEXFILTER_NONE, TEXFILTER_POINT, 0};
+  int d3d_filt[] = {0, TEXFILTER_SMOOTH, TEXFILTER_BEST, TEXFILTER_NONE, TEXFILTER_POINT, 0};
   return d3d_filt[texFilterMode];
 }
 int TextureMetaData::d3dMipFilter() const

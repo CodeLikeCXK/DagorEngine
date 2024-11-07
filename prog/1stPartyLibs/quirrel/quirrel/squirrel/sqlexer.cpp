@@ -71,6 +71,7 @@ void SQLexer::Init(SQSharedState *ss, const char *sourceText, size_t sourceTextS
     ADD_KEYWORD(default, TK_DEFAULT);
     ADD_KEYWORD(this, TK_THIS);
     ADD_KEYWORD(class,TK_CLASS);
+    ADD_KEYWORD(extends,TK_EXTENDS);
     ADD_KEYWORD(constructor,TK_CONSTRUCTOR);
     ADD_KEYWORD(instanceof,TK_INSTANCEOF);
     ADD_KEYWORD(true,TK_TRUE);
@@ -312,7 +313,7 @@ SQInteger SQLexer::LexSingleToken()
                 NEXT();
                 if (CUR_CHAR == _SC('$')) {
                     NEXT();
-                    RETURN_TOKEN(TK_NULLABLE_TYPE_METHOD_GETSTR);
+                    RETURN_TOKEN(TK_NULLABLE_BUILT_IN_GETSTR);
                 }
                 else {
                     RETURN_TOKEN(TK_NULLGETSTR);
@@ -326,7 +327,7 @@ SQInteger SQLexer::LexSingleToken()
             NEXT();
             if (CUR_CHAR == _SC('$')) {
                 NEXT();
-                RETURN_TOKEN(TK_TYPE_METHOD_GETSTR);
+                RETURN_TOKEN(TK_BUILT_IN_GETSTR);
             }
             if (CUR_CHAR != _SC('.')){ RETURN_TOKEN('.') }
             NEXT();
@@ -345,7 +346,8 @@ SQInteger SQLexer::LexSingleToken()
             else { NEXT(); RETURN_TOKEN(TK_OR); }
         case _SC(':'):
             NEXT();
-            if (CUR_CHAR != _SC(':')){ RETURN_TOKEN(':') }
+            if (CUR_CHAR == '=') { NEXT(); RETURN_TOKEN(TK_INEXPR_ASSIGNMENT) }
+            else if (CUR_CHAR != _SC(':')){ RETURN_TOKEN(':') }
             else { NEXT(); RETURN_TOKEN(TK_DOUBLE_COLON); }
         case _SC('*'):
             NEXT();
@@ -555,7 +557,7 @@ loop_exit:
     return t;
 }
 
-static void LexHexadecimal(const SQChar *s,SQUnsignedInteger *res)
+void LexHexadecimal(const SQChar *s,SQUnsignedInteger *res)
 {
     *res = 0;
     while(*s != 0)
@@ -566,25 +568,20 @@ static void LexHexadecimal(const SQChar *s,SQUnsignedInteger *res)
     }
 }
 
-#define INT_OVERFLOW_THRESHOLD (~SQUnsignedInteger(0) / 10)
-#define INT_OVERFLOW_DIGIT (~SQUnsignedInteger(0) % 10)
-
-static bool LexInteger(const SQChar *s, SQUnsignedInteger *res)
+bool LexInteger(const SQChar *s, SQUnsignedInteger *res)
 {
-
     SQUnsignedInteger x = 0;
     while(*s != 0)
     {
-        SQUnsignedInteger digit = (*s++) - '0';
-        if (x > INT_OVERFLOW_THRESHOLD || (x == INT_OVERFLOW_THRESHOLD && digit > INT_OVERFLOW_DIGIT))
-            return false;
-        x = x * 10 + digit;
+        SQUnsignedInteger prev = x;
+        x = x * 10 + ((*s++) - '0');
+        if(prev > x) return false; //overflow
     }
     *res = x;
     return x <= (~SQUnsignedInteger(0) >> 1);
 }
 
-static SQInteger isexponent(SQInteger c) { return c == 'e' || c=='E'; }
+SQInteger isexponent(SQInteger c) { return c == 'e' || c=='E'; }
 
 
 #define MAX_HEX_DIGITS (sizeof(SQInteger)*2)
@@ -651,22 +648,7 @@ SQInteger SQLexer::ReadNumber()
     switch(type) {
     case TSCIENTIFIC:
     case TFLOAT:
-#if SQ_USE_STD_FROM_CHARS
-        {
-            auto ret = std::from_chars(&_longstr[0], &_longstr[0] + _longstr.size(), _fvalue);
-            if (ret.ec == std::errc::result_out_of_range)
-                _ctx.reportDiagnostic(_fvalue == 0 ? DiagnosticsId::DI_LITERAL_UNDERFLOW : DiagnosticsId::DI_LITERAL_OVERFLOW,
-                    _tokenline, _tokencolumn, _currentcolumn - _tokencolumn, "float");
-
-            for (const char * c = ret.ptr; c < &_longstr[0] + _longstr.size() - 1; ++c)
-                if (*c != '0')
-                {
-                    _ctx.reportDiagnostic(DiagnosticsId::DI_MALFORMED_NUMBER, _tokenline, _tokencolumn, _currentcolumn - _tokencolumn);
-                    break;
-                }
-        }
-#else
-        value = (SQFloat)strtod(&_longstr[0], &sTemp);
+        value = (SQFloat)strtod(&_longstr[0],&sTemp);
         _fvalue = value;
         if(value == 0)
         {
@@ -679,7 +661,6 @@ SQInteger SQLexer::ReadNumber()
                     _ctx.reportDiagnostic(DiagnosticsId::DI_LITERAL_UNDERFLOW, _tokenline, _tokencolumn, _currentcolumn - _tokencolumn, "float");
             }
         }
-#endif
 
         if(sizeof(_fvalue) == sizeof(float))
         {

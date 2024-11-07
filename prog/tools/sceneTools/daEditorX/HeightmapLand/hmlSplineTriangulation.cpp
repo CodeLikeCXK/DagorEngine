@@ -1,10 +1,8 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "hmlSplineObject.h"
 #include "hmlSplinePoint.h"
 #include "hmlObjectsEditor.h"
 
-#include <EditorCore/ec_IEditorCore.h>
+#include <dllPluginCore/core.h>
 #include <oldEditor/de_interface.h>
 #include <oldEditor/de_common_interface.h>
 #include <de3_genObjData.h>
@@ -15,9 +13,6 @@
 #include <debug/dag_log.h>
 
 // #include <debug/dag_debug.h>
-
-using editorcore_extapi::dagGeom;
-using editorcore_extapi::dagRender;
 
 #define ERROR_ANGLE 5
 

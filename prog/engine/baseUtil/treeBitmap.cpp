@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <generic/dag_span.h>
 #include <generic/dag_staticTab.h>
 #include <math/integer/dag_IPoint2.h>

@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -68,8 +69,11 @@ struct EntitySystemDesc : public NamedQueryDesc
       after_set, user_data, def_quant, dyn, on_delete)
   {}
 
-  ~EntitySystemDesc();
-  EntitySystemDesc &operator=(EntitySystemDesc &&) = default;
+  ~EntitySystemDesc()
+  {
+    if (onDelete)
+      onDelete(this);
+  }
 
   void freeIfDynamic()
   {
@@ -184,28 +188,6 @@ inline void remove_if_systems(Lambda fn)
       prevSys = system;
     system = nextSys;
   }
-}
-
-inline EntitySystemDesc::~EntitySystemDesc()
-{
-  for (EntitySystemDesc *system = EntitySystemDesc::tail, *prevSys = nullptr; system;)
-  {
-    EntitySystemDesc *nextSys = system->next;
-    if (system == this)
-    {
-      ++EntitySystemDesc::generation;
-      if (prevSys)
-        prevSys->next = nextSys;
-      else
-        EntitySystemDesc::tail = nextSys;
-      break;
-    }
-    else
-      prevSys = system;
-    system = nextSys;
-  }
-  if (onDelete)
-    onDelete(this);
 }
 
 inline void clear_component_manager_registry()

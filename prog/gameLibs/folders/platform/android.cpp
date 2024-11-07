@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "internal.h"
 #include <stdlib.h>
 #include <unistd.h>

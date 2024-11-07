@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <debug/dag_debug.h>
@@ -43,7 +42,7 @@ struct GenRingBuffer
       wrPos = 0;
     if (wrPos == rdPos)
     {
-      DEBUG_CTX("overrun: rdPos=%d wrPos=%d used=%d depth=%d", rdPos, wrPos, used, depth);
+      debug_ctx("overrun: rdPos=%d wrPos=%d used=%d depth=%d", rdPos, wrPos, used, depth);
       return false;
     }
     used++;
@@ -53,7 +52,7 @@ struct GenRingBuffer
   {
     if (!used)
     {
-      DEBUG_CTX("underrun: rdPos=%d wrPos=%d used=%d depth=%d", rdPos, wrPos, used, depth);
+      debug_ctx("underrun: rdPos=%d wrPos=%d used=%d depth=%d", rdPos, wrPos, used, depth);
       return false;
     }
     rdPos++;

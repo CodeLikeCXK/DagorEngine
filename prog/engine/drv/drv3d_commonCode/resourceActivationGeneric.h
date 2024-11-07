@@ -1,8 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
-#include <drv/3d/dag_heap.h>
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
 
 
 namespace res_act_generic

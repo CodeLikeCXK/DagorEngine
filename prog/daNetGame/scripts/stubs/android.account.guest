@@ -1,5 +1,0 @@
-
-return {
-  prepareGuestFID = @() null
-  loadFID = @() null
-}

@@ -20,7 +20,6 @@ class JobSystem;
 class StateRecorder;
 class TempAllocator;
 class PhysicsStepListener;
-class SoftBodyContactListener;
 
 /// The main class for the physics system. It contains all rigid bodies and simulates them.
 ///
@@ -51,10 +50,6 @@ public:
 	/// Listener that is notified whenever a contact point between two bodies is added/updated/removed
 	void						SetContactListener(ContactListener *inListener)				{ mContactManager.SetContactListener(inListener); }
 	ContactListener *			GetContactListener() const									{ return mContactManager.GetContactListener(); }
-
-	/// Listener that is notified whenever a contact point between a soft body and another body
-	void						SetSoftBodyContactListener(SoftBodyContactListener *inListener) { mSoftBodyContactListener = inListener; }
-	SoftBodyContactListener *	GetSoftBodyContactListener() const							{ return mSoftBodyContactListener; }
 
 	/// Set the function that combines the friction of two bodies and returns it
 	/// Default method is the geometric mean: sqrt(friction1 * friction2).
@@ -193,9 +188,6 @@ public:
 	/// - During the ContactListener::OnContactRemoved callback this function can be used to determine if this is the last contact pair between the bodies (function returns false) or if there are other contacts still present (function returns true).
 	bool						WereBodiesInContact(const BodyID &inBody1ID, const BodyID &inBody2ID) const { return mContactManager.WereBodiesInContact(inBody1ID, inBody2ID); }
 
-	/// Get the bounding box of all bodies in the physics system
-	AABox						GetBounds() const											{ return mBroadPhase->GetBounds(); }
-
 #ifdef JPH_TRACK_BROADPHASE_STATS
 	/// Trace the accumulated broadphase stats to the TTY
 	void						ReportBroadphaseStats()										{ mBroadPhase->ReportStats(); }
@@ -243,9 +235,6 @@ private:
 	/// Number of constraints to process at once in JobDetermineActiveConstraints
 	static constexpr int		cDetermineActiveConstraintsBatchSize = 64;
 
-	/// Number of constraints to process at once in JobSetupVelocityConstraints, we want a low number of threads working on this so we take fairly large batches
-	static constexpr int		cSetupVelocityConstraintsBatchSize = 256;
-
 	/// Number of bodies to process at once in JobApplyGravity
 	static constexpr int		cApplyGravityBatchSize = 64;
 
@@ -284,9 +273,6 @@ private:
 
 	/// The broadphase does quick collision detection between body pairs
 	BroadPhase *				mBroadPhase = nullptr;
-
-	/// The soft body contact listener
-	SoftBodyContactListener *	mSoftBodyContactListener = nullptr;
 
     /// Simulation settings
 	PhysicsSettings				mPhysicsSettings;

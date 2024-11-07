@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -20,6 +21,7 @@ namespace rendinst::render
 
 inline constexpr int MAX_LOD_COUNT_WITH_ALPHA = rendinst::MAX_LOD_COUNT + 1;
 inline constexpr int GPU_INSTANCING_OFSBUFFER_TEXREG = 11;
+inline constexpr int TREECROWN_TEXREG = 16;
 
 extern bool avoidStaticShadowRecalc;
 extern bool useConditionalRendering;
@@ -31,7 +33,7 @@ extern float riExtraMinSizeForReflection;
 extern float riExtraMinSizeForDraftDepth;
 extern int instancingTexRegNo;
 
-bool useRiDepthPrepass(bool use); // returns previous state
+void useRiDepthPrepass(bool use);
 void useRiCellsDepthPrepass(bool use);
 void useImpostorDepthPrepass(bool use);
 
@@ -42,8 +44,6 @@ bool enableSecLayerRender(bool en);
 bool enablePrimaryLayerRender(bool en);
 bool enableRiExtraRender(bool en);
 bool isSecLayerRenderEnabled();
-
-bool pendingRebuild();
 
 void before_draw(RenderPass render_pass, const RiGenVisibility *visibility, const Frustum &frustum, const Occlusion *occlusion,
   const char *mission_name = "", const char *map_name = "", bool gpu_instancing = false);
@@ -63,22 +63,15 @@ void renderRITreeDepth(const RiGenVisibility *visibility, const TMatrix &view_it
 
 bool renderRIGenClipmapShadowsToTextures(const Point3 &sunDir0, bool for_sli, bool force_update = true);
 bool notRenderedClipmapShadowsBBox(BBox2 &box, int cascadeNo);
-bool notRenderedStaticShadowsBBox(BBox3 &box, bool add_instance_box = true);
+bool notRenderedStaticShadowsBBox(BBox3 &box);
 void setClipmapShadowsRendered(int cascadeNo);
 void renderRIGenShadowsToClipmap(const BBox2 &region, int renderNewForCascadeNo); //-1 - render all, not only new
-bool renderRIGenGlobalShadowsToTextures(const Point3 &sunDir0, bool force_update = true, bool use_compression = true,
-  bool free_temp_resources = false);
-bool are_impostors_ready_for_depth_shadows();
-
-BBox3 get_newly_created_instance_box_and_reset();
-
+bool renderRIGenGlobalShadowsToTextures(const Point3 &sunDir0, bool force_update = true, bool use_compression = true);
 // compatibility
 void renderRendinstShadowsToTextures(const Point3 &sunDir0);
 
 void renderDebug();
 
 bool update_rigen_color(const char *name, E3DCOLOR from, E3DCOLOR to);
-bool verify_riex_number(const RiGenVisibility *visibility);
-void log_riex_number(const RiGenVisibility *visibility);
 
 }; // namespace rendinst::render

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "fileentry.h"
 #include "filebackend.h"
 #include <time.h>

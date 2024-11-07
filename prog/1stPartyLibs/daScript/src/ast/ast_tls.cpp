@@ -16,9 +16,4 @@ void daScriptEnvironment::ensure() {
     }
 }
 
-uint64_t getCancelLimit() {
-    if ( !daScriptEnvironment::bound ) return 0;
-    return daScriptEnvironment::bound->dataWalkerStringLimit;
-}
-
 }

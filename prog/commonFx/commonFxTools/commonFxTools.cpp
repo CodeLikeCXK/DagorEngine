@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <fx/commonFxTools.h>
 #include <util/dag_string.h>
 

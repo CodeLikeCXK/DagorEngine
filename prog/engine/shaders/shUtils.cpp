@@ -1,5 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
+// Copyright 2023 by Gaijin Games KFT, All rights reserved.
 #include <shaders/dag_shaderCommon.h>
 #include <shaders/shUtils.h>
 #include <shaders/shOpcodeFormat.h>
@@ -68,7 +67,6 @@ const char *shader_var_type_name(int t)
     case SHVT_COLOR4: return "color4";
     case SHVT_TEXTURE: return "texture";
     case SHVT_BUFFER: return "buffer";
-    case SHVT_TLAS: return "tlas";
     case SHVT_INT4: return "int4";
     case SHVT_FLOAT4X4: return "float4x4";
   }
@@ -88,20 +86,16 @@ const char *shcod_tokname(int t)
     case SHCOD_CS_CONST: return "CS_CONST";
     case SHCOD_GET_INT: return "GET_INT";
     case SHCOD_GET_INT_TOREAL: return "GET_INT(real)";
-    case SHCOD_GET_IVEC_TOREAL: return "GET_IVEC(color4)";
     case SHCOD_GET_REAL: return "GET_REAL";
     case SHCOD_GET_TEX: return "GET_TEX";
     case SHCOD_GET_VEC: return "GET_VEC";
     case SHCOD_GET_GINT: return "GET_GINT";
     case SHCOD_GET_GINT_TOREAL: return "GET_GINT(real)";
-    case SHCOD_GET_GIVEC_TOREAL: return "GET_GIVEC(color4)";
     case SHCOD_GET_GREAL: return "GET_GREAL";
     case SHCOD_GET_GTEX: return "GET_GTEX";
     case SHCOD_GET_GBUF: return "GET_GBUF";
-    case SHCOD_GET_GTLAS: return "GET_GTLAS";
     case SHCOD_BUFFER: return "BUFFER";
     case SHCOD_CONST_BUFFER: return "CONST_BUFFER";
-    case SHCOD_TLAS: return "TLAS";
     case SHCOD_GET_GVEC: return "GET_GVEC";
     case SHCOD_GET_GMAT44: return "GET_GMAT44";
     case SHCOD_G_TM: return "G_TM";
@@ -217,7 +211,6 @@ void shcod_dump(dag::ConstSpan<int> cod, const shaderbindump::VarList *globals, 
       break;
       case SHCOD_GET_INT:
       case SHCOD_GET_INT_TOREAL:
-      case SHCOD_GET_IVEC_TOREAL:
       case SHCOD_GET_REAL:
       case SHCOD_GET_VEC:
       case SHCOD_GET_TEX:
@@ -239,13 +232,11 @@ void shcod_dump(dag::ConstSpan<int> cod, const shaderbindump::VarList *globals, 
       break;
       case SHCOD_GET_GINT:
       case SHCOD_GET_GINT_TOREAL:
-      case SHCOD_GET_GIVEC_TOREAL:
       case SHCOD_GET_GREAL:
       case SHCOD_GET_GVEC:
       case SHCOD_GET_GMAT44:
       case SHCOD_GET_GTEX:
       case SHCOD_GET_GBUF:
-      case SHCOD_GET_GTLAS:
       {
         int ro = shaderopcode::getOp2p1(cod[i]);
         int ofs = shaderopcode::getOp2p2(cod[i]);
@@ -297,7 +288,6 @@ void shcod_dump(dag::ConstSpan<int> cod, const shaderbindump::VarList *globals, 
         break;
       case SHCOD_BUFFER:
       case SHCOD_CONST_BUFFER:
-      case SHCOD_TLAS:
       {
         int stage = shaderopcode::getOpStageSlot_Stage(cod[i]);
         int slot = shaderopcode::getOpStageSlot_Slot(cod[i]);
@@ -326,14 +316,12 @@ void shcod_dump(dag::ConstSpan<int> cod, const shaderbindump::VarList *globals, 
       break;
       case SHCOD_SAMPLER:
       {
-        int ofs = shaderopcode::getOpStageSlot_Reg(cod[i]);
+        int ind = shaderopcode::getOp2p1(cod[i]);
+        int ofs = shaderopcode::getOp2p2(cod[i]);
         if ((uint32_t)ofs < (uint32_t)globals->v.size())
         {
+          debug_("%sreg=%d var_ofs=%d  |", str.str(), ind, ofs);
 #if DAGOR_DBGLEVEL > 0
-          int stage = shaderopcode::getOpStageSlot_Stage(cod[i]);
-          int ind = shaderopcode::getOpStageSlot_Slot(cod[i]);
-          const char *stageStr = stage == STAGE_CS ? "cs" : (stage == STAGE_PS ? "ps" : stage == STAGE_VS ? "vs" : "?");
-          debug_("%sstage=%s reg=%d var_ofs=%d  |", str.str(), stageStr, ind, ofs);
           shaderbindump::dumpVar(*globals, ofs);
 #endif
           continue;

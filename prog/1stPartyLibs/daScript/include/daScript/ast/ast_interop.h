@@ -189,7 +189,6 @@ namespace das
         fnX->arguments[0]->type->explicitConst = explicitConst;
         fnX->setSideEffects(sideEffects);
         fnX->propertyFunction = true;
-        DAS_ASSERTF(!fnX->result->isSmartPointer(), "property function can't return smart pointer %s::%s", mod.name.c_str(), name);
         mod.addFunction(fnX,true);  // yes, this one can fail. same C++ bound property can be in multiple classes before or after refactor
         return fnX;
     }
@@ -218,7 +217,6 @@ namespace das
         fnX->arguments[0]->type->explicitConst = explicitConst;
         fnX->setSideEffects(sideEffects);
         fnX->propertyFunction = true;
-        DAS_ASSERTF(!fnX->result->isSmartPointer(), "property function can't return smart pointer %s::%s", mod.name.c_str(), name);
         mod.addFunction(fnX,true);  // yes, this one can fail. same C++ bound property can be in multiple classes before or after refactor
         return fnX;
     }

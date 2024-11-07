@@ -1,7 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
-#include <drv/3d/dag_driver.h>
-#include <drv/3d/dag_resetDevice.h>
+#include <3d/dag_drv3d.h>
+#include <3d/dag_drv3dReset.h>
 #include <math/dag_Point4.h>
 #include <vecmath/dag_vecMath_const.h>
 #include <daECS/core/entityManager.h>
@@ -183,12 +181,6 @@ bool DecalsMatrices::isMatrixUsed(uint32_t id) const
   return matricesReferences[id] > 0;
 }
 
-bool DecalsMatrices::isMatrixAliased(uint32_t id) const
-{
-  G_ASSERT_RETURN(id != INVALID_MATRIX_ID && id - 1 < idCount, false);
-  return matricesReferences[id - 1] > 1;
-}
-
 void DecalsMatrices::clearItems()
 {
   clearDeletedMatrices();
@@ -298,13 +290,6 @@ void DecalsMatrices::useMatrixId(uint32_t id, uint32_t item_id)
   }
 }
 
-int DecalsMatrices::getMatrixItemCount(uint32_t matrix_id) const
-{
-  if (matrix_id == INVALID_MATRIX_ID)
-    return 0;
-  return itemMap.getMatrixItemCount(matrix_id - 1);
-}
-
 void DecalsMatrices::entity_update(ecs::EntityId eid, const TMatrix &tm)
 {
   if (!registeredMatrixManagers)
@@ -405,5 +390,3 @@ eastl::optional<uint32_t> DecalsMatrices::UniqueMap::popReusableItem()
   else
     return {};
 }
-
-int DecalsMatrices::UniqueMap::getMatrixItemCount(uint32_t matrix) const { return matrixToItems[matrix].size(); }

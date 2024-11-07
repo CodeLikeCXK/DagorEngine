@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <de3_interface.h>
 #include <de3_entityFilter.h>
 #include <de3_objEntity.h>
@@ -18,15 +16,11 @@
 #include <fx/dag_hdrRender.h>
 #include <shaders/dag_renderScene.h>
 #include <render/dag_cur_view.h>
-#include <drv/3d/dag_matricesAndPerspective.h>
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
 #include <ioSys/dag_dataBlock.h>
 #include <ioSys/dag_fileIo.h>
 #include <ioSys/dag_memIo.h>
 #include <osApiWrappers/dag_direct.h>
-
-#include <EditorCore/ec_interface.h>
-#include <EditorCore/ec_interface_ex.h>
 
 
 class BuiltSceneViewService : public IEditorService, public IRenderingService, public IRenderOnCubeTex, public IBinaryDataBuilder
@@ -128,7 +122,7 @@ public:
   }
 
   // IBinaryDataBuilder interface
-  virtual bool validateBuild(int target, ILogWriter &rep, PropPanel::ContainerPropertyControl *params)
+  virtual bool validateBuild(int target, ILogWriter &rep, PropPanel2 *params)
   {
     String sceneDir;
     makeScenePath(sceneDir, "");
@@ -154,7 +148,7 @@ public:
 
     return true;
   }
-  virtual bool buildAndWrite(BinDumpSaveCB &cwr, const ITextureNumerator &tn, PropPanel::ContainerPropertyControl *pp)
+  virtual bool buildAndWrite(BinDumpSaveCB &cwr, const ITextureNumerator &tn, PropPanel2 *pp)
   {
     String sceneDir;
     makeScenePath(sceneDir, "");
@@ -196,7 +190,7 @@ protected:
 
     ShaderGlobal::set_int_fast(fakeLtGvId, 0);
     d3d::settm(TM_WORLD, TMatrix::IDENT);
-    scene->render(EDITORCORE->queryEditorInterface<IVisibilityFinderProvider>()->getVisibilityFinder(), render_id, mask);
+    scene->render(render_id, mask);
 
     ShaderGlobal::set_int_fast(fakeLtGvId, 1);
   }

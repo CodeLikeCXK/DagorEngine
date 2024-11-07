@@ -1,4 +1,4 @@
-class Foo {
+let class Foo {
     //constructor
 
     testy = null

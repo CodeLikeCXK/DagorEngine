@@ -1,5 +1,0 @@
-semi_trans_render {
-  _singleton:b=true
-  _tags:t="render"
-  "semi_trans_render__manager:SemiTransRenderManager"{}
-}

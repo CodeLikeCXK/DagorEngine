@@ -1,14 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
-#include <drv/3d/dag_buffers.h>
+#include "device.h"
 #include <atomic>
-#include <value_range.h>
-#include "buffer_resource.h"
-#include "async_completion_state.h"
-#include "temp_buffers.h"
-#include "globals.h"
-#include "debug_naming.h"
 
 namespace drv3d_vulkan
 {
@@ -17,12 +10,13 @@ class GenericBufferInterface final : public Sbuffer
   uint32_t bufSize = 0;
   uint32_t bufFlags = 0;
   ValueRange<uint32_t> lockRange;
-  BufferRef ref = {};
+  Buffer *buffer = nullptr;
   Buffer *stagingBuffer = nullptr;
   uint16_t structSize = 0;
   FormatStore uavFormat;
   uint8_t lastLockFlags = 0;
-  AsyncCompletionState asyncCopyEvent;
+  bool asyncCopyInProgress = false;
+  size_t lastUpdateWorkId = -1;
   TempBufferHolder *pushAllocation;
 
   bool bufferLockedForRead() const { return lastLockFlags & VBLOCK_READONLY; }
@@ -39,23 +33,76 @@ class GenericBufferInterface final : public Sbuffer
   {
     return (!bufferLockedForRead() && bufferLockedForWrite() && !bufferLockDiscardRequested() && !bufferSyncUpdateRequested());
   }
-  DeviceMemoryClass getMemoryClass() const { return BufferDescription::memoryClassFromCflags(bufFlags); }
+  uint32_t getInitialDiscardCount() const
+  {
+    if (bufFlags & SBCF_DYNAMIC)
+    {
+      if (bufFlags & SBCF_BIND_CONSTANT)
+        return 5;
+      return 2;
+    }
+    else if (isStagingBuffer())
+    {
+      return 2;
+    }
+
+    return 1;
+  }
+  DeviceMemoryClass getMemoryClass() const
+  {
+    if (bufFlags & (SBCF_CPU_ACCESS_WRITE | SBCF_DYNAMIC))
+    {
+      if (bufFlags & SBCF_BIND_CONSTANT)
+      {
+        if (bufFlags & SBCF_CPU_ACCESS_READ)
+          return DeviceMemoryClass::HOST_RESIDENT_HOST_READ_WRITE_BUFFER;
+        else
+          return DeviceMemoryClass::DEVICE_RESIDENT_HOST_WRITE_ONLY_BUFFER;
+      }
+      else
+      {
+        if (bufFlags & SBCF_CPU_ACCESS_READ)
+          return DeviceMemoryClass::HOST_RESIDENT_HOST_READ_WRITE_BUFFER;
+        else
+          return DeviceMemoryClass::HOST_RESIDENT_HOST_WRITE_ONLY_BUFFER;
+      }
+    }
+    return DeviceMemoryClass::DEVICE_RESIDENT_BUFFER;
+  }
   DeviceMemoryClass getPermanentStagingBufferMemoryClass() const
   {
-    // keep permanent stagings in host heaps, do not waste shared host-device heap
-    if (bufFlags & SBCF_CPU_ACCESS_READ)
-      return (bufFlags & SBCF_CPU_ACCESS_WRITE) ? DeviceMemoryClass::HOST_RESIDENT_HOST_READ_WRITE_BUFFER
-                                                : DeviceMemoryClass::HOST_RESIDENT_HOST_READ_ONLY_BUFFER;
-    return DeviceMemoryClass::HOST_RESIDENT_HOST_WRITE_ONLY_BUFFER;
+    if (0 != (bufFlags & SBCF_CPU_ACCESS_READ))
+    {
+      if (0 != (bufFlags & SBCF_CPU_ACCESS_WRITE))
+        return DeviceMemoryClass::HOST_RESIDENT_HOST_READ_WRITE_BUFFER;
+      else
+        return DeviceMemoryClass::HOST_RESIDENT_HOST_READ_ONLY_BUFFER;
+    }
+    return DeviceMemoryClass::DEVICE_RESIDENT_HOST_WRITE_ONLY_BUFFER;
   }
   DeviceMemoryClass getTemporaryStagingBufferMemoryClass() const
   {
     if (bufferLockedForRead())
-      return bufferLockedForWrite() ? DeviceMemoryClass::HOST_RESIDENT_HOST_READ_WRITE_BUFFER
-                                    : DeviceMemoryClass::HOST_RESIDENT_HOST_READ_ONLY_BUFFER;
-    return DeviceMemoryClass::HOST_RESIDENT_HOST_WRITE_ONLY_BUFFER;
+    {
+      if (bufferLockedForWrite())
+        return DeviceMemoryClass::HOST_RESIDENT_HOST_READ_WRITE_BUFFER;
+      else
+        return DeviceMemoryClass::HOST_RESIDENT_HOST_READ_ONLY_BUFFER;
+    }
+    return DeviceMemoryClass::DEVICE_RESIDENT_HOST_WRITE_ONLY_BUFFER;
   }
-  bool isStagingBuffer() const { return bufFlags == SBCF_STAGING_BUFFER; }
+  bool isStagingBuffer() const
+  {
+    // if it can not be used for anything and its read/write its a staging buffer (dx11 driver requires
+    // r/w so we do it too).
+    return (0 == (bufFlags & SBCF_BIND_MASK)) && (SBCF_CPU_ACCESS_WRITE | SBCF_CPU_ACCESS_READ) == (SBCF_CPU_ACCESS_MASK & bufFlags);
+  }
+  bool stagingBufferIsPermanent() const
+  {
+    // TODO: reevaluate this, this is always false
+    // - see getMemoryClass
+    return 0 != (bufFlags & SBCF_DYNAMIC);
+  }
 
   bool isDMAPathAvailable();
 
@@ -70,6 +117,9 @@ class GenericBufferInterface final : public Sbuffer
   void disposeStagingBuffer();
   void processDiscardFlag();
 
+  void markDataUpdate();
+  bool updatedInCurrentWorkItem();
+
   void markAsyncCopyInProgress();
   void markAsyncCopyFinished();
   void blockingReadbackWait();
@@ -78,7 +128,7 @@ class GenericBufferInterface final : public Sbuffer
   {
     if (ptr)
     {
-      if (!asyncCopyEvent.isRequested())
+      if (!asyncCopyInProgress)
       {
         startReadback();
         blockingReadbackWait();
@@ -95,11 +145,8 @@ class GenericBufferInterface final : public Sbuffer
     }
   }
 
-  void afterBufferResourceAllocated();
-
 public:
-  GenericBufferInterface(uint32_t struct_size, uint32_t element_count, uint32_t flags, FormatStore format, bool managed,
-    const char *stat_name);
+  GenericBufferInterface(uint32_t struct_size, uint32_t element_count, uint32_t flags, FormatStore format, const char *stat_name);
   ~GenericBufferInterface();
 
   int ressize() const override;
@@ -109,18 +156,12 @@ public:
   int lock(unsigned ofs_bytes, unsigned size_bytes, void **ptr, int flags) override;
   int getElementSize() const override;
   int getNumElements() const override;
-  virtual void setResApiName(const char *name) const override { Globals::Dbg::naming.setBufName(ref.buffer, name); }
   bool copyTo(Sbuffer *dst) override;
   bool copyTo(Sbuffer *dst, uint32_t dst_offset, uint32_t src_offset, uint32_t size_bytes) override;
   bool updateData(uint32_t ofs_bytes, uint32_t size_bytes, const void *__restrict src, uint32_t lockFlags) override;
-  void useExternalResource(Buffer *resource);
-  BufferRef fillFrameMemWithDummyData();
 
-  const BufferRef &getBufferRef() const { return ref; }
+  Buffer *getDeviceBuffer() const { return buffer; }
   VkIndexType getIndexType() const { return bufFlags & SBCF_INDEX32 ? VK_INDEX_TYPE_UINT32 : VK_INDEX_TYPE_UINT16; }
 };
-
-GenericBufferInterface *allocate_buffer(uint32_t struct_size, uint32_t element_count, uint32_t flags, FormatStore format, bool managed,
-  const char *stat_name);
 void free_buffer(GenericBufferInterface *buffer);
 } // namespace drv3d_vulkan

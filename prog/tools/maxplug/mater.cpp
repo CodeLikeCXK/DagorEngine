@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <max.h>
 #include <stdmat.h>
 #include "dagor.h"
@@ -8,7 +6,6 @@
 #include "resource.h"
 #include <IHardwareMaterial.h>
 #include <iparamb2.h>
-#include <d3d9types.h>
 // #include "debug.h"
 
 #include <string>
@@ -489,11 +486,7 @@ void MaterDlg::UpdateTexDisplay(int i)
   Texmap *t = theMtl->texmaps->gettex(i);
   TSTR nm;
   if (t)
-#if defined(MAX_RELEASE_R27) && MAX_RELEASE >= MAX_RELEASE_R27
-    nm = t->GetFullName(false).data();
-#else
     nm = t->GetFullName();
-#endif
   else
     nm = GetString(IDS_NONE);
   tbut[i]->SetText(nm);

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <math/dag_math3d.h>
 
 #include "t3dLoader.h"

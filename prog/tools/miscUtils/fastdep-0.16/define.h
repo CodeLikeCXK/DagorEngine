@@ -1,5 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-#pragma once
+#ifndef DEFINE_H_
+#define DEFINE_H_
 
 #include "element.h"
 
@@ -26,3 +26,5 @@ private:
   std::string MacroName;
   std::string Content;
 };
+
+#endif

@@ -1,4 +1,0 @@
-if $(HaveRenderer) = yes {
-  gamePulls += framework_retinal_damage_pull daNetGameLibs_retinal_damage_DAS_pull_AOT ;
-  UseProgLibs += daNetGameLibs/retinal_damage ;
-}

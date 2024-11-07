@@ -1,6 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
-
 #include <util/dag_stdint.h>
 #include <datacache/datacache.h>
 #include <util/dag_simpleString.h>

@@ -1,8 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-#pragma once
-
 // defines full RT ready state that can be applied to execution state
-
+#pragma once
 #if D3D_HAS_RAY_TRACING
 
 #include "util/tracked_state.h"

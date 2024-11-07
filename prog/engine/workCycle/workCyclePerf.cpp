@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <workCycle/dag_workCyclePerf.h>
 
 namespace workcycleperf

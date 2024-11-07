@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <render/editorGrass.h>
 #include <shaders/dag_rendInstRes.h>
 #include <math/random/dag_random.h>
@@ -132,8 +130,7 @@ void EditorGrass::setLayerDensity(int layer_i, float new_density)
     unsigned int numInstancesInCell = (unsigned int)(baseNumInstances * lod.density / (GRID_SIZE * GRID_SIZE) + 0.5f);
 
     const ShaderMesh::RElem &elem = lod.mesh->getAllElems()[0];
-    numInstancesInCell = min(numInstancesInCell, (unsigned int)MAX_VERTICES_IN_CELL / elem.numv);
-    lod.numInstancesInCell = numInstancesInCell;
+    lod.numInstancesInCell = min(numInstancesInCell, (unsigned int)MAX_VERTICES_IN_CELL / elem.numv);
 
     if (numInstancesInCell == 0)
       return;

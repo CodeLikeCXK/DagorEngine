@@ -1,2 +1,0 @@
-gamePulls += framework_terraform_pull TerraformModule_pull ;
-UseProgLibs += daNetGameLibs/terraform ;

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "entityMatEditor.h"
 
 #include <assets/assetExporter.h>
@@ -7,21 +5,19 @@
 #include <gameRes/dag_stdGameResId.h>
 #include <shaders/dag_shMaterialUtils.h>
 #include <EASTL/algorithm.h>
-#include <propPanel/control/container.h>
+#include <propPanel2/c_panel_base.h>
 #include <shaders/dag_shaderCommon.h>
 #include <obsolete/dag_cfg.h>
 #include <osApiWrappers/dag_direct.h>
 #include <winGuiWrapper/wgw_input.h>
 #include <winGuiWrapper/wgw_dialogs.h>
+#include <propPanel2/comWnd/dialog_window.h>
 #include <de3_entityGetSceneLodsRes.h>
 #include <libTools/dagFileRW/dagFileNode.h>
 #include <memory/dag_framemem.h>
 #include <de3_interface.h>
-#include <propPanel/commonWindow/dialogWindow.h>
-#include <propPanel/commonWindow/listDialog.h>
-#include <propPanel/commonWindow/multiListDialog.h>
+#include <propPanel2/comWnd/list_dialog.h>
 #include <libTools/util/strUtil.h>
-#include <math/dag_mesh.h>
 #include <util/dag_strUtil.h>
 #include <util/dag_delayedAction.h>
 #include <libTools/shaderResBuilder/processMat.h>
@@ -53,7 +49,6 @@ enum
 
 enum
 {
-  PID_MATERIALS_SHOW_TRIANGLE_COUNT,
   PID_LODS_MATERIAL_EDITORS_BASE
 };
 
@@ -67,8 +62,8 @@ enum
 enum
 {
   // Material group local property IDs.
-  LPID_MATERIAL_GROUP = 1,
-  LPID_TEXTURE_GROUP,
+  LPID_MATERIAL_GROUP,
+  LPID_TEXTRUE_GROUP,
   LPID_SHADER_BUTTON,
   LPID_PROXYMAT_BUTTON,
   LPID_SAVE_PARAMS_BUTTON,
@@ -231,82 +226,6 @@ static bool get_panel_property_address(int pcb_id, int &out_lod, int &out_mat_id
   return true;
 }
 
-int EntityMaterialEditor::getMaterialIndexByName(const DagMatFileResourcesHandler &file_res, const char *name)
-{
-  const int count = file_res.getMaterialCount();
-  for (int i = 0; i < count; ++i)
-    if (file_res.getMaterialName(i) == name)
-      return i;
-
-  return -1;
-}
-
-void EntityMaterialEditor::createSubMaterialToMaterialIndexMap(const char *dag_name, const Node &node,
-  const DagMatFileResourcesHandler &file_res, dag::Vector<int> &map)
-{
-  // node.mat is never null due to the condition in countMaterialUsage.
-  G_ASSERT(node.mat);
-  if (!node.mat)
-    return;
-
-  const int subMatCount = node.mat->subMatCount();
-  map.resize(subMatCount, -1);
-
-  for (int i = 0; i < subMatCount; ++i)
-  {
-    const MaterialData *subMaterialData = node.mat->getSubMat(i);
-    if (!subMaterialData)
-      continue;
-
-    const char *subMatName = subMaterialData->matName.c_str();
-    const int materialIndex = getMaterialIndexByName(file_res, subMatName);
-    if (materialIndex >= 0)
-      map[i] = materialIndex;
-    else
-      logwarn("Sub-material '%s' of node '%s' cannot be found in the main material list in file '%s'.", subMatName, node.name.c_str(),
-        dag_name);
-  }
-}
-
-void EntityMaterialEditor::countMaterialUsage(const char *dag_name, const Node &node, const DagMatFileResourcesHandler &file_res,
-  dag::Span<int> materials)
-{
-  for (const Node *child : node.child)
-    if (child)
-      countMaterialUsage(dag_name, *child, file_res, materials);
-
-  if ((node.flags & NODEFLG_RENDERABLE) == 0 || !node.mat || node.mat->subMatCount() == 0 || !node.obj ||
-      !node.obj->isSubOf(OCID_MESHHOLDER))
-    return;
-
-  const MeshHolderObj &meshHolder = static_cast<const MeshHolderObj &>(*node.obj);
-  if (!meshHolder.mesh)
-    return;
-
-  dag::Vector<int> subMaterialToMaterialIndexMap;
-  createSubMaterialToMaterialIndexMap(dag_name, node, file_res, subMaterialToMaterialIndexMap);
-  G_ASSERT(!subMaterialToMaterialIndexMap.empty()); // This is always true due to the "node.mat->subMatCount() == 0" condition above.
-
-  for (const Face &face : meshHolder.mesh->face)
-  {
-    // Bad sub-material indices are simply clamped. (See collapse_nodes in shaderResBuilder/collapseData.h.)
-    int subMaterialIndex = face.mat;
-    if (subMaterialIndex >= subMaterialToMaterialIndexMap.size())
-      subMaterialIndex = subMaterialToMaterialIndexMap.size() - 1;
-
-    const int materialIndex = subMaterialToMaterialIndexMap[subMaterialIndex];
-    if (materialIndex >= 0)
-      ++materials[materialIndex];
-  }
-}
-
-void EntityMaterialEditor::loadSettings(const DataBlock &settings)
-{
-  showTriangleCount = settings.getBool("showTriangleCount", showTriangleCount);
-}
-
-void EntityMaterialEditor::saveSettings(DataBlock &settings) const { settings.addBool("showTriangleCount", showTriangleCount); }
-
 void EntityMaterialEditor::begin(DagorAsset *asset, IObjEntity *asset_entity)
 {
   entity = asset_entity;
@@ -349,15 +268,6 @@ void EntityMaterialEditor::begin(DagorAsset *asset, IObjEntity *asset_entity)
 
     EntityLodMatData &lodMatData = matDataPerLod.push_back();
     lodMatData.fileRes = eastl::make_unique<DagMatFileResourcesHandler>(dagFileName, DAEDITOR3.getAssetByName(assetName.c_str()));
-
-    dag::Vector<int> materialUsage(lodMatData.fileRes->getMaterialCount(), 0);
-    if (showTriangleCount)
-    {
-      AScene scene;
-      if (load_ascene(dagFileName, scene, LASF_MATNAMES | LASF_NOSPLINES | LASF_NOLIGHTS, false) && scene.root)
-        countMaterialUsage(dagFileName, *scene.root, *lodMatData.fileRes, make_span(materialUsage));
-    }
-
     for (int dagMatId = 0; dagMatId < lodMatData.fileRes->getMaterialCount(); ++dagMatId)
     {
       SimpleString shClassName = lodMatData.fileRes->getShaderClass(dagMatId);
@@ -366,7 +276,6 @@ void EntityMaterialEditor::begin(DagorAsset *asset, IObjEntity *asset_entity)
 
       EntityMatProperties &matProps = lodMatData.matProperties.push_back();
       matProps.dagMatId = dagMatId;
-      matProps.facesUsingMaterial = materialUsage[dagMatId];
       matProps.matName = lodMatData.fileRes->getMaterialName(dagMatId);
       matProps.shClassName = shClassName;
       matProps.vars = lodMatData.fileRes->getVars(dagMatId);
@@ -393,13 +302,13 @@ bool EntityMaterialEditor::end()
       "You have changed material properties. Do you want to save the changes to the physical resources?");
     switch (dialogResult)
     {
-      case PropPanel::DIALOG_ID_CANCEL: return false;
-      case PropPanel::DIALOG_ID_NO:
+      case DIALOG_ID_CANCEL: return false;
+      case DIALOG_ID_NO:
         for (int lod = 0; lod < matDataPerLod.size(); ++lod)
           clearMaterialOverrides(lod);
         notifyCurrentAssetNeedsReload();
         break;
-      case PropPanel::DIALOG_ID_YES: saveAllChanges(); break;
+      case DIALOG_ID_YES: saveAllChanges(); break;
     }
   }
 
@@ -416,7 +325,7 @@ void EntityMaterialEditor::saveAllChanges()
   }
 }
 
-void EntityMaterialEditor::fillPropPanel(PropPanel::ContainerPropertyControl &panel)
+void EntityMaterialEditor::fillPropPanel(PropertyContainerControlBase &panel)
 {
   if (!active)
     return;
@@ -424,18 +333,16 @@ void EntityMaterialEditor::fillPropPanel(PropPanel::ContainerPropertyControl &pa
   panel.setEventHandler(this);
   panel.clear();
 
-  panel.createCheckBox(PID_MATERIALS_SHOW_TRIANGLE_COUNT, "Show triangle count", showTriangleCount);
-
   for (int lod = 0; lod < matDataPerLod.size(); ++lod)
   {
-    PropPanel::ContainerPropertyControl *grpLodMatList =
+    PropertyContainerControlBase *grpLodMatList =
       panel.createGroup(lod * MAX_LOD_GROUP_GUI_ELEMENTS_COUNT + LPID_MATERIAL_GROUP, String(0, "Materials (Lod%d)", lod).c_str());
     if (!grpLodMatList)
       continue;
 
     for (int matId = 0; matId < matDataPerLod[lod].matProperties.size(); ++matId)
     {
-      PropPanel::ContainerPropertyControl *grpMat =
+      PropertyContainerControlBase *grpMat =
         grpLodMatList->createGroup(get_mat_group_panel_base_pid(lod, matId) + LPID_MATERIAL_GROUP, "");
       if (grpMat)
       {
@@ -449,7 +356,7 @@ void EntityMaterialEditor::fillPropPanel(PropPanel::ContainerPropertyControl &pa
   panel.restoreFillAutoResize();
 }
 
-void EntityMaterialEditor::addShaderProps(int mat_gui_elements_baseid, PropPanel::ContainerPropertyControl &mat_panel,
+void EntityMaterialEditor::addShaderProps(int mat_gui_elements_baseid, PropertyContainerControlBase &mat_panel,
   const dag::Vector<MatVarDesc> &vars, const dag::Vector<int> &var_indices)
 {
   for (int varId = 0; varId < vars.size(); ++varId)
@@ -478,7 +385,7 @@ void EntityMaterialEditor::addShaderProps(int mat_gui_elements_baseid, PropPanel
   }
 }
 
-void EntityMaterialEditor::addShaderPropsCategories(int mat_gui_elements_baseid, PropPanel::ContainerPropertyControl &mat_panel,
+void EntityMaterialEditor::addShaderPropsCategories(int mat_gui_elements_baseid, PropertyContainerControlBase &mat_panel,
   const dag::Vector<MatVarDesc> &vars, const ShaderSeparatorToPropsType &shaderSeparatorToProps)
 {
   auto isVarInProps = [](const ShaderSeparatorToPropsType &props, const SimpleString &var_name) {
@@ -561,19 +468,14 @@ void EntityMaterialEditor::addShaderPropsCategories(int mat_gui_elements_baseid,
   }
 }
 
-void EntityMaterialEditor::fillMatPropPanel(int lod, int mat_id, PropPanel::ContainerPropertyControl &mat_panel)
+void EntityMaterialEditor::fillMatPropPanel(int lod, int mat_id, PropertyContainerControlBase &mat_panel)
 {
   const EntityMatProperties &matProps = matDataPerLod[lod].matProperties[mat_id];
   const char *matShaderName = matProps.shClassName.c_str();
   const int matGuiElementsBaseId = get_mat_group_panel_base_pid(lod, mat_id);
   mat_panel.disableFillAutoResize();
   mat_panel.clear();
-
-  if (showTriangleCount)
-    mat_panel.setCaptionValue(String(64, "%s (%d tri)", matProps.matName.c_str(), matProps.facesUsingMaterial));
-  else
-    mat_panel.setCaptionValue(matProps.matName.c_str());
-
+  mat_panel.setCaptionValue(matProps.matName.c_str());
   mat_panel.createButton(matGuiElementsBaseId + LPID_SHADER_BUTTON, make_shader_button_name(matShaderName));
   SimpleString proxyMatName = matDataPerLod[lod].fileRes->getCurProxyMatName(matProps.dagMatId);
   mat_panel.createButton(matGuiElementsBaseId + LPID_PROXYMAT_BUTTON, make_proxymat_button_name(proxyMatName.c_str()));
@@ -595,7 +497,7 @@ void EntityMaterialEditor::fillMatPropPanel(int lod, int mat_id, PropPanel::Cont
   mat_panel.createButton(matGuiElementsBaseId + LPID_TRANSFER_CHANGES_TO_LODS, "Transfer changes to lods");
 
   mat_panel.createSeparator();
-  PropPanel::ContainerPropertyControl *grpTextures = mat_panel.createGroup(matGuiElementsBaseId + LPID_TEXTURE_GROUP, "Textures");
+  PropertyContainerControlBase *grpTextures = mat_panel.createGroup(matGuiElementsBaseId + LPID_TEXTRUE_GROUP, "Textures");
   if (grpTextures)
   {
     unsigned usedTexMask = get_shclass_used_tex_mask(matShaderName);
@@ -615,9 +517,9 @@ void EntityMaterialEditor::fillMatPropPanel(int lod, int mat_id, PropPanel::Cont
   mat_panel.restoreFillAutoResize();
 }
 
-void EntityMaterialEditor::refillMatPropPanel(int lod, int mat_id, PropPanel::ContainerPropertyControl &editor_panel)
+void EntityMaterialEditor::refillMatPropPanel(int lod, int mat_id, PropertyContainerControlBase &editor_panel)
 {
-  PropPanel::ContainerPropertyControl *grpMat =
+  PropertyContainerControlBase *grpMat =
     editor_panel.getContainerById(get_mat_group_panel_base_pid(lod, mat_id) + LPID_MATERIAL_GROUP);
   if (grpMat)
     fillMatPropPanel(lod, mat_id, *grpMat);
@@ -666,8 +568,7 @@ void EntityMaterialEditor::updateAssetShaderMaterial(int lod, int mat_id)
     if (alphaTexSlotId == texSlot || !(usedTexMask & (1 << texSlot)))
       continue;
 
-    String tempString;
-    String texName(replace_asset_name(matProps.textures[texSlot].c_str(), tempString, assetName));
+    String texName(matProps.textures[texSlot].c_str());
     if (!texName.empty())
       texName += "*";
 
@@ -715,8 +616,8 @@ void EntityMaterialEditor::performAddOrRemoveScriptVars(int lod, int mat_id, boo
     if (var.usedInMaterial != is_to_add)
       availableVars.push_back(String(var.name.c_str()));
   Tab<String> selectedVars;
-  PropPanel::MultiListDialog selectVars("List of parameters", _pxScaled(300), _pxScaled(400), availableVars, selectedVars);
-  if (selectVars.showDialog() == PropPanel::DIALOG_ID_OK)
+  MultiListDialog selectVars("List of parameters", _pxScaled(300), _pxScaled(400), availableVars, selectedVars);
+  if (selectVars.showDialog() == DIALOG_ID_OK)
   {
     for (auto &selVarName : selectedVars)
       eastl::find_if(matVars.begin(), matVars.end(),
@@ -755,10 +656,10 @@ const char *EntityMaterialEditor::performShaderClassSelection(int lod, int mat_i
   EntityLodMatData &lodMatData = matDataPerLod[lod];
   EntityMatProperties &matProperties = lodMatData.matProperties[mat_id];
 
-  PropPanel::ListDialog selectShClass("Select shader", availableShClasses, _pxScaled(300), _pxScaled(600));
+  ListDialog selectShClass(0, "Select shader", availableShClasses, _pxScaled(300), _pxScaled(600));
   int curSelectId = find_value_idx(availableShClasses, String(matProperties.shClassName.c_str()));
   selectShClass.setSelectedIndex(curSelectId);
-  if (selectShClass.showDialog() == PropPanel::DIALOG_ID_OK)
+  if (selectShClass.showDialog() == DIALOG_ID_OK)
   {
     const char *newShaderClassName = selectShClass.getSelectedText();
     if (newShaderClassName && newShaderClassName != matProperties.shClassName)
@@ -840,7 +741,7 @@ void EntityMaterialEditor::pasteMatProperties(int lod, int mat_id)
   {
     if (wingw::message_box(wingw::MBS_YESNO, "Shaders difference",
           "The copied shader '%s' is different from the current one. Do you want to paste it?",
-          propertiesCopyBuffer.shClassName.c_str()) == PropPanel::DIALOG_ID_YES)
+          propertiesCopyBuffer.shClassName.c_str()) == DIALOG_ID_YES)
     {
       if (find_value_idx(getAvailableShaderClasses(), String(propertiesCopyBuffer.shClassName.c_str())) >= 0)
       {
@@ -1004,20 +905,11 @@ DataBlock EntityMaterialEditor::makeCurMatPropertiesBlk(int lod, int mat_id) con
   return propsBlk;
 }
 
-void EntityMaterialEditor::onChange(int pcb_id, PropPanel::ContainerPropertyControl *panel)
+void EntityMaterialEditor::onChange(int pcb_id, PropertyContainerControlBase *panel)
 {
   int lod, matId, matLocalPropId;
   if (!get_panel_property_address(pcb_id, lod, matId, matLocalPropId))
-  {
-    if (pcb_id == PID_MATERIALS_SHOW_TRIANGLE_COUNT)
-    {
-      showTriangleCount = panel->getBool(pcb_id);
-      reloadCurrentAsset();
-      isReloading = false; // Do a full reload.
-    }
-
     return;
-  }
 
   if (matLocalPropId < LPID_TEXTURE_LIST_BASE && matLocalPropId >= LPID_SHADER_VARS_BASE)
   {
@@ -1084,7 +976,7 @@ void EntityMaterialEditor::clearMaterialOverrides(int lod)
     lodProps->removeBlock("materialOverrides");
 }
 
-void EntityMaterialEditor::onClick(int pcb_id, PropPanel::ContainerPropertyControl *panel)
+void EntityMaterialEditor::onClick(int pcb_id, PropertyContainerControlBase *panel)
 {
   int lod, matId, matLocalPropId;
   if (!get_panel_property_address(pcb_id, lod, matId, matLocalPropId))
@@ -1124,12 +1016,12 @@ void EntityMaterialEditor::onClick(int pcb_id, PropPanel::ContainerPropertyContr
         refillMatPropPanel(lod, matId, *panel);
         break;
       case LPID_SAVE_PARAMS_BUTTON:
-        if (lodMatData.isMatChanged(matId) &&
-            wingw::message_box(wingw::MBS_OKCANCEL, "Save parameters",
-              lodMatData.fileRes->getCurProxyMatName(matProps.dagMatId).empty()
-                ? "This will overwrite current LOD's DAG"
-                : "This will overwrite proxymat used by the material. All assets using this proxymat will be affected.") ==
-              PropPanel::DIALOG_ID_OK)
+        if (
+          lodMatData.isMatChanged(matId) &&
+          wingw::message_box(wingw::MBS_OKCANCEL, "Save parameters",
+            lodMatData.fileRes->getCurProxyMatName(matProps.dagMatId).empty()
+              ? "This will overwrite current LOD's DAG"
+              : "This will overwrite proxymat used by the material. All assets using this proxymat will be affected.") == DIALOG_ID_OK)
         {
           clearMaterialOverrides(lod);
           lodMatData.save({matId});
@@ -1146,7 +1038,7 @@ void EntityMaterialEditor::onClick(int pcb_id, PropPanel::ContainerPropertyContr
         break;
       case LPID_RESET_PARAMS_TO_DAG_BUTTON:
         if (lodMatData.isMatChanged(matId) &&
-            wingw::message_box(wingw::MBS_OKCANCEL, "Reset parameters", "This will discard your changes!") == PropPanel::DIALOG_ID_OK)
+            wingw::message_box(wingw::MBS_OKCANCEL, "Reset parameters", "This will discard your changes!") == DIALOG_ID_OK)
         {
           DagorAsset *curAsset = DAEDITOR3.getAssetByName(assetName.c_str());
           if (!curAsset)
@@ -1176,7 +1068,7 @@ void EntityMaterialEditor::applyToCommonVars(dag::Vector<MatVarDesc> &dst_vars, 
   }
 }
 
-void EntityMaterialEditor::transferChangesToLods(int lod, int mat_id, PropPanel::ContainerPropertyControl *panel)
+void EntityMaterialEditor::transferChangesToLods(int lod, int mat_id, PropertyContainerControlBase *panel)
 {
   const EntityMatProperties &matPropsSrc = matDataPerLod[lod].matProperties[mat_id];
   const dag::Vector<MatVarDesc> &matVarsSrc = matPropsSrc.vars;
@@ -1203,10 +1095,10 @@ void EntityMaterialEditor::transferChangesToLods(int lod, int mat_id, PropPanel:
     }
   }
   Tab<String> sels;
-  PropPanel::MultiListDialog dlg("List of lods", _pxScaled(300), _pxScaled(400), vals, sels);
+  MultiListDialog dlg("List of lods", _pxScaled(300), _pxScaled(400), vals, sels);
   Tab<int> selIndices;
   dlg.setSelectionTab(&selIndices);
-  if (dlg.showDialog() != PropPanel::DIALOG_ID_OK)
+  if (dlg.showDialog() != DIALOG_ID_OK)
     return;
   for (int sel : selIndices)
   {

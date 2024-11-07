@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <EditorCore/ec_brushfilter.h>
 #include <EditorCore/ec_brush.h>
 

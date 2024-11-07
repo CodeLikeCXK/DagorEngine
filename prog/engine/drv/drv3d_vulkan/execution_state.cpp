@@ -1,8 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
-#include "execution_state.h"
 #include "state_field_execution_context.h"
-#include "execution_context.h"
+#include "device.h"
 
 namespace drv3d_vulkan
 {
@@ -41,10 +38,9 @@ void ExecutionState::interruptRenderPass(const char *why)
   if (!getData().scopes.isDirty())
     executionContext->insertEvent(why, 0xFF00FFFF);
 
-  if (Globals::cfg.bits.fatalOnNRPSplit &&
-      (get<StateFieldGraphicsInPass, InPassStateFieldType, BackGraphicsState>()) == InPassStateFieldType::NATIVE_PASS)
-    DAG_FATAL("vulkan: native RP can't be interrupted, but trying to interrupt it due to %s, caller %s", why,
-      executionContext->getCurrentCmdCaller());
+  G_ASSERTF((get<StateFieldGraphicsInPass, InPassStateFieldType, BackGraphicsState>()) != InPassStateFieldType::NATIVE_PASS,
+    "vulkan: native RP can't be interrupted, but trying to interrupt it due to %s, caller %s", why,
+    executionContext->getCurrentCmdCaller());
 
   set<StateFieldGraphicsRenderPassScopeCloser, bool, BackScopeState>(true);
   set<StateFieldGraphicsConditionalRenderingScopeCloser, ConditionalRenderingState::InvalidateTag, BackScopeState>({});

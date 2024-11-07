@@ -122,7 +122,6 @@ function listRow(tpl_name, idx) {
       children = {
         rendObj = ROBJ_TEXT
         text = tpl_name
-        color = colors.TextDefault
         margin = fsh(0.5)
       }
     }
@@ -164,7 +163,6 @@ function listMore() {
     children = {
       rendObj = ROBJ_TEXT
       text = "... (show all)"
-      color = colors.TextDarker
       margin = fsh(0.5)
     }
   }

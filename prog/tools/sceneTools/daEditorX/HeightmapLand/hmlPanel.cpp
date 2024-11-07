@@ -1,7 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "hmlPanel.h"
-#include <propPanel/control/panelWindow.h>
+#include <dllPluginCore/core.h>
 #include "hmlCm.h"
 
 
@@ -16,7 +14,7 @@ bool HmapLandPlugin::HmapLandPanel::showPropPanel(bool show)
     if (show)
       EDITORCORE->addPropPanel(PROPBAR_EDITOR_WTYPE, hdpi::_pxScaled(PROPBAR_WIDTH));
     else
-      EDITORCORE->removePropPanel(mPanelWindow);
+      EDITORCORE->removePropPanel(mPanelWindow->getParentWindowHandle());
   }
 
   return true;
@@ -32,7 +30,7 @@ void HmapLandPlugin::HmapLandPanel::fillPanel(bool refill, bool schedule_regen, 
 }
 
 
-void HmapLandPlugin::HmapLandPanel::onPostEvent(int pcb_id, PropPanel::ContainerPropertyControl *panel)
+void HmapLandPlugin::HmapLandPanel::onPostEvent(int pcb_id, PropPanel2 *panel)
 {
   if (pcb_id) // refill
   {
@@ -42,12 +40,14 @@ void HmapLandPlugin::HmapLandPanel::onPostEvent(int pcb_id, PropPanel::Container
       plugin.mainPanelState.setInt("pOffset", mPanelWindow->getScrollPos());
   }
 
+  mPanelWindow->showPanel(false);
   plugin.fillPanel(*panel);
   if (pcb_id & 3)
     panel->loadState(plugin.mainPanelState);
   if (pcb_id & 4)
     mPanelWindow->setScrollPos(plugin.mainPanelState.getInt("pOffset", 0));
 
+  mPanelWindow->showPanel(true);
   if (pcb_id & 2) // schedule_regen
     plugin.onPluginMenuClick(CM_BUILD_COLORMAP);
 }
@@ -62,15 +62,12 @@ void HmapLandPlugin::HmapLandPanel::updateLightGroup()
 
 //==============================================================================
 
-void HmapLandPlugin::HmapLandPanel::onChange(int pcb_id, PropPanel::ContainerPropertyControl *panel)
-{
-  plugin.onChange(pcb_id, panel);
-}
+void HmapLandPlugin::HmapLandPanel::onChange(int pcb_id, PropPanel2 *panel) { plugin.onChange(pcb_id, panel); }
 
 
 //==============================================================================
 
-void HmapLandPlugin::HmapLandPanel::onClick(int pcb_id, PropPanel::ContainerPropertyControl *panel) { plugin.onClick(pcb_id, panel); }
+void HmapLandPlugin::HmapLandPanel::onClick(int pcb_id, PropPanel2 *panel) { plugin.onClick(pcb_id, panel); }
 
 
 //==============================================================================

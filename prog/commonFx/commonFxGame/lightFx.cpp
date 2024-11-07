@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <math/dag_Point3.h>
 #include <math/dag_TMatrix.h>
 #include <lightFx_decl.h>
@@ -184,16 +182,6 @@ public:
     else if (id == _MAKE4C('CACH')) // Does no rendering so is shader cache friendly.
     {
       return (void *)1; //-V566
-    }
-    else if (id == _MAKE4C('LFXS') && value)
-    {
-      *((float *)value) = par.color.scale * colorScale;
-      return value;
-    }
-    else if (id == _MAKE4C('LFXC') && value)
-    {
-      *((bool *)value) = par.cloudLight;
-      return value;
     }
     else
       return NULL;

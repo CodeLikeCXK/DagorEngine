@@ -1,10 +1,8 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #import <GameController/GameController.h>
 #include <util/dag_globDef.h>
-#include <drv/hid/dag_hiXInputMappings.h>
-#include <drv/hid/dag_hiJoystick.h>
-#include <drv/hid/dag_hiTvosMap.h>
+#include <humanInput/dag_hiXInputMappings.h>
+#include <humanInput/dag_hiJoystick.h>
+#include <humanInput/dag_hiTvosMap.h>
 
 #include "gamepad_ex.h"
 

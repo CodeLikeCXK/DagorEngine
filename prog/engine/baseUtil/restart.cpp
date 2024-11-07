@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <startup/dag_restart.h>
 #include <generic/dag_tab.h>
 #include <util/dag_globDef.h>
@@ -7,7 +5,7 @@
 #include <perfMon/dag_cpuFreq.h>
 #include <util/dag_loadingProgress.h>
 
-#define debug(...) logmessage(_MAKE4C('RSRT'), __VA_ARGS__)
+#define LOGLEVEL_DEBUG _MAKE4C('RSRT')
 
 #if 0
 #define VERBOSE_DEBUG debug

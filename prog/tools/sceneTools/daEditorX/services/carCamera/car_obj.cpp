@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "car_phys.h"
 #include "car_obj.h"
 
@@ -22,9 +20,6 @@
 
 #include <gui/dag_stdGuiRenderEx.h>
 #include <render/dag_cur_view.h>
-
-#include <EditorCore/ec_interface.h>
-#include <EditorCore/ec_interface_ex.h>
 
 #define USE_BULLET_PHYSICS 1
 #include <phys/dag_vehicle.h>
@@ -190,7 +185,7 @@ void VehicleViewer::beforeRenderObjects()
   if (!carRender)
     return;
   carphyssimulator::beforeRender();
-  carRender->beforeRender(::grs_cur_view.pos, EDITORCORE->queryEditorInterface<IVisibilityFinderProvider>()->getVisibilityFinder());
+  carRender->beforeRender(::grs_cur_view.pos);
 }
 
 

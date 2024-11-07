@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <ioSys/dag_lzmaIo.h>
 #include <arc/lzma-9.20/LzmaEnc.h>
 

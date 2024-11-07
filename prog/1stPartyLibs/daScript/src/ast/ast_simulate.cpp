@@ -114,26 +114,14 @@ namespace das
 
     // common for move and copy
 
-    SimNode_CallBase * getCallBase ( SimNode * node ) {
-#if DAS_ENABLE_KEEPALIVE
-        if ( node->rtti_node_isKeepAlive() ) {
-            SimNode_KeepAlive * ka = static_cast<SimNode_KeepAlive *>(node);
-            node = ka->value;
-        }
-#endif
-        DAS_ASSERTF(node->rtti_node_isCallBase(),"we are calling getCallBase on a node, which is not a call base node."
-                    "we should not be here, script compiler should have caught this during compilation.");
-        return static_cast<SimNode_CallBase *>(node);
-    }
-
     SimNode * makeLocalCMResMove (const LineInfo & at, Context & context, uint32_t offset, const ExpressionPtr & rE ) {
         const auto & rightType = *rE->type;
         // now, call with CMRES
         if ( rE->rtti_isCall() ) {
             auto cll = static_pointer_cast<ExprCall>(rE);
             if ( cll->allowCmresSkip() ) {
-                auto right = rE->simulate(context);
-                getCallBase(right)->cmresEval = context.code->makeNode<SimNode_GetCMResOfs>(rE->at, offset);
+                SimNode_CallBase * right = (SimNode_CallBase *) rE->simulate(context);
+                right->cmresEval = context.code->makeNode<SimNode_GetCMResOfs>(rE->at, offset);
                 return right;
             }
         }
@@ -141,8 +129,8 @@ namespace das
         if ( rE->rtti_isInvoke() ) {
             auto cll = static_pointer_cast<ExprInvoke>(rE);
             if ( cll->allowCmresSkip() ) {
-                auto * right = rE->simulate(context);
-                getCallBase(right)->cmresEval = context.code->makeNode<SimNode_GetCMResOfs>(rE->at, offset);
+                SimNode_CallBase * right = (SimNode_CallBase *) rE->simulate(context);
+                right->cmresEval = context.code->makeNode<SimNode_GetCMResOfs>(rE->at, offset);
                 return right;
             }
         }
@@ -167,16 +155,18 @@ namespace das
         if ( rE->rtti_isCall() ) {
             auto cll = static_pointer_cast<ExprCall>(rE);
             if ( cll->allowCmresSkip() ) {
-                getCallBase(right)->cmresEval = context.code->makeNode<SimNode_GetCMResOfs>(rE->at, offset);
-                return right;
+                SimNode_CallBase * rightC = (SimNode_CallBase *) right;
+                rightC->cmresEval = context.code->makeNode<SimNode_GetCMResOfs>(rE->at, offset);
+                return rightC;
             }
         }
         // now, invoke with CMRES
         if ( rE->rtti_isInvoke() ) {
             auto cll = static_pointer_cast<ExprInvoke>(rE);
             if ( cll->allowCmresSkip() ) {
-                getCallBase(right)->cmresEval = context.code->makeNode<SimNode_GetCMResOfs>(rE->at, offset);
-                return right;
+                SimNode_CallBase * rightC = (SimNode_CallBase *) right;
+                rightC->cmresEval = context.code->makeNode<SimNode_GetCMResOfs>(rE->at, offset);
+                return rightC;
             }
         }
         // wo standard path
@@ -202,8 +192,8 @@ namespace das
         if ( rE->rtti_isCall() ) {
             auto cll = static_pointer_cast<ExprCall>(rE);
             if ( cll->allowCmresSkip() ) {
-                auto right = rE->simulate(context);
-                getCallBase(right)->cmresEval = context.code->makeNode<SimNode_GetLocalRefOff>(rE->at, stackTop, offset);
+                SimNode_CallBase * right = (SimNode_CallBase *) rE->simulate(context);
+                right->cmresEval = context.code->makeNode<SimNode_GetLocalRefOff>(rE->at, stackTop, offset);
                 return right;
             }
         }
@@ -211,8 +201,8 @@ namespace das
         if ( rE->rtti_isInvoke() ) {
             auto cll = static_pointer_cast<ExprInvoke>(rE);
             if ( cll->allowCmresSkip() ) {
-                auto right = rE->simulate(context);
-                getCallBase(right)->cmresEval = context.code->makeNode<SimNode_GetLocalRefOff>(rE->at, stackTop, offset);
+                SimNode_CallBase * right = (SimNode_CallBase *) rE->simulate(context);
+                right->cmresEval = context.code->makeNode<SimNode_GetLocalRefOff>(rE->at, stackTop, offset);
                 return right;
             }
         }
@@ -237,16 +227,18 @@ namespace das
         if ( rE->rtti_isCall() ) {
             auto cll = static_pointer_cast<ExprCall>(rE);
             if ( cll->allowCmresSkip() ) {
-                getCallBase(right)->cmresEval = context.code->makeNode<SimNode_GetLocalRefOff>(rE->at, stackTop, offset);
-                return right;
+                SimNode_CallBase * rightC = (SimNode_CallBase *) right;
+                rightC->cmresEval = context.code->makeNode<SimNode_GetLocalRefOff>(rE->at, stackTop, offset);
+                return rightC;
             }
         }
         // now, invoke with CMRES
         if ( rE->rtti_isInvoke() ) {
             auto cll = static_pointer_cast<ExprInvoke>(rE);
             if ( cll->allowCmresSkip() ) {
-                getCallBase(right)->cmresEval = context.code->makeNode<SimNode_GetLocalRefOff>(rE->at, stackTop, offset);
-                return right;
+                SimNode_CallBase * rightC = (SimNode_CallBase *) right;
+                rightC->cmresEval = context.code->makeNode<SimNode_GetLocalRefOff>(rE->at, stackTop, offset);
+                return rightC;
             }
         }
         // wo standard path
@@ -272,8 +264,8 @@ namespace das
         if ( rE->rtti_isCall() ) {
             auto cll = static_pointer_cast<ExprCall>(rE);
             if ( cll->allowCmresSkip() ) {
-                auto right = rE->simulate(context);
-                getCallBase(right)->cmresEval = context.code->makeNode<SimNode_GetLocal>(rE->at, stackTop);
+                SimNode_CallBase * right = (SimNode_CallBase *) rE->simulate(context);
+                right->cmresEval = context.code->makeNode<SimNode_GetLocal>(rE->at, stackTop);
                 return right;
             }
         }
@@ -281,8 +273,8 @@ namespace das
         if ( rE->rtti_isInvoke() ) {
             auto cll = static_pointer_cast<ExprInvoke>(rE);
             if ( cll->allowCmresSkip() ) {
-                auto right = rE->simulate(context);
-                getCallBase(right)->cmresEval = context.code->makeNode<SimNode_GetLocal>(rE->at, stackTop);
+                SimNode_CallBase * right = (SimNode_CallBase *) rE->simulate(context);
+                right->cmresEval = context.code->makeNode<SimNode_GetLocal>(rE->at, stackTop);
                 return right;
             }
         }
@@ -306,8 +298,8 @@ namespace das
         if ( rE->rtti_isCall() ) {
             auto cll = static_pointer_cast<ExprCall>(rE);
             if ( cll->allowCmresSkip() ) {
-                auto right = rE->simulate(context);
-                getCallBase(right)->cmresEval = context.code->makeNode<SimNode_GetLocal>(rE->at, stackTop);
+                SimNode_CallBase * right = (SimNode_CallBase *) rE->simulate(context);
+                right->cmresEval = context.code->makeNode<SimNode_GetLocal>(rE->at, stackTop);
                 return right;
             }
         }
@@ -315,8 +307,8 @@ namespace das
         if ( rE->rtti_isInvoke() ) {
             auto cll = static_pointer_cast<ExprInvoke>(rE);
             if ( cll->allowCmresSkip() ) {
-                auto right = rE->simulate(context);
-                getCallBase(right)->cmresEval = context.code->makeNode<SimNode_GetLocal>(rE->at, stackTop);
+                SimNode_CallBase * right = (SimNode_CallBase *) rE->simulate(context);
+                right->cmresEval = context.code->makeNode<SimNode_GetLocal>(rE->at, stackTop);
                 return right;
             }
         }
@@ -348,8 +340,8 @@ namespace das
         if ( rE->rtti_isCall() ) {
             auto cll = static_pointer_cast<ExprCall>(rE);
             if ( cll->allowCmresSkip() ) {
-                auto right = rE->simulate(context);
-                getCallBase(right)->cmresEval = lE->simulate(context);
+                SimNode_CallBase * right = (SimNode_CallBase *) rE->simulate(context);
+                right->cmresEval = lE->simulate(context);
                 return right;
             }
         }
@@ -357,8 +349,8 @@ namespace das
         if ( rE->rtti_isInvoke() ) {
             auto cll = static_pointer_cast<ExprInvoke>(rE);
             if ( cll->allowCmresSkip() ) {
-                auto right = rE->simulate(context);
-                getCallBase(right)->cmresEval = lE->simulate(context);
+                SimNode_CallBase * right = (SimNode_CallBase *) rE->simulate(context);
+                right->cmresEval = lE->simulate(context);
                 return right;
             }
         }
@@ -386,8 +378,8 @@ namespace das
         if ( rE->rtti_isCall() ) {
             auto cll = static_pointer_cast<ExprCall>(rE);
             if ( cll->allowCmresSkip() ) {
-                auto right = rE->simulate(context);
-                getCallBase(right)->cmresEval = lE->simulate(context);
+                SimNode_CallBase * right = (SimNode_CallBase *) rE->simulate(context);
+                right->cmresEval = lE->simulate(context);
                 return right;
             }
         }
@@ -395,8 +387,8 @@ namespace das
         if ( rE->rtti_isInvoke() ) {
             auto cll = static_pointer_cast<ExprInvoke>(rE);
             if ( cll->allowCmresSkip() ) {
-                auto right = rE->simulate(context);
-                getCallBase(right)->cmresEval = lE->simulate(context);
+                SimNode_CallBase * right = (SimNode_CallBase *) rE->simulate(context);
+                right->cmresEval = lE->simulate(context);
                 return right;
             }
         }
@@ -411,22 +403,19 @@ namespace das
             // its ok to generate simplified set here
             auto left = lE->simulate(context);
             auto right = rE->simulate(context);
-            if ( rightType.baseType == Type::tHandle ) {
-                // this is a value type, we need to copy it
-                return ((TypeAnnotation*)(rightType.annotation))->simulateCopy(context, at, left, right);
-            } else {
-                return context.code->makeValueNode<SimNode_Set>(rightType.baseType, at, left, right);
-            }
+            return context.code->makeValueNode<SimNode_Set>(rightType.baseType, at, left, right);
         }
     }
 
     SimNode * Function::makeSimNode ( Context & context, const vector<ExpressionPtr> & ) {
-        if ( copyOnReturn || moveOnReturn ) {
-            return context.code->makeNodeUnrollAny<SimNode_CallAndCopyOrMove>(int(arguments.size()), at);
-        } else if ( fastCall ) {
-            return context.code->makeNodeUnrollAny<SimNode_FastCall>(int(arguments.size()), at);
-        } else {
-            return context.code->makeNodeUnrollAny<SimNode_Call>(int(arguments.size()), at);
+        {
+            if ( copyOnReturn || moveOnReturn ) {
+                return context.code->makeNodeUnrollAny<SimNode_CallAndCopyOrMove>(int(arguments.size()), at);
+            } else if ( fastCall ) {
+                return context.code->makeNodeUnrollAny<SimNode_FastCall>(int(arguments.size()), at);
+            } else {
+                return context.code->makeNodeUnrollAny<SimNode_Call>(int(arguments.size()), at);
+            }
         }
     }
 
@@ -527,7 +516,6 @@ namespace das
                 uint32_t offset =  extraOffset + index*stride + fieldOffset;
                 auto mkl = static_pointer_cast<ExprMakeLocal>(decl->value);
                 mkl->setRefSp(ref, cmres, sp, offset);
-                mkl->doesNotNeedInit = false;
             } else if ( decl->value->rtti_isCall() ) {
                 auto cll = static_pointer_cast<ExprCall>(decl->value);
                 if ( cll->allowCmresSkip() ) {
@@ -584,12 +572,13 @@ namespace das
             // field itself
             auto fieldOffset = makeType->getVariantFieldOffset(fieldVariant);
             uint32_t offset =  voffset + fieldOffset;
-            SimNode * cpy = nullptr;
+            SimNode * cpy;
             if ( decl->value->rtti_isMakeLocal() ) {
                 // so what happens here, is we ask it for the generated commands and append it to this list only
                 auto mkl = static_pointer_cast<ExprMakeLocal>(decl->value);
                 auto lsim = mkl->simulateLocal(context);
                 simlist.insert(simlist.end(), lsim.begin(), lsim.end());
+                continue;
             } else if ( useCMRES ) {
                 if ( decl->moveSemantics ){
                     cpy = makeLocalCMResMove(at,context,offset,decl->value);
@@ -609,7 +598,10 @@ namespace das
                     cpy = makeLocalCopy(at,context,stackTop+offset,decl->value);
                 }
             }
-            if ( cpy ) simlist.push_back(cpy);
+            if ( !cpy ) {
+                context.thisProgram->error("internal compilation error, can't generate structure initialization", "", "", at);
+            }
+            simlist.push_back(cpy);
             index++;
         }
         return simlist;
@@ -690,20 +682,6 @@ namespace das
         }
         if ( makeType->baseType == Type::tStructure ) {
             for ( int index=0; index != total; ++index ) {
-                if ( constructor ) {
-                    uint32_t offset =  extraOffset + index*stride;
-                    SimNode_CallBase * pCall = (SimNode_CallBase *) context.code->makeNodeUnrollAny<SimNode_CallAndCopyOrMove>(0, at);
-                    DAS_ASSERT(constructor->index!=-1 && "should have failed in type infer otherwise");
-                    pCall->fnPtr = context.getFunction(constructor->index);
-                    if ( useCMRES ) {
-                        pCall->cmresEval = context.code->makeNode<SimNode_GetCMResOfs>(at, offset);
-                    } else if ( useStackRef ) {
-                        pCall->cmresEval = context.code->makeNode<SimNode_GetLocalRefOff>(at, stackTop, offset);
-                    } else {
-                        pCall->cmresEval = context.code->makeNode<SimNode_GetLocal>(at, stackTop + offset);
-                    }
-                    simlist.push_back(pCall);
-                }
                 auto & fields = structs[index];
                 for ( const auto & decl : *fields ) {
                     auto field = makeType->structType->findField(decl->name);
@@ -1178,7 +1156,7 @@ namespace das
 
     SimNode * ExprConstString::simulate (Context & context) const {
         if ( !text.empty() ) {
-            char* str = context.constStringHeap->impl_allocateString(text);
+            char* str = context.constStringHeap->allocateString(text);
             return context.code->makeNode<SimNode_ConstString>(at, str);
         } else {
             return context.code->makeNode<SimNode_ConstString>(at, nullptr);
@@ -1193,7 +1171,7 @@ namespace das
         string message;
         if ( arguments.size()==2 && arguments[1]->rtti_isStringConstant() )
             message = static_pointer_cast<ExprConstString>(arguments[1])->getValue();
-        return context.code->makeNode<SimNode_Assert>(at,arguments[0]->simulate(context),context.constStringHeap->impl_allocateString(message));
+        return context.code->makeNode<SimNode_Assert>(at,arguments[0]->simulate(context),context.constStringHeap->allocateString(message));
     }
 
     struct SimNode_AstGetExpression : SimNode_CallBase {
@@ -1239,7 +1217,7 @@ namespace das
         return context.code->makeNode<SimNode_Debug>(at,
                                                arguments[0]->simulate(context),
                                                pTypeInfo,
-                                               context.constStringHeap->impl_allocateString(message));
+                                               context.constStringHeap->allocateString(message));
     }
 
     SimNode * ExprMemZero::simulate (Context & context) const {
@@ -1284,26 +1262,6 @@ namespace das
     SimNode * ExprInvoke::simulate (Context & context) const {
         auto blockT = arguments[0]->type;
         SimNode_CallBase * pInvoke;
-        uint32_t methodOffset = 0;
-        if ( isInvokeMethod ) {
-            bool foundOffset = false;
-            if ( arguments[0]->rtti_isField() ) {
-                auto field = static_pointer_cast<ExprField>(arguments[0]);
-                methodOffset = field->field->offset;
-                foundOffset = true;
-            } else if ( arguments[0]->rtti_isR2V() ) {
-                auto eR2V = static_pointer_cast<ExprRef2Value>(arguments[0]);
-                if ( eR2V->subexpr->rtti_isField() ) {
-                    auto field = static_pointer_cast<ExprField>(eR2V->subexpr);
-                    methodOffset = field->field->offset;
-                    foundOffset = true;
-                }
-            }
-            if (!foundOffset) {
-                context.thisProgram->error("internal compilation error, invoke method expects field", "", "", at);
-                return nullptr;
-            }
-        }
         {
             if ( isCopyOrMove() ) {
                 DAS_ASSERTF ( blockT->baseType!=Type::tString, "its never CMRES for named function" );
@@ -1311,10 +1269,6 @@ namespace das
                 if ( blockT->baseType==Type::tBlock ) {
                     pInvoke = (SimNode_CallBase *) context.code->makeNodeUnrollAny<SimNode_InvokeAndCopyOrMove>(
                                                         int(arguments.size()), at, getSp);
-                } else if ( blockT->baseType==Type::tFunction && isInvokeMethod ) {
-                    pInvoke = (SimNode_CallBase *) context.code->makeNodeUnrollAny<SimNode_InvokeAndCopyOrMoveMethod>(
-                                                        int(arguments.size()-1), at, getSp);
-                    ((SimNode_InvokeAndCopyOrMoveMethodAny *) pInvoke)->methodOffset = methodOffset;
                 } else if ( blockT->baseType==Type::tFunction ) {
                     pInvoke = (SimNode_CallBase *) context.code->makeNodeUnrollAny<SimNode_InvokeAndCopyOrMoveFn>(
                                                         int(arguments.size()), at, getSp);
@@ -1327,9 +1281,6 @@ namespace das
                     pInvoke = (SimNode_CallBase *) context.code->makeNodeUnrollAny<SimNode_InvokeFnByName>(int(arguments.size()),at);
                 } else if ( blockT->baseType==Type::tBlock ) {
                     pInvoke = (SimNode_CallBase *) context.code->makeNodeUnrollAny<SimNode_Invoke>(int(arguments.size()),at);
-                } else if ( blockT->baseType==Type::tFunction && isInvokeMethod ) {
-                    pInvoke = (SimNode_CallBase *) context.code->makeNodeUnrollAny<SimNode_InvokeMethod>(int(arguments.size()-1),at);
-                    ((SimNode_InvokeMethodAny *) pInvoke)->methodOffset = methodOffset;
                 } else if ( blockT->baseType==Type::tFunction ) {
                     pInvoke = (SimNode_CallBase *) context.code->makeNodeUnrollAny<SimNode_InvokeFn>(int(arguments.size()),at);
                 } else {
@@ -1338,25 +1289,17 @@ namespace das
             }
         }
         pInvoke->debugInfo = at;
-        int nArg = (int) arguments.size();
-        if ( isInvokeMethod ) nArg --;
-        if (  nArg ) {
+        if ( int nArg = (int) arguments.size() ) {
             pInvoke->arguments = (SimNode **) context.code->allocate(nArg * sizeof(SimNode *));
             pInvoke->nArguments = nArg;
-            if ( !isInvokeMethod ) {
-                for ( int a=0; a!=nArg; ++a ) {
-                    pInvoke->arguments[a] = arguments[a]->simulate(context);
-                }
-            } else {
-                for ( int a=0; a!=nArg; ++a ) {
-                    pInvoke->arguments[a] = arguments[a+1]->simulate(context);
-                }
+            for ( int a=0; a!=nArg; ++a ) {
+                pInvoke->arguments[a] = arguments[a]->simulate(context);
             }
         } else {
             pInvoke->arguments = nullptr;
             pInvoke->nArguments = 0;
         }
-        return keepAlive(context,pInvoke);
+        return pInvoke;
     }
 
     SimNode * ExprErase::simulate (Context & context) const {
@@ -1364,15 +1307,7 @@ namespace das
         auto val = arguments[1]->simulate(context);
         if ( arguments[0]->type->isGoodTableType() ) {
             uint32_t valueTypeSize = arguments[0]->type->secondType->getSizeOf();
-            Type valueType;
-            if ( arguments[0]->type->firstType->isWorkhorseType() ) {
-                valueType = arguments[0]->type->firstType->baseType;
-            } else {
-                auto valueT = arguments[0]->type->firstType->annotation->makeValueType();
-                valueType = valueT->baseType;
-                val = context.code->makeNode<SimNode_CastToWorkhorse>(at, val);
-            }
-            return context.code->makeValueNode<SimNode_TableErase>(valueType, at, cont, val, valueTypeSize);
+            return context.code->makeValueNode<SimNode_TableErase>(arguments[0]->type->firstType->baseType, at, cont, val, valueTypeSize);
         } else {
             DAS_ASSERTF(0, "we should not even be here. erase can only accept tables. infer type should have failed.");
             context.thisProgram->error("internal compilation error, generating erase for non-table type", "", "", at);
@@ -1385,15 +1320,7 @@ namespace das
         auto val = arguments[1]->simulate(context);
         if ( arguments[0]->type->isGoodTableType() ) {
             DAS_ASSERTF(arguments[0]->type->secondType->getSizeOf()==0,"Expecting value type size to be 0 for set insert");
-            Type valueType;
-            if ( arguments[0]->type->firstType->isWorkhorseType() ) {
-                valueType = arguments[0]->type->firstType->baseType;
-            } else {
-                auto valueT = arguments[0]->type->firstType->annotation->makeValueType();
-                valueType = valueT->baseType;
-                val = context.code->makeNode<SimNode_CastToWorkhorse>(at, val);
-            }
-            return context.code->makeValueNode<SimNode_TableSetInsert>(valueType, at, cont, val);
+            return context.code->makeValueNode<SimNode_TableSetInsert>(arguments[0]->type->firstType->baseType, at, cont, val);
         } else {
             DAS_ASSERTF(0, "we should not even be here. erase can only accept tables. infer type should have failed.");
             context.thisProgram->error("internal compilation error, generating erase for non-table type", "", "", at);
@@ -1406,15 +1333,7 @@ namespace das
         auto val = arguments[1]->simulate(context);
         if ( arguments[0]->type->isGoodTableType() ) {
             uint32_t valueTypeSize = arguments[0]->type->secondType->getSizeOf();
-            Type valueType;
-            if ( arguments[0]->type->firstType->isWorkhorseType() ) {
-                valueType = arguments[0]->type->firstType->baseType;
-            } else {
-                auto valueT = arguments[0]->type->firstType->annotation->makeValueType();
-                valueType = valueT->baseType;
-                val = context.code->makeNode<SimNode_CastToWorkhorse>(at, val);
-            }
-            return context.code->makeValueNode<SimNode_TableFind>(valueType, at, cont, val, valueTypeSize);
+            return context.code->makeValueNode<SimNode_TableFind>(arguments[0]->type->firstType->baseType, at, cont, val, valueTypeSize);
         } else {
             DAS_ASSERTF(0, "we should not even be here. find can only accept tables. infer type should have failed.");
             context.thisProgram->error("internal compilation error, generating find for non-table type", "", "", at);
@@ -1427,15 +1346,7 @@ namespace das
         auto val = arguments[1]->simulate(context);
         if ( arguments[0]->type->isGoodTableType() ) {
             uint32_t valueTypeSize = arguments[0]->type->secondType->getSizeOf();
-            Type valueType;
-            if ( arguments[0]->type->firstType->isWorkhorseType() ) {
-                valueType = arguments[0]->type->firstType->baseType;
-            } else {
-                auto valueT = arguments[0]->type->firstType->annotation->makeValueType();
-                valueType = valueT->baseType;
-                val = context.code->makeNode<SimNode_CastToWorkhorse>(at, val);
-            }
-            return context.code->makeValueNode<SimNode_KeyExists>(valueType, at, cont, val, valueTypeSize);
+            return context.code->makeValueNode<SimNode_KeyExists>(arguments[0]->type->firstType->baseType, at, cont, val, valueTypeSize);
         } else {
             DAS_ASSERTF(0, "we should not even be here. find can only accept tables. infer type should have failed.");
             context.thisProgram->error("internal compilation error, generating find for non-table type", "", "", at);
@@ -1488,7 +1399,7 @@ namespace das
                         auto sze = sizeexpr->simulate(context);
                         return context.code->makeNode<SimNode_DeleteClassPtr>(at, sube, total, sze, persistent);
                     } else {
-                        context.thisProgram->error("internal compiler error: SimNode_DeleteClassPtr needs size expression", "", "",
+                        context.thisProgram->error("internal compiler error, SimNode_DeleteClassPtr needs size expression", "", "",
                                                 at, CompilationError::missing_node );
                         return nullptr;
                     }
@@ -1526,7 +1437,7 @@ namespace das
             return context.code->makeNode<SimNode_DeleteLambda>(at, sube, total);
         } else {
             DAS_ASSERTF(0, "we should not be here. this is delete for unsupported type. infer types should have failed.");
-            context.thisProgram->error("internal compiler error: generating node for unsupported ExprDelete", "", "", at);
+            context.thisProgram->error("internal compilation error, generating node for unsupported ExprDelete", "", "", at);
             return nullptr;
         }
     }
@@ -1567,6 +1478,7 @@ namespace das
         if ( typeexpr->baseType == Type::tHandle ) {
             DAS_ASSERT(typeexpr->annotation->canNew() && "how???");
             if ( initializer ) {
+                int32_t bytes = type->firstType->getBaseSizeOf();
                 auto pCall = static_cast<SimNode_CallBase *>(func->makeSimNode(context,arguments));
                 ExprCall::simulateCall(func, this, context, pCall);
                 pCall->cmresEval = typeexpr->annotation->simulateGetNew(context, at);
@@ -1636,29 +1548,14 @@ namespace das
                 return context.code->makeNode<SimNode_ArrayAt>(at, prv, pidx, stride, extraOffset);
             }
         } else if ( subexpr->type->isPointer() ) {
+            uint32_t range = 0xffffffff;
             uint32_t stride = subexpr->type->firstType->getSizeOf();
             auto prv = subexpr->simulate(context);
             auto pidx = index->simulate(context);
             if ( r2vType->baseType!=Type::none ) {
-                switch ( index->type->baseType ) {
-                case Type::tInt:    return context.code->makeValueNode<SimNode_PtrAtR2V_Int>(r2vType->baseType, at, prv, pidx, stride, extraOffset);
-                case Type::tUInt:   return context.code->makeValueNode<SimNode_PtrAtR2V_UInt>(r2vType->baseType, at, prv, pidx, stride, extraOffset);
-                case Type::tInt64:  return context.code->makeValueNode<SimNode_PtrAtR2V_Int64>(r2vType->baseType, at, prv, pidx, stride, extraOffset);
-                case Type::tUInt64: return context.code->makeValueNode<SimNode_PtrAtR2V_UInt64>(r2vType->baseType, at, prv, pidx, stride, extraOffset);
-                default:
-                    context.thisProgram->error("internal compilation error, generating ptr at for unsupported index type " + index->type->describe(), "", "", at);
-                    return nullptr;
-                };
+                return context.code->makeValueNode<SimNode_AtR2V>(r2vType->baseType, at, prv, pidx, stride, extraOffset, range);
             } else {
-                switch ( index->type->baseType ) {
-                case Type::tInt:    return context.code->makeNode<SimNode_PtrAt<int32_t>>(at, prv, pidx, stride, extraOffset);
-                case Type::tUInt:   return context.code->makeNode<SimNode_PtrAt<uint32_t>>(at, prv, pidx, stride, extraOffset);
-                case Type::tInt64:  return context.code->makeNode<SimNode_PtrAt<int64_t>>(at, prv, pidx, stride, extraOffset);
-                case Type::tUInt64: return context.code->makeNode<SimNode_PtrAt<uint64_t>>(at, prv, pidx, stride, extraOffset);
-                default:
-                    context.thisProgram->error("internal compilation error, generating ptr at for unsupported index type " + index->type->describe(), "", "", at);
-                    return nullptr;
-                };
+                return context.code->makeNode<SimNode_At>(at, prv, pidx, stride, extraOffset, range);
             }
         } else {
             uint32_t range = subexpr->type->dim[0];
@@ -1718,15 +1615,7 @@ namespace das
             auto prv = subexpr->simulate(context);
             auto pidx = index->simulate(context);
             uint32_t valueTypeSize = subexpr->type->secondType->getSizeOf();
-            Type keyType;
-            if ( subexpr->type->firstType->isWorkhorseType() ) {
-                keyType = subexpr->type->firstType->baseType;
-            } else {
-                auto keyValueType = subexpr->type->firstType->annotation->makeValueType();
-                keyType = keyValueType->baseType;
-                pidx = context.code->makeNode<SimNode_CastToWorkhorse>(at, pidx);
-            }
-            auto res = context.code->makeValueNode<SimNode_TableIndex>(keyType, at, prv, pidx, valueTypeSize, 0);
+            auto res = context.code->makeValueNode<SimNode_TableIndex>(subexpr->type->firstType->baseType, at, prv, pidx, valueTypeSize, 0);
             if ( r2v ) {
                 return ExprRef2Value::GetR2V(context, at, type, res);
             } else {
@@ -1757,15 +1646,7 @@ namespace das
                 auto prv = subexpr->simulate(context);
                 auto pidx = index->simulate(context);
                 uint32_t valueTypeSize = seT->secondType->getSizeOf();
-                Type valueType;
-                if ( seT->firstType->isWorkhorseType() ) {
-                    valueType = seT->firstType->baseType;
-                } else {
-                    auto valueT = seT->firstType->annotation->makeValueType();
-                    valueType = valueT->baseType;
-                    pidx = context.code->makeNode<SimNode_CastToWorkhorse>(at, pidx);
-                }
-                return context.code->makeValueNode<SimNode_SafeTableIndex>(valueType, at, prv, pidx, valueTypeSize, 0);
+                return context.code->makeValueNode<SimNode_SafeTableIndex>(seT->firstType->baseType, at, prv, pidx, valueTypeSize, 0);
             } else if ( seT->dim.size() ) {
                 uint32_t range = seT->dim[0];
                 uint32_t stride = seT->getStride();
@@ -1792,15 +1673,7 @@ namespace das
                 auto prv = subexpr->simulate(context);
                 auto pidx = index->simulate(context);
                 uint32_t valueTypeSize = seT->secondType->getSizeOf();
-                Type valueType;
-                if ( seT->firstType->isWorkhorseType() ) {
-                    valueType = seT->firstType->baseType;
-                } else {
-                    auto valueT = seT->firstType->annotation->makeValueType();
-                    valueType = valueT->baseType;
-                    pidx = context.code->makeNode<SimNode_CastToWorkhorse>(at, pidx);
-                }
-                return context.code->makeValueNode<SimNode_SafeTableIndex>(valueType, at, prv, pidx, valueTypeSize, 0);
+                return context.code->makeValueNode<SimNode_SafeTableIndex>(seT->firstType->baseType, at, prv, pidx, valueTypeSize, 0);
             } else if ( seT->dim.size() ) {
                 uint32_t range = seT->dim[0];
                 uint32_t stride = seT->getStride();
@@ -1932,8 +1805,7 @@ namespace das
                         } else
 #endif
                         {
-                            auto lsize = int(simlist.size());
-                            block = (SimNode_Block *) context.code->makeNodeUnrollAny<SimNode_BlockNFT>(lsize, at);
+                            block = context.code->makeNode<SimNode_BlockNF>(at);
                         }
                     } else {
 #if DAS_DEBUGGER
@@ -2129,7 +2001,7 @@ namespace das
     }
 
     SimNode * ExprStringBuilder::simulate (Context & context) const {
-        SimNode_StringBuilder * pSB = context.code->makeNode<SimNode_StringBuilder>(isTempString, at);
+        SimNode_StringBuilder * pSB = context.code->makeNode<SimNode_StringBuilder>(at);
         if ( int nArg = (int) elements.size() ) {
             pSB->arguments = (SimNode **) context.code->allocate(nArg * sizeof(SimNode *));
             pSB->types = (TypeInfo **) context.code->allocate(nArg * sizeof(TypeInfo *));
@@ -2301,45 +2173,7 @@ namespace das
         }
     }
 
-    // we flatten or(or(or(a,b),c),d) into a single vector {a,b,c,d}
-    void flattenOrSequence ( const ExprOp2 * op, vector<ExpressionPtr> & ret ) {
-        if ( op->left->rtti_isOp2() && static_pointer_cast<ExprOp2>(op->left)->op==op->op ) {
-            flattenOrSequence(static_pointer_cast<ExprOp2>(op->left).get(), ret);
-        } else {
-            ret.push_back(op->left);
-        }
-        if ( op->right->rtti_isOp2() && static_pointer_cast<ExprOp2>(op->right)->op==op->op ) {
-            flattenOrSequence(static_pointer_cast<ExprOp2>(op->right).get(), ret);
-        } else {
-            ret.push_back(op->right);
-        }
-    }
-
     SimNode * ExprOp2::simulate (Context & context) const {
-        // special case for logical operator sequence
-        if ( func->builtIn && func->module->name=="$" && func->arguments[0]->type->isBool() ) {
-            if ( func->name=="||" || func->name=="&&" ) {
-                vector<ExpressionPtr> flat;
-                flattenOrSequence(this, flat);
-                if ( flat.size()>2 && flat.size()<=7 ) {
-                    SimNode_CallBase * pSimNode;
-                    if ( func->name=="||" ) {
-                        pSimNode = (SimNode_OrAny *) context.code->makeNodeUnrollAny<SimNode_OrT>((int32_t)flat.size(), at);
-                    } else if ( func->name=="&&" ) {
-                        pSimNode = (SimNode_AndAny *) context.code->makeNodeUnrollAny<SimNode_AndT>((int32_t)flat.size(), at);
-                    } else {
-                        DAS_ASSERTF(0, "unknown logical operator");
-                        return nullptr;
-                    }
-                    pSimNode->nArguments = (uint32_t) flat.size();
-                    pSimNode->arguments = (SimNode **) context.code->allocate((uint32_t)(flat.size() * sizeof(SimNode *)));
-                    for ( uint32_t i=0; i!=uint32_t(flat.size()); ++i ) {
-                        pSimNode->arguments[i] = flat[i]->simulate(context);
-                    }
-                    return pSimNode;
-                }
-            }
-        }
         vector<ExpressionPtr> sarguments = { left, right };
         if ( func->builtIn && !func->callBased ) {
             auto pSimOp2 = static_cast<SimNode_Op2 *>(func->makeSimNode(context,sarguments));
@@ -2391,10 +2225,6 @@ namespace das
         if ( left->type->isHandle() ) {
             auto lN = left->simulate(context);
             auto rN = right->simulate(context);
-            auto ta = ((TypeAnnotation *)(right->type->annotation));
-            if ( !ta->isRefType() && right->type->isRef() ) {
-                rN = ta->simulateRef2Value(context, at, rN);
-            }
             retN = left->type->annotation->simulateClone(context, at, lN, rN);
         } else if ( left->type->canCopy() ) {
             retN = makeCopy(at, context, left, right );
@@ -2442,7 +2272,7 @@ namespace das
         if (subexpr && subexpr->type && subexpr->rtti_isConstant()) {
             if (subexpr->type->isSimpleType(Type::tString)) {
                 auto cVal = static_pointer_cast<ExprConstString>(subexpr);
-                char * str = context.constStringHeap->impl_allocateString(cVal->text);
+                char * str = context.constStringHeap->allocateString(cVal->text);
                 return context.code->makeNode<SimNode_ReturnConstString>(at, str);
             }
         }
@@ -2471,7 +2301,8 @@ namespace das
         } else if ( returnInBlock ) {
             if ( returnCallCMRES ) {
                 DAS_VERIFYF(simSubE, "internal error. can't be zero");
-                getCallBase(simSubE)->cmresEval = context.code->makeNode<SimNode_GetBlockCMResOfs>(at,0,stackTop);
+                SimNode_CallBase * simRet = (SimNode_CallBase *) simSubE;
+                simRet->cmresEval = context.code->makeNode<SimNode_GetBlockCMResOfs>(at,0,stackTop);
                 return context.code->makeNode<SimNode_Return>(at, simSubE);
             } else if ( takeOverRightStack ) {
                 DAS_VERIFYF(simSubE, "internal error. can't be zero");
@@ -2489,7 +2320,8 @@ namespace das
         } else if ( subexpr ) {
             if ( returnCallCMRES ) {
                 DAS_VERIFYF(simSubE, "internal error. can't be zero");
-                getCallBase(simSubE)->cmresEval = context.code->makeNode<SimNode_GetCMResOfs>(at,0);
+                SimNode_CallBase * simRet = (SimNode_CallBase *) simSubE;
+                simRet->cmresEval = context.code->makeNode<SimNode_GetCMResOfs>(at,0);
                 return context.code->makeNode<SimNode_Return>(at, simSubE);
             } else if ( returnCMRES ) {
                 // ReturnLocalCMRes
@@ -2520,13 +2352,9 @@ namespace das
         }
         DAS_VERIFYF(simSubE, "internal error. can't be zero");
         if ( moveSemantics ) {
+            // TODO: support by-value annotations?
             if ( subexpr->type->isRef() ) {
-                if ( subexpr->type->isHandle() && !subexpr->type->annotation->isRefType() ) {
-                    auto r2v = subexpr->type->annotation->simulateRef2Value(context, at, simSubE);
-                    return context.code->makeNode<SimNode_Return>(at, r2v);
-                } else {
-                    return context.code->makeValueNode<SimNode_ReturnAndMoveR2V>(subexpr->type->baseType, at, simSubE);
-                }
+                return context.code->makeValueNode<SimNode_ReturnAndMoveR2V>(subexpr->type->baseType, at, simSubE);
             } else {
                 return context.code->makeNode<SimNode_Return>(at, simSubE);
             }
@@ -2636,22 +2464,18 @@ namespace das
     }
 
     SimNode * ExprWhile::simulate (Context & context) const {
-        SimNode_Block * whileNode = nullptr;
 #if DAS_DEBUGGER
         if ( context.thisProgram->getDebugger() ) {
-            whileNode = context.code->makeNode<SimNodeDebug_While>(at, cond->simulate(context));
-        } else
-#endif
-#if DAS_ENABLE_KEEPALIVE
-        if ( context.thisProgram->policies.keep_alive ) {
-            whileNode = context.code->makeNode<SimNode_While>(at, cond->simulate(context));
+            auto node = context.code->makeNode<SimNodeDebug_While>(at, cond->simulate(context));
+            simulateFinal(context, body, node);
+            return node;
         } else
 #endif
         {
-            whileNode = context.code->makeNode<SimNode_While>(at, cond->simulate(context));
+            auto node = context.code->makeNode<SimNode_While>(at, cond->simulate(context));
+            simulateFinal(context, body, node);
+            return node;
         }
-        simulateFinal(context, body, whileNode);
-        return whileNode;
     }
 
     SimNode * ExprUnsafe::simulate (Context & context) const {
@@ -2695,15 +2519,6 @@ namespace das
                     result = (SimNode_ForWithIteratorBase *) context.code->makeNode<SimNodeDebug_ForWithIteratorBase>(at);
                 } else {
                     result = (SimNode_ForWithIteratorBase *) context.code->makeNodeUnrollNZ_FOR<SimNodeDebug_ForWithIterator>(total, at);
-                }
-            } else
-#endif
-#if DAS_ENABLE_KEEPALIVE
-            if ( context.thisProgram->policies.keep_alive ) {
-                if ( total>MAX_FOR_UNROLL ) {
-                    result = (SimNode_ForWithIteratorBase *) context.code->makeNode<SimNodeKeepAlive_ForWithIteratorBase>(at);
-                } else {
-                    result = (SimNode_ForWithIteratorBase *) context.code->makeNodeUnrollNZ_FOR<SimNodeKeepAlive_ForWithIterator>(total, at);
                 }
             } else
 #endif
@@ -2793,42 +2608,6 @@ namespace das
                             result = (SimNode_ForBase *)context.code->makeRangeNode<SimNodeDebug_ForRange1>(sources[0]->type->baseType,at);
                         } else {
                             result = (SimNode_ForBase *)context.code->makeRangeNode<SimNodeDebug_ForRange>(sources[0]->type->baseType,at);
-                        }
-                    }
-                } else {
-                    DAS_ASSERTF(0, "we should not be here yet. logic above assumes optimized for path of some kind.");
-                    context.thisProgram->error("internal compilation error, generating for", "", "", at);
-                    return nullptr;
-                }
-            } else
-#endif
-#if DAS_ENABLE_KEEPALIVE
-            if ( context.thisProgram->policies.keep_alive ) {
-                if ( dynamicArrays ) {
-                    if (loop1) {
-                        result = (SimNode_ForBase *) context.code->makeNodeUnrollNZ_FOR<SimNodeKeepAlive_ForGoodArray1>(total, at);
-                    } else {
-                        result = (SimNode_ForBase *) context.code->makeNodeUnrollNZ_FOR<SimNodeKeepAlive_ForGoodArray>(total, at);
-                    }
-                } else if ( fixedArrays ) {
-                    if (loop1) {
-                        result = (SimNode_ForBase *)context.code->makeNodeUnrollNZ_FOR<SimNodeKeepAlive_ForFixedArray1>(total, at);
-                    } else {
-                        result = (SimNode_ForBase *)context.code->makeNodeUnrollNZ_FOR<SimNodeKeepAlive_ForFixedArray>(total, at);
-                    }
-                } else if ( rangeBase ) {
-                    DAS_ASSERT(total==1 && "simple range on 1 loop only");
-                    if ( NF ) {
-                        if (loop1) {
-                            result = (SimNode_ForBase *)context.code->makeRangeNode<SimNodeKeepAlive_ForRangeNF1>(sources[0]->type->baseType,at);
-                        } else {
-                            result = (SimNode_ForBase *)context.code->makeRangeNode<SimNodeKeepAlive_ForRangeNF>(sources[0]->type->baseType,at);
-                        }
-                    } else {
-                        if (loop1) {
-                            result = (SimNode_ForBase *)context.code->makeRangeNode<SimNodeKeepAlive_ForRange1>(sources[0]->type->baseType,at);
-                        } else {
-                            result = (SimNode_ForBase *)context.code->makeRangeNode<SimNodeKeepAlive_ForRange>(sources[0]->type->baseType,at);
                         }
                     }
                 } else {
@@ -2966,13 +2745,13 @@ namespace das
             varExpr->variable = var;
             varExpr->local = local;
             varExpr->type = make_smart<TypeDecl>(*var->type);
-            SimNode * retN = nullptr; // it has to be CALL with CMRES
+            SimNode_CallBase * retN = nullptr; // it has to be CALL with CMRES
             const auto & rE = var->init;
             if ( rE->rtti_isCall() ) {
                 auto cll = static_pointer_cast<ExprCall>(rE);
                 if ( cll->allowCmresSkip() ) {
-                    retN = rE->simulate(context);
-                    getCallBase(retN)->cmresEval = varExpr->simulate(context);
+                    retN = (SimNode_CallBase *) rE->simulate(context);
+                    retN->cmresEval = varExpr->simulate(context);
                 }
             }
             if ( !retN ) {
@@ -2992,17 +2771,6 @@ namespace das
         auto simList = ExprLet::simulateInit(context, this);
         copy(simList.data(), simList.data() + simList.size(), let->list);
         return let;
-    }
-
-    SimNode * ExprLooksLikeCall::keepAlive ( Context & context, SimNode * result ) const {
-#if DAS_ENABLE_KEEPALIVE
-        if ( context.thisProgram->policies.keep_alive ) {
-            return context.code->makeNode<SimNode_KeepAlive>(at,result);
-        } else
-#endif
-        {
-            return result;
-        }
     }
 
     SimNode_CallBase * ExprCall::simulateCall (const FunctionPtr & func,
@@ -3055,13 +2823,7 @@ namespace das
         if ( !doesNotNeedSp && stackTop ) {
             pCall->cmresEval = context.code->makeNode<SimNode_GetLocal>(at,stackTop);
         }
-        if ( func->builtIn ) {
-            // TODO: we need to determine, if we need keep-alive for the func
-            // basic function which is not recursive in any shape or form may not need one
-            return pCall;   // we don't need keep-alive for the built-in functions
-        } else {
-            return keepAlive(context,pCall);
-        }
+        return pCall;
     }
 
     SimNode * ExprNamedCall::simulate (Context &) const {
@@ -3073,36 +2835,22 @@ namespace das
         context.tabGMnLookup = make_shared<das_hash_map<uint64_t,uint32_t>>();
         context.tabGMnLookup->clear();
         for ( int i=0, is=context.totalVariables; i!=is; ++i ) {
-            auto & gvar = context.globalVariables[i];
-            auto mnh = gvar.mangledNameHash;
-            auto it = context.tabGMnLookup->find(mnh);
-            if ( it != context.tabGMnLookup->end() ) {
-                GlobalVariable * collision = context.globalVariables + it->second;
-                LineInfo * errorAt = nullptr;
-                TextWriter message;
-                message << "internal compiler error: global variable mangled name hash collision '"
-                    << gvar.name << ": " << debug_type(gvar.debugInfo) << "'"
-                    << " hash=" << HEX << gvar.mangledNameHash << DEC
-                    << " offset=" << gvar.offset;
-                if ( collision ) {
-                    message << " and '" << collision->name << ": " << debug_type(collision->debugInfo) << "'"
-                        << " hash=" << HEX << collision->mangledNameHash << DEC
-                        << " offset=" << collision->offset;
-                }
-                if ( gvar.init ) {
-                    errorAt = &gvar.init->debugInfo;
-                } else if ( collision && collision->init ) {
-                    errorAt = &collision->init->debugInfo;
-                }
-                error(message.str(), "", "", errorAt ? *errorAt : LineInfo());
-                return;
-            }
-            context.tabGMnLookup->insert({mnh, context.globalVariables[i].offset});
+            auto mnh = context.globalVariables[i].mangledNameHash;
+            (*context.tabGMnLookup)[mnh] = context.globalVariables[i].offset;
         }
         if ( options.getBoolOption("log_gmn_hash",false) ) {
             logs
                 << "totalGlobals: " << context.totalVariables << "\n"
                 << "tabGMnLookup:" << context.tabGMnLookup->size() << "\n";
+        }
+        for ( int i=0, is=context.totalVariables; i!=is; ++i ) {
+            auto & gvar = context.globalVariables[i];
+            uint32_t voffset = context.globalOffsetByMangledName(gvar.mangledNameHash);
+            if ( voffset != gvar.offset ) {
+                error("internal compiler error. global variable mangled name hash collision "
+                        + string(context.functions[i].mangledName), "", "", LineInfo());
+                return;
+            }
         }
     }
 
@@ -3111,13 +2859,7 @@ namespace das
         context.tabMnLookup->clear();
         for ( const auto & fn : lookupFunctions ) {
             auto mnh = fn->getMangledNameHash();
-            auto it = context.tabMnLookup->find(mnh);
-            if ( it != context.tabMnLookup->end() ) {
-                error("internal compiler error: function mangled name hash collision '" + fn->name + "'",
-                    "", "", LineInfo());
-                return;
-            }
-            context.tabMnLookup->insert({mnh, context.functions + fn->index});
+            (*context.tabMnLookup)[mnh] = context.functions + fn->index;
         }
         if ( options.getBoolOption("log_mn_hash",false) ) {
             logs
@@ -3130,13 +2872,7 @@ namespace das
         context.tabAdLookup = make_shared<das_hash_map<uint64_t,uint64_t>>();
         for (auto & pm : library.modules ) {
             for(auto s2d : pm->annotationData ) {
-                auto it = context.tabAdLookup->find(s2d.first);
-                if ( it != context.tabAdLookup->end() ) {
-                    error("internal compiler error: annotation data hash collision " + to_string(s2d.second),
-                        "", "", LineInfo());
-                    return;
-                }
-                context.tabAdLookup->insert(s2d);
+                (*context.tabAdLookup)[s2d.first] = s2d.second;
             }
         }
         if ( options.getBoolOption("log_ad_hash",false) ) {
@@ -3161,26 +2897,9 @@ namespace das
     extern "C" int64_t ref_time_ticks ();
     extern "C" int get_time_usec (int64_t reft);
 
-    void Program::updateSemanticHash() {
-        thisModule->structures.foreach([&](StructurePtr & ps){
-            HashBuilder hb;
-            das_set<Structure *> dep;
-            das_set<Annotation *> adep;
-            ps->ownSemanticHash = ps->getOwnSemanticHash(hb,dep,adep);
-        });
-   }
-
     bool Program::simulate ( Context & context, TextWriter & logs, StackAllocator * sharedStack ) {
         auto time0 = ref_time_ticks();
-    #if !(DAS_ENABLE_KEEPALIVE)
-        if ( policies.keep_alive ) {
-            error("keep_alive is not enabled in this build. Modify DAS_ENABLE_KEEPALIVE first", "", "", LineInfo());
-            return false;
-        }
-    #endif
         isSimulating = true;
-        context.failed = true;
-        astTypeInfo.clear();    // this is to be filled via typeinfo(ast_typedecl and such)
         auto disableInit = options.getBoolOption("no_init", policies.no_init);
         context.thisProgram = this;
         context.breakOnException |= policies.debugger;
@@ -3193,9 +2912,7 @@ namespace das
             context.stringHeap = make_smart<LinearStringAllocator>();
         }
         context.heap->setInitialSize ( options.getIntOption("heap_size_hint", policies.heap_size_hint) );
-        context.heap->setLimit ( options.getUInt64Option("heap_size_limit", policies.max_heap_allocated) );
         context.stringHeap->setInitialSize ( options.getIntOption("string_heap_size_hint", policies.string_heap_size_hint) );
-        context.stringHeap->setLimit ( options.getUInt64Option("string_heap_size_limit", policies.max_string_heap_allocated) );
         context.constStringHeap = make_shared<ConstStringAllocator>();
         if ( globalStringHeapSize ) {
             context.constStringHeap->setInitialSize(globalStringHeapSize);
@@ -3222,42 +2939,20 @@ namespace das
                     gvar.debugInfo = helper.makeVariableDebugInfo(*pvar);
                     gvar.flags = 0;
                     if ( pvar->global_shared ) {
-                        gvar.offset = pvar->stackTop = (uint32_t) context.sharedSize;
+                        gvar.offset = pvar->stackTop = context.sharedSize;
                         gvar.shared = true;
-                        context.sharedSize = (context.sharedSize + uint64_t(gvar.size) + 0xful) & ~0xfull;
+                        context.sharedSize = (context.sharedSize + gvar.size + 0xf) & ~0xf;
                     } else {
-                        gvar.offset = pvar->stackTop = (uint32_t) context.globalsSize;
-                        context.globalsSize = (context.globalsSize + uint64_t(gvar.size) + 0xful) & ~0xfull;
+                        gvar.offset = pvar->stackTop = context.globalsSize;
+                        context.globalsSize = (context.globalsSize + gvar.size + 0xf) & ~0xf;
                     }
                     gvar.mangledNameHash = pvar->getMangledNameHash();
                     gvar.init = nullptr;
                 });
             }
         }
-        bool canAllocateVariables = true;
-        if ( context.globalsSize >= policies.max_static_variables_size || context.globalsSize >= 0x100000000ul ) {
-            error("Global variables size exceeds " + to_string(policies.max_static_variables_size), "Global variables size is " + to_string(context.globalsSize) + " bytes", "", LineInfo());
-            canAllocateVariables = false;
-        }
-        if ( context.sharedSize >= policies.max_static_variables_size || context.sharedSize >= 0x100000000ul ) {
-            error("Shared variables size exceeds " + to_string(policies.max_static_variables_size), "Shared variables size is " + to_string(context.sharedSize) + " bytes", "", LineInfo());
-            canAllocateVariables = false;
-        }
         context.globals = (char *) das_aligned_alloc16(context.globalsSize);
         context.shared = (char *) das_aligned_alloc16(context.sharedSize);
-        if ( context.globalsSize && !context.globals ) {
-            error("Failed to allocate memory for global variables", "Global variables size is " + to_string(context.globalsSize) + " bytes", "", LineInfo());
-            canAllocateVariables = false;
-        }
-        if ( context.sharedSize && !context.shared ) {
-            error("Failed to allocate memory for shared variables", "Shared variables size is " + to_string(context.sharedSize) + " bytes", "", LineInfo());
-            canAllocateVariables = false;
-        }
-        if ( !canAllocateVariables ) {
-            context.globalsSize = 0;
-            context.sharedSize = 0;
-            context.totalVariables = 0;
-        }
         context.sharedOwner = true;
         context.totalVariables = totalVariables;
         context.functions = (SimFunction *) context.code->allocate( totalFunctions*sizeof(SimFunction) );
@@ -3273,7 +2968,7 @@ namespace das
                         return;
                     if ( (pfun->init || pfun->shutdown) && disableInit ) {
                         error("[init] is disabled in the options or CodeOfPolicies",
-                            "internal compiler error: [init] function made it all the way to simulate somehow", "",
+                            "internal compiler error. [init] function made it all the way to simulate somehow", "",
                                 pfun->at, CompilationError::no_init);
                     }
                     auto mangledName = pfun->getMangledName();
@@ -3325,7 +3020,7 @@ namespace das
                     if ( !folding && pvar->init ) {
                         if ( disableInit && !pvar->init->rtti_isConstant() ) {
                             error("[init] is disabled in the options or CodeOfPolicies",
-                                "internal compiler error: [init] function made it all the way to simulate somehow", "",
+                                "internal compiler error. [init] function made it all the way to simulate somehow", "",
                                     pvar->at, CompilationError::no_init);
                         }
                         if ( pvar->init->rtti_isMakeLocal() ) {
@@ -3364,7 +3059,6 @@ namespace das
             isSimulating = false;
             return false;
         }
-        context.failed = false;
         bool aot_hint = policies.aot && !folding && !thisModule->isModule;
 #if DAS_FUSION
         if ( !folding ) {               // note: only run fusion when not folding
@@ -3481,36 +3175,26 @@ namespace das
             }
         }
         context.totalInitFunctions = (uint32_t) allInitFunctions.size();
-        if ( context.totalInitFunctions!=0 && allInitFunctions.data()!=nullptr ) {
-            context.initFunctions = (SimFunction **) context.code->allocate(uint32_t(allInitFunctions.size()*sizeof(SimFunction *)));
-            memcpy ( context.initFunctions, allInitFunctions.data(), allInitFunctions.size()*sizeof(SimFunction *) );
-        } else {
-            context.initFunctions = nullptr;
-        }
+        context.initFunctions = (SimFunction **) context.code->allocate(uint32_t(allInitFunctions.size()*sizeof(SimFunction *)));
+        memcpy ( context.initFunctions, allInitFunctions.data(), allInitFunctions.size()*sizeof(SimFunction *) );
         // lockchecking
         context.skipLockChecks = options.getBoolOption("skip_lock_checks",false);
         // run init script and restart
         if ( !folding ) {
             auto time1 = ref_time_ticks();
-            bool initScriptSuccess;
-            if ( context.stack.size() && context.stack.size()>globalInitStackSize ) {
-                initScriptSuccess = context.runWithCatch([&]() {
+            if (!context.runWithCatch([&]() {
+                if ( context.stack.size() && context.stack.size()>globalInitStackSize ) {
                     context.runInitScript();
-                });
-            } else if ( sharedStack && sharedStack->size()>globalInitStackSize ) {
-                SharedStackGuard guard(context, *sharedStack);
-                initScriptSuccess = context.runWithCatch([&]() {
+                } else if ( sharedStack && sharedStack->size()>globalInitStackSize ) {
+                    SharedStackGuard guard(context, *sharedStack);
                     context.runInitScript();
-                });
-            } else {
-                auto ssz = max ( getContextStackSize(), 16384 ) + globalInitStackSize;
-                StackAllocator init_stack(ssz);
-                SharedStackGuard guard(context, init_stack);
-                initScriptSuccess = context.runWithCatch([&]() {
+                } else {
+                    auto ssz = max ( getContextStackSize(), 16384 ) + globalInitStackSize;
+                    StackAllocator init_stack(ssz);
+                    SharedStackGuard guard(context, init_stack);
                     context.runInitScript();
-                });
-            }
-            if (!initScriptSuccess) {
+                }
+            })) {
                 error("exception during init script", context.getException(), "",
                     context.exceptionAt, CompilationError::cant_initialize);
             }
@@ -3554,11 +3238,6 @@ namespace das
                     fann->complete(&context, func);
                 }
             }
-        }
-        for ( int i=0, is=context.totalFunctions; i!=is; ++i ) {
-            Function * func = indexToFunction[i];
-            SimFunction & fn = context.functions[i];
-            func->hash = getFunctionHash(func, fn.code, &context);
         }
         for (auto pm : library.modules) {
             pm->structures.foreach([&](auto st){

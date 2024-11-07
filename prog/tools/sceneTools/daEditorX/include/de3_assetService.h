@@ -1,6 +1,7 @@
 //
 // DaEditorX
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -57,8 +58,7 @@ public:
   //! generates loft geometry using spline class asset data and path
   virtual bool createLoftMesh(Mesh &mesh, const splineclass::LoftGeomGenData *data, int loft_idx, BezierSpline3d &path, int start_seg,
     int end_seg, bool place_on_collision, float scale_tc_along, int select_mat, dag::ConstSpan<splineclass::Attr> splineScales,
-    Tab<splineclass::SegData> *out_loftSeg, const char *asset_name, float zero_opac_fore_end, float zero_opac_back_end,
-    float path_start_margin, float path_end_margin) = 0;
+    Tab<splineclass::SegData> *out_loftSeg, const char *asset_name, float zero_opac_fore_end, float zero_opac_back_end) = 0;
 
   //! creates and returns MaterialData built from material asset
   virtual MaterialData *getMaterialData(const char *asset_name) = 0;

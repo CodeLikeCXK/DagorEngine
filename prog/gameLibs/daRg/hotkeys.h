@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <dag/dag_vector.h>
@@ -9,7 +8,7 @@
 
 #include <daRg/dag_inputIds.h>
 #include <daRg/dag_guiScene.h>
-#include <drv/hid/dag_hiXInputMappings.h>
+#include <humanInput/dag_hiXInputMappings.h>
 
 
 namespace darg

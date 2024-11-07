@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <ecs/anim/animCharEffectors.h>
 #include "dasModules/aotEffectorData.h"
 

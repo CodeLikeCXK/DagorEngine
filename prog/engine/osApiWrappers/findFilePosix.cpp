@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #if _TARGET_PC_LINUX | _TARGET_APPLE | _TARGET_ANDROID | _TARGET_C3
 
 #include <osApiWrappers/dag_direct.h>

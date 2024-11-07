@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <supp/_platform.h>
 #include <util/limBufWriter.h>
 #include <util/dag_cropMultiLineStr.h>

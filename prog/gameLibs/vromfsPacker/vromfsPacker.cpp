@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <libTools/util/strUtil.h>
 #include <libTools/util/makeBindump.h>
 #include <regExp/regExp.h>
@@ -60,10 +58,9 @@ static const int C_SHA1_RECSZ = VirtualRomFsPack::BackedData::C_SHA1_RECSZ;
 static const int ZSTD_BLK_CLEVEL = 11;
 
 static const char *targetString = NULL;
-using RegExpPtr = eastl::unique_ptr<RegExp>;
-static Tab<RegExpPtr> reExcludeFile(tmpmem);
-static Tab<RegExpPtr> reIncludeBlk(tmpmem), reExcludeBlk(tmpmem);
-static Tab<RegExpPtr> reIncludeKeepLines(tmpmem);
+static Tab<RegExp *> reExcludeFile(tmpmem);
+static Tab<RegExp *> reIncludeBlk(tmpmem), reExcludeBlk(tmpmem);
+static Tab<RegExp *> reIncludeKeepLines(tmpmem);
 static bool blkCheckOnly = false;
 static size_t z1_blk_sz = 1 << 20;
 static bool force_legacy_format = true;
@@ -83,26 +80,27 @@ static unsigned get_target_code(const char *targetStr)
   return targetCode;
 }
 
-bool loadPatterns(const DataBlock &b, const char *name, Tab<RegExpPtr> &reList)
+bool loadPatterns(const DataBlock &b, const char *name, Tab<RegExp *> &reList)
 {
   int nid = b.getNameId(name);
   for (int j = 0; j < b.paramCount(); j++)
     if (b.getParamNameId(j) == nid && b.getParamType(j) == DataBlock::TYPE_STRING)
     {
       const char *pattern = b.getStr(j);
-      RegExpPtr re(new RegExp);
+      RegExp *re = new RegExp;
       if (re->compile(pattern, "i"))
-        reList.push_back(eastl::move(re));
+        reList.push_back(re);
       else
       {
         printf("ERR: bad regexp /%s/\n", pattern);
+        delete re;
         return false;
       }
     }
   return true;
 }
 
-bool checkPattern(const char *str, dag::ConstSpan<RegExpPtr> re)
+bool checkPattern(const char *str, dag::ConstSpan<RegExp *> re)
 {
   for (int i = 0; i < re.size(); i++)
     if (re[i]->test(str))
@@ -148,7 +146,7 @@ String make_fname(const char *sname, const char *src_folder, const char *dst_fol
 }
 
 void scan_files(const char *root_path, const char *src_folder, const char *dst_folder, Tab<SimpleString> &wclist,
-  dag::ConstSpan<RegExpPtr> exclist, bool scan_files, bool scan_subfolders, FastNameMapEx &files, Tab<String> &dst_files)
+  dag::ConstSpan<RegExp *> exclist, bool scan_files, bool scan_subfolders, FastNameMapEx &files, Tab<String> &dst_files)
 {
   alefind_t ff;
   String tmpPath;
@@ -309,7 +307,7 @@ void gatherFilesList(const DataBlock &blk, FastNameMapEx &files, Tab<String> &ds
   const char *def_outdir = blk.getStr(out_pname, blk.getStr("output", ""));
 
   Tab<SimpleString> wclist(tmpmem);
-  Tab<RegExpPtr> exclist(tmpmem);
+  Tab<RegExp *> exclist(tmpmem);
   int folder_nid = blk.getNameId("folder");
   int wildcard_nid = blk.getNameId("wildcard");
   int file_nid = blk.getNameId("file");
@@ -349,7 +347,7 @@ void gatherFilesList(const DataBlock &blk, FastNameMapEx &files, Tab<String> &ds
         continue;
       }
 
-      clear_and_shrink(exclist);
+      clear_all_ptr_items_and_shrink(exclist);
       if (!loadPatterns(b, "exclude", exclist))
       {
         printf("WARN: failed to load exclude patterns in block #%d", i + 1);
@@ -360,7 +358,7 @@ void gatherFilesList(const DataBlock &blk, FastNameMapEx &files, Tab<String> &ds
         files, dst_files);
     }
 
-  clear_and_shrink(exclist);
+  clear_all_ptr_items_and_shrink(exclist);
 
   if (stricmp(def_outdir, output) != 0)
     return;
@@ -436,7 +434,7 @@ bool buildVromfsDump(const char *fname, unsigned targetCode, FastNameMapEx &file
       if (!crd.fileHandle)
       {
         printf("ERR: ZTD compression dictionary %s not found\n", dict_fn);
-        remove(fname);
+        unlink(fname);
         exit(13);
       }
 
@@ -472,7 +470,7 @@ bool buildVromfsDump(const char *fname, unsigned targetCode, FastNameMapEx &file
   if (write_be)
   {
     printf("ERR: big endian format not supported!\n");
-    remove(fname);
+    unlink(fname);
     exit(13);
   }
   bool sign_contents = READ_PROP(Bool, "signedContents", true);
@@ -495,7 +493,7 @@ bool buildVromfsDump(const char *fname, unsigned targetCode, FastNameMapEx &file
     if (idx + 1 != sorted_fnlist.nameCount())
     {
       printf("ERR: duplicate DEST <%s>\n", tmpbuf.data());
-      remove(fname);
+      unlink(fname);
       exit(13);
     }
   }
@@ -691,8 +689,6 @@ bool buildVromfsDump(const char *fname, unsigned targetCode, FastNameMapEx &file
         cwr_data_for_dict.beginBlock();
         preloaded_blk[id]->saveBinDumpWithSharedNamemap(cwr_data_for_dict, shared_nm);
         cwr_data_for_dict.endBlock();
-        if (file_data_cwr != &cwr.getRawWriter())
-          destory_hash_computer_cb(file_data_cwr);
         continue; // we are not going to build target vrom
       }
       goto done_write;
@@ -806,7 +802,7 @@ bool buildVromfsDump(const char *fname, unsigned targetCode, FastNameMapEx &file
   if (blk_err)
   {
     printf("ERR: some BLK were unreadable\n");
-    remove(fname);
+    unlink(fname);
     return false;
   }
   if (export_data_for_dict_dir)
@@ -1639,7 +1635,6 @@ int buildVromfs(DataBlock *explicit_build_rules, dag::ConstSpan<const char *> ar
           if (strcmp(argv[i] + 11, "*") == 0)
           {
             char buf[DAGOR_MAX_PATH];
-#if _TARGET_PC
             if (getcwd(buf, DAGOR_MAX_PATH))
             {
               dd_append_slash_c(buf);
@@ -1647,9 +1642,6 @@ int buildVromfs(DataBlock *explicit_build_rules, dag::ConstSpan<const char *> ar
             }
             else
               buf[0] = '\0';
-#else
-            buf[0] = '\0';
-#endif
             dd_add_base_path(buf, true);
             String real_folder_name(df_get_real_folder_name(inp.getStr("rootFolder")));
             if (real_folder_name.suffix("/"))

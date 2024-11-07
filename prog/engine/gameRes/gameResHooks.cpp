@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <gameRes/dag_gameResHooks.h>
 
 bool (*gamereshooks::resolve_res_handle)(GameResHandle rh, unsigned class_id, int &out_res_id) = 0;

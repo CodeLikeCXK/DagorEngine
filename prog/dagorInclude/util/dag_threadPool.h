@@ -1,14 +1,16 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
+#include <util/dag_stdint.h>
 #include <osApiWrappers/dag_cpuJobs.h>
 #include <osApiWrappers/dag_atomic.h>
 #include <generic/dag_enumBitMask.h>
 
-#include <supp/dag_define_KRNLIMP.h>
+#include <supp/dag_define_COREIMP.h>
 
 namespace cpujobs
 {
@@ -74,7 +76,8 @@ KRNLIMP void shutdown();
 
 KRNLIMP JobEnvironment *get_job_env(int worker_index);
 
-KRNLIMP int get_num_workers(); // Returns 0 if not inited/shutdowned
+KRNLIMP bool set_stay_awake_but_idle(bool val); // Returns prev value
+KRNLIMP int get_num_workers();                  // Returns 0 if not inited/shutdowned
 KRNLIMP int get_queue_size(JobPriority prio);
 
 enum class AddFlags : uint32_t
@@ -124,4 +127,4 @@ KRNLIMP void wake_up_all_delayed(JobPriority prio = PRIO_DEFAULT, bool wake = tr
 KRNLIMP int get_current_worker_id();
 }; // namespace threadpool
 
-#include <supp/dag_undef_KRNLIMP.h>
+#include <supp/dag_undef_COREIMP.h>

@@ -29,7 +29,7 @@ UseProgLibs +=
   1stPartyLibs/daScript
 ;
 
-if $(Platform) in windows xboxOne scarlett
+if $(Platform) in win32 win64 xboxOne scarlett
 {
   CPPopt = /bigobj ;
 }

@@ -1,6 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-#pragma once
-
 #include <math/dag_Point3.h>
 
 namespace dafx_ex

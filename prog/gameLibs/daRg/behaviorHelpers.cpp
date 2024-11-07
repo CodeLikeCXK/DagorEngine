@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "behaviorHelpers.h"
 #include "sceneConfig.h"
 #include "guiScene.h"
@@ -15,8 +13,8 @@
 #include "scriptUtil.h"
 #include "eventData.h"
 
-#include <drv/hid/dag_hiKeybIds.h>
-#include <drv/hid/dag_hiKeyboard.h>
+#include <humanInput/dag_hiKeybIds.h>
+#include <humanInput/dag_hiKeyboard.h>
 #include <startup/dag_inpDevClsDrv.h>
 
 #include <forceFeedback/forceFeedback.h>

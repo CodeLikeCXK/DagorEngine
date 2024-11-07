@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <gameRes/dag_collisionResource.h>
 #include <ecs/core/entityManager.h>
 #include <scene/dag_physMat.h>

@@ -12,47 +12,32 @@
     NOTE: this should be the only file where daScript needs exceptions enabled.
 */
 
-// Workaround for https://github.com/google/sanitizers/issues/749
-#if DAS_ENABLE_EXCEPTIONS && defined(__clang__) && defined(_WIN32) && defined(__has_feature)
-#if __has_feature(address_sanitizer)
-#define WIN_EH_NO_ASAN __attribute__((no_sanitize_address))
-#endif
-#endif
-#ifndef WIN_EH_NO_ASAN
-#define WIN_EH_NO_ASAN
-#endif
-
 namespace das {
-    static void stackWalkToErr(Context & ctx, const LineInfo & at, bool showArguments, bool showLocalVariables) {
-        const das::string stack = ctx.getStackWalk(&at, showArguments, showLocalVariables);
-        ctx.to_err(&at, stack.c_str());
-    }
 
     void Context::throw_fatal_error ( const char * message, const LineInfo & at ) {
-        constexpr bool SHOW_ARGUMENTS = false;
-        constexpr bool SHOW_LOCAL_VARIABLES = false;
-        exceptionMessage = message ? message : "";
-        exceptionMessage += "\n";
+        exceptionMessage = message;
         exception = exceptionMessage.c_str();
         exceptionAt = at;
 #if DAS_ENABLE_EXCEPTIONS
-        if ( alwaysErrorOnException ) {
-            to_err(&at, exception);
-        }
         if ( alwaysStackWalkOnException ) {
-            stackWalkToErr(*this, at, SHOW_ARGUMENTS, SHOW_LOCAL_VARIABLES);
+            if (message) {
+                to_err(&at, message);
+                to_err(&at, "\n");
+            }
+            stackWalk(&at, false, false);
         }
-        if ( breakOnException ) breakPoint(at, "exception", exception);
-        throw dasException(exception, at);
+        if ( breakOnException ) breakPoint(at, "exception", message);
+        throw dasException(message ? message : "", at);
 #else
         if ( throwBuf ) {
-            if ( alwaysErrorOnException ) {
-                to_err(&at, exception);
-            }
             if ( alwaysStackWalkOnException ) {
-                stackWalkToErr(*this, at, SHOW_ARGUMENTS, SHOW_LOCAL_VARIABLES);
+                if (message) {
+                    to_err(&at, message);
+                    to_err(&at, "\n");
+                }
+                stackWalk(&at, false, false);
             }
-            if ( breakOnException ) breakPoint(at, "exception", exception);
+            if ( breakOnException ) breakPoint(at, "exception", message);
 #if defined(WIN64) || defined(_WIN64)
             //  "An invalid or unaligned stack was encountered during an unwind operation." exception is issued via longjmp
             //  this is a known issue with longjmp on x64, and this workaround disables stack unwinding
@@ -61,10 +46,13 @@ namespace das {
             longjmp(*throwBuf,1);
         } else {
             to_err(&at, "\nunhandled exception\n");
-            string msg = exceptionAt.describe() + ": " + exception;
-            to_err(&at, msg.c_str());
-            stackWalkToErr(*this, at, SHOW_ARGUMENTS, SHOW_LOCAL_VARIABLES);
-            breakPoint(at, "exception", exception);
+            if ( exception ) {
+                string msg = exceptionAt.describe() + ": " + exception;
+                to_err(&at, msg.c_str());
+                to_err(&at, "\n");
+            }
+            stackWalk(&at, false, false);
+            breakPoint(at, "exception", message);
         }
 #endif
 #if !defined(_MSC_VER) || (_MSC_VER>1900)
@@ -100,7 +88,7 @@ namespace das {
 #endif
     }
 
-    vec4f WIN_EH_NO_ASAN Context::evalWithCatch ( SimNode * node ) {
+    vec4f Context::evalWithCatch ( SimNode * node ) {
         auto aa = abiArg;
         auto acm = abiCMRES;
         auto atba = abiThisBlockArg;
@@ -136,7 +124,7 @@ namespace das {
         return vres;
     }
 
-    bool WIN_EH_NO_ASAN Context::runWithCatch ( const callable<void()> & subexpr ) {
+    bool Context::runWithCatch ( const callable<void()> & subexpr ) {
         auto aa = abiArg;
         auto acm = abiCMRES;
         auto atba = abiThisBlockArg;
@@ -174,7 +162,7 @@ namespace das {
         return bres;
     }
 
-    vec4f WIN_EH_NO_ASAN Context::evalWithCatch ( SimFunction * fnPtr, vec4f * args, void * res ) {
+    vec4f Context::evalWithCatch ( SimFunction * fnPtr, vec4f * args, void * res ) {
         auto aa = abiArg;
         auto acm = abiCMRES;
         auto atba = abiThisBlockArg;
@@ -212,7 +200,7 @@ namespace das {
 
     // SimNode_TryCatch
 
-    vec4f WIN_EH_NO_ASAN SimNode_TryCatch::eval ( Context & context ) {
+    vec4f SimNode_TryCatch::eval ( Context & context ) {
         DAS_PROFILE_NODE
         auto aa = context.abiArg; auto acm = context.abiCMRES;
         char * EP, * SP;
@@ -251,7 +239,7 @@ namespace das {
     }
 
 #if DAS_DEBUGGER
-    vec4f WIN_EH_NO_ASAN SimNodeDebug_TryCatch::eval ( Context & context ) {
+    vec4f SimNodeDebug_TryCatch::eval ( Context & context ) {
         DAS_PROFILE_NODE
         auto aa = context.abiArg; auto acm = context.abiCMRES;
         char * EP, * SP;
@@ -294,7 +282,7 @@ namespace das {
     }
 #endif
 
-    void WIN_EH_NO_ASAN das_try_recover ( Context * __context__, const callable<void()> & try_block, const callable<void()> & catch_block ) {
+    void das_try_recover ( Context * __context__, const callable<void()> & try_block, const callable<void()> & catch_block ) {
         auto aa = __context__->abiArg; auto acm = __context__->abiCMRES;
         char * EP, * SP;
         __context__->stack.watermark(EP,SP);
@@ -330,7 +318,7 @@ namespace das {
 #endif
     }
 
-    void WIN_EH_NO_ASAN builtin_try_recover ( const Block & try_block, const Block & catch_block, Context * context, LineInfoArg * at ) {
+    void builtin_try_recover ( const Block & try_block, const Block & catch_block, Context * context, LineInfoArg * at ) {
         auto aa = context->abiArg; auto acm = context->abiCMRES;
         char * EP, * SP;
         context->stack.watermark(EP,SP);

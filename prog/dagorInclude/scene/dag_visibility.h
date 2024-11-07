@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -10,8 +11,6 @@
 #include <math/dag_vecMathCompatibility.h>
 #include <math/dag_frustum.h>
 
-
-class Occlusion;
 
 class VisibilityFinder
 {
@@ -30,7 +29,7 @@ public:
   static inline bool isInvisible(unsigned val) { return !(val & (INSIDE | INTERSECT)); }
 
   void set(vec4f viewpos, const Frustum &frustum_, float object_to_sceen_ratio, float near_ratio_offset,
-    float visibility_range_multiplier, float hk, const Occlusion *occlusion_);
+    float visibility_range_multiplier, float hk, bool use_occlusion);
 
   // scalar implementation, to be obsoleted
   bool isScreenRatioVisible(const Point3 &sphc, float sph_radius_squared) const
@@ -47,14 +46,21 @@ public:
 
   const Frustum &getFrustum() const { return frustum; }
   void setFrustum(const Frustum &f) { frustum = f; }
-  const Occlusion *getOcclusion() const { return occlusion; }
+  void setUseOcclusion(bool use) { useOcclusion = use; }
+  bool isUsingOcclusion() const { return useOcclusion; }
   vec3f getViewerPos() const { return viewerPos; }
 
 protected:
   vec3f viewerPos = v_zero();
   vec4f c_nearRatioOffsetSq = v_zero(), c_squaredDistanceOffset = v_zero();
   Frustum frustum;
-  const Occlusion *occlusion = nullptr;
+  bool useOcclusion = true;
 
   inline bool isScreenRatioVisibleInline(vec3f sphc, vec4f sphr2, vec4f msor_sq) const;
 };
+
+#include <supp/dag_define_COREIMP.h>
+
+extern KRNLIMP VisibilityFinder *visibility_finder;
+
+#include <supp/dag_undef_COREIMP.h>

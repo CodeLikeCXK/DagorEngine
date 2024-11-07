@@ -1,14 +1,9 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "render_state_system.h"
-#include "globals.h"
-#include "device_context.h"
-#include "physical_device_set.h"
-#include "translate_d3d_to_vk.h"
+#include "device.h"
 
 using namespace drv3d_vulkan;
 
-GraphicsPipelineStaticState RenderStateSystemBackend::extractStaticState(const shaders::RenderState &state)
+GraphicsPipelineStaticState RenderStateSystem::Backend::extractStaticState(const shaders::RenderState &state, Device &device)
 {
   GraphicsPipelineStaticState ret;
   ret.reset();
@@ -27,7 +22,7 @@ GraphicsPipelineStaticState RenderStateSystemBackend::extractStaticState(const s
   ret.colorMask = state.colorWr;
   ret.alphaToCoverage = state.alphaToCoverage;
 
-  if (Globals::VK::phy.features.depthClamp != VK_FALSE)
+  if (device.getDeviceProperties().features.depthClamp != VK_FALSE)
   {
     ret.depthClipEnable = state.zClip;
   }
@@ -86,9 +81,9 @@ GraphicsPipelineStaticState RenderStateSystemBackend::extractStaticState(const s
   return ret;
 }
 
-RenderStateSystem::DynamicState RenderStateSystemBackend::extractDynamicState(const shaders::RenderState &state)
+RenderStateSystem::DynamicState RenderStateSystem::Backend::extractDynamicState(const shaders::RenderState &state)
 {
-  RenderStateSystem::DynamicState ret;
+  DynamicState ret;
 
   if (state.stencil.func > 0)
   {
@@ -109,10 +104,10 @@ RenderStateSystem::DynamicState RenderStateSystemBackend::extractDynamicState(co
   return ret;
 }
 
-void RenderStateSystemBackend::setRenderStateData(shaders::DriverRenderStateId id, const shaders::RenderState &state)
+void RenderStateSystem::Backend::setRenderStateData(shaders::DriverRenderStateId id, const shaders::RenderState &state, Device &device)
 {
-  RenderStateSystem::DynamicState dynamicPart = extractDynamicState(state);
-  GraphicsPipelineStaticState staticPart = extractStaticState(state);
+  DynamicState dynamicPart = extractDynamicState(state);
+  GraphicsPipelineStaticState staticPart = extractStaticState(state, device);
 
   uint32_t intId = (uint32_t)id;
   if (states.size() <= intId)

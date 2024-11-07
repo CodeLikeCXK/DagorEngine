@@ -1,4 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __DAGOR_POINTINTRIANGLE_H
+#define __DAGOR_POINTINTRIANGLE_H
 #pragma once
 
 #include <math/dag_math3d.h>
@@ -74,3 +75,4 @@ static inline bool isPointInTriangle(const Point3 &p1, const Point3 &tv0, const 
 {
   return isPointInTriangleUV(p1, tv0, tv1 - tv0, tv2 - tv0, eps);
 }
+#endif

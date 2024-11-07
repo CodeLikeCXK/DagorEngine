@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <daECS/core/entitySystem.h>
 #include <daECS/core/coreEvents.h>
 #include <util/dag_stlqsort.h>
@@ -21,7 +19,7 @@ void remove_system_from_list(EntitySystemDesc *desc)
 }
 
 
-void clear_entity_systems_registry() // should be called at exit, to optimize destruction of ESD
+void clear_entity_systems_registry() //?
 {
   for (EntitySystemDesc *esd = EntitySystemDesc::tail; esd;)
   {
@@ -81,12 +79,10 @@ static bool visit_top_sort(int node, const EdgeContainer &edges, MarkContainer &
   return ret;
 }
 
-typedef eastl::fixed_vector<int, 2, true> edge_container_t; // typically no more than 2 edges
-template <typename T>
-using SmallFmemTab = SmallTab<T, framemem_allocator>; // To consider: move to public headers?
+typedef eastl::fixed_vector<int, 2, true> edge_container; // typically no more than 2 edges
 
-template <typename LoopDetected, typename E, typename T>
-static bool topo_sort(int N, const E &edges, T &sortedList, LoopDetected cb)
+template <typename LoopDetected>
+static bool topo_sort(int N, const SmallTab<edge_container> &edges, SmallTab<int, framemem_allocator> &sortedList, LoopDetected cb)
 {
   sortedList.reserve(N);
   eastl::bitvector<framemem_allocator> tempMark(N, false);
@@ -115,11 +111,12 @@ void EntityManager::resetEsOrder()
     return false;
   });
 
+  static eastl::vector_set<ecs::hash_str_t> ignoredES; // move to instance?
   {
     FRAMEMEM_REGION;
 
     // enumerate all ES
-    SmallFmemTab<EntitySystemDesc *> esFullList;
+    SmallTab<EntitySystemDesc *> esFullList;
     for (EntitySystemDesc *psd = EntitySystemDesc::tail; psd; psd = psd->next)
       esFullList.push_back(psd);
 
@@ -144,16 +141,14 @@ void EntityManager::resetEsOrder()
 
     // build graph
 
-    eastl::hash_map<eastl::string_view, int, eastl::hash<eastl::string_view>, eastl::equal_to<eastl::string_view>, framemem_allocator>
-      nameESMap;
-    nameESMap.reserve(esFullList.size() * 17 / 16); // Heuristic
+    eastl::hash_map<eastl::string_view, int, eastl::hash<eastl::string_view>, eastl::equal_to<eastl::string_view>> nameESMap;
 
-    SmallFmemTab<int> esToGraphNodeMap; // ES to graph vertex map
+    SmallTab<int> esToGraphNodeMap; // ES to graph vertex map
     esToGraphNodeMap.reserve(esFullList.size());
-    SmallFmemTab<int> graphNodeToEsMap; // graph vertex -> ES map
+    SmallTab<int> graphNodeToEsMap; // graph vertex -> ES map
     graphNodeToEsMap.reserve(esFullList.size());
     int graphNodesCount = 0;
-    SmallFmemTab<edge_container_t> edgesFrom;
+    SmallTab<edge_container> edgesFrom;
     auto insertEdge = [&edgesFrom](int from, int to) {
       if (edgesFrom.size() <= max(from, to))
         edgesFrom.resize(max(from, to) + 1);
@@ -164,7 +159,7 @@ void EntityManager::resetEsOrder()
     if (esOrder.size())
     {
       // restore linear esOrder
-      SmallFmemTab<eastl::string_view> esOrderList;
+      SmallTab<eastl::string_view> esOrderList;
       esOrderList.resize(esOrder.size());
       for (auto &i : esOrder)
         esOrderList[i.second] = eastl::string_view(i.first);
@@ -254,7 +249,7 @@ void EntityManager::resetEsOrder()
 
 
     // topo sort
-    SmallFmemTab<int> sortedList;
+    SmallTab<int, framemem_allocator> sortedList;
     auto loopDetected = [&](int i, auto &) {
       auto it = eastl::find_if(nameESMap.begin(), nameESMap.end(), [&](const auto &it) { return it.second == i; });
       eastl::string node = "n/a";
@@ -281,7 +276,7 @@ void EntityManager::resetEsOrder()
       PrioEntitySystemDesc(int i, int p) : id(i), prio(p) {}
       bool operator<(const PrioEntitySystemDesc &other) const { return prio < other.prio; }
     };
-    SmallFmemTab<PrioEntitySystemDesc> prio;
+    SmallTab<PrioEntitySystemDesc, framemem_allocator> prio;
     prio.reserve(esFullList.size());
 
     for (int i = 0, e = esFullList.size(); i < e; ++i)
@@ -376,7 +371,7 @@ void EntityManager::resetEsOrder()
       for (int j = 0; j < esList.size(); ++j)
         useES(j);
     */
-  } // End of framemem region
+  }
   clearQueries();
   updateAllQueries();
   lastEsGen = EntitySystemDesc::generation;
@@ -414,6 +409,12 @@ void EntityManager::setEsOrder(dag::ConstSpan<const char *> es_order, dag::Const
   resetEsOrder();
 }
 
+
+void reset_es_order()
+{
+  if (g_entity_mgr)
+    g_entity_mgr->resetEsOrder();
+}
 
 void EntityManager::setEsTags(dag::ConstSpan<const char *> es_tags)
 {

@@ -1,12 +1,11 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <EASTL/span.h>
 #include <osApiWrappers/dag_critSec.h>
-#include <winapi_helpers.h>
 
 #include "driver.h"
 #include "pipeline.h"
+#include "winapi_helpers.h"
 #include "command_list_storage.h"
 #include "call_stack.h"
 #include "configuration.h"
@@ -20,8 +19,9 @@
 namespace drv3d_dx12
 {
 struct Direct3D12Enviroment;
+}
 
-namespace debug::gpu_postmortem::nvidia
+namespace drv3d_dx12::debug::gpu_postmortem::nvidia
 {
 class Aftermath
 {
@@ -49,7 +49,6 @@ class Aftermath
       PFN_GFSDK_Aftermath_GpuCrashDump_GetGpuInfoCount getGPUInfoCount = nullptr;
       PFN_GFSDK_Aftermath_GpuCrashDump_GetGpuInfo getGPUInfo = nullptr;
       PFN_GFSDK_Aftermath_GpuCrashDump_GetPageFaultInfo getPageFaultInfo = nullptr;
-      PFN_GFSDK_Aftermath_GpuCrashDump_GetPageFaultResourceInfo getPageFaultResourceInfo = nullptr;
       PFN_GFSDK_Aftermath_GpuCrashDump_GetActiveShadersInfoCount getActiveShadersInfoCount = nullptr;
       PFN_GFSDK_Aftermath_GpuCrashDump_GetActiveShadersInfo getActiveShadersInfo = nullptr;
       PFN_GFSDK_Aftermath_GpuCrashDump_GetEventMarkersInfoCount getEventMarkersInfoCount = nullptr;
@@ -84,13 +83,13 @@ class Aftermath
   void onCrashDumpGenerate(const void *dump, const uint32_t size, bool manually_send);
   void onShaderDebugInfo(const void *dump, const uint32_t size);
   void onCrashDumpDescription(PFN_GFSDK_Aftermath_AddGpuCrashDumpDescription add_value);
-  void onResolveMarkerCallback(const void *marker_id, uint32_t marker_id_size, void **resolved_marker_data, uint32_t *marker_size);
+  void onResolveMarkerCallback(const void *marker_id, void **resolved_marker_data, uint32_t *marker_size);
 
   static void GFSDK_AFTERMATH_CALL onCrashDumpGenerateProxy(const void *dump, const uint32_t size, void *self);
   static void GFSDK_AFTERMATH_CALL onShaderDebugInfoProxy(const void *dump, const uint32_t size, void *self);
   static void GFSDK_AFTERMATH_CALL onCrashDumpDescriptionProxy(PFN_GFSDK_Aftermath_AddGpuCrashDumpDescription add_value, void *self);
-  static void GFSDK_AFTERMATH_CALL onResolveMarkerCallbackProxy(const void *marker_id, uint32_t marker_id_size, void *self,
-    void **resolved_marker_data, uint32_t *marker_size);
+  static void GFSDK_AFTERMATH_CALL onResolveMarkerCallbackProxy(const void *marker_id, void *self, void **resolved_marker_data,
+    uint32_t *marker_size);
 
 public:
   // Have to delete move constructor, otherwise compiler / templated stuff of variant tries to be smart and results in compile errors.
@@ -109,8 +108,8 @@ public:
   void configure();
   void beginCommandBuffer(ID3D12Device *device, ID3D12GraphicsCommandList *cmd);
   void endCommandBuffer(ID3D12GraphicsCommandList *cmd);
-  void beginEvent(ID3D12GraphicsCommandList *cmd, eastl::span<const char> text, const eastl::string &full_path);
-  void endEvent(ID3D12GraphicsCommandList *cmd, const eastl::string &full_path);
+  void beginEvent(ID3D12GraphicsCommandList *cmd, eastl::span<const char> text, eastl::span<const char> full_path);
+  void endEvent(ID3D12GraphicsCommandList *cmd, eastl::span<const char> full_path);
   void marker(ID3D12GraphicsCommandList *cmd, eastl::span<const char> text);
   void draw(const call_stack::CommandData &debug_info, D3DGraphicsCommandList *cmd, const PipelineStageStateBase &vs,
     const PipelineStageStateBase &ps, BasePipeline &pipeline_base, PipelineVariant &pipeline, uint32_t count, uint32_t instance_count,
@@ -119,27 +118,23 @@ public:
     const PipelineStageStateBase &ps, BasePipeline &pipeline_base, PipelineVariant &pipeline, uint32_t count, uint32_t instance_count,
     uint32_t index_start, int32_t vertex_base, uint32_t first_instance, D3D12_PRIMITIVE_TOPOLOGY topology);
   void drawIndirect(const call_stack::CommandData &debug_info, D3DGraphicsCommandList *cmd, const PipelineStageStateBase &vs,
-    const PipelineStageStateBase &ps, BasePipeline &pipeline_base, PipelineVariant &pipeline,
-    const BufferResourceReferenceAndOffset &buffer);
+    const PipelineStageStateBase &ps, BasePipeline &pipeline_base, PipelineVariant &pipeline, BufferResourceReferenceAndOffset buffer);
   void drawIndexedIndirect(const call_stack::CommandData &debug_info, D3DGraphicsCommandList *cmd, const PipelineStageStateBase &vs,
-    const PipelineStageStateBase &ps, BasePipeline &pipeline_base, PipelineVariant &pipeline,
-    const BufferResourceReferenceAndOffset &buffer);
+    const PipelineStageStateBase &ps, BasePipeline &pipeline_base, PipelineVariant &pipeline, BufferResourceReferenceAndOffset buffer);
   void dispatchIndirect(const call_stack::CommandData &debug_info, D3DGraphicsCommandList *cmd, const PipelineStageStateBase &state,
-    ComputePipeline &pipeline, const BufferResourceReferenceAndOffset &buffer);
+    ComputePipeline &pipeline, BufferResourceReferenceAndOffset buffer);
   void dispatch(const call_stack::CommandData &debug_info, D3DGraphicsCommandList *cmd, const PipelineStageStateBase &stage,
     ComputePipeline &pipeline, uint32_t x, uint32_t y, uint32_t z);
   void dispatchMesh(const call_stack::CommandData &debug_info, D3DGraphicsCommandList *cmd, const PipelineStageStateBase &vs,
     const PipelineStageStateBase &ps, BasePipeline &pipeline_base, PipelineVariant &pipeline, uint32_t x, uint32_t y, uint32_t z);
   void dispatchMeshIndirect(const call_stack::CommandData &debug_info, D3DGraphicsCommandList *cmd, const PipelineStageStateBase &vs,
-    const PipelineStageStateBase &ps, BasePipeline &pipeline_base, PipelineVariant &pipeline,
-    const BufferResourceReferenceAndOffset &args, const BufferResourceReferenceAndOffset &count, uint32_t max_count);
+    const PipelineStageStateBase &ps, BasePipeline &pipeline_base, PipelineVariant &pipeline, BufferResourceReferenceAndOffset args,
+    BufferResourceReferenceAndOffset count, uint32_t max_count);
   void blit(const call_stack::CommandData &debug_info, D3DGraphicsCommandList *cmd);
   void onDeviceRemoved(D3DDevice *device, HRESULT reason, call_stack::Reporter &reporter);
   bool sendGPUCrashDump(const char *type, const void *data, uintptr_t size);
   void onDeviceShutdown();
   bool onDeviceSetup(ID3D12Device *device, const Configuration &config, const Direct3D12Enviroment &d3d_env);
-
-  bool tryCreateDevice(IUnknown *, D3D_FEATURE_LEVEL, void **) { return false; }
 
   template <typename T>
   static bool load(const Configuration &config, const Direct3D12Enviroment &, T &target)
@@ -179,5 +174,4 @@ public:
     return true;
   }
 };
-} // namespace debug::gpu_postmortem::nvidia
-} // namespace drv3d_dx12
+} // namespace drv3d_dx12::debug::gpu_postmortem::nvidia

@@ -98,24 +98,20 @@ class DAGOR_PT_CollectionProperties(Panel):
     def draw(self, context):
         C=bpy.context
         l=self.layout
-        column = l.column(align = True)
         pref = bpy.context.preferences.addons[basename(__package__)].preferences
         col = C.collection
         if col is not None:
-            colprops = column.box()
+            colprops = l.box()
             header = colprops.row()
-            header.prop(pref, 'colprops_maximized',
-                icon = 'DOWNARROW_HLT'if pref.colprops_maximized else 'RIGHTARROW_THIN',
-                emboss=False,text='Active Collection')
-            header.prop(pref, 'colprops_maximized',text='', icon='OUTLINER_COLLECTION', emboss = False)
+            header.prop(pref, 'colprops_maximized',icon = 'DOWNARROW_HLT'if pref.colprops_maximized else 'RIGHTARROW_THIN',
+                emboss=False,text='Active Collection',expand=True)
+            header.label(text='', icon='OUTLINER_COLLECTION')
             if pref.colprops_maximized:
                 props = col.keys()
                 renamed = "name" in props
                 override = colprops.row()
-                toggle_operator = override.operator('dt.set_col_name', text = "Override name/path:",
-                    icon = 'CHECKBOX_HLT' if renamed else 'CHECKBOX_DEHLT',
-                    depress = renamed)
-                toggle_operator.col = col.name
+                override.operator('dt.set_col_name',text = "", icon = 'CHECKBOX_HLT' if renamed else 'CHECKBOX_DEHLT').col = col.name
+                override.label(text = "Override name:")
                 if renamed:
                     colprops.prop(col,'["name"]',text = '')
                 else:
@@ -125,12 +121,11 @@ class DAGOR_PT_CollectionProperties(Panel):
 
             cols = [col for col in bpy.data.collections if "name" in col.keys()]
             if cols.__len__()>0:
-                all_col = column.box()
+                all_col = l.box()
                 header = all_col.row()
-                header.prop(pref, 'colprops_all_maximized',
-                    icon = 'DOWNARROW_HLT'if pref.colprops_all_maximized else 'RIGHTARROW_THIN',
-                    emboss=False,text='Overridden:')
-                header.prop(pref, 'colprops_all_maximized', text='', icon='OUTLINER_COLLECTION', emboss = False)
+                header.prop(pref, 'colprops_all_maximized',icon = 'DOWNARROW_HLT'if pref.colprops_all_maximized else 'RIGHTARROW_THIN',
+                    emboss=False,text='Overridden:',expand=True)
+                header.label(text='', icon='OUTLINER_COLLECTION')
                 if pref.colprops_all_maximized:
                     cols = list(col for col in bpy.data.collections if 'name' in col.keys() and col.children.__len__()==0)
                     for col in cols:
@@ -140,13 +135,11 @@ class DAGOR_PT_CollectionProperties(Panel):
                         row.label(text=f'{col.name}')
                         box.prop(col, '["name"]',text='')
             if pref.guess_dag_type or pref.use_cmp_editor:
-                typebox = column.box()
+                typebox = l.box()
                 boxname = typebox.row()
-                boxname.prop(pref, 'type_maximized', text = "",
-                    icon = 'DOWNARROW_HLT'if pref.type_maximized else 'RIGHTARROW_THIN',
-                    emboss=False)
-                boxname.prop(pref, 'type_maximized', text = 'Type:' if pref.type_maximized else "Type", emboss = False)
-                boxname.prop(pref, 'type_maximized', text = "", icon = 'BLANK1', emboss = False)
+                boxname.prop(pref, 'type_maximized', text = "", icon = 'DOWNARROW_HLT'if pref.type_maximized else 'RIGHTARROW_THIN',
+                emboss=False,expand=True)
+                boxname.label(text = 'Type:' if pref.type_maximized else "Type")
                 if not pref.type_maximized:
                     return
                 if not "type" in col.keys():
@@ -154,39 +147,29 @@ class DAGOR_PT_CollectionProperties(Panel):
                 else:
                     current_type = col["type"]
 
-                types = typebox.column(align = True)
+                undefined = typebox.row()
+                undefined.operator('dt.set_col_type', text = "", emboss = False, icon = 'RADIOBUT_ON' if current_type == "undefined" else 'RADIOBUT_OFF').type = 0
+                undefined.label(text = "Undefined")
 
-                types.operator('dt.set_col_type', text = "Undefined",
-                    depress = True if current_type == "undefined" else False,
-                    icon = 'RADIOBUT_ON' if current_type == "undefined" else 'RADIOBUT_OFF').type = 0
+                prefab = typebox.row()
+                prefab.operator('dt.set_col_type', text = "", emboss = False, icon = 'RADIOBUT_ON' if current_type == "prefab" else 'RADIOBUT_OFF').type = 1
+                prefab.label(text = "Prefab")
 
+                rendinst = typebox.row()
+                rendinst.operator('dt.set_col_type', text = "", emboss = False, icon = 'RADIOBUT_ON' if current_type == "rendinst" else 'RADIOBUT_OFF').type = 2
+                rendinst.label(text = "RendInst")
 
+                dynmodel = typebox.row()
+                dynmodel.operator('dt.set_col_type', text = "", emboss = False, icon = 'RADIOBUT_ON' if current_type == "dynmodel" else 'RADIOBUT_OFF').type = 3
+                dynmodel.label(text = "DynModel")
 
-                types.operator('dt.set_col_type', text = "Prefab",
-                    depress = True if current_type == "prefab" else False,
-                    icon = 'RADIOBUT_ON' if current_type == "prefab" else 'RADIOBUT_OFF').type = 1
+                composit = typebox.row()
+                composit.operator('dt.set_col_type', text = "", emboss = False, icon = 'RADIOBUT_ON' if current_type == "composit" else 'RADIOBUT_OFF').type = 4
+                composit.label(text = "Composit")
 
-
-                types.operator('dt.set_col_type', text = "RendInst",
-                    depress = True if current_type == "rendinst" else False,
-                    icon = 'RADIOBUT_ON' if current_type == "rendinst" else 'RADIOBUT_OFF').type = 2
-
-
-
-                types.operator('dt.set_col_type', text = "DynModel",
-                    depress = True if current_type == "dynmodel" else False,
-                    icon = 'RADIOBUT_ON' if current_type == "dynmodel" else 'RADIOBUT_OFF').type = 3
-
-
-
-                types.operator('dt.set_col_type', text = "Composit",
-                    depress = True if current_type == "composit" else False,
-                    icon = 'RADIOBUT_ON' if current_type == "composit" else 'RADIOBUT_OFF').type = 4
-
-
-                types.operator('dt.set_col_type', text = "Gameobj",
-                    depress = True if current_type == "gameobj" else False,
-                    icon = 'RADIOBUT_ON' if current_type == "gameobj" else 'RADIOBUT_OFF').type = 5
+                gameobj = typebox.row()
+                gameobj.operator('dt.set_col_type', text = "", emboss = False, icon = 'RADIOBUT_ON' if current_type == "gameobj" else 'RADIOBUT_OFF').type = 5
+                gameobj.label(text = "Gameobj")
         return
 
 classes =  [DT_OT_SetColName,

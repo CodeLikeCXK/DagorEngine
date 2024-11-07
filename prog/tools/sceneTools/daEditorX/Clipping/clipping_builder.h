@@ -1,4 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __GAIJIN_CLIPPING_BUILDER__
+#define __GAIJIN_CLIPPING_BUILDER__
 #pragma once
 
 #include <math/dag_mesh.h>
@@ -108,3 +109,5 @@ static bool getPhysMatNameFromMatName(const char *name, String &s)
 
   return false;
 }
+
+#endif

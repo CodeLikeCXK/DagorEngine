@@ -1,3 +1,4 @@
+Platform ?= win64 ;
 Root    ?= ../../../.. ;
 Location = prog/tools/sceneTools/findDup ;
 include $(Root)/prog/tools/tools_setup.jam ;
@@ -5,7 +6,9 @@ ConsoleExe  = yes ;
 
 TargetType  = exe ;
 Target      = tools/findDup.exe ;
-include $(Root)/prog/tools/tools_setup_outdir_util.jam ;
+
+OutDir = $(Root)/tools/dagor3_cdk/util ;
+if $(Platform) = win64 { OutDir = $(OutDir)64 ; }
 
 
 Sources =

@@ -1,10 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <stdio.h>
 #include <startup/dag_restart.h>
-#include <drv/3d/dag_matricesAndPerspective.h>
-#include <drv/3d/dag_texture.h>
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
 #include <3d/dag_render.h>
 #include <3d/dag_ringDynBuf.h>
 #include <generic/dag_tab.h>
@@ -473,9 +469,9 @@ void EffectsInterface::startup()
 
   int max_vcount = maxFaceDynBufSz * 2;
   max_vcount += maxQuadDynBufSz * 4;
-  fxMeshVB.init(max_vcount, dynrender::getStride(stdPartsChannels, countof(stdPartsChannels)), "fx_mesh_vb");
+  fxMeshVB.init(max_vcount, dynrender::getStride(stdPartsChannels, countof(stdPartsChannels)));
   if (maxFaceDynBufSz > 0)
-    fxMeshIB.init(maxFaceDynBufSz * 3, "fx_mesh_ib");
+    fxMeshIB.init(maxFaceDynBufSz * 3);
   fxMeshVB.addRef();
   fxMeshIB.addRef();
 

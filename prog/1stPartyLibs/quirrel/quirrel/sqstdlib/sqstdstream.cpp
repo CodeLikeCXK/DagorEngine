@@ -68,8 +68,8 @@ SQInteger _stream_readn(HSQUIRRELVM v)
               }
         break;
     case 'c': {
-        signed char c;
-        SAFE_READN(&c, sizeof(signed char));
+        char c;
+        SAFE_READN(&c, sizeof(char));
         sq_pushinteger(v, c);
               }
         break;
@@ -162,10 +162,10 @@ SQInteger _stream_writen(HSQUIRRELVM v)
               }
         break;
     case 'c': {
-        signed char c;
+        char c;
         sq_getinteger(v, 2, &ti);
-        c = (signed char)ti;
-        self->Write(&c, sizeof(signed char));
+        c = (char)ti;
+        self->Write(&c, sizeof(char));
                   }
         break;
     case 'b': {

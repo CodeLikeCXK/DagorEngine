@@ -1,6 +1,3 @@
-if (__name__ == "__analysis__")
-  return
-
 //expect:w240
 
 local a = ::x; // can be null

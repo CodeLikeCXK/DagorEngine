@@ -1,5 +1,5 @@
-#include <drv/hid/dag_hiPointing.h>
-#include <drv/hid/dag_hiGlobals.h>
+#include <humanInput/dag_hiPointing.h>
+#include <humanInput/dag_hiGlobals.h>
 #include <perfMon/dag_cpuFreq.h>
 #include <math/dag_mathBase.h>
 

@@ -1,7 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
-#include <drv/3d/dag_sampler.h>
+#include <3d/dag_sampler.h>
 
 #include "bitfield.h"
 #include "half_float.h"
@@ -50,20 +49,6 @@ BEGIN_BITFIELD_TYPE(SamplerState, uint32_t)
     ADD_BITFIELD_MEMBER(exponent, 23, 8)
     ADD_BITFIELD_MEMBER(sign, 31, 1)
   END_BITFIELD_TYPE()
-
-  static SamplerState make_default()
-  {
-    SamplerState desc;
-    desc.setMip(D3D12_FILTER_TYPE_LINEAR);
-    desc.setFilter(D3D12_FILTER_TYPE_LINEAR);
-    desc.setU(D3D12_TEXTURE_ADDRESS_MODE_WRAP);
-    desc.setV(D3D12_TEXTURE_ADDRESS_MODE_WRAP);
-    desc.setW(D3D12_TEXTURE_ADDRESS_MODE_WRAP);
-    desc.setBias(0.f);
-    desc.setAniso(1.f);
-    desc.setBorder(0);
-    return desc;
-  }
 
   D3D12_SAMPLER_DESC asDesc() const
   {
@@ -217,11 +202,5 @@ inline SamplerState SamplerState::fromSamplerInfo(const d3d::SamplerInfo &info)
   state.setBorder(info.border_color);
   return state;
 }
-
-struct SamplerDescriptorAndState
-{
-  D3D12_CPU_DESCRIPTOR_HANDLE sampler;
-  SamplerState state;
-};
 
 } // namespace drv3d_dx12

@@ -1,7 +1,6 @@
 include "shader_global.dshl"
 include "rendinst_opaque_inc.dshl"
 include "static_shadow.dshl"
-include "rtr_use.dshl"
 
 macro INIT_RENDINST_INTERIOR_MAPPING()
   texture tex = material.texture.diffuse;
@@ -32,18 +31,16 @@ macro INIT_RENDINST_INTERIOR_MAPPING()
   }
 endmacro
 
-define_macro_if_not_defined INIT_NUCLEAR_DESTRUCTION(camera_offset)
+define_macro_if_not_defined INIT_NUCLEAR_DESTRUCTION()
 endmacro
 
-define_macro_if_not_defined USE_NUCLEAR_DESTRUCTION(camera_offset)
+define_macro_if_not_defined USE_NUCLEAR_DESTRUCTION()
 endmacro
 
-macro USE_RENDINST_INTERIOR_MAPPING(offset)
+macro USE_RENDINST_INTERIOR_MAPPING()
   RENDINST_BLOCK()
 
-  INIT_NUCLEAR_DESTRUCTION(offset)
-
-  CHECKING_RTR(ps)
+  INIT_NUCLEAR_DESTRUCTION()
 
   channel float3 pos = pos;
   channel color8 norm = norm unsigned_pack;
@@ -136,9 +133,6 @@ macro USE_RENDINST_INTERIOR_MAPPING(offset)
     #if NUKEDESTR_ACTIVE
       NUKEDESTR_VS_OUTPUT
     #endif
-    #if defined(VSOUT_DRAW_ID)
-      VSOUT_DRAW_ID
-    #endif
     };
   }
 
@@ -167,12 +161,6 @@ macro USE_RENDINST_INTERIOR_MAPPING(offset)
       )
     {
       VsOutput output;
-
-      #if SET_UP_MULTIDRAW
-        INIT_MULTIDRAW(output);
-        DRAW_CALL_ID = GET_MATERIAL_OFFSET;
-      #endif
-
       float3 localNormal = float3(0, 1, 0);
 #if RENDINST_FULL_VDECL
       localNormal = normalize(BGR_SWIZZLE(input.normal.xyz)*2.f-1.f);
@@ -180,7 +168,7 @@ macro USE_RENDINST_INTERIOR_MAPPING(offset)
       float3 localPos = input.pos;
       VB_PERFORM_INSTANCING
 
-      output.pos = mulPointTm(worldPos + offset, globtm);
+      output.pos = mulPointTm(worldPos, globtm);
     #if NUKEDESTR_ACTIVE
       NUKEDESTR_CALC_VS_OUTPUT
     #endif
@@ -211,10 +199,6 @@ macro USE_RENDINST_INTERIOR_MAPPING(offset)
     hlsl(ps) {
       float4 rendinst_render_depth_black_ps(VsOutput input HW_USE_SCREEN_POS) : SV_Target
       {
-        #if SET_UP_MULTIDRAW
-          DRAW_CALL_ID = GET_MATERIAL_OFFSET(input);
-        #endif
-
         float4 screenpos = GET_SCREEN_POS(input.pos);
         #if NUKEDESTR_ACTIVE
           float2 checkerTC = 0;
@@ -233,10 +217,6 @@ macro USE_RENDINST_INTERIOR_MAPPING(offset)
 
       void apply_reflection(float3 normalGlobal, float3 pointToEye, float fresnelterm, inout half3 diffuseColor)
       {
-        // With RTR, reflections will be calculated in the raytracer
-        if (isRTREnabled())
-          return;
-
         float4 reflectedNormal = float4(reflect(-pointToEye, normalGlobal), 0);
 
         // fade static cubemap for correct brightness of fake reflection
@@ -262,10 +242,6 @@ macro USE_RENDINST_INTERIOR_MAPPING(offset)
       #endif
       )
       {
-        #if SET_UP_MULTIDRAW
-          DRAW_CALL_ID = GET_MATERIAL_OFFSET(input);
-        #endif
-
         UnpackedGbuffer gbuffer;
         init_gbuffer(gbuffer);
         init_smoothness(gbuffer, get_smoothness_metalness_reflection().x);
@@ -401,21 +377,15 @@ macro USE_RENDINST_INTERIOR_MAPPING(offset)
           ##endif
           init_normal(gbuffer, normalGlobal);
           init_albedo(gbuffer, diffuseColor);
-
-          if (isRTREnabled())
-            init_glass(gbuffer);
-
-          handle_if_two_sided(gbuffer);
-
           #if NUKEDESTR_ACTIVE
             NUKEDESTR_CHARRING(gbuffer, checkerTC)
           #endif
         }
-        return encode_gbuffer(gbuffer, input.pointToEye, GET_SCREEN_POS(input.pos));
+        return encode_gbuffer3(gbuffer, input.pointToEye, GET_SCREEN_POS(input.pos));
       }
     }
     compile("target_ps", "simple_ps");
   }
 
-  USE_NUCLEAR_DESTRUCTION(offset)
+  USE_NUCLEAR_DESTRUCTION()
 endmacro

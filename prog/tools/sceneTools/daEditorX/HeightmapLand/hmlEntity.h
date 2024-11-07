@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <EditorCore/ec_rendEdObject.h>
@@ -29,20 +28,17 @@ public:
   virtual bool isSelectedByPointClick(IGenViewportWnd *vp, int x, int y) const;
   virtual bool getWorldBox(BBox3 &box) const;
 
-  virtual void fillProps(PropPanel::ContainerPropertyControl &panel, DClassID for_class_id,
-    dag::ConstSpan<RenderableEditableObject *> objects);
+  virtual void fillProps(PropPanel2 &panel, DClassID for_class_id, dag::ConstSpan<RenderableEditableObject *> objects);
 
-  virtual void onPPChange(int pid, bool edit_finished, PropPanel::ContainerPropertyControl &panel,
-    dag::ConstSpan<RenderableEditableObject *> objects);
+  virtual void onPPChange(int pid, bool edit_finished, PropPanel2 &panel, dag::ConstSpan<RenderableEditableObject *> objects);
 
-  virtual void onPPBtnPressed(int pid, PropPanel::ContainerPropertyControl &panel, dag::ConstSpan<RenderableEditableObject *> objects);
+  virtual void onPPBtnPressed(int pid, PropPanel2 &panel, dag::ConstSpan<RenderableEditableObject *> objects);
 
   virtual void save(DataBlock &blk);
   virtual void load(const DataBlock &blk);
 
   virtual bool mayRename() { return true; }
   virtual bool mayDelete() { return true; }
-  virtual bool setName(const char *nm) override;
   virtual void setWtm(const TMatrix &wtm);
 
   virtual void onRemove(ObjectEditor *);
@@ -82,9 +78,7 @@ public:
       PT_3pod = ICompositObj::Props::PT_3pod,
       PT_fnd = ICompositObj::Props::PT_fnd,
       PT_flt = ICompositObj::Props::PT_flt,
-      PT_riColl = ICompositObj::Props::PT_riColl,
-
-      PT_count
+      PT_riColl = ICompositObj::Props::PT_riColl
     };
     SimpleString entityName;
     int placeType = PT_coll;
@@ -136,9 +130,6 @@ public:
   static void loadColliders(const DataBlock &blk);
   static void rePlaceAllEntitiesOnCollision(HmapLandObjectEditor &objEd, bool loft_changed, bool polygeom_changed, bool roads_chanded,
     BBox3 changed_region);
-  static void rePlaceAllEntitiesOverRI(HmapLandObjectEditor &objEd);
-  static void changeAssset(ObjectEditor &object_editor, dag::ConstSpan<RenderableEditableObject *> objects,
-    const char *initially_selected_asset_name);
 
   void setGizmoTranformMode(bool enable);
 
@@ -187,19 +178,13 @@ protected:
 
   static CollidersData colliders;
 
-  struct DecalMaterialIndex
-  {
-    int node_idx;
-    int material_idx;
-  };
-  Tab<DecalMaterialIndex> decalMaterialIndices;
-
   ~LandscapeEntityObject();
 
   static bool isColliderEnabled(const IDagorEdCustomCollider *collider);
+
   void setPosOnCollision(Point3 pos);
+
   void rePlaceAllEntities();
-  void fillMaterialProps(PropPanel::ContainerPropertyControl &panel);
 
   class UndoStaticPropsChange : public UndoRedoObject
   {
@@ -225,12 +210,8 @@ protected:
 
   class UndoPropsChange : public UndoRedoObject
   {
-  private:
     Ptr<LandscapeEntityObject> obj;
     LandscapeEntityObject::Props oldProps, redoProps;
-
-  protected:
-    LandscapeEntityObject *getObj() { return obj; }
 
   public:
     UndoPropsChange(LandscapeEntityObject *o) : obj(o) { oldProps = redoProps = obj->props; }

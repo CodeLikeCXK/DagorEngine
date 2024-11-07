@@ -1,16 +1,10 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <daRg/dag_panelRenderer.h>
 #include <daRg/dag_guiScene.h>
-#include <drv/3d/dag_draw.h>
-#include <drv/3d/dag_vertexIndexBuffer.h>
-#include <drv/3d/dag_matricesAndPerspective.h>
-#include <drv/3d/dag_driver.h>
-#include <drv/3d/dag_resetDevice.h>
+#include <3d/dag_drv3d.h>
+#include <3d/dag_drv3dReset.h>
 #include <3d/dag_resPtr.h>
 #include <shaders/dag_DynamicShaderHelper.h>
 #include <shaders/dag_shaderBlock.h>
-#include <shaders/dag_overrideStates.h>
 #include <perfMon/dag_statDrv.h>
 #include <math/dag_mathAng.h>
 #include <math/dag_mathUtils.h>
@@ -292,7 +286,7 @@ void render_panels_in_world(const darg::IGuiScene &scene_, const Point3 &view_po
   using namespace darg;
 
   const darg::GuiScene &scene = static_cast<const darg::GuiScene &>(scene_);
-  const auto &panels = scene.getPanels();
+  const eastl::vector<PanelData> &panels = scene.getPanels();
 
   if (panels.empty())
     return;
@@ -302,13 +296,13 @@ void render_panels_in_world(const darg::IGuiScene &scene_, const Point3 &view_po
   eastl::vector_multimap<float, const PanelData *, eastl::less<float>, framemem_allocator> sortedPanels;
 
   // sort panels and calculate their transforms
-  for (const auto &itPanelData : panels)
+  for (const PanelData &panelData : panels)
   {
-    const PanelData *panelData = itPanelData.second.get();
-    if (panelData->panel->spatialInfo.visible && panelData->isInThisPass(render_pass) && panelData->panel->renderInfo.isValid)
+    if (panelData.isPanelInited() && panelData.panel->spatialInfo.visible && panelData.isInThisPass(render_pass) &&
+        panelData.panel->renderInfo.isValid)
     {
-      float distSq = (view_point - panelData->panel->renderInfo.transform.getcol(3)).lengthSq();
-      sortedPanels.insert({distSq, panelData});
+      float distSq = (view_point - panelData.panel->renderInfo.transform.getcol(3)).lengthSq();
+      sortedPanels.insert({distSq, &panelData});
     }
   }
 

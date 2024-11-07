@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <sceneBuilder/nsb_LightmappedScene.h>
 #include <sceneBuilder/nsb_LightingProvider.h>
 #include <sceneBuilder/nsb_StdTonemapper.h>
@@ -1529,7 +1527,7 @@ bool StaticSceneBuilder::StaticVisualScene::checkLostGeom()
     isize = data_size(vd->iData) + data_size(vd->iData32) - isize;
     if (vsize != 0 || isize != 0)
     {
-      DEBUG_CTX("lost vdata=%d idata=%d", vsize, isize);
+      debug_ctx("lost vdata=%d idata=%d", vsize, isize);
       isLost = true;
     }
   }

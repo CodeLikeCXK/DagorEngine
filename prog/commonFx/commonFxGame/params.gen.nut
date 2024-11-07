@@ -15,7 +15,7 @@ let codegen = {
 }
 
 
-class OutputText {
+let class OutputText {
   text = null
 
   constructor() {
@@ -556,7 +556,7 @@ let class ParamStruct (BaseParam) {
 
 
 
-function declare_extern_struct(name) {
+let function declare_extern_struct(name) {
   if (name in glob_types) {
     codegen.error(name+" already declared")
     return
@@ -568,7 +568,7 @@ function declare_extern_struct(name) {
 
 
 
-function declare_struct(name, version, list) {
+let function declare_struct(name, version, list) {
   if (name in glob_types) {
     codegen.error(name+" already declared")
     return
@@ -600,12 +600,12 @@ function declare_struct(name, version, list) {
 
 
 
-function write_declarations(fn) {
+let function write_declarations(fn) {
   codegen.writeFile(fn, glob_decl_text.text)
 }
 
 
-function write_tools_code(fn) {
+let function write_tools_code(fn) {
   codegen.writeFile(fn, glob_tools_text.text)
 }
 
@@ -614,7 +614,7 @@ function write_tools_code(fn) {
 local module_name = null
 
 
-function include_decl_h(name) {
+let function include_decl_h(name) {
   local fname = name.slice(0,1).tolower()+name.slice(1)
   if (name!=module_name)
     glob_decl_text.append($"#include <{fname}_decl.h>\n")
@@ -622,13 +622,13 @@ function include_decl_h(name) {
 }
 
 
-function begin_declare_params(name) {
+let function begin_declare_params(name) {
   module_name = name
   include_decl_h(name)
 }
 
 
-function end_module() {
+let function end_module() {
   let fname = "".concat(module_name.slice(0,1).tolower(), module_name.slice(1))
   write_declarations($"{fname}_decl.h")
   write_tools_code($"../commonFxTools/{fname}_tools.cpp")
@@ -637,7 +637,7 @@ function end_module() {
 }
 
 
-function end_declare_params(und_name, version, struct_list) {
+let function end_declare_params(und_name, version, struct_list) {
 glob_tools_text.append("\n")
 glob_tools_text.append(@"
 class "+module_name+@"EffectTools : public IEffectClassTools

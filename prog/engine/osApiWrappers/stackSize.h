@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 inline unsigned get_stack_size(const void *const *stack, unsigned max_size)

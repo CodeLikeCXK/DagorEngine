@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -26,7 +27,7 @@ public:
   TEXTUREID getSSAOTexId() override;
 
 private:
-  void render(const TMatrix &view_tm, const TMatrix4 &proj_tm, BaseTexture *depth_tex_to_use, const ManagedTex *ssaoTex,
+  void render(const TMatrix &, const TMatrix4 &, BaseTexture *depth_tex_to_use, const ManagedTex *ssaoTex,
     const ManagedTex *prevSsaoTex, const ManagedTex *tmpTex, const DPoint3 *,
     SubFrameSample sub_sample = SubFrameSample::Single) override;
 
@@ -35,7 +36,6 @@ private:
   void applyBlur();
 
   void setFactor();
-  void setReprojection(const TMatrix &view_tm, const TMatrix4 &proj_tm);
 
   static constexpr const char *ssao_sh_name = "mobile_ssao";
   static constexpr const char *blur_sh_name = "mobile_ssao_blur";
@@ -48,10 +48,4 @@ private:
   eastl::array<UniqueTex, 2> ssaoTex;
 
   eastl::unique_ptr<PostFxRenderer> ssaoBlurRenderer{nullptr};
-
-  struct
-  {
-    TMatrix4 prevGlobTm;
-    DPoint3 prevWorldPos;
-  } reprojectionData;
 };

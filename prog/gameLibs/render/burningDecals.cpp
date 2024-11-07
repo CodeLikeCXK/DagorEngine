@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <generic/dag_tabWithLock.h>
 #include <render/burningDecals.h>
 #include <render/clipmapDecals.h>
@@ -9,13 +7,7 @@
 #include <generic/dag_range.h>
 #include <debug/dag_log.h>
 #include <debug/dag_debug.h>
-#include <drv/3d/dag_renderTarget.h>
-#include <drv/3d/dag_draw.h>
-#include <drv/3d/dag_vertexIndexBuffer.h>
-#include <drv/3d/dag_buffers.h>
-#include <drv/3d/dag_texture.h>
-#include <drv/3d/dag_lock.h>
-#include <drv/3d/dag_info.h>
+#include <3d/dag_drv3d.h>
 #include <3d/dag_render.h>
 #include <3d/dag_materialData.h>
 #include <math/dag_bounds2.h>
@@ -29,6 +21,7 @@
 #include <osApiWrappers/dag_direct.h>
 #include <generic/dag_staticTab.h>
 #include <memory/dag_framemem.h>
+#include <math/dag_bounds2.h>
 #include <3d/dag_quadIndexBuffer.h>
 #include <util/dag_console.h>
 #include <rendInst/rendInstGen.h>
@@ -64,15 +57,13 @@ void BurningDecals::createTexturesAndBuffers()
   inited = true;
   mem_set_0(decals);
 
-  activeCount = 0;
-
   burningMap.set(d3d::create_tex(NULL, resolution, resolution, TEXFMT_R8G8 | TEXCF_RTARGET, 1, "burning_map_tex"), "burning_map_tex");
 
   bakedBurningMap.set(d3d::create_tex(NULL, resolution, resolution, TEXFMT_R8G8 | TEXCF_RTARGET, 1, "baked_burning_map_tex"),
     "baked_burning_map_tex");
 
+  d3d::driver_command(DRV3D_COMMAND_ACQUIRE_OWNERSHIP, NULL, NULL, NULL);
   {
-    d3d::GpuAutoLock gpuLock;
     SCOPE_RENDER_TARGET;
 
     d3d::set_render_target(bakedBurningMap.getTex2D(), 0);
@@ -84,6 +75,7 @@ void BurningDecals::createTexturesAndBuffers()
     d3d::resource_barrier({bakedBurningMap.getTex2D(), RB_RO_SRV | RB_STAGE_PIXEL, 0, 0});
     d3d::resource_barrier({burningMap.getTex2D(), RB_RO_SRV | RB_STAGE_PIXEL, 0, 0});
   }
+  d3d::driver_command(DRV3D_COMMAND_RELEASE_OWNERSHIP, NULL, NULL, NULL);
 
   decalDataVS = dag::buffers::create_one_frame_sr_tbuf(decals_count * sizeof(InstData) / sizeof(Point4), TEXFMT_A32B32G32R32F,
     "burning_decal_data_vs");
@@ -100,7 +92,7 @@ void BurningDecals::clear()
 
   needUpdate = false;
 
-  d3d::GpuAutoLock gpuLock;
+  d3d::driver_command(DRV3D_COMMAND_ACQUIRE_OWNERSHIP, NULL, NULL, NULL);
 
   decalDataVS.close();
   bakedBurningMap.close();
@@ -109,6 +101,7 @@ void BurningDecals::clear()
   static int burning_trees_varId = ::get_shader_variable_id("burning_trees", true);
   ShaderGlobal::set_int(burning_trees_varId, 0);
 
+  d3d::driver_command(DRV3D_COMMAND_RELEASE_OWNERSHIP, NULL, NULL, NULL);
   inited = false;
 }
 
@@ -126,12 +119,6 @@ void BurningDecals::createDecal(const Point2 &pos, const Point2 &dir, const Poin
 {
   if (!inited)
     createTexturesAndBuffers();
-
-  if (size.x == 0.0f || size.y == 0.0f)
-  {
-    logerr("Trying to create burning decal with zero size!");
-    return;
-  }
 
   // try to add decals one to another if possible to avoid decal spam in one place if decal is small
   if (min(size.x, size.y) < 10.0f)

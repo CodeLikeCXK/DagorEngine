@@ -1,13 +1,14 @@
 //
 // DaEditorX
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
 #include <math/dag_plane3.h>
 
 
-static void generateBox(const TMatrix &m, Plane3 box[6], BBox3 &b)
+void generateBox(const TMatrix &m, Plane3 box[6], BBox3 &b)
 {
   float bverts[8][3] = {{-0.5, -0.5, 0.5}, {-0.5, 0.5, 0.5}, {0.5, 0.5, 0.5}, {0.5, -0.5, 0.5},
 
@@ -46,7 +47,7 @@ static void generateBox(const TMatrix &m, Plane3 box[6], BBox3 &b)
   }
 }
 
-static bool isInside(Plane3 box[6], Point3 &p)
+bool isInside(Plane3 box[6], Point3 &p)
 {
   for (int i = 0; i < 6; ++i)
   {

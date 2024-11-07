@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <EASTL/variant.h>
@@ -15,17 +14,14 @@
 namespace dabfg
 {
 
-struct MissingOptionalResource
-{};
-using ProvidedResource = eastl::variant<MissingOptionalResource, ManagedTexView, ManagedBufView, BlobView>;
-using ProvidedResolution = eastl::variant<IPoint2, IPoint3>;
+using ProvidedResource = eastl::variant<ManagedTexView, ManagedBufView, BlobView>;
 
 struct ResourceProvider
 {
   dag::VectorMap<ResNameId, ProvidedResource> providedResources;
   dag::VectorMap<ResNameId, ProvidedResource> providedHistoryResources;
 
-  IdIndexedMapping<AutoResTypeNameId, ProvidedResolution> resolutions;
+  IdIndexedMapping<AutoResTypeNameId, IPoint2> resolutions;
 
   void clear()
   {

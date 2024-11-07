@@ -1,7 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
-#include <drv/3d/dag_consts.h>
+#include <3d/dag_drv3dConsts.h>
 #include "d3d_cap_set_xmacro.h"
 
 

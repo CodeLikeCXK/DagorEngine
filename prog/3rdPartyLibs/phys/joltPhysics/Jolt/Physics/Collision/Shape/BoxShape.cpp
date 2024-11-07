@@ -103,7 +103,6 @@ const ConvexShape::Support *BoxShape::GetSupportFunction(ESupportMode inMode, Su
 	switch (inMode)
 	{
 	case ESupportMode::IncludeConvexRadius:
-	case ESupportMode::Default:
 		{
 			// Make box out of our half extents
 			AABox box = AABox(-scaled_half_extent, scaled_half_extent);

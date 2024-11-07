@@ -1,12 +1,9 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
-
-#include <drv/hid/dag_hiVrInput.h>
+#include <humanInput/dag_hiVrInput.h>
 
 #include "openXr.h"
 #include <EASTL/string.h>
 #include <EASTL/vector.h>
-#include <EASTL/vector_set.h>
 
 
 class OpenXrInputHandler : public HumanInput::VrInput
@@ -87,7 +84,7 @@ private:
 
   Bindings currentBindings;
   eastl::vector<HumanInput::ButtonBits> currentBindingMasks;
-  void updateBindingMask(ActionIndex action, XrPath binding, const eastl::vector_set<XrPath> &bindings);
+  void updateBindingMask(ActionIndex action, XrPath binding);
 
   eastl::vector<XrActionSet> actionSets;
   eastl::vector<ActionSetId> actionSetIds;

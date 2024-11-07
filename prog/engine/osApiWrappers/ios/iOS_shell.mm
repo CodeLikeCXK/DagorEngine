@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #import <UIKit/UIApplication.h>
 #import <Foundation/NSString.h>
 #import <Foundation/NSURL.h>
@@ -10,18 +8,7 @@
 void os_shell_execute(const char *op, const char *file, const char *params, const char *dir, bool force_sync, OpenConsoleMode)
 {
 #if _TARGET_IOS
-  NSURL *url = [NSURL URLWithString:[NSString stringWithUTF8String:file]];
-  if ([[UIApplication sharedApplication] canOpenURL:url])
-  {
-    [[UIApplication sharedApplication] openURL:url options:@{} completionHandler:^(BOOL success)
-    {
-      if (!success) debug("URL is not opened");
-    }];
-  }
-  else
-  {
-    debug("Can't open URL");
-  }
+  [[UIApplication sharedApplication] openURL:[NSURL URLWithString:[NSString stringWithUTF8String:file]]];
 #else
   logerr("unsupported: shell_execute(%s, %s, %s, %s)", op, file, params, dir);
 #endif

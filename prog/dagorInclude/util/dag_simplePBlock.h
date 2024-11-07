@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -80,10 +81,6 @@ private:
 
     void setString(const char *s);
     ParamDesc();
-    ParamDesc(ParamDesc &&) = default;
-    ParamDesc(const ParamDesc &) = delete;
-    ParamDesc &operator=(ParamDesc &&) = default;
-    ParamDesc &operator=(const ParamDesc &) = delete;
     ~ParamDesc();
   };
 

@@ -17,8 +17,6 @@ struct GPUFxTracerDynamic
 {
   float3 pos;
   int partCountSegmentId;
-  float3 pad;
-  float amplifyScale;
 };
 
 // have to pad it because on metal float3 is 16-byte aligned, while in c++ counter part its not
@@ -73,7 +71,7 @@ struct GPUFxSegmentCreate
 struct GPUFXTracerType
 {
   float3 tracerStartColor1;
-  float tracerHeadTaper;
+  float pad0;
   float3 tracerStartColor2;
   float tracerStartTime;
   float4 tracerHeadColor1;
@@ -100,7 +98,6 @@ struct GPUFXHeadProcessed
   float beam;
   float minPixelSize;
   float time;
-  float tracerHeadTaper;
 };
 
 
@@ -183,17 +180,16 @@ struct GPUFXHeadProcessed
   head.worldDir = normalize(tracerDynamic.pos - segment_buffer[head_h.tracerId * MAX_FX_SEGMENTS + head_h.segmentId].worldPos); \
   head.worldSize = ht.headHalfSize * head_h.lenScale; \
   head.worldPos = tracerDynamic.pos - head.worldDir * head.worldSize; \
-  head.radius = ht.headRadius * tracerDynamic.amplifyScale; \
-  head.tracerHeadColor1 = ht.tracerHeadColor1 * tracerDynamic.amplifyScale; \
-  head.tracerHeadColor2 = ht.tracerHeadColor2 * tracerDynamic.amplifyScale; \
+  head.radius = ht.headRadius; \
+  head.tracerHeadColor1 = ht.tracerHeadColor1; \
+  head.tracerHeadColor2 = ht.tracerHeadColor2; \
   head.tracerHeadColor1.w *= head_h.opacity; \
   head.beam = ht.beam; \
-  head.minPixelSize = ht.minPixelSize * tracerDynamic.amplifyScale; \
+  head.minPixelSize = ht.minPixelSize; \
   head.time = head_h.time; \
-  head.tracerStartColor1 = ht.tracerStartColor1 * tracerDynamic.amplifyScale; \
-  head.tracerStartColor2 = ht.tracerStartColor2 * tracerDynamic.amplifyScale; \
+  head.tracerStartColor1 = ht.tracerStartColor1; \
+  head.tracerStartColor2 = ht.tracerStartColor2; \
   head.tracerStartTime = ht.tracerStartTime; \
-  head.tracerHeadTaper = ht.tracerHeadTaper; \
 }
 
 #define PACK_FX_HEAD_PROCESSED(hd, id, head) \
@@ -206,7 +202,7 @@ struct GPUFXHeadProcessed
   hd[offset + 4] = float4(head.minPixelSize, head.time, 0, 0); \
   if (FX_HEAD_NUM_REGISTERS >= 7) \
   { \
-    hd[offset + 5] = float4(head.tracerStartColor1.x, head.tracerStartColor1.y, head.tracerStartColor1.z, head.tracerHeadTaper); \
+    hd[offset + 5] = float4(head.tracerStartColor1.x, head.tracerStartColor1.y, head.tracerStartColor1.z, 0); \
     hd[offset + 6] = float4(head.tracerStartColor2.x, head.tracerStartColor2.y, head.tracerStartColor2.z, head.tracerStartTime); \
   } \
 }
@@ -226,7 +222,6 @@ struct GPUFXHeadProcessed
   if (FX_HEAD_NUM_REGISTERS >= 7) \
   { \
     head.tracerStartColor1 = hd[offset + 5].xyz; \
-    head.tracerHeadTaper = hd[offset + 5].w; \
     head.tracerStartColor2 = hd[offset + 6].xyz; \
     head.tracerStartTime = hd[offset + 6].w; \
   } \

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <dasModules/aotPhysMat.h>
 #include <daScript/ast/ast_handle.h>
 

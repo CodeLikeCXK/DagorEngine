@@ -1,3 +1,0 @@
--keep public class com.gaijinent.common.DagorLogger {
-  private static native <methods>;
-}

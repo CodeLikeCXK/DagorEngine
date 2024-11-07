@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <set>
 #include <map>
 #include <generic/dag_smallTab.h>

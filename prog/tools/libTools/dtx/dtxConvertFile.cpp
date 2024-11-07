@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <libTools/dtx/dtx.h>
 #include <libTools/util/de_TextureName.h>
 #include <nvtt/nvtt.h>
@@ -12,7 +10,7 @@
 #include <math/dag_adjpow2.h>
 #include <ioSys/dag_chainedMemIo.h>
 #include <ioSys/dag_fileIo.h>
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
 #include <3d/ddsFormat.h>
 #include <osApiWrappers/dag_files.h>
 #include <osApiWrappers/dag_direct.h>
@@ -233,7 +231,7 @@ bool ddstexture::Converter::convert(const char *src_filename, const char *dst_fi
 
     case fmtDXT5: comprOptions.setFormat(nvtt::Format_DXT5); break;
 
-    default: LOGERR_CTX("type=%d format=%d failed: no support in convert()", type, format); return false;
+    default: logerr_ctx("type=%d format=%d failed: no support in convert()", type, format); return false;
   }
 
   switch (mipmapFilter)

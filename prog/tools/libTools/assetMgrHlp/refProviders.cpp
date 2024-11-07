@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <assets/assetHlp.h>
 #include <assets/assetMgr.h>
 #include <assets/assetRefs.h>
@@ -22,7 +20,7 @@ static Tab<int> expTypes(inimem);
 
 static bool loadSingleExporterPlugin(const DataBlock &appblk, DagorAssetMgr &mgr, const char *fname)
 {
-  void *dllHandle = os_dll_load_deep_bind(fname);
+  void *dllHandle = os_dll_load(fname);
   IDaBuildPlugin *p = NULL;
 
   if (dllHandle)
@@ -85,7 +83,7 @@ static bool loadSingleExporterPlugin(const DataBlock &appblk, DagorAssetMgr &mgr
 static bool load_plugins_from_dir(DataBlock &appblk, DagorAssetMgr &mgr, const char *dirpath)
 {
   alefind_t ff;
-  const String mask(260, "%s/*" DAGOR_OS_DLL_SUFFIX, dirpath);
+  const String mask(260, "%s/*" DAGOR_PC_OS_DLL_SUFFIX, dirpath);
   String fname;
 
   if (::dd_find_first(mask, DA_FILE, &ff))
@@ -146,7 +144,15 @@ bool assetrefs::load_plugins(DagorAssetMgr &mgr, DataBlock &appblk, const char *
     if (blk.getParamType(i) == DataBlock::TYPE_STRING && blk.getParamNameId(i) == nid_folder)
     {
       const char *pfolder = blk.getStr(i);
-      const char *common_dir = "plugins/dabuild";
+#if _TARGET_PC_LINUX
+      const char *common_dir = "../bin-linux64/plugins/daBuild";
+#elif _TARGET_PC_MACOSX
+      const char *common_dir = "../bin-macosx/plugins/daBuild";
+#elif _TARGET_64BIT
+      const char *common_dir = "../bin64/plugins/daBuild";
+#else
+      const char *common_dir = "../bin/plugins/daBuild";
+#endif
       bool ret;
       if (stricmp(pfolder, "*common") == 0)
         ret = load_plugins_from_dir(appblk, mgr, String(260, "%s/%s", start_dir, common_dir));

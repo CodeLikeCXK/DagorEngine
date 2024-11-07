@@ -1,7 +1,4 @@
-if (__name__ == "__analysis__")
-  return
-
-function fn(x) {
+let function fn(x) {
     return ::y(x)
   }
 

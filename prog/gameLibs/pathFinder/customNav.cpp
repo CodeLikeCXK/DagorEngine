@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <pathFinder/pathFinder.h>
 #include <pathFinder/customNav.h>
 #include <math/dag_mathUtils.h>
@@ -194,7 +192,7 @@ void CustomNav::areaAddToTiles(Area &area)
     {
       for (const Area &a : tile.cylinderAreas)
       {
-        if (DAGOR_UNLIKELY(a.id == area.id))
+        if (EASTL_UNLIKELY(a.id == area.id))
         {
           logerr("a.id == area.id  %d == %d for cylinder area in %s", a.id, area.id, __FUNCTION__);
           debug("tile count %d and gen %d", area.tileCount, area.generation);
@@ -211,7 +209,7 @@ void CustomNav::areaAddToTiles(Area &area)
     {
       for (const Area &a : tile.boxAreas)
       {
-        if (DAGOR_UNLIKELY(a.id == area.id))
+        if (EASTL_UNLIKELY(a.id == area.id))
         {
           logerr("a.id == area.id  %d == %d for box area in %s", a.id, area.id, __FUNCTION__);
           debug("tile count %d and gen %d", area.tileCount, area.generation);

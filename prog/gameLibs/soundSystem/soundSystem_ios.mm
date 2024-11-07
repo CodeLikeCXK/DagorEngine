@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "soundSystem_ios.h"
 #import <UIKit/UIKit.h>
 #include <AVFoundation/AVFoundation.h>

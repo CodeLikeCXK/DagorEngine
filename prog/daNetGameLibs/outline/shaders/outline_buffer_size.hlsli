@@ -1,1 +1,0 @@
-#define COLOR_BUF_SIZE (256 * 2)

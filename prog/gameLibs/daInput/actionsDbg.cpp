@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "actionData.h"
 #include <util/dag_string.h>
 #include <gui/dag_visualLog.h>

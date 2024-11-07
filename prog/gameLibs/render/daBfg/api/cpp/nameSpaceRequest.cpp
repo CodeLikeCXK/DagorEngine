@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <render/daBfg/nameSpaceRequest.h>
 #include <frontend/internalRegistry.h>
 
@@ -13,15 +11,11 @@ NameSpaceRequest NameSpaceRequest::operator/(const char *child_name) const
   return {nsId, nodeId, registry};
 }
 
-template <int D>
-AutoResolutionRequest<D> NameSpaceRequest::getResolution(const char *type_name, float multiplier) const
+AutoResolutionRequest NameSpaceRequest::getResolution(const char *type_name, float multiplier) const
 {
   const auto autoResTypeId = registry->knownNames.addNameId<AutoResTypeNameId>(nameSpaceId, type_name);
   return {autoResTypeId, multiplier, &registry->resourceProviderReference};
 }
-
-template AutoResolutionRequest<2> NameSpaceRequest::getResolution<2>(const char *, float) const;
-template AutoResolutionRequest<3> NameSpaceRequest::getResolution<3>(const char *, float) const;
 
 // === Resource requesting ===
 

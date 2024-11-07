@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <webui/websocket/webSocketStream.h>
 
 #include <time.h>
@@ -73,12 +71,7 @@ public:
   int port = -1;
 
   WebSocketStream() :
-    DaThread("WebSocketStream", DEFAULT_STACK_SZ, 0, WORKER_THREADS_AFFINITY_MASK),
-    currentWriteBuffer(0),
-    currentReadBuffer(-1),
-    readyForRead(true),
-    ctx(NULL),
-    nextPing(0)
+    DaThread("WebSocketStream"), currentWriteBuffer(0), currentReadBuffer(-1), readyForRead(true), ctx(NULL), nextPing(0)
   {
     for (int i = 0; i < buffers.size(); ++i)
     {
@@ -139,12 +132,12 @@ public:
 
       ctx = mg_start(&callbacks, this, options);
       if (!ctx)
-        DEBUG_CTX("[WEBSOCKET] Failed to start websocket server");
+        debug_ctx("[WEBSOCKET] Failed to start websocket server");
       else
-        DEBUG_CTX("[WEBSOCKET] The server has been started at port %d", port);
+        debug_ctx("[WEBSOCKET] The server has been started at port %d", port);
     }
 
-    while (!isThreadTerminating())
+    while (!terminating)
     {
       doExecute();
       sleep_msec(10);
@@ -501,8 +494,8 @@ bool start(int port)
 
   if (websocket_stream->start())
   {
-    websocket_stream->addMessageListener(&websocket_listener);
     started = true;
+    websocket_stream->addMessageListener(&websocket_listener);
     return true;
   }
 

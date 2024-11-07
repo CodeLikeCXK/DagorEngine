@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <libTools/pageAsg/asg_anim_tree.h>
 #include <libTools/pageAsg/asg_anim_ctrl.h>
 #include <ioSys/dag_dataBlock.h>

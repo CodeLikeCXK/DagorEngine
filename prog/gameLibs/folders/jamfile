@@ -12,23 +12,21 @@ AddIncludes =
 
 Sources = folders.cpp ;
 
-if $(Platform) in windows {
-  Sources += platform/common.cpp ;
-  if $(UseGDK) = no {
-    Sources += platform/windows.cpp ;
-  } else {
-    Sources += platform/xbox.cpp ;
-  }
+if $(Platform) in win32 win64 {
+  Sources +=
+    platform/windows.cpp
+    platform/common.cpp
+  ;
 }
 
-if $(Platform) = linux {
+if $(Platform) = linux64 {
   Sources +=
     platform/linux.cpp
     platform/common.cpp
   ;
 }
 
-if $(Platform) = macOS {
+if $(Platform) = macosx {
   Sources +=
     platform/macos.cpp
     platform/common.cpp
@@ -51,16 +49,6 @@ if $(Platform) = nswitch {
 }
 
 if $(Platform) = iOS {
-  HideiOSGameDataFromUser ?= no ;
-
-  if $(HideiOSGameDataFromUser) = yes {
-    Target = $(Target:S=~hidden.lib) ;
-
-    Sources += platform/iosHiddenGameData.mm ;
-  } else {
-    Sources += platform/iosVisibleGameData.cpp ;
-  }
-
   Sources +=
     platform/ios.cpp
     platform/common.cpp

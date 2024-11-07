@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "clipping_builder.h"
 
 #include <de3_interface.h>
@@ -68,11 +66,11 @@ public:
   {
     if (!rt)
     {
-      DEBUG_CTX("addCapsule without start");
+      debug_ctx("addCapsule without start");
       return;
     }
 
-    DEBUG_CTX("addCapsule not implemented!");
+    debug_ctx("addCapsule not implemented!");
     // rt->addcapsule ( c, obj_id, obj_flags, physmat_id );
   }
   virtual void addSphere(const Point3 &c, float rad, int obj_id, int obj_flags, const char *physmat)
@@ -113,7 +111,7 @@ public:
   {
     if (!rt)
     {
-      DEBUG_CTX("addMesh without start");
+      debug_ctx("addMesh without start");
       return;
     }
 
@@ -190,7 +188,7 @@ public:
   {
     if (!rt)
     {
-      DEBUG_CTX("finishAndWrite without start");
+      debug_ctx("finishAndWrite without start");
       return false;
     }
 

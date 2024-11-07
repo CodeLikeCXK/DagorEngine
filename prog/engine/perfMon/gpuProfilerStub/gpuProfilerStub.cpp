@@ -1,5 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
+#pragma once
 #include <util/dag_stdint.h>
 struct DrawStatSingle;
 namespace gpu_profiler

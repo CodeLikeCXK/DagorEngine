@@ -1,10 +1,8 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <dag/dag_vector.h>
 #include <debug/dag_assert.h>
 #include "idEnumerateView.h"
-#include "idRange.h"
 
 
 template <class EnumType, class ValueType, typename Allocator = EASTLAllocatorType>
@@ -35,13 +33,13 @@ struct IdIndexedMapping : dag::Vector<ValueType, Allocator, true, eastl::underly
   void set(EnumType key, ValueType value)
   {
     expandMapping(key);
-    operator[](key) = eastl::move(value);
+    operator[](key) = value;
   }
 
   // Automatically expands
   ValueType &get(EnumType key, ValueType value)
   {
-    expandMapping(key, eastl::move(value));
+    expandMapping(key, value);
     return operator[](key);
   }
 
@@ -68,6 +66,4 @@ struct IdIndexedMapping : dag::Vector<ValueType, Allocator, true, eastl::underly
 
   IdEnumerateView<IdIndexedMapping> enumerate() & { return {*this}; }
   IdEnumerateView<const IdIndexedMapping> enumerate() const & { return {*this}; }
-
-  IdRange<EnumType> keys() const { return {static_cast<EnumType>(0), static_cast<EnumType>(Container::size())}; }
 };

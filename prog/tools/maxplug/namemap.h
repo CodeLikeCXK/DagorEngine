@@ -1,4 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright 2023 by Gaijin Games KFT, All rights reserved.
+#ifndef _GAIJIN_DAGOR_NAMEMAP_H
+#define _GAIJIN_DAGOR_NAMEMAP_H
 #pragma once
 
 #include <max.h>
@@ -105,3 +107,5 @@ public:
 /// @}
 
 // #include "undef_.h"
+
+#endif // _GAIJIN_DAGOR_NAMEMAP_H

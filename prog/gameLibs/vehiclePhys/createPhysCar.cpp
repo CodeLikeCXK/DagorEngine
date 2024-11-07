@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <vehiclePhys/physCarGameRes.h>
 #include <gameRes/dag_gameResSystem.h>
 #include <debug/dag_debug.h>
@@ -35,7 +33,7 @@ IPhysCar *create_bullet_raywheel_car(const char *res_name, const TMatrix &tm, vo
   TMatrix physTm;
   body->getBody()->getTm(physTm);
 
-  //  DEBUG_CTX("car '%s' body material id = %d",
+  //  debug_ctx("car '%s' body material id = %d",
   //    res_name, body->getBody()->getMaterialId());
 
   TMatrix physToLogic = inverse(physTm) * pccd->carDataPtr->logicTm;
@@ -110,7 +108,7 @@ IPhysCar *create_bullet_raywheel_car(const char *car_name, PhysBody *car_body, c
   TMatrix physToLogic = inverse(physTm) * carData->logicTm;
   invLogicTm = inverse(carData->logicTm);
   TMatrix btm = invLogicTm * physTm;
-  // DEBUG_CTX("car '%s' body material id = %d", car_name, car_body->getMaterialId());
+  // debug_ctx("car '%s' body material id = %d", car_name, car_body->getMaterialId());
 
   RayCar *car =
     new RayCar(car_name, car_body, physToLogic, btm * bbox, btm * bsphere, simple_phys, carData->frontSusp, carData->rearSusp);

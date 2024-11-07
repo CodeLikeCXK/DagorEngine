@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <libTools/shaderResBuilder/dynSceneResSrc.h>
 #include <libTools/shaderResBuilder/lodsEqMatGather.h>
 #include <libTools/shaderResBuilder/globalVertexDataConnector.h>

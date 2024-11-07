@@ -1,4 +1,0 @@
-return {
-  get_regions = @() []
-  get_region_name_by_pos = @(_) ""
-}

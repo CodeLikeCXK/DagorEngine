@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -124,7 +125,6 @@ struct TexImage32 : public TexImage
 {
   inline TexPixel32 *getPixels() { return (TexPixel32 *)(this + 1); }
   static TexImage32 *create(int w, int h, IMemAlloc *mem = NULL);
-  static TexImage32 *tryCreate(int w, int h, IMemAlloc *mem = NULL); // Returns nullptr if tryAlloc() failed
 };
 
 struct TexImage8a : public TexImage

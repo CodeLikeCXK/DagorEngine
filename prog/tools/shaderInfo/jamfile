@@ -5,7 +5,8 @@ ConsoleExe = yes ;
 
 TargetType  = exe ;
 Target      = tools/util/shaderInfo.exe ;
-include $(Root)/prog/tools/tools_setup_outdir_util.jam ;
+OutDir      = $(Root)/tools/dagor3_cdk/util ;
+if $(Platform) = win64 { OutDir = $(OutDir)64 ; } else { CopyTo = $(GDEVTOOL)/util ; }
 
 AddIncludes =
   $(Root)/prog/engine/shaders

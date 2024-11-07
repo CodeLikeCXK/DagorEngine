@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <anim/dag_animDecl.h>
@@ -26,7 +25,7 @@ public:
   virtual bool isSelectedByRectangle(IGenViewportWnd *vp, const EcRect &rect) const;
   virtual bool getWorldBox(BBox3 &box) const;
 
-  virtual void onPPChange(int pid, bool edit_finished, PropPanel::ContainerPropertyControl &panel,
+  virtual void onPPChange(int pid, bool edit_finished, PropertyContainerControlBase &panel,
     dag::ConstSpan<RenderableEditableObject *> objects){};
 
   virtual void scaleObject(const Point3 &delta, const Point3 &origin, IEditorCoreEngine::BasisType basis) {}

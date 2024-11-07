@@ -1,14 +1,11 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright 2023 by Gaijin Games KFT, All rights reserved.
 #pragma once
 
 #include "joy_android.h"
 
-#include <math/dag_Point3.h>
 #include <util/dag_globDef.h>
-#include <drv/hid/dag_hiDeclDInput.h>
+#include <humanInput/dag_hiDeclDInput.h>
 #include <string.h>
-
-#include <atomic>
 
 struct ASensorEventQueue;
 struct ASensorManager;
@@ -25,14 +22,7 @@ enum
 
 struct SensorsPollingData
 {
-  struct PendingData
-  {
-    Point3 values;
-    bool hasEvents;
-  };
-
-  std::atomic<PendingData> pendingGyro;
-  std::atomic<PendingData> pendingGravity;
+  int *gyroValues = nullptr;
 };
 
 /*

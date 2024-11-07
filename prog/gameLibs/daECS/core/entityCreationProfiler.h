@@ -1,6 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
-
 #include <perfMon/dag_perfTimer.h>
 #include <debug/dag_debug.h>
 

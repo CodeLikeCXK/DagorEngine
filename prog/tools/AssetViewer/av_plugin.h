@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <EditorCore/ec_interface.h>
@@ -8,13 +7,10 @@
 #include <winGuiWrapper/wgw_dialogs.h>
 #include "av_script_panel.h"
 
-namespace PropPanel
-{
-class ContainerPropertyControl;
-}
 
 class DagorAsset;
 class CoolConsole;
+class PropertyContainerControlBase;
 class IWndManager;
 class AvTree;
 
@@ -30,19 +26,9 @@ public:
   virtual void registered() = 0;
   virtual void unregistered() = 0;
 
-  // Plugins can save and load their settings with these functions. Each plugin has its own block within the main
-  // application settings, so any name can be used freely in the provided DataBlock.
-  virtual void loadSettings(const DataBlock &settings) {}
-  virtual void saveSettings(DataBlock &settings) const {}
-
   virtual bool begin(DagorAsset *asset) = 0;
   virtual bool end() = 0;
   virtual IGenEventHandler *getEventHandler() { return this; }
-
-  // called when user requests switch to this plugin
-  virtual void registerMenuAccelerators() {}
-
-  virtual void handleViewportAcceleratorCommand(IGenViewportWnd &wnd, unsigned id) {}
 
   virtual bool reloadOnAssetChanged(const DagorAsset *changed_asset) { return false; }
   virtual bool reloadAsset(DagorAsset *asset) { return false; }
@@ -60,17 +46,16 @@ public:
   virtual void renderObjects() = 0;
   virtual void renderTransObjects() = 0;
   virtual void renderUI() {}
-  virtual void updateImgui() {}
 
   virtual bool supportAssetType(const DagorAsset &asset) const { return false; }
   virtual bool supportEditing() const { return true; }
 
-  virtual void fillPropPanel(PropPanel::ContainerPropertyControl &propPanel) = 0;
+  virtual void fillPropPanel(PropertyContainerControlBase &propPanel) = 0;
   virtual void postFillPropPanel() = 0;
-  virtual void onPropPanelClear(PropPanel::ContainerPropertyControl &propPanel);
+  virtual void onPropPanelClear(PropertyContainerControlBase &propPanel);
 
   virtual bool hasScriptPanel();
-  virtual void fillScriptPanel(PropPanel::ContainerPropertyControl &propPanel);
+  virtual void fillScriptPanel(PropertyContainerControlBase &propPanel);
   void initScriptPanelEditor(const char *scheme, const char *panel_caption = NULL);
 
   // IGenEventHandler
@@ -104,8 +89,9 @@ public:
 
   static void drawInfo(IGenViewportWnd *wnd);
   static void repaintView();
-  static PropPanel::ContainerPropertyControl *getPropPanel();
-  static PropPanel::ContainerPropertyControl *getPluginPanel();
+  static PropertyContainerControlBase *getPropPanel();
+  static PropertyContainerControlBase *getPluginPanel();
+  static void *getAdditinalPropWindow();
   static void fillPluginPanel();
   static CoolConsole &getMainConsole();
   static IWndManager &getWndManager();

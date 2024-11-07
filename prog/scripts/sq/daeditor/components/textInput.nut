@@ -170,7 +170,7 @@ function textInput(text_state, options={}, frameCtor=defaultFrame) {
       animations = [failAnim(text_state)]
       margin = [0, sh(0.5)]
     }
-    placeholderObj = isObservable(placeholder)
+    placeholderObj = placeholder instanceof Watched
       ? @() phBase.__update({ watch = placeholder, text = placeholder.value })
       : phBase
   }

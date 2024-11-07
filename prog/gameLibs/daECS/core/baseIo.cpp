@@ -1,34 +1,30 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <daECS/core/baseIo.h>
 #include <daECS/core/entityManager.h>
+#include <daECS/core/internal/trackComponentAccess.h>
 namespace ecs
 {
 
-bool can_serialize_type(ecs::type_index_t typeId, const ecs::EntityManager &mgr)
+bool can_serialize_type(ecs::type_index_t typeId)
 {
-  ecs::ComponentType componentTypeInfo = mgr.getComponentTypes().getTypeInfo(typeId);
+  ecs::ComponentType componentTypeInfo = g_entity_mgr->getComponentTypes().getTypeInfo(typeId);
   // todo: check for component serializer
   return ecs::is_pod(componentTypeInfo.flags) || (componentTypeInfo.flags & COMPONENT_TYPE_HAS_IO);
 }
 
-bool can_serialize(const ecs::EntityComponentRef &comp, const ecs::EntityManager &mgr)
-{
-  return can_serialize_type(comp.getTypeId(), mgr);
-}
+bool can_serialize(const ecs::EntityComponentRef &comp) { return can_serialize_type(comp.getTypeId()); }
 
-bool should_replicate(const ecs::EntityComponentRef &comp, const ecs::EntityManager &mgr)
+bool should_replicate(const ecs::EntityComponentRef &comp)
 {
-  if (!can_serialize(comp, mgr) || comp.getUserType() == ComponentTypeInfo<ecs::Tag>::type)
+  if (!can_serialize(comp) || comp.getUserType() == ComponentTypeInfo<ecs::Tag>::type)
     return false;
-  DataComponent component = mgr.getDataComponents().getComponentById(comp.getComponentId());
+  DataComponent component = g_entity_mgr->getDataComponents().getComponentById(comp.getComponentId());
   return !(component.flags & (DataComponent::DONT_REPLICATE | DataComponent::IS_COPY));
 }
 
-bool should_replicate(component_index_t cidx, const ecs::EntityManager &mgr)
+bool should_replicate(component_index_t cidx)
 {
-  DataComponent component = mgr.getDataComponents().getComponentById(cidx);
-  if (!can_serialize_type(component.componentType, mgr) || component.componentTypeName == ComponentTypeInfo<ecs::Tag>::type)
+  DataComponent component = g_entity_mgr->getDataComponents().getComponentById(cidx);
+  if (!can_serialize_type(component.componentType) || component.componentTypeName == ComponentTypeInfo<ecs::Tag>::type)
     return false;
   return !(component.flags & (DataComponent::DONT_REPLICATE | DataComponent::IS_COPY));
 }
@@ -56,12 +52,12 @@ int read_string(const ecs::DeserializerCb &cb, char *buf, uint32_t buf_size)
 }
 
 void serialize_entity_component_ref_typeless(const void *comp_data, component_index_t cidx, component_type_t type_name,
-  type_index_t type_id, SerializerCb &serializer, const ecs::EntityManager &mgr)
+  type_index_t type_id, SerializerCb &serializer)
 {
-  const auto &componentTypes = mgr.getComponentTypes();
+  auto &componentTypes = g_entity_mgr->getComponentTypes();
   ComponentSerializer *typeIO = nullptr;
   if (cidx != ecs::INVALID_COMPONENT_INDEX)
-    typeIO = mgr.getDataComponents().getComponentIO(cidx);
+    typeIO = g_entity_mgr->getDataComponents().getComponentIO(cidx);
   ComponentType componentTypeInfo = componentTypes.getTypeInfo(type_id);
 
   const bool isPod = is_pod(componentTypeInfo.flags);
@@ -79,33 +75,31 @@ void serialize_entity_component_ref_typeless(const void *comp_data, component_in
   }
 }
 
-void serialize_entity_component_ref_typeless(const void *comp_data, component_type_t type_name, SerializerCb &serializer,
-  const ecs::EntityManager &mgr)
+void serialize_entity_component_ref_typeless(const void *comp_data, component_type_t type_name, SerializerCb &serializer)
 {
   serialize_entity_component_ref_typeless(comp_data, ecs::INVALID_COMPONENT_INDEX, type_name,
-    mgr.getComponentTypes().findType(type_name), serializer, mgr);
+    g_entity_mgr->getComponentTypes().findType(type_name), serializer);
 }
 
-void serialize_entity_component_ref_typeless(const EntityComponentRef &comp, SerializerCb &serializer, const ecs::EntityManager &mgr)
+void serialize_entity_component_ref_typeless(const EntityComponentRef &comp, SerializerCb &serializer)
 {
   G_ASSERT(comp.getComponentId() != INVALID_COMPONENT_INDEX);
-  serialize_entity_component_ref_typeless(comp.getRawData(), comp.getComponentId(), comp.getUserType(), comp.getTypeId(), serializer,
-    mgr);
+  serialize_entity_component_ref_typeless(comp.getRawData(), comp.getComponentId(), comp.getUserType(), comp.getTypeId(), serializer);
 }
 
-bool deserialize_component_typeless(EntityComponentRef &comp, const DeserializerCb &deserializer, const ecs::EntityManager &mgr)
+bool deserialize_component_typeless(EntityComponentRef &comp, const DeserializerCb &deserializer)
 {
-  auto &componentTypes = mgr.getComponentTypes();
+  auto &componentTypes = g_entity_mgr->getComponentTypes();
   ecs::component_index_t cidx = comp.getComponentId();
   type_index_t typeId = comp.getTypeId();
   component_type_t userType = comp.getUserType();
   ComponentSerializer *typeIO = nullptr;
   if (cidx != ecs::INVALID_COMPONENT_INDEX)
-    typeIO = mgr.getDataComponents().getComponentIO(cidx);
+    typeIO = g_entity_mgr->getDataComponents().getComponentIO(cidx);
   ComponentType componentTypeInfo = componentTypes.getTypeInfo(typeId);
   if (!typeIO && has_io(componentTypeInfo.flags))
     typeIO = componentTypes.getTypeIO(typeId);
-  mgr.trackComponentIndex(comp.getComponentId(), EntityManager::TrackComponentOp::WRITE, "deserialize");
+  ecsdebug::track_ecs_component_by_index(comp.getComponentId(), ecsdebug::TRACK_WRITE, "deserialize");
   if (typeIO)
   {
     const bool isBoxed = (componentTypeInfo.flags & COMPONENT_TYPE_BOXED) != 0;
@@ -122,11 +116,10 @@ bool deserialize_component_typeless(EntityComponentRef &comp, const Deserializer
   }
 }
 
-bool deserialize_component_typeless(void *raw_data, component_type_t type_name, const DeserializerCb &deserializer,
-  const ecs::EntityManager &mgr)
+bool deserialize_component_typeless(void *raw_data, component_type_t type_name, const DeserializerCb &deserializer)
 {
-  const auto &componentTypes = mgr.getComponentTypes();
-  type_index_t typeId = componentTypes.findType(type_name);
+  auto &componentTypes = g_entity_mgr->getComponentTypes();
+  type_index_t typeId = g_entity_mgr->getComponentTypes().findType(type_name);
   ComponentSerializer *typeIO = nullptr;
   ComponentType componentTypeInfo = componentTypes.getTypeInfo(typeId);
   if (has_io(componentTypeInfo.flags))
@@ -152,16 +145,16 @@ bool deserialize_component_typeless(void *raw_data, component_type_t type_name, 
 // if replication packet arrive before Entity is created, just store it is _packet_, no need to deserialize it
 // current version always make a lot of copies/allocations for no reason
 eastl::optional<ChildComponent> deserialize_init_component_typeless(component_type_t userType, ecs::component_index_t cidx,
-  const DeserializerCb &deserializer, ecs::EntityManager &mgr)
+  const DeserializerCb &deserializer)
 {
   if (userType == 0)
     return ChildComponent(); // Assume that null type is not an error
-  const auto &componentTypes = mgr.getComponentTypes();
+  auto &componentTypes = g_entity_mgr->getComponentTypes();
   ComponentSerializer *typeIO = nullptr;
   type_index_t typeId;
   if (cidx != ecs::INVALID_COMPONENT_INDEX)
   {
-    const auto &components = mgr.getDataComponents();
+    auto &components = g_entity_mgr->getDataComponents();
     DataComponent dataComp = components.getComponentById(cidx);
     typeId = dataComp.componentType;
     DAECS_EXT_ASSERT(dataComp.componentTypeName == userType);
@@ -174,7 +167,7 @@ eastl::optional<ChildComponent> deserialize_init_component_typeless(component_ty
   else
   {
     typeId = componentTypes.findType(userType); // hash lookup
-    if (DAGOR_UNLIKELY(typeId == INVALID_COMPONENT_TYPE_INDEX))
+    if (EASTL_UNLIKELY(typeId == INVALID_COMPONENT_TYPE_INDEX))
     {
       logerr("Attempt to deserialize component of invalid/unknown type 0x%X", userType);
       return MaybeChildComponent(); // We can't read unknown type of unknown size
@@ -182,8 +175,8 @@ eastl::optional<ChildComponent> deserialize_init_component_typeless(component_ty
   }
   ComponentType componentTypeInfo = componentTypes.getTypeInfo(typeId);
   if (has_io(componentTypeInfo.flags) && !typeIO)
-    typeIO = mgr.getComponentTypes().getTypeIO(typeId);
-  mgr.trackComponentIndex(cidx, EntityManager::TrackComponentOp::WRITE, "deserialize_init");
+    typeIO = g_entity_mgr->getComponentTypes().getTypeIO(typeId);
+  ecsdebug::track_ecs_component_by_index(cidx, ecsdebug::TRACK_WRITE, "deserialize_init");
   const bool isPod = is_pod(componentTypeInfo.flags);
   const bool allocatedMem = ChildComponent::is_child_comp_boxed_by_size(componentTypeInfo.size);
   alignas(void *) char compData[ChildComponent::value_size]; // actually, should be sizeof(ChildComponent::Value), but it is protected
@@ -204,7 +197,7 @@ eastl::optional<ChildComponent> deserialize_init_component_typeless(component_ty
       G_ASSERTF(ctm, "type manager for type 0x%X (%d) missing", userType, typeId);
     }
     if (ctm)
-      ctm->create(tempData, mgr, INVALID_ENTITY_ID, ComponentsMap(), cidx);
+      ctm->create(tempData, *g_entity_mgr.get(), INVALID_ENTITY_ID, ComponentsMap(), cidx);
     else if (!isPod)
       memset(tempData, 0, componentTypeInfo.size);
     if (typeIO->deserialize(deserializer, isBoxed ? *(void **)tempData : tempData, componentTypeInfo.size, userType))
@@ -223,19 +216,19 @@ eastl::optional<ChildComponent> deserialize_init_component_typeless(component_ty
   return MaybeChildComponent();
 }
 
-void serialize_child_component(const ChildComponent &comp, SerializerCb &serializer, ecs::EntityManager &mgr)
+void serialize_child_component(const ChildComponent &comp, SerializerCb &serializer)
 {
   component_type_t userType = comp.getUserType();
   serializer.write(&userType, sizeof(userType) * CHAR_BIT, 0);
   serialize_entity_component_ref_typeless(comp.getRawData(), ecs::INVALID_COMPONENT_INDEX, comp.getUserType(), comp.getTypeId(),
-    serializer, mgr);
+    serializer);
 }
 
-MaybeChildComponent deserialize_child_component(const DeserializerCb &deserializer, ecs::EntityManager &mgr)
+MaybeChildComponent deserialize_child_component(const DeserializerCb &deserializer)
 {
   component_type_t userType = 0;
   if (deserializer.read(&userType, sizeof(userType) * CHAR_BIT, 0))
-    return deserialize_init_component_typeless(userType, ecs::INVALID_COMPONENT_INDEX, deserializer, mgr);
+    return deserialize_init_component_typeless(userType, ecs::INVALID_COMPONENT_INDEX, deserializer);
   else
     return MaybeChildComponent();
 }

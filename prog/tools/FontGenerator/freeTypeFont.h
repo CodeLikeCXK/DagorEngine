@@ -1,5 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __GAIJIN_CORE_TRUETYPE2_H__
+#define __GAIJIN_CORE_TRUETYPE2_H__
 #pragma once
+
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
@@ -41,3 +43,5 @@ public:
   String srcDesc;
 };
 DAG_DECLARE_RELOCATABLE(FreeTypeFont);
+
+#endif

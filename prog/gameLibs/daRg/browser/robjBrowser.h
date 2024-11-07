@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <daRg/dag_renderObject.h>
@@ -21,7 +20,7 @@ public:
 class RenderObjectBrowser : public RenderObject
 {
 public:
-  virtual void render(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *rdata,
+  virtual void renderCustom(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *rdata,
     const RenderState &render_state) override;
 };
 

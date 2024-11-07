@@ -31,7 +31,7 @@ struct CTypeInfo
     size : uint
     eraser     : function<(var arr:array<uint8>):void>
     clonner    : function<(var dst:array<uint8>; src:array<uint8>):void>
-    serializer : function<(var arch:Archive; var arr:array<uint8>; name : string):void>
+    serializer : function<(var arch:Archive; var arr:array<uint8>):void>
     dumper     : function<(elem:void?):string>
     mkTypeInfo : function<():TypeInfo const?>
     gc         : function<(var src:array<uint8>):lambda>
@@ -191,10 +191,7 @@ def public serialize ( var arch:Archive; var src:Component )
     arch |> serialize(src.hash)
     arch |> serialize(src.stride)
     arch |> serialize(src.info)
-    if src.info.serializer != null
-        invoke(src.info.serializer, arch, src.data, src.name)
-    else
-        panic("decs: unable to serialize component '{src.name}'")
+    invoke(src.info.serializer, arch, src.data)
 
 def public register_decs_stage_call ( name:string; pcall:PassFunction )
     //! Registration of a single pass callback. This is a low-level function, used by decs_boost macros.
@@ -226,7 +223,7 @@ def operator delete ( var cmp:Component )
 def public restart
     //! Restarts ECS by erasing all deferred actions and entire state.
     if insideQuery!=0
-        panic("decs: can't call `restart` from inside query")
+        panic("can't call `restart` from inside query")
     delete deferActions
     delete decsState
 
@@ -245,7 +242,7 @@ def public before_gc
     //! Low level callback to be called before the garbage collection.
     //! This is a low-level function typically used by `live`.
     if insideQuery!=0
-        panic("decs: can't call 'before_gc' from inside query")
+        panic("can't call 'before_gc' from inside query")
     for arch in decsState.allArchetypes
         if arch.size > 0
             for comp in arch.components
@@ -256,7 +253,7 @@ def public after_gc
     //! Low level callback to be called after the garbage collection.
     //! This is a low-level function typically used by `live`.
     if insideQuery!=0
-        panic("decs: can't call 'after_gc' from inside query")
+        panic("can't call 'after_gc' from inside query")
     for arch in decsState.allArchetypes
         if arch.size > 0
             for comp in arch.components
@@ -303,7 +300,7 @@ def private create_archetype ( var arch:Archetype; cmp:ComponentMap; idx:int )
         var ct & = unsafe(decsState.componentTypeCheck[kv.name])
         if ct.hash != 0ul
             if kv.info.hash != ct.hash
-                panic("decs: component {kv.name} type mismatch {ct} vs {kv.info}")
+                panic("component {kv.name} type mismatch {ct} vs {kv.info}")
         else
             ct = kv.info
         let chash = hash(kv.name)
@@ -494,12 +491,12 @@ def public get ( arch:Archetype; name:string; value:auto(TT) )
                 else
                     cvinfo  = addr(typeinfo(rtti_typeinfo type<TT-const-&-#>))
                 if comp.info.hash != cvinfo.hash
-                    panic("decs: component array {name} type mismatch, expecting {describe(comp.info)} vs {describe(cvinfo)} MNH={get_mangled_name(cvinfo)} hash={cvinfo.hash} size={cvinfo.size}")
+                    panic("component array {name} type mismatch, expecting {describe(comp.info)} vs {describe(cvinfo)} MNH={get_mangled_name(cvinfo)} hash={cvinfo.hash} size={cvinfo.size}")
                 static_if typeinfo(is_dim value)
                     return <- decs_array(type<TT[typeinfo(dim value)]>, comp.data, arch.size)
                 else
                     return <- decs_array(type<TT>, comp.data, arch.size)
-    panic("decs: component array {name} not found")
+    panic("component array {name} not found")
     unsafe
         static_if typeinfo(is_dim value)
             return <- [[array<TT[typeinfo(dim value)]-const-&-#> ]]
@@ -532,7 +529,7 @@ def public get_default_ro ( arch:Archetype; name:string; value:auto(TT) ) : iter
                 else
                     cvinfo  = addr(typeinfo(rtti_typeinfo type<TT-const-&-#>))
                 if comp.info.hash != cvinfo.hash
-                    panic("decs: component array {name} type mismatch, expecting {describe(comp.info)} vs {describe(cvinfo)} MNH={get_mangled_name(cvinfo)} hash={cvinfo.hash} size={cvinfo.size}")
+                    panic("component array {name} type mismatch, expecting {describe(comp.info)} vs {describe(cvinfo)} MNH={get_mangled_name(cvinfo)} hash={cvinfo.hash} size={cvinfo.size}")
                 static_if typeinfo(is_dim value)
                     var it : iterator<TT[typeinfo(dim value)] const &>
                     _builtin_make_fixed_array_iterator(it,addr(comp.data[0]),arch.size,comp.stride)
@@ -553,7 +550,7 @@ def public get_optional ( arch:Archetype; name:string; value:auto(TT)? ) : itera
             unsafe
                 let cvinfo = addr(typeinfo(rtti_typeinfo type<TT-const-&-#>))
                 if comp.info.hash != cvinfo.hash
-                    panic("decs: component array {name} type mismatch, expecting {describe(comp.info)} vs {describe(cvinfo)} MNH={get_mangled_name(cvinfo)} hash={cvinfo.hash} size={cvinfo.size}")
+                    panic("component array {name} type mismatch, expecting {describe(comp.info)} vs {describe(cvinfo)} MNH={get_mangled_name(cvinfo)} hash={cvinfo.hash} size={cvinfo.size}")
             var it : iterator<TT-const-&-#?>
             unsafe
                 _builtin_make_fixed_array_iterator(it,addr(comp.data[0]),arch.size,comp.stride)
@@ -637,7 +634,7 @@ def public delete_entity ( entityid:EntityId implicit )
 def public commit
     //! Finishes all deferred actions.
     if insideQuery!=0
-        panic("decs: can't call `commit` from inside query")
+        panic("can't call `commit` from inside query")
     var actions <- deferActions
     for da in actions
         da.action |> invoke(da)
@@ -655,7 +652,7 @@ def public get ( var cmp:ComponentMap; name:string; var value:auto(TT) )
             else
                 cvinfo = addr(typeinfo(rtti_typeinfo type<TT-const-&-#>))
             if cmp[idx].info.hash != cvinfo.hash
-                panic("decs: get component {name} type mismatch, expecting {describe(cmp[idx].info)} vs {describe(cvinfo)} MNH={get_mangled_name(cvinfo)} hash={cvinfo.hash} size={cvinfo.size}")
+                panic("get component {name} type mismatch, expecting {describe(cmp[idx].info)} vs {describe(cvinfo)} MNH={get_mangled_name(cvinfo)} hash={cvinfo.hash} size={cvinfo.size}")
             memcpy ( addr(value), addr(cmp[idx].data), typeinfo(sizeof type<TT const-&>))
     return value
 
@@ -725,24 +722,18 @@ def private make_callbacks ( var cv:ComponentValue; value:auto(TT) )
                 _builtin_make_temp_array(ssrc, addr(src[0]), size )
             for d,s in dsrc,ssrc
                 d := s
-    cv.info.serializer = @@ <| ( var arch:Archive; var src:array<uint8>; name : string )
+    cv.info.serializer = @@ <| ( var arch:Archive; var src:array<uint8> )
         static_if typeinfo(is_dim value)
-            var stride = typeinfo(sizeof type<TT[typeinfo (dim value)]-const-&-#>)
+            let stride = typeinfo(sizeof type<TT[typeinfo (dim value)]-const-&-#>)
             if arch.reading
-                var wasStride : int
-                arch |> _::serialize(wasStride)
-                if wasStride != stride
-                    panic("decs: component '{name}' stride mismatch, expecting {stride}, got {wasStride}")
-                else
-                    var temp : array<TT[typeinfo (dim value)]-const-&-#>
-                    arch |> _::serialize(temp)
-                    let size = length(temp)
-                    src |> resize ( size*stride )
-                    if size > 0
-                        unsafe
-                            memcpy ( addr(src[0]), addr(temp[0]), size*stride )
+                var temp : array<TT[typeinfo (dim value)]-const-&-#>
+                arch |> _::serialize(temp)
+                let size = length(temp)
+                src |> resize ( size*stride )
+                if size > 0
+                    unsafe
+                        memcpy ( addr(src[0]), addr(temp[0]), size*stride )
             else
-                arch |> _::serialize(stride)
                 var ssrc : array<TT-const-&-#>
                 let size = length(src) / stride
                 unsafe
@@ -750,22 +741,16 @@ def private make_callbacks ( var cv:ComponentValue; value:auto(TT) )
                         _builtin_make_temp_array(ssrc, addr(src[0]), size )
                 arch |> serialize(ssrc)
         else
-            var stride : int = typeinfo(sizeof type<TT-const-&-#>)
+            let stride = typeinfo(sizeof type<TT-const-&-#>)
             if arch.reading
-                var wasStride : int
-                arch |> _::serialize(wasStride)
-                if wasStride != stride
-                    panic("decs: component '{name}' stride mismatch, expecting {stride}, got {wasStride}")
-                else
-                    var temp : array<TT-const-&-#>
-                    arch |> _::serialize(temp)
-                    let size = length(temp)
-                    src |> resize ( size*stride )
-                    if size > 0
-                        unsafe
-                            memcpy ( addr(src[0]), addr(temp[0]), size*stride )
+                var temp : array<TT-const-&-#>
+                arch |> _::serialize(temp)
+                let size = length(temp)
+                src |> resize ( size*stride )
+                if size > 0
+                    unsafe
+                        memcpy ( addr(src[0]), addr(temp[0]), size*stride )
             else
-                arch |> _::serialize(stride)
                 var ssrc : array<TT-const-&-#>
                 let size = length(src) / stride
                 unsafe
@@ -816,7 +801,7 @@ def public set ( var cmp:ComponentMap; name:string; value:auto(TT) )
     let idx = lower_bound(cmp,[[ComponentValue name=name]]) <| $ ( x,y ) => x.name < y.name
     if idx<length(cmp) && cmp[idx].name==name
         if cmp[idx].info.hash != cv.info.hash
-            panic("decs: set component {name} type mismatch, expecting {describe(cmp[idx].info)} vs vs {describe(cv.info)} MNH={cv.info.mangledName} hash={cv.info.hash} size={cv.info.size}")
+            panic("set component {name} type mismatch, expecting {describe(cmp[idx].info)} vs vs {describe(cv.info)} MNH={cv.info.mangledName} hash={cv.info.hash} size={cv.info.size}")
         cmp[idx] = cv           // overwrite
     else
         cmp |> push(cv, idx)    // insert new one

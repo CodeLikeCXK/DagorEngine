@@ -1,8 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <EASTL/vector.h>
-#include <EASTL/fixed_vector.h>
 #include "vulkan_device.h"
 
 namespace drv3d_vulkan
@@ -20,7 +18,6 @@ struct SwapchainMode
   VkPresentModeKHR presentMode;
   VkExtent2D extent;
   FormatStore colorFormat;
-  uint32_t recreateRequest;
   uint8_t enableSrgb : 1;
   // TODO: VK_EXT_full_screen_exclusive support
   // uint8_t fullscreen : 1;
@@ -51,9 +48,6 @@ struct SwapchainMode
     if (colorFormat != r.colorFormat)
       return false;
 
-    if (recreateRequest != r.recreateRequest)
-      return false;
-
     return true;
   }
 
@@ -65,6 +59,9 @@ class Swapchain
 {
 
 private:
+  Device &device;
+  VulkanDevice &vkDev;
+
   VulkanSwapchainKHRHandle handle;
 
   // when we change swapchain, old one will be still used by display/gpu
@@ -83,7 +80,6 @@ private:
 
   SwapchainMode activeMode{};
   SwapchainMode frontMode{};
-  uint32_t recreateRequest = 0;
 
   // defines internal swapchain state
   // that enforces & checks state validity & sequencing
@@ -125,15 +121,21 @@ private:
     return 0;
   }
 #if _TARGET_ANDROID
-  static constexpr int SURFACE_POLLING_INTERVAL = 120;
-  int surfacePolling = 0;
+  static constexpr int SURFACE_ROTATION_POLLING_INTERVAL = 120;
+  int surfaceRotationPolling = 0;
   bool usePredefinedPresentFormat;
+#endif
+
+#if ENABLE_SWAPPY
+  int swappyTarget = 0;
+  bool swappyInitialized = false;
 #endif
 
   // saved global configuration
   bool reuseHandle = true;
 
   Image *offscreenBuffer = nullptr;
+  Image *depthStencilImage = nullptr;
   Image *lastRenderedImage = nullptr;
 
   // around 5'ish formats are reported usually
@@ -168,7 +170,7 @@ private:
   bool checkVkSwapchainError(VkResult rc, const char *source_call);
 
 public:
-  Swapchain() = default;
+  Swapchain() = delete;
   ~Swapchain() = default;
 
   Swapchain(const Swapchain &) = delete;
@@ -177,9 +179,10 @@ public:
   Swapchain(Swapchain &&) = delete;
   Swapchain &operator=(Swapchain &&) = delete;
 
+  Swapchain(Device &dvc);
+
   const SwapchainMode &getMode() const { return frontMode; }
   void setMode(const SwapchainMode &new_mode);
-  void forceRecreate() { ++frontMode.recreateRequest; }
 
   bool init(const SwapchainMode &initial_mode);
   void shutdown(FrameInfo &frame);
@@ -188,6 +191,7 @@ public:
   // following methods should not be called
   // outside of execution context
   // frame should not be intermixed too
+  Image *getDepthStencilImageForExtent(VkExtent2D ext, FrameInfo &frame);
   Image *getColorImage() const { return colorTarget; }
   const SwapchainMode &getActiveMode() const { return activeMode; }
 
@@ -201,6 +205,9 @@ public:
   void prePresent(ExecutionContext &ctx);
   void present(ExecutionContext &ctx);
   void onFrameBegin(ExecutionContext &ctx);
+
+  void setSwappyTargetFrameRate(int rate);
+  void getSwappyStatus(int *status);
 };
 
 } // namespace drv3d_vulkan

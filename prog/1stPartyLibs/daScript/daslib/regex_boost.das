@@ -30,7 +30,7 @@ class RegexReader : AstReaderMacro
         if !is_valid(regex)
             unsafe
                 delete regex
-            macro_error(prog,expr.at,"regular expression did not compile {expr.sequence}")
+            macro_error(prog,expr.at,"regular expression did not compile")
             return <- [[ExpressionPtr]]
         // TODO: turn into AOT?
         var inscope re_data <- convert_to_expression(regex,expr.at)

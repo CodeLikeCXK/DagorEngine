@@ -1,15 +1,11 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <render/resourceSlot/resolveAccess.h>
 #include <render/resourceSlot/state.h>
-#include <render/resourceSlot/actions.h>
 
 #include <detail/storage.h>
 #include <detail/graph.h>
 #include <detail/slotUsage.h>
 #include <detail/unregisterAccess.h>
 
-#include <generic/dag_enumerate.h>
 #include <util/dag_convar.h>
 #include <memory/dag_framemem.h>
 #include <perfMon/dag_graphStat.h>
@@ -29,34 +25,34 @@ static inline void add_node_to_usage_list(UsageMap &slot_usage, const resource_s
   if (debug_topological_order)
     debug("addNode \"%s\"", storage.nodeMap.name(node.id));
 
-  for (const resource_slot::detail::SlotAction &declaration : node.actionList)
+  for (const resource_slot::detail::AccessDecl &declaration : node.action_list)
   {
     eastl::visit(
       [&slot_usage, &node, &storage](const auto &decl) {
         typedef eastl::remove_cvref_t<decltype(decl)> ValueT;
-        if constexpr (eastl::is_same_v<ValueT, resource_slot::Create>)
+        if constexpr (eastl::is_same_v<ValueT, resource_slot::detail::CreateDecl>)
         {
           slot_usage[decl.slot].push_back({node.id, CREATE_PRIORITY, false});
 
           if (debug_topological_order)
             debug("node \"%s\" creates slot \"%s\" with resource \"%s\"", storage.nodeMap.name(node.id),
-              resource_slot::detail::slot_map.name(decl.slot), resource_slot::detail::resource_map.name(decl.resource));
+              storage.slotMap.name(decl.slot), storage.resourceMap.name(decl.resource));
         }
-        else if constexpr (eastl::is_same_v<ValueT, resource_slot::Update>)
+        else if constexpr (eastl::is_same_v<ValueT, resource_slot::detail::UpdateDecl>)
         {
           slot_usage[decl.slot].push_back({node.id, decl.priority, false});
 
           if (debug_topological_order)
             debug("node \"%s\" updates slot \"%s\" with resource \"%s\", priority %d", storage.nodeMap.name(node.id),
-              resource_slot::detail::slot_map.name(decl.slot), resource_slot::detail::resource_map.name(decl.resource), decl.priority);
+              storage.slotMap.name(decl.slot), storage.resourceMap.name(decl.resource), decl.priority);
         }
-        else if constexpr (eastl::is_same_v<ValueT, resource_slot::Read>)
+        else if constexpr (eastl::is_same_v<ValueT, resource_slot::detail::ReadDecl>)
         {
           slot_usage[decl.slot].push_back({node.id, decl.priority, true});
 
           if (debug_topological_order)
-            debug("node \"%s\" reads slot \"%s\", priority %d", storage.nodeMap.name(node.id),
-              resource_slot::detail::slot_map.name(decl.slot), decl.priority);
+            debug("node \"%s\" reads slot \"%s\", priority %d", storage.nodeMap.name(node.id), storage.slotMap.name(decl.slot),
+              decl.priority);
         }
       },
       declaration);
@@ -115,8 +111,8 @@ static inline void invalidate_node(resource_slot::detail::NodeId node_id, UsageM
     --storage.validNodeCount;
 
     if (node.createsSlot)
-      for (const resource_slot::detail::SlotAction &declaration : node.actionList)
-        if (const resource_slot::Create *createDecl = eastl::get_if<resource_slot::Create>(&declaration))
+      for (const resource_slot::detail::AccessDecl &declaration : node.action_list)
+        if (const resource_slot::detail::CreateDecl *createDecl = eastl::get_if<resource_slot::detail::CreateDecl>(&declaration))
           invalidate_slot(createDecl->slot, slot_usage, storage);
   }
 }
@@ -137,9 +133,8 @@ static inline void validate_usage_list(UsageMap &slot_usage, resource_slot::deta
     if (storage.registeredNodes[prevUsage->node].status != resource_slot::detail::NodeStatus::Valid ||
         usageList.front().priority != CREATE_PRIORITY)
     {
-      logerr("Missed 'Create' declaration for slot \"%s\" requested in node \"%s\" \nRerun with resource_slot.debug_topological_order "
-             "to get more info",
-        resource_slot::detail::slot_map.name(slotId), storage.nodeMap.name(usageList[0].node));
+      logerr("Missed 'Create' declaration for slot \"%s\"\nRerun with resource_slot.debug_topological_order to get more info",
+        storage.slotMap.name(slotId));
       invalidate_slot(slotId, slot_usage, storage);
       continue; // Next slot
     }
@@ -156,12 +151,11 @@ static inline void validate_usage_list(UsageMap &slot_usage, resource_slot::deta
         if (usage.priority == CREATE_PRIORITY)
           logerr("Double declaration of 'Create' for slot \"%s\" in node \"%s\"; previous declaration in node \"%s\"\nRerun with "
                  "resource_slot.debug_topological_order to get more info",
-            resource_slot::detail::slot_map.name(slotId), storage.nodeMap.name(usage.node), storage.nodeMap.name(usageList[0].node));
+            storage.slotMap.name(slotId), storage.nodeMap.name(usage.node), storage.nodeMap.name(usageList[0].node));
         else if (!usage.isOnlyRead && usage.priority <= prevUsage->priority)
           logerr("All declaration for slot \"%s\" should have different priority; node \"%s\" and node \"%s\" have the same priority "
                  "%d\nRerun with resource_slot.debug_topological_order to get more info",
-            resource_slot::detail::slot_map.name(slotId), storage.nodeMap.name(usage.node), storage.nodeMap.name(prevUsage->node),
-            usage.priority);
+            storage.slotMap.name(slotId), storage.nodeMap.name(usage.node), storage.nodeMap.name(prevUsage->node), usage.priority);
       }
 
       prevUsage = &usage;
@@ -196,7 +190,7 @@ static inline void build_edges_from_usage_list(Dependencies &dependencies, const
       dependencies.addEdge(usage.node, prevModification->node);
       if (debug_topological_order)
         debug("addEdge \"%s\" -> modify \"%s\" for slot \"%s\"", storage.nodeMap.name(usage.node),
-          storage.nodeMap.name(prevModification->node), resource_slot::detail::slot_map.name(slotId));
+          storage.nodeMap.name(prevModification->node), storage.slotMap.name(slotId));
 
       if (usage.isOnlyRead)
         prevReads.push_back(&usage);
@@ -207,7 +201,7 @@ static inline void build_edges_from_usage_list(Dependencies &dependencies, const
           dependencies.addEdge(usage.node, read->node);
 
           debug("addEdge modify \"%s\" -> read \"%s\" for slot \"%s\"", storage.nodeMap.name(usage.node),
-            storage.nodeMap.name(read->node), resource_slot::detail::slot_map.name(slotId));
+            storage.nodeMap.name(read->node), storage.slotMap.name(slotId));
         }
         prevReads.clear();
 
@@ -263,7 +257,7 @@ template <typename Dependencies, typename UsageMap, typename NodeList>
 template <typename NodeList>
 static inline void fill_slots_state(resource_slot::detail::Storage &storage, NodeList &top_sort_order)
 {
-  storage.currentSlotsState = decltype(storage.currentSlotsState){resource_slot::detail::slot_map.nameCount()};
+  storage.currentSlotsState = decltype(storage.currentSlotsState){storage.slotMap.nameCount()};
 
   for (resource_slot::detail::NodeId nodeId : top_sort_order)
   {
@@ -274,19 +268,19 @@ static inline void fill_slots_state(resource_slot::detail::Storage &storage, Nod
     node.resourcesBeforeNode.clear();
 
     // Update state after node
-    for (const resource_slot::detail::SlotAction &declaration : node.actionList)
+    for (const resource_slot::detail::AccessDecl &declaration : node.action_list)
     {
       eastl::visit(
         [&storage, &node](const auto &decl) {
           typedef eastl::remove_cvref_t<decltype(decl)> ValueT;
-          if constexpr (eastl::is_same_v<ValueT, resource_slot::Create>)
+          if constexpr (eastl::is_same_v<ValueT, resource_slot::detail::CreateDecl>)
             storage.currentSlotsState[decl.slot] = decl.resource;
-          else if constexpr (eastl::is_same_v<ValueT, resource_slot::Update>)
+          else if constexpr (eastl::is_same_v<ValueT, resource_slot::detail::UpdateDecl>)
           {
             node.resourcesBeforeNode[decl.slot] = storage.currentSlotsState[decl.slot];
             storage.currentSlotsState[decl.slot] = decl.resource;
           }
-          else if constexpr (eastl::is_same_v<ValueT, resource_slot::Read>)
+          else if constexpr (eastl::is_same_v<ValueT, resource_slot::detail::ReadDecl>)
             node.resourcesBeforeNode[decl.slot] = storage.currentSlotsState[decl.slot];
         },
         declaration);
@@ -308,7 +302,7 @@ void resource_slot::resolve_access()
     }
 
     if (!storage.isNodeRegisterRequired)
-      continue;
+      return;
 
     TIME_PROFILE(resource_slot__perform_access);
     storage.isNodeRegisterRequired = false;
@@ -339,7 +333,7 @@ void resource_slot::resolve_access()
 
       typedef dag::RelocatableFixedVector<detail::SlotUsage, detail::EXPECTED_MAX_SLOT_USAGE, true, framemem_allocator> UsageList;
       typedef detail::AutoGrowVector<detail::SlotId, UsageList, detail::EXPECTED_MAX_SLOT_COUNT, false, framemem_allocator> UsageMap;
-      UsageMap slotUsage{resource_slot::detail::slot_map.nameCount()};
+      UsageMap slotUsage{storage.slotMap.nameCount()};
 
       if (debug_topological_order)
         debug("resource_slot::resolve_access(): start graph generation");
@@ -375,14 +369,13 @@ void resource_slot::resolve_access()
     }
 
     // Call declarations outside FRAMEMEM_REGION
-    G_ASSERT(storage.registeredNodes.size() < eastl::numeric_limits<uint16_t>::max());
-    for (auto [i, node] : enumerate(storage.registeredNodes))
+    for (resource_slot::detail::NodeDeclaration &node : storage.registeredNodes)
     {
       if (node.status != resource_slot::detail::NodeStatus::Valid)
         continue;
 
-      node.nodeHandle = node.declaration_callback(resource_slot::State{
-        ns, static_cast<int>(node.id), static_cast<uint16_t>(i), static_cast<uint16_t>(storage.registeredNodes.size())});
+      node.nodeHandle = dabfg::NodeHandle{};
+      node.nodeHandle = node.declaration_callback(resource_slot::State{ns, static_cast<int>(node.id)});
     }
   }
 }

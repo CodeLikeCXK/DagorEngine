@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <asyncHTTPClient/curl_global.h>
 #include <debug/dag_debug.h>
 

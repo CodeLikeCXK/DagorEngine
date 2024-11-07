@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "../av_plugin.h"
 #include "../av_appwnd.h"
 #include <assets/asset.h>
@@ -14,10 +12,10 @@
 #include <debug/dag_debug.h>
 #include <debug/dag_debug3d.h>
 
-#include <propPanel/control/container.h>
-#include <propPanel/c_control_event_handler.h>
+#include <propPanel2/c_panel_base.h>
+#include <propPanel2/c_control_event_handler.h>
 
-class CsgEntityViewPlugin : public IGenEditorPlugin, public PropPanel::ControlEventHandler
+class CsgEntityViewPlugin : public IGenEditorPlugin, public ControlEventHandler
 {
 public:
   enum
@@ -136,7 +134,7 @@ public:
 
   virtual bool supportAssetType(const DagorAsset &asset) const { return strcmp(asset.getTypeStr(), "csg") == 0; }
 
-  virtual void fillPropPanel(PropPanel::ContainerPropertyControl &panel)
+  virtual void fillPropPanel(PropertyContainerControlBase &panel)
   {
     panel.setEventHandler(this);
 
@@ -151,7 +149,7 @@ public:
     {
       const int lodsCount = iLodCtrl->getLodCount();
       const bool moreThanOne = lodsCount > 1;
-      PropPanel::ContainerPropertyControl *rg = panel.createRadioGroup(PID_LODS_GROUP, "Presentation lods:");
+      PropertyContainerControlBase *rg = panel.createRadioGroup(PID_LODS_GROUP, "Presentation lods:");
 
       if (moreThanOne)
         rg->createRadio(PID_LOD_AUTO_CHOOSE, "auto choose");
@@ -175,7 +173,7 @@ public:
     }
 
     panel.createEditFloat(PID_POLYGON_SIZE, "polygon size", pathScale * 40);
-    PropPanel::ContainerPropertyControl *rg = panel.createRadioGroup(PID_POLYGON_TYPE_GROUP, "polygon type:");
+    PropertyContainerControlBase *rg = panel.createRadioGroup(PID_POLYGON_TYPE_GROUP, "polygon type:");
     for (int i = 0; i < viewShapes.blockCount(); i++)
       if (PID_TYPE_START + i <= PID_TYPE_END)
         rg->createRadio(PID_TYPE_START + i, viewShapes.getBlock(i)->getBlockName());
@@ -185,7 +183,7 @@ public:
 
   virtual void postFillPropPanel() {}
 
-  virtual void onChange(int pcb_id, PropPanel::ContainerPropertyControl *panel)
+  virtual void onChange(int pcb_id, PropertyContainerControlBase *panel)
   {
     if (pcb_id == PID_LODS_GROUP)
     {
@@ -194,7 +192,7 @@ public:
         return;
 
       const int n = panel->getInt(PID_LODS_GROUP);
-      if (PropPanel::RADIO_SELECT_NONE == n)
+      if (RADIO_SELECT_NONE == n)
         return;
 
       iLodCtrl->setCurLod(n <= PID_LOD_AUTO_CHOOSE ? -1 : n - PID_LOD_FIRST);
@@ -222,7 +220,7 @@ public:
       setFoundationPath();
     }
   }
-  virtual void onClick(int pcb_id, PropPanel::ContainerPropertyControl *panel)
+  virtual void onClick(int pcb_id, PropertyContainerControlBase *panel)
   {
     if (pcb_id == PID_GENERATE_SEED && entity)
       if (IRandomSeedHolder *irsh = entity->queryInterface<IRandomSeedHolder>())

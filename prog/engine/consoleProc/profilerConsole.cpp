@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <util/dag_console.h>
 #include <perfMon/dag_statDrv.h>
 #include <perfMon/dag_daProfilerSettings.h>

@@ -1,11 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
+#include "device.h"
 #include <math/dag_adjpow2.h>
-#include <perfMon/dag_cpuFreq.h>
-
-#include "globals.h"
-#include "device_memory.h"
-#include "resource_manager.h"
 
 using namespace drv3d_vulkan;
 
@@ -17,7 +11,7 @@ void AbstractAllocator::initBase(uint32_t mem_type, VkDeviceSize mixing_granular
 
 void AbstractAllocator::onWrongFree(ResourceMemory &target)
 {
-  D3D_ERROR("vulkan: double free / wrong allocator for res mem %u [%08lX]", target.index, target.allocatorIndex);
+  logerr("vulkan: double free / wrong allocator for res mem %u [%08lX]", target.index, target.allocatorIndex);
 }
 
 void DedicatedAllocator::shutdown()
@@ -26,8 +20,8 @@ void DedicatedAllocator::shutdown()
   {
     if (!is_null(i))
     {
-      D3D_ERROR("vulkan: leaked %016llX : %u Kb memory in dedicated allocator", generalize(i.memory), i.size);
-      Globals::Mem::pool.free(i);
+      logerr("vulkan: leaked %016llX : %u Kb memory in dedicated allocator", generalize(i.memory), i.size);
+      get_device().memory->free(i);
     }
   }
   clear_and_shrink(list);
@@ -48,9 +42,11 @@ bool DedicatedAllocator::alloc(ResourceMemory &target, const AllocationDesc &des
     {
       devMemDsc.targetImage = VulkanImageHandle(desc.obj.getBaseHandle());
     }
+    else
+      DAG_FATAL("vulkan: unsupported force dedicated resource type");
   }
 
-  DeviceMemory ret = Globals::Mem::pool.allocate(devMemDsc);
+  DeviceMemory ret = get_device().memory->allocate(devMemDsc);
   if (is_null(ret))
     return false;
 
@@ -81,7 +77,7 @@ void DedicatedAllocator::free(ResourceMemory &target)
     DeviceMemory &element = list[target.allocatorIndex];
     if (!is_null(element.memory) && (generalize(element.memory) == target.handle))
     {
-      Globals::Mem::pool.free(element);
+      get_device().memory->free(element);
       element.memory = VulkanNullHandle();
       target.allocatorIndex = -1;
       return;
@@ -343,7 +339,7 @@ void SuballocRingedAllocator<subAllocMethod>::init()
     ::dgs_get_settings()->getBlockByNameEx("vulkan")->getBlockByNameEx("allocators")->getBlockByNameEx("ring");
 
   ring.size = settings->getInt64("pageSizeMb", 8) << 20;
-  ring.maxPages = settings->getInt("maxPages", 6);
+  ring.maxPages = settings->getInt("maxPages", 4);
 
 #if DAGOR_DBGLEVEL > 0
   lastGoodAllocTime = 0;
@@ -360,7 +356,8 @@ void SuballocRingedAllocator<subAllocMethod>::shutdown()
 template <SubAllocationMethod subAllocMethod>
 bool SuballocRingedAllocator<subAllocMethod>::alloc(ResourceMemory &target, const AllocationDesc &desc)
 {
-  if (ring.size <= desc.reqs.requirements.size)
+  // no point to keep 1 element, so allow 2 minimum
+  if ((ring.size >> 1) <= desc.reqs.requirements.size)
     return false;
 
   bool ret = ring.alloc(this, target, desc, 0, mixingGranularity);
@@ -383,16 +380,14 @@ void SuballocRingedAllocator<subAllocMethod>::checkIntegrity()
   if (!allocFailures)
     return;
 
-  // if allocator keep failing in a whole timeout period and has allocated items - it is surely broken
+  // if allocator keep failing in a whole timeout period - it is surely broken
   if (lastGoodAllocTime && (ref_time_delta_to_usec(ref_time_ticks() - lastGoodAllocTime) >= failureTimeoutUsec))
   {
+    logerr("vulkan: ringed allocator are compromised");
     for (int i = 0; i < ring.list.size(); ++i)
     {
-      if (!ring.list[i].isValid())
-        continue;
-
-      if (ring.list[i].getOccupiedCount())
-        D3D_ERROR("vulkan: ring page %u have %u refs, probably blocking reuse", i, ring.list[i].getOccupiedCount());
+      if (ring.list[i].isValid())
+        debug("vulkan: ring page %u have %u refs", i, ring.list[i].getOccupiedCount());
     }
   }
 #endif
@@ -449,7 +444,7 @@ template class SuballocRingedAllocator<SubAllocationMethod::BUF_OFFSET>;
 void ObjectBackedAllocator::shutdown()
 {
   if (count)
-    D3D_ERROR("vulkan: leaked %u objects in object backed allocator", count);
+    logerr("vulkan: leaked %u objects in object backed allocator", count);
   count = 0;
 }
 

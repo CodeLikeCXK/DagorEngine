@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <generic/dag_initOnDemand.h>
 #include <debug/dag_log.h>
 #include <phys/dag_physResource.h>
@@ -214,7 +212,7 @@ void PhysicsResource::Body::load(IGenLoad &cb)
       cb.readString(helper.name);
       cb.read(&helper.tm, sizeof(helper.tm));
 
-      // DEBUG_CTX("added tm helper '%s'", (const char*)helper.name);
+      // debug_ctx("added tm helper '%s'", (const char*)helper.name);
     }
     else if (id == MAKE4C('M', 'a', 't', ' '))
     {

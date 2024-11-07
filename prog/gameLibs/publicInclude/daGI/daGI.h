@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -8,7 +9,6 @@
 #include <generic/dag_carray.h>
 #include <generic/dag_staticTab.h>
 #include <EASTL/unique_ptr.h>
-#include <EASTL/fixed_function.h>
 #include <shaders/dag_DynamicShaderHelper.h>
 #include <shaders/dag_computeShaders.h>
 // #include <render/toroidalHelper.h>
@@ -22,7 +22,6 @@
 #include <daGI25D/irradiance.h>
 #include <textureUtil/textureUtil.h>
 #include <vecmath/dag_vecMath.h>
-#include <GIWindows/GIWindows.h>
 
 #define GI3D_VERBOSE_DEBUG 0
 
@@ -38,9 +37,10 @@ class TiledScene;
 namespace dagi
 {
 
+class GIWindows;
 class GIWalls;
 
-typedef eastl::fixed_function<sizeof(void *) * 2, void(const BBox3 &box, const Point3 &voxel_size)> render_scene_fun_cb_t;
+typedef eastl::function<void(const BBox3 &box, const Point3 &voxel_size)> render_scene_fun_cb;
 class GI3D
 {
 public:
@@ -67,13 +67,13 @@ public:
   void updateVolmapResolution(float xz_voxel_size, float y_voxel_size, float xz_voxel_size2, float y_voxel_size2);
   //--
   void afterReset();
-  void render(const TMatrix &view_tm, const TMatrix4 &proj_tm, const TMatrix4_vec4 &glob_tm);
+  void render(const TMatrix &view_tm, const TMatrix4 &proj_tm);
   void markVoxelsFromRT(const TMatrix4 &globtm, float speed = 0.5);
   float getSceneDist3D() const;  // 3d quality dist of lit area provided in that dist
   float getLightDist3D() const;  // 3d quality dist of lit area provided in that dist
   float getLightMaxDist() const; // 2.5d quality dist of lit area provided in that dist
   void updateOrigin(const Point3 &center, const dagi25d::voxelize_scene_fun_cb &voxelize_25d_cb,
-    const render_scene_fun_cb_t &preclear_cb = {}, const render_scene_fun_cb_t &voxelize_cb = {},
+    const render_scene_fun_cb &preclear_cb = {}, const render_scene_fun_cb &voxelize_cb = {},
     int max_scenes_to_update = 1); // will schedule dispatch
   void updateVoxelSceneBox(const BBox3 &sceneBox);
   void updateVoxelMinSize(float voxel_resolution);
@@ -188,6 +188,7 @@ private:
     BufPtr frustumVisibleAmbientVoxelsCount, visibleAmbientVoxelsIndirect;
     UniqueBufHolder poissonBuf;
     UniqueBufHolder enviCube, enviCubes; // for two stage reduction
+    eastl::shared_ptr<texture_util::ShaderHelper> shaderHelperUtils;
     UniqueBufHolder volmapCB;
     UniqueTexHolder cube;
     UniqueTexHolder ssgiTemporalWeight;
@@ -306,13 +307,16 @@ private:
   void invalidateVoxelScene();
   BBox3 sceneVoxelBox;
 
+  TexPtr sampledTarget;
+  shaders::UniqueOverrideStateId voxelizeOverride;
+  bool ensureSampledTarget(int w, int h, uint32_t fmt);
   bool isSceneTeleported(const Point3 &center) const;
   bool isSceneTeleported(int scene, const Point3 &center) const;
   IPoint3 getTexelOrigin(int scene, const Point3 &baseOrigin) const;
 
-  SceneCascade::STATUS updateOriginScene(int scene, const Point3 &center, const render_scene_fun_cb_t &preclear_cb,
-    const render_scene_fun_cb_t &voxelize_cb, bool repeat_last);
-  bool updateOriginScene(const Point3 &center, const render_scene_fun_cb_t &preclear_cb, const render_scene_fun_cb_t &voxelize_cb,
+  SceneCascade::STATUS updateOriginScene(int scene, const Point3 &center, const render_scene_fun_cb &preclear_cb,
+    const render_scene_fun_cb &voxelize_cb, bool repeat_last);
+  bool updateOriginScene(const Point3 &center, const render_scene_fun_cb &preclear_cb, const render_scene_fun_cb &voxelize_cb,
     int max_scenes, bool repeat_last);
 
 
@@ -321,7 +325,11 @@ private:
 
   void updateWindowsPos(const Point3 &pos);
   void invalidateWindows();
-  eastl::unique_ptr<GIWindows> cWindows;
+  struct GIWindowsDestroyer
+  {
+    void operator()(GIWindows *ptr);
+  };
+  eastl::unique_ptr<GIWindows, GIWindowsDestroyer> cWindows;
 
   struct GIWallsDestroyer
   {

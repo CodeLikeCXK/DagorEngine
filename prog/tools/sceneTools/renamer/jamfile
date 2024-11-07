@@ -1,12 +1,12 @@
+ReproducibleExeBuild = yes ;
 Root    ?= ../../../.. ;
 Location = prog/tools/sceneTools/renamer ;
-include $(Root)/prog/tools/tools_setup.jam ;
 ConsoleExe = yes ;
 
 TargetType  = exe ;
 Target      = tools/renamer ;
 
-include $(Root)/prog/tools/tools_setup_outdir_util.jam ;
+OutDir = $(Root)/tools/dagor3_cdk/util ;
 
 Sources =
   renamer.cpp

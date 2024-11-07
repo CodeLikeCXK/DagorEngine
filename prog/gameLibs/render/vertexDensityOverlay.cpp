@@ -1,12 +1,9 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <render/vertexDensityOverlay.h>
 #include <3d/dag_resPtr.h>
 #include <util/dag_convar.h>
 #include <shaders/dag_shaders.h>
 #include <shaders/dag_shaderVar.h>
-#include <drv/3d/dag_rwResource.h>
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
 #include <shaders/dag_postFxRenderer.h>
 #include <startup/dag_globalSettings.h>
 #include <ioSys/dag_dataBlock.h>

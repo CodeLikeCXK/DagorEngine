@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "hmlPlugin.h"
 #include "landClassSlotsMgr.h"
 #include <de3_genObjUtil.h>
@@ -8,13 +6,11 @@
 #include <de3_genObjData.h>
 #include "hmlSplineObject.h"
 #include "hmlSplinePoint.h"
-#include <EditorCore/ec_IEditorCore.h>
+#include <dllPluginCore/core.h>
 #include <math/dag_bezierPrec.h>
 #include <perfMon/dag_cpuFreq.h>
 #include <libTools/math/bitrender.h>
 #include <sceneRay/dag_sceneRay.h>
-
-using editorcore_extapi::dagGeom;
 
 objgenerator::WorldHugeBitmask bm_loft_mask[LAYER_ORDER_MAX], bm_poly_mask;
 //! allocated for this DLL plugin (but should be avoided in future)

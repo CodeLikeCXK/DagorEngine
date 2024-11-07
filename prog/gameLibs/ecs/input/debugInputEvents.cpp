@@ -1,8 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <ecs/input/debugInputEvents.h>
 #include <util/dag_delayedAction.h>
-#include <drv/hid/dag_hiGlobals.h>
+#include <humanInput/dag_hiGlobals.h>
 #include <ecs/input/hidEventRouter.h>
 
 

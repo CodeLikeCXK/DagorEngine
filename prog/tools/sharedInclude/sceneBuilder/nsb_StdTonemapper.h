@@ -1,5 +1,8 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright 2023 by Gaijin Games KFT, All rights reserved.
+#ifndef __GAIJIN_NSB_STDTONEMAPPER_H__
+#define __GAIJIN_NSB_STDTONEMAPPER_H__
 #pragma once
+
 
 #include <supp/dag_math.h>
 #include <math/dag_color.h>
@@ -207,3 +210,6 @@ public:
   }
 };
 } // namespace StaticSceneBuilder
+
+
+#endif

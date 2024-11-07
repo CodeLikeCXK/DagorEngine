@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <assets/asset.h>
@@ -12,8 +11,6 @@ struct PkgDepMap
   FastNameMapEx nm;
   Bitarray dep;
   int stride;
-  static constexpr unsigned PACK_IDX_MASK = 0x1FFFu;
-  static constexpr unsigned NON_EXPORT_BIT = 0x2000u;
 
   PkgDepMap(const DataBlock &pkgBlk)
   {
@@ -83,8 +80,8 @@ struct PkgDepMap
     if (!pkg || strcmp(pkg, "*") == 0)
       return true;
 
-    a->setUserFlags((allow_add && nm.nameCount() < PACK_IDX_MASK) ? nm.addNameId(pkg) : nm.getNameId(pkg));
-    return a->testUserFlags(PACK_IDX_MASK) != PACK_IDX_MASK;
+    a->setUserFlags((allow_add && nm.nameCount() < 0x7F) ? nm.addNameId(pkg) : nm.getNameId(pkg));
+    return a->testUserFlags(0x7F) != 0x7F;
   }
   void resetUserFlags(DagorAssetMgr &mgr)
   {
@@ -117,10 +114,10 @@ struct PkgDepMap
 
     // mark all as not exported
     for (int i = 0; i < assets.size(); i++)
-      assets[i]->setUserFlags(NON_EXPORT_BIT);
+      assets[i]->setUserFlags(0x80);
 
     make_exp_types_mask(expTypesMask, mgr, expblk, log);
-    preparePacks(mgr, mgr.getAssets(), expTypesMask, expblk, tex_pack, res_pack, addPackages, log, true, true, ts, profile);
+    preparePacks(mgr, expTypesMask, expblk, tex_pack, res_pack, addPackages, log, true, true, ts, profile);
 
     // clear marks for exported assets
     Tab<DagorAsset *> tmp_list(tmpmem);
@@ -132,7 +129,7 @@ struct PkgDepMap
       if (!get_exported_assets(tmp_list, tex_pack[i]->assets, ts, profile))
         continue;
       for (int j = 0; j < tmp_list.size(); j++)
-        tmp_list[j]->clrUserFlags(NON_EXPORT_BIT);
+        tmp_list[j]->clrUserFlags(0x80);
     }
     for (int i = 0; i < res_pack.size(); i++)
     {
@@ -142,20 +139,20 @@ struct PkgDepMap
       if (!get_exported_assets(tmp_list, res_pack[i]->assets, ts, profile))
         continue;
       for (int j = 0; j < tmp_list.size(); j++)
-        tmp_list[j]->clrUserFlags(NON_EXPORT_BIT);
+        tmp_list[j]->clrUserFlags(0x80);
     }
 
     // validate references
     for (int i = 0; i < assets.size(); i++)
     {
       bool exportable = expTypesMask[assets[i]->getType()];
-      if (exportable && assets[i]->testUserFlags(NON_EXPORT_BIT)) // exportable but not exported, skip
+      if (exportable && assets[i]->testUserFlags(0x80)) // exportable but not exported, skip
         continue;
       if (!exportable && !strict)
         continue;
 
-      int pkg = assets[i]->testUserFlags(PACK_IDX_MASK);
-      if (pkg == PACK_IDX_MASK)
+      int pkg = assets[i]->testUserFlags(0x7F);
+      if (pkg == 0x7F)
         continue;
       if (dep0.size() && !dep0.get(pkg))
         continue;
@@ -180,14 +177,14 @@ struct PkgDepMap
           }
           else
           {
-            int ref = refs[j].getAsset()->testUserFlags(PACK_IDX_MASK);
-            if (ref == PACK_IDX_MASK)
+            int ref = refs[j].getAsset()->testUserFlags(0x7F);
+            if (ref == 0x7F)
               continue;
             if (!dep.get(pkg * stride + ref))
               log.addMessage(l = (ext_ref ? log.ERROR : log.WARNING),
                 "asset %s:%s pkg=\"%s\" doesn't depend on \"%s\" for ref[%d]=<%s:%s>", assets[i]->getName(), assets[i]->getTypeStr(),
                 nm.getName(pkg), nm.getName(ref), j, refs[j].getAsset()->getName(), refs[j].getAsset()->getTypeStr());
-            else if (refs[j].getAsset()->testUserFlags(NON_EXPORT_BIT) && (ext_ref || expTypesMask[refs[j].getAsset()->getType()]))
+            else if (refs[j].getAsset()->testUserFlags(0x80) && (ext_ref || expTypesMask[refs[j].getAsset()->getType()]))
               log.addMessage(l = (ext_ref ? log.ERROR : log.WARNING), "asset %s:%s ref[%d]=<%s:%s> is not exported",
                 assets[i]->getName(), assets[i]->getTypeStr(), j, refs[j].getAsset()->getName(), refs[j].getAsset()->getTypeStr());
           }

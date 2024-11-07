@@ -1,7 +1,7 @@
 Root        ?= ../../../../.. ;
 BreakpadRoot = prog/3rdPartyLibs/breakpad ;
 Location     = $(BreakpadRoot)/common/linux ;
-Platform    ?= linux ;
+Platform    ?= linux64 ;
 
 TargetType  = lib ;
 Target      = 3rdPartyLibs/breakpad/common/linux.lib ;

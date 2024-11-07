@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <dag/dag_vector.h>
@@ -152,10 +151,10 @@ protected:
   {
     OSSpinlockScopedLock lock{bufferPoolGuard};
     auto sz = bufferPool.size();
-#if DAGOR_DBGLEVEL > 0
-    bufferPool.iterateAllocated([](auto buffer) { logwarn("DX12: Buffer <%s> still alive!", buffer->getBufName()); });
-#endif
     G_ASSERTF(0 == sz, "DX12: Shutdown without destroying all buffers, there are still %u buffers alive!", sz);
+#if DAGOR_DBGLEVEL > 0
+    bufferPool.iterateAllocated([](auto buffer) { G_ASSERTF(false, "DX12: Buffer <%s> still alive!", buffer->getBufName()); });
+#endif
     G_UNUSED(sz);
     bufferPool.freeAll();
 
@@ -197,16 +196,6 @@ public:
     bufferPool.iterateAllocated(clb);
   }
 
-  /// visits all buffers with explicit(ly named) interface that T has to implement
-  template <typename T>
-  void visitBufferObjectsExplicit(T clb)
-  {
-    OSSpinlockScopedLock lock{bufferPoolGuard};
-    clb.beginVisit(bufferPool.size());
-    bufferPool.iterateAllocated([&clb](auto buffer) { clb.visitBuffer(buffer); });
-    clb.endVisit();
-  }
-
   void reserveBufferObjects(size_t size)
   {
     OSSpinlockScopedLock lock{bufferPoolGuard};
@@ -233,7 +222,7 @@ class TextureObjectProvider : public BufferObjectProvider
 protected:
   struct PendingForCompletedFrameData : BaseType::PendingForCompletedFrameData
   {
-    dag::Vector<TextureInterfaceBase *> freedTextureObjects;
+    eastl::vector<TextureInterfaceBase *> freedTextureObjects;
   };
 
   ContainerMutexWrapper<ObjectPool<TextureInterfaceBase>, OSSpinlock> texturePool;
@@ -242,10 +231,10 @@ protected:
   {
     auto poolAccess = texturePool.access();
     auto sz = poolAccess->size();
-#if DAGOR_DBGLEVEL > 0
-    poolAccess->iterateAllocated([](auto tex) { logwarn("DX12: Texture <%s> still alive!", tex->getResName()); });
-#endif
     G_ASSERTF(0 == sz, "DX12: Shutdown without destroying all textures, there are still %u textures alive!", sz);
+#if DAGOR_DBGLEVEL > 0
+    poolAccess->iterateAllocated([](auto tex) { G_ASSERTF(false, "DX12: Texture <%s> still alive!", tex->getResName()); });
+#endif
     G_UNUSED(sz);
     poolAccess->freeAll();
 
@@ -274,16 +263,6 @@ public:
   void visitTextureObjects(T clb)
   {
     texturePool.access()->iterateAllocated(clb);
-  }
-
-  /// visits all textures with explicit(ly named) interface that T has to implement
-  template <typename T>
-  void visitTextureObjectsExplicit(T clb)
-  {
-    auto poolAccess = texturePool.access();
-    clb.beginVisit();
-    poolAccess->iterateAllocated([&clb](auto tex) { clb.visitTexture(tex); });
-    clb.endVisit();
   }
 
   void deleteTextureObjectOnFrameCompletion(TextureInterfaceBase *texture)
@@ -347,16 +326,6 @@ public:
   void visitImageObjects(T &&clb)
   {
     imageObjectPool.access()->iterateAllocated(eastl::forward<T>(clb));
-  }
-
-  /// visits all images with explicit(ly named) interface that T has to implement
-  template <typename T>
-  void visitImageObjectsExplicit(T &&clb)
-  {
-    auto poolAccess = imageObjectPool.access();
-    clb.beginVisit();
-    poolAccess->iterateAllocated([&clb](auto image) { clb.visitTexture(image); });
-    clb.endVisit();
   }
 
   bool isImageAlive(Image *img) { return imageObjectPool.access()->isAllocated(img); }

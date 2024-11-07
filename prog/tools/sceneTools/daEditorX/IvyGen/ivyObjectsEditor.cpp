@@ -1,22 +1,15 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "plugIn.h"
 #include "ivyObject.h"
 
 #include "ivyObjectsEditor.h"
 
-#include <EditorCore/ec_IEditorCore.h>
+#include <dllPluginCore/core.h>
 #include <libTools/staticGeom/geomObject.h>
-#include <drv/3d/dag_renderTarget.h>
-#include <drv/3d/dag_matricesAndPerspective.h>
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
 #include <debug/dag_debug.h>
 #include <perfMon/dag_cpuFreq.h>
 #include <winGuiWrapper/wgw_input.h>
 #include <shaders/dag_overrideStates.h>
-
-using editorcore_extapi::dagGeom;
-using editorcore_extapi::dagRender;
 
 #define OBJECT_IVY     "Ivy"
 #define MAX_TRACE_DIST 1000.0
@@ -54,11 +47,11 @@ IvyObjectEditor::~IvyObjectEditor()
 }
 
 
-void IvyObjectEditor::fillToolBar(PropPanel::ContainerPropertyControl *toolbar)
+void IvyObjectEditor::fillToolBar(PropertyContainerControlBase *toolbar)
 {
   ObjectEditor::fillToolBar(toolbar);
 
-  PropPanel::ContainerPropertyControl *tb = toolbar->createToolbarPanel(0, "");
+  PropertyContainerControlBase *tb = toolbar->createToolbarPanel(0, "");
 
   tb->createSeparator();
   addButton(tb, CM_CREATE_IVY, "create_complex", "Create ivy", true);
@@ -455,7 +448,7 @@ bool IvyObjectEditor::handleMouseRBPress(IGenViewportWnd *wnd, int x, int y, boo
 }
 
 
-void IvyObjectEditor::onClick(int pcb_id, PropPanel::ContainerPropertyControl *panel)
+void IvyObjectEditor::onClick(int pcb_id, PropPanel2 *panel)
 {
   switch (pcb_id)
   {

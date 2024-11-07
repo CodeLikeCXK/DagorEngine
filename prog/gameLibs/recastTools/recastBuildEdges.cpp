@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <recastTools/recastBuildEdges.h>
 #include <recastTools/recastTools.h>
 

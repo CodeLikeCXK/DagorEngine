@@ -1,10 +1,8 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <ioSys/dag_genIo.h>
 
 #include "tunedParams.h"
 #include <math/dag_Point2.h>
-#include "../../../../libTools/propPanel/commonWindow/w_curve_math.cpp"
+#include "../../../../libTools/propPanel2/windowControls/w_curve_math.cpp"
 
 #include <debug/dag_debug.h>
 
@@ -88,9 +86,9 @@ public:
   virtual void saveData(mkbindump::BinDumpSaveCB &cwr, SaveDataCB *save_cb)
   {
     Tab<Point2> segc(tmpmem);
-    PropPanel::ICurveControlCallback *curve = NULL;
-    PropPanel::CubicPolynomCB curve0;
-    PropPanel::CubicPSplineCB curve1;
+    ICurveControlCallback *curve = NULL;
+    CubicPolynomCB curve0;
+    CubicPSplineCB curve1;
 
     if (curveType == 0)
       curve = &curve0;

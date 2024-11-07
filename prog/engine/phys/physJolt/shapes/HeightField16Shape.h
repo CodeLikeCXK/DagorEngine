@@ -1,9 +1,8 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-#pragma once
-
 // based on Jolt Physics Library (https://github.com/jrouwe/JoltPhysics)
 // SPDX-FileCopyrightText: 2021 Jorrit Rouwe
 // SPDX-License-Identifier: MIT
+
+#pragma once
 
 #include <Jolt/Physics/Collision/Shape/Shape.h>
 #include <Jolt/Physics/Collision/PhysicsMaterial.h>
@@ -118,7 +117,7 @@ public:
   virtual void CollidePoint(Vec3Arg inPoint, const SubShapeIDCreator &inSubShapeIDCreator, CollidePointCollector &ioCollector,
     const ShapeFilter &inShapeFilter = {}) const override;
 
-  // See: Shape::CollideSoftBodyVertices
+  // See: Shape::ColideSoftBodyVertices
   virtual void CollideSoftBodyVertices(Mat44Arg inCenterOfMassTransform, Vec3Arg inScale, SoftBodyVertex *ioVertices,
     uint inNumVertices, float inDeltaTime, Vec3Arg inDisplacementDueToGravity, int inCollidingShapeIndex) const override;
 
@@ -210,7 +209,7 @@ private:
 
   /// Visit the entire height field using a visitor pattern
   template <class Visitor>
-  void WalkHeightField(Visitor &ioVisitor) const;
+  JPH_INLINE void WalkHeightField(Visitor &ioVisitor) const;
 
   /// The height field is a surface defined by: mOffset + mScale * (x, mHeightSamples[y * mSampleCount + x], y).
   /// where x and y are integers in the range x and y e [0, mSampleCount - 1].

@@ -1,10 +1,11 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
-#include <supp/dag_define_KRNLIMP.h>
+#include <supp/dag_define_COREIMP.h>
 
 //! returns true is game is running in DEMO mode
 extern KRNLIMP bool dagor_is_demo_mode();
@@ -32,4 +33,4 @@ extern KRNLIMP void dagor_force_demo_mode(bool demo, int timout_ms);
 // set it in local project under #if DEMO
 extern bool dagor_demo_mode;
 
-#include <supp/dag_undef_KRNLIMP.h>
+#include <supp/dag_undef_COREIMP.h>

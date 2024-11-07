@@ -1,4 +1,5 @@
-KernelLinkage = dynamic ;
+DriverLinkage = dynamic ;
+Platform ?= win64 ;
 UseD3DMulti = yes ;
 
 Root    ?= ../../../../.. ;

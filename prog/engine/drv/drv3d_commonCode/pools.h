@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <EASTL/fixed_vector.h>
@@ -113,7 +112,7 @@ struct PodPool
     return index;
   }
 
-  bool isIndexInFreeListUnsafe(int idx) const
+  bool isIndexInFreeList(int idx) const
   {
     int index = freeList;
     while (index != BAD_HANDLE)
@@ -136,7 +135,7 @@ struct PodPoolWithLock : protected PodPool<T, InitialCapacity>
   typedef PodPool<T, InitialCapacity> PodPoolType;
 
 protected:
-  mutable CritSecStorage critSec;
+  CritSecStorage critSec;
   using PodPoolType::destroy;
   using PodPoolType::entries;
   using PodPoolType::freeList;
@@ -151,6 +150,7 @@ public:
   using PodPoolType::clearGarbage;
   using PodPoolType::fillEntryAsInvalid;
   using PodPoolType::isEntryUsed;
+  using PodPoolType::isIndexInFreeList;
   using PodPoolType::isIndexValid;
   using PodPoolType::size;
   using PodPoolType::totalUsed;
@@ -162,8 +162,12 @@ public:
   {
   private:
     void *pCritSec;
-    AutoLock(const AutoLock &) = delete;
-    AutoLock &operator=(const AutoLock &) = delete;
+    AutoLock(const AutoLock &refAutoLock) { pCritSec = refAutoLock.refAutoLock; }
+    AutoLock &operator=(const AutoLock &refAutoLock)
+    {
+      pCritSec = refAutoLock.refAutoLock;
+      return *this;
+    }
     friend struct PodPoolWithLock;
 
   public:
@@ -176,8 +180,8 @@ public:
     ::create_critical_section(critSec);
   }
   ~PodPoolWithLock() { ::destroy_critical_section(critSec); }
-  void lock() const { ::enter_critical_section(critSec); }
-  void unlock() const { ::leave_critical_section(critSec); }
+  inline void lock() { ::enter_critical_section(critSec); }
+  inline void unlock() { ::leave_critical_section(critSec); }
 
   // returns handle, returns in locked state if allocation succeeded
   int safeAllocAndSet(T value)
@@ -215,15 +219,6 @@ public:
     lock();
     destroy();
     unlock();
-  }
-
-
-  bool isIndexInFreeList(int idx) const
-  {
-    lock();
-    bool r = PodPool<T, InitialCapacity>::isIndexInFreeListUnsafe(idx);
-    unlock();
-    return r;
   }
 
   void releaseEntryUnsafe(int index)
@@ -281,7 +276,6 @@ public:
   typedef PodPoolWithLock<EntryType, InitialCapacity> PodPoolWithLockType;
   using PodPoolWithLockType::clearGarbage;
   using PodPoolWithLockType::isEntryUsed;
-  using PodPoolWithLockType::isIndexInFreeListUnsafe;
   using PodPoolWithLockType::isIndexValid;
   using PodPoolWithLockType::lock;
   using PodPoolWithLockType::releaseEntryUnsafe;

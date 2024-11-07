@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <quirrel/sqModules/sqModules.h>
 #include <quirrel/bindQuirrelEx/bindQuirrelEx.h>
 #include <startup/dag_globalSettings.h>
@@ -204,7 +202,7 @@ void register_dagor_fs_module(SqModules *module_mgr)
       All functions in this module are sync.
       Better never use them in production code, cause this can cause freeze and fps stutter (and usually will).
   */
-  exports //
+  exports
     .Func("file_exists", dd_file_exists)
     ///@param path s
     ///@return b
@@ -213,10 +211,6 @@ void register_dagor_fs_module(SqModules *module_mgr)
     ///@return b
     .Func("mkdir", dd_mkdir)
     ///@param path s
-    ///@return b
-    .Func("mkpath", dd_mkpath)
-    ///@param path s
-    ///@return b
     .SquirrelFunc("scan_folder", sq_scan_folder, 2, ".t")
     /**
     @kwarged
@@ -228,7 +222,7 @@ void register_dagor_fs_module(SqModules *module_mgr)
     @param directories_only b : return only directories (works for realfs only)
 
     @return a : array of found files with path on root
-    */
+   */
     .SquirrelFunc("find_files", find_files, -2, ".st")
     /**
     @param file_mask s : file mask like *.nut or foo/some.nut
@@ -245,8 +239,8 @@ void register_dagor_fs_module(SqModules *module_mgr)
     @return t|o : file_stat or or null if file not found
     @code file_stat sq
       {size:i, atime:i, mtime:i, ctime:i}
-    */
-    /**/;
+   */
+    ;
 
   module_mgr->addNativeModule("dagor.fs", exports);
 }

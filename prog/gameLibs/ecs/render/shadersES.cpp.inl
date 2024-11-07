@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <ecs/render/shaders.h>
 
 ShadersECS::operator bool() const { return shmat && shElem; }

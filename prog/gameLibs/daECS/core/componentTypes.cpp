@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <daECS/core/componentTypes.h>
 #include <daECS/core/sharedComponent.h>
 #include <daECS/core/entityManager.h>
@@ -37,8 +35,6 @@ ECS_REGISTER_TYPE(TMatrix, nullptr);
 ECS_REGISTER_TYPE(vec4f, nullptr);
 ECS_REGISTER_TYPE(bbox3f, nullptr);
 ECS_REGISTER_TYPE(mat44f, nullptr);
-ECS_REGISTER_TYPE(BBox3, nullptr);
-
 ECS_REGISTER_SHARED_TYPE(ecs::Object, nullptr);
 ECS_REGISTER_SHARED_TYPE(ecs::Array, nullptr);
 ECS_REGISTER_SHARED_TYPE(ecs::string, nullptr);
@@ -120,7 +116,7 @@ public:
     const SerializedType &arr = *((const SerializedType *)data);
     ecs::write_compressed(cb, arr.size());
     for (auto &it : arr)
-      ecs::serialize_child_component(it, cb, *g_entity_mgr);
+      ecs::serialize_child_component(it, cb);
   }
   bool deserialize(const ecs::DeserializerCb &cb, void *data, size_t sz, ecs::component_type_t hint) override
   {
@@ -135,7 +131,7 @@ public:
     arr.reserve(cnt);
     for (uint32_t i = 0; i < cnt; ++i)
     {
-      if (ecs::MaybeChildComponent mbcomp = ecs::deserialize_child_component(cb, *g_entity_mgr))
+      if (ecs::MaybeChildComponent mbcomp = ecs::deserialize_child_component(cb))
         arr.push_back(eastl::move(*mbcomp));
       else
         return false;

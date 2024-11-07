@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <daECS/core/component.h>
 #include <daECS/core/entityManager.h>
 #include <daECS/core/componentType.h>
@@ -27,7 +25,7 @@ ChildComponent::ChildComponent(size_t size, type_index_t ti, component_type_t t,
 
 void ChildComponent::setRaw(component_type_t component_type, const void *raw_data, CopyType copy_type)
 {
-  if (DAGOR_UNLIKELY(component_type == 0))
+  if (EASTL_UNLIKELY(component_type == 0))
   {
     reset();
     return;
@@ -56,7 +54,7 @@ void ChildComponent::setRaw(component_type_t component_type, const void *raw_dat
 
 ChildComponent &ChildComponent::operator=(const ChildComponent &a)
 {
-  if (DAGOR_UNLIKELY(this == &a))
+  if (EASTL_UNLIKELY(this == &a))
     return *this;
   free();
   setRaw(a.getUserType(), a.getRawData());
@@ -65,7 +63,7 @@ ChildComponent &ChildComponent::operator=(const ChildComponent &a)
 
 void ChildComponent::free()
 {
-  if (DAGOR_LIKELY(componentType != 0))
+  if (EASTL_LIKELY(componentType != 0))
   {
     const ComponentType typeInfo = g_entity_mgr->componentTypes.getTypeInfo(componentTypeIndex);
     if (need_constructor(typeInfo.flags))

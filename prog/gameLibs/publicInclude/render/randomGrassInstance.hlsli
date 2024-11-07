@@ -12,7 +12,7 @@
 #else
   struct RandomGrassInstance//should be 16 bytes aligned for performance
   {
-    uint2 position_yScale_prevYScale;
+    uint2 position; // we have a half worth of data here, w is not used
     uint landColor_lodLayerNo;
     uint landNormal;
     uint rot;
@@ -34,8 +34,6 @@ struct RandomGrassInstanceUncompressed
   float verScale;
   float2 wind;
   float2 prevWind;
-  float yScale;
-  float prevYScale;
   uint layerNo;
   uint lodNo;
 };
@@ -45,13 +43,6 @@ struct RandomGrassIndirectParams
   int2 cornerPos;
   uint xySize;
   float tileSize;
-};
-
-struct RandomGrassBvhMapping
-{
-  uint2 blas;
-  uint metaIndex;
-  uint padding;
 };
 
 #endif

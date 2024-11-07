@@ -1,10 +1,9 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "yuvRenderer.h"
 
 #include <shaders/dag_shaders.h>
 #include <shaders/dag_shaderBlock.h>
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
+#include <3d/dag_drv3dCmd.h>
 #include <3d/dag_materialData.h>
 #include <osApiWrappers/dag_miscApi.h>
 #include <math/dag_bounds2.h>
@@ -20,7 +19,7 @@ bool YuvRenderer::init()
   textureYVarId = VariableMap::getVariableId("texY");
   textureUVarId = VariableMap::getVariableId("texU");
   textureVVarId = VariableMap::getVariableId("texV");
-  alphaVarId = get_shader_variable_id("transparent", true);
+  alphaVarId = VariableMap::getVariableId("transparent");
 
   if (!shader.init(YuvRenderer::shaderName, false))
     return false;
@@ -44,10 +43,10 @@ void YuvRenderer::render(StdGuiRender::GuiContext &ctx, TEXTUREID texIdY, TEXTUR
   shader.material->set_texture_param(textureYVarId, texIdY);
   shader.material->set_texture_param(textureUVarId, texIdU);
   shader.material->set_texture_param(textureVVarId, texIdV);
-  ShaderGlobal::set_int(alphaVarId, blend_mode);
+  shader.material->set_int_param(alphaVarId, blend_mode);
   ctx.setShader(&shader);
   ctx.set_color(color);
-  ctx.set_texture(texIdY, d3d::INVALID_SAMPLER_HANDLE); // TODO: Use actual sampler IDs
+  ctx.set_texture(texIdY);
   if (saturate != 1.0f)
     ctx.set_picquad_color_matrix_saturate(saturate);
 

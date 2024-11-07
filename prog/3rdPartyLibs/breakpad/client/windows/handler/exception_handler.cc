@@ -39,9 +39,6 @@
 #include "client/windows/handler/exception_handler.h"
 #include "common/windows/guid_string.h"
 
-#include <debug/dag_minidumpCallback.h>
-#include <debug/dag_log.h>
-
 namespace google_breakpad {
 
 static const int kWaitForHandlerThreadMs = 60000;
@@ -863,42 +860,34 @@ bool ExceptionHandler::WriteMinidumpWithException(
   return success;
 }
 
-struct MinidumpCallbackParam
-{
-  MinidumpCallbackParam(const AppMemoryList &app_memory_info, EXCEPTION_POINTERS *eptr, uintptr_t exc_thread_id)
-    : dagorCbData(eptr, exc_thread_id)
-  {
-    context.iter = app_memory_info.begin();
-    context.end = app_memory_info.end();
-
-    // Skip the reserved element if there was no instruction memory
-    if (context.iter->ptr == 0) {
-      context.iter++;
-    }
-  }
-  MinidumpCallbackContext context;
-  DagorHwException::MinidumpExceptionData dagorCbData;
-};
-
 // static
 BOOL CALLBACK ExceptionHandler::MinidumpWriteDumpCallback(
     PVOID context,
     const PMINIDUMP_CALLBACK_INPUT callback_input,
     PMINIDUMP_CALLBACK_OUTPUT callback_output) {
-  MinidumpCallbackParam *param = reinterpret_cast<MinidumpCallbackParam*>(context);
   switch (callback_input->CallbackType) {
   case MemoryCallback: {
-    MinidumpCallbackContext* callback_context = &param->context;
-    if (callback_context->iter != callback_context->end)
-    {
-      // Include the specified memory region.
-      callback_output->MemoryBase = int64_t(intptr_t(callback_context->iter->ptr)); // sign extend for win32
-      callback_output->MemorySize = callback_context->iter->length;
-      callback_context->iter++;
-      return TRUE;
-    }
-    break;
+    MinidumpCallbackContext* callback_context =
+        reinterpret_cast<MinidumpCallbackContext*>(context);
+    if (callback_context->iter == callback_context->end)
+      return FALSE;
+
+    // Include the specified memory region.
+    callback_output->MemoryBase = callback_context->iter->ptr;
+    callback_output->MemorySize = callback_context->iter->length;
+    callback_context->iter++;
+    return TRUE;
   }
+
+    // Include all modules.
+  case IncludeModuleCallback:
+  case ModuleCallback:
+    return TRUE;
+
+    // Include all threads.
+  case IncludeThreadCallback:
+  case ThreadCallback:
+    return TRUE;
 
     // Stop receiving cancel callbacks.
   case CancelCallback:
@@ -906,10 +895,8 @@ BOOL CALLBACK ExceptionHandler::MinidumpWriteDumpCallback(
     callback_output->Cancel = FALSE;
     return TRUE;
   }
-
-  if (!param->dagorCbData.eptr)
-    return FALSE;
-  return DagorHwException::minidump_callback(&param->dagorCbData, callback_input, callback_output);
+  // Ignore other callback types.
+  return FALSE;
 }
 
 bool ExceptionHandler::WriteMinidumpWithExceptionForProcess(
@@ -980,8 +967,6 @@ bool ExceptionHandler::WriteMinidumpWithExceptionForProcess(
           exinfo->ContextRecord->Eip;
 #elif defined(_M_AMD64)
         exinfo->ContextRecord->Rip;
-#elif defined(_M_ARM64)
-        exinfo->ContextRecord->Pc;
 #else
 #error Unsupported platform
 #endif
@@ -1011,39 +996,28 @@ bool ExceptionHandler::WriteMinidumpWithExceptionForProcess(
         }
       }
 
-      MinidumpCallbackParam param(app_memory_info_, exinfo, requesting_thread_id);
+      MinidumpCallbackContext context;
+      context.iter = app_memory_info_.begin();
+      context.end = app_memory_info_.end();
+
+      // Skip the reserved element if there was no instruction memory
+      if (context.iter->ptr == 0) {
+        context.iter++;
+      }
 
       MINIDUMP_CALLBACK_INFORMATION callback;
       callback.CallbackRoutine = MinidumpWriteDumpCallback;
-      callback.CallbackParam = reinterpret_cast<void*>(&param);
+      callback.CallbackParam = reinterpret_cast<void*>(&context);
 
-      // We need to wrap the __try/__except block into a lambda to prevent a C2712 error in debug /EHsc builds
-      // where destructors of the objects created in this function are not optimized out and must be unwinded
-      [&]()
-      {
-        __try
-        {
-          // The explicit comparison to TRUE avoids a warning (C4800).
-          success = (minidump_write_dump_(process,
-                                          GetProcessId(process),
-                                          dump_file,
-                                          dump_type_,
-                                          exinfo ? &except_info : NULL,
-                                          &user_streams,
-                                          &callback) == TRUE);
-        }
-        __except (DagorHwException::write_minidump_fallback(::GetCurrentProcess(), ::GetCurrentProcessId(), dump_file, GetExceptionInformation(), nullptr))
-        {
-          success = true;
-          logerr("Exception in minidump callback was handled");
-        }
-      } ();
+      // The explicit comparison to TRUE avoids a warning (C4800).
+      success = (minidump_write_dump_(process,
+                                      GetProcessId(process),
+                                      dump_file,
+                                      dump_type_,
+                                      exinfo ? &except_info : NULL,
+                                      &user_streams,
+                                      &callback) == TRUE);
 
-      if (!success || !param.dagorCbData.memCallbackCalled)
-      {
-        debug("Minidump with callback write error, memCallbackCalled=%i", param.dagorCbData.memCallbackCalled);
-        DagorHwException::write_minidump_fallback(process, GetProcessId(process), dump_file, exinfo, &user_streams);
-      }
       CloseHandle(dump_file);
     }
   }

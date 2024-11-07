@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <vehiclePhys/tireTracks.h>
 #include <ioSys/dag_dataBlock.h>
 #include <shaders/dag_dynShaderBuf.h>
@@ -8,7 +6,7 @@
 #include <generic/dag_range.h>
 #include <debug/dag_log.h>
 #include <debug/dag_debug.h>
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
 #include <3d/dag_render.h>
 #include <3d/dag_materialData.h>
 #include <shaders/dag_shaderMesh.h>
@@ -629,8 +627,8 @@ void init(const char *blk_file, bool pack_normal_into_color_)
 
   // create shader buffer
   G_ASSERT(vertexCount < 65536);
-  meshVB.init(vertexCount, dynrender::getStride(channels.data(), channels.size()), "tireTracksVB");
-  meshIB.init((vertexCount - 2) * 3, "tireTracksIB");
+  meshVB.init(vertexCount, dynrender::getStride(channels.data(), channels.size()));
+  meshIB.init((vertexCount - 2) * 3);
   meshVB.addRef();
   meshIB.addRef();
   buffer.setRingBuf(&meshVB, &meshIB);

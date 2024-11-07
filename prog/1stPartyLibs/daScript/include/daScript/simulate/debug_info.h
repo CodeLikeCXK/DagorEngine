@@ -7,17 +7,11 @@ namespace das
 #define DAS_ENABLE_PROFILER 0
 #endif
 
-#ifndef DAS_ENABLE_KEEPALIVE
-#define DAS_ENABLE_KEEPALIVE 0
-#endif
-
     enum Type : int32_t {
         none,
         autoinfer,
         alias,
         option,
-        typeDecl,
-        typeMacro,
         fakeContext,
         fakeLineInfo,
         anyArgument,
@@ -52,7 +46,6 @@ namespace das
         tEnumeration,
         tEnumeration8,
         tEnumeration16,
-        tEnumeration64,
         tBitfield,
         tPointer,
         tFunction,
@@ -88,7 +81,7 @@ namespace das
     template <typename T>
     struct isCloneable  {
         template<typename U>
-        static decltype(declval<U&>() = declval<const U&>(), U (declval<const U&>()), true_type{}) func (das::remove_reference<U>*);
+        static decltype(declval<U&>() = declval<const U&>(), U (declval<const U&>()), true_type{}) func (remove_reference_t<U>*);
         template<typename U>
         static false_type func (...);
         using  type = decltype(func<T>(nullptr));
@@ -156,12 +149,8 @@ namespace das
         virtual ModuleInfo getModuleInfo ( const string & req, const string & from ) const;
         virtual bool isModuleAllowed ( const string &, const string & ) const { return true; };
         virtual bool canModuleBeUnsafe ( const string &, const string & ) const { return true; };
-        virtual bool canBeRequired ( const string &, const string & ) const { return true; };
         virtual bool addFsRoot ( const string & , const string & ) { return false; }
         virtual void serialize ( AstSerializer & ser );
-        virtual bool isSameFileName ( const string & f1, const string & f2 ) const;
-        virtual bool isOptionAllowed ( const string & /*opt*/, const string & /*from*/ ) const { return true; }
-        virtual bool isAnnotationAllowed ( const string & /*ann*/, const string & /*from*/ ) const { return true; }
     protected:
         virtual FileInfo * getNewFileInfo ( const string & ) { return nullptr; }
     protected:
@@ -183,21 +172,13 @@ namespace das
         virtual string getIncludeFileName ( const string & fileName, const string & incFileName ) const override;
         virtual bool isModuleAllowed ( const string &, const string & ) const override;
         virtual bool canModuleBeUnsafe ( const string &, const string & ) const override;
-        virtual bool canBeRequired ( const string &, const string & ) const override;
         virtual void serialize ( AstSerializer & ser ) override;
-        virtual bool isSameFileName ( const string & f1, const string & f2 ) const override;
-        virtual bool isOptionAllowed ( const string & opt, const string & from ) const override;
-        virtual bool isAnnotationAllowed ( const string & /*ann*/, const string & /*from*/ ) const override;
     protected:
         Context *           context = nullptr;
         SimFunction *       modGet = nullptr;
         SimFunction *       includeGet = nullptr;
         SimFunction *       moduleAllowed = nullptr;
         SimFunction *       moduleUnsafe = nullptr;
-        SimFunction *       canModuleBeRequired = nullptr;
-        SimFunction *       sameFileName = nullptr;
-        SimFunction *       optionAllowed = nullptr;
-        SimFunction *       annotationAllowed = nullptr;
     };
     template <> struct isCloneable<ModuleFileAccess> : false_type {};
 
@@ -239,7 +220,6 @@ namespace das
             flag_heapGC = 1<<13,
             flag_stringHeapGC = 1<<14,
             flag_lockCheck = 1<<15,
-            flag_private = 1<<16,
         };
         union {
             StructInfo *                structType;
@@ -437,14 +417,15 @@ namespace das
     ,   namesAndDimensions =    (1<<1)
     ,   typeQualifiers =        (1<<2)
     ,   refAddresses =          (1<<3)
-    ,   singleLine =            (1<<4)
-    ,   fixedFloatingPoint =    (1<<5)
+    ,   humanReadable =         (1<<4)
+    ,   singleLine =            (1<<5)
+    ,   fixedFloatingPoint =    (1<<6)
 
-    ,   string_builder  =   PrintFlags::none
+    ,   string_builder  =   PrintFlags::fixedFloatingPoint
     ,   debugger        =   PrintFlags::escapeString | PrintFlags::namesAndDimensions
-            | PrintFlags::typeQualifiers | PrintFlags::refAddresses | PrintFlags::fixedFloatingPoint
+            | PrintFlags::humanReadable | PrintFlags::typeQualifiers | PrintFlags::refAddresses | PrintFlags::fixedFloatingPoint
     ,   stackwalker     =   PrintFlags::escapeString | PrintFlags::namesAndDimensions
-            | PrintFlags::typeQualifiers | PrintFlags::fixedFloatingPoint
+            | PrintFlags::typeQualifiers | PrintFlags::humanReadable | PrintFlags::fixedFloatingPoint
     };
 
     string debug_type ( const TypeInfo * info );

@@ -1,9 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "kbd_device_common.h"
 #include "kbd_private.h"
-#include <drv/hid/dag_hiKeybIds.h>
-#include <drv/hid/dag_hiGlobals.h>
+#include <humanInput/dag_hiKeybIds.h>
+#include <humanInput/dag_hiGlobals.h>
 #include <math/dag_math3d.h>
 #include <debug/dag_debug.h>
 using namespace HumanInput;

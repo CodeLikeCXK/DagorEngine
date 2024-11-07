@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <render/daBfg/usage.h>
@@ -11,7 +10,7 @@
 #include <render/daBfg/detail/access.h>
 #include <render/daBfg/detail/resourceType.h>
 
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
 #include <EASTL/optional.h>
 
 

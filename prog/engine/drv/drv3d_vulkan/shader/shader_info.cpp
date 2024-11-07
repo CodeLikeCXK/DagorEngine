@@ -1,8 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "shader_info.h"
 #include "shader.h"
-#include "device_context.h"
+#include "device.h"
 
 using namespace drv3d_vulkan;
 

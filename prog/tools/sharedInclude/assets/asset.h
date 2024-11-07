@@ -1,6 +1,7 @@
 //
 // Dagor Tech 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -76,10 +77,20 @@ protected:
   short folderIdx;
   short assetType;
   short nspaceId;
-  unsigned short globUnique : 1, virtualBlk : 1, userFlags : 14;
+  unsigned short globUnique : 1, virtualBlk : 1, _resv : 6;
+  unsigned short userFlags : 8;
   DagorAssetMgr &mgr;
 
   DagorAsset(DagorAssetMgr &m) :
-    mgr(m), folderIdx(-1), assetType(-1), nameId(-1), nspaceId(-1), fileNameId(-1), globUnique(0), virtualBlk(0), userFlags(0)
+    mgr(m),
+    folderIdx(-1),
+    assetType(-1),
+    nameId(-1),
+    nspaceId(-1),
+    fileNameId(-1),
+    globUnique(0),
+    virtualBlk(0),
+    _resv(0),
+    userFlags(0)
   {}
 };

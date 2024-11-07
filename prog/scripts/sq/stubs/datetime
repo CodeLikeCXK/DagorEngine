@@ -1,7 +1,5 @@
 return {
-  function clock(...) {
-    return 0
-  }
+  function clock(...) { }
   function time() { }
   function date(...) {
     //assert(["float", "integer"].contains(type(a)), @() $"type of argument should be one of: 'float' 'integer'")

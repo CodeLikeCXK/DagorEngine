@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <render/randomGrass.h>
 #include <render/landMask.h>
 #include <render/noiseTex.h>
@@ -17,15 +15,9 @@
 #include <3d/dag_texIdSet.h>
 #include <3d/dag_texPackMgr2.h>
 #include <3d/dag_render.h>
-#include <drv/3d/dag_draw.h>
-#include <drv/3d/dag_vertexIndexBuffer.h>
-#include <drv/3d/dag_shaderConstants.h>
-#include <drv/3d/dag_buffers.h>
-#include <drv/3d/dag_texture.h>
-#include <drv/3d/dag_driver.h>
-#include <drv/3d/dag_info.h>
-#include <drv/3d/dag_commands.h>
-#include <drv/3d/dag_platform.h>
+#include <3d/dag_drv3d.h>
+#include <3d/dag_drv3dCmd.h>
+#include <3d/dag_drv3d_platform.h>
 #include <3d/dag_dynAtlas.h>
 #include <supp/dag_prefetch.h>
 #include <perfMon/dag_statDrv.h>
@@ -42,8 +34,7 @@
 #include <render/vertexDataCompression.hlsli>
 #include <3d/dag_lockSbuffer.h>
 #include <webui/editVarNotifications.h>
-#include <frustumCulling/frustumPlanes.h>
-#include <bvh/bvh_connection.h>
+
 
 #define LMESH_DELTA      5.f
 #define SORT_SQUARE_SIZE 2.f
@@ -87,8 +78,6 @@ enum
 };
 
 static int grass_bumpVarId = -1;
-
-BVHConnection *RandomGrass::bvhConnection = nullptr;
 
 struct CellVertex
 {
@@ -491,7 +480,7 @@ void RandomGrass::renderOpaque(const LandMask &land_mask)
     for (int i = 0; i < grassLayerData.size(); ++i)
       for (int j = 0; j < 6; ++j)
         grassLayerData[i][j] = to_float4(grassDescs[i].colors[j]);
-    updateGrassColorLayer(eastl::move(grassLayerData));
+    updateGrassColorLayer(grassLayerData);
     varNotification->varChanged = false;
   }
 #endif
@@ -937,7 +926,7 @@ void RandomGrass::initWebTools()
     auto readColor = [&](E3DCOLOR &variable, Color4 defaultColor, const char *variable_name) {
       variable = E3DCOLOR((char)(defaultColor.r * 255), (char)(defaultColor.g * 255), (char)(defaultColor.b * 255),
         (char)(defaultColor.a * 255));
-      if (varNotification && de3_webui_check_inited())
+      if (varNotification)
         varNotification->registerE3dcolor(&variable, grassNameCount[foundIdx].name, variable_name);
     };
 
@@ -1092,11 +1081,14 @@ void RandomGrass::beginRender(const LandMask &land_mask)
   float offsetXZ = (1.0f - scaleXZ) * 0.5f;
   Point2 offsetCenter = (land_mask.getCenterPos() - Point2::xy(squareCenter) * cellSize) / land_mask.getWorldSize();
 
-  ShaderGlobal::set_color4_fast(shaderVars[SHV_SCALE_OFFSET], safediv(-1.0f, cellSize * GRID_SIZE), scaleXZ, offsetCenter.y + offsetXZ,
-    offsetCenter.x + offsetXZ);
+  ShaderGlobal::set_color4_fast(shaderVars[SHV_SCALE_OFFSET], safediv(-1.0f, cellSize * GRID_SIZE), scaleXZ,
+    offsetCenter.y + offsetXZ + HALF_TEXEL_OFSF / land_mask.getLandTexSize(),
+    offsetCenter.x + offsetXZ + HALF_TEXEL_OFSF / land_mask.getLandTexSize());
 }
 
 void RandomGrass::endRender() {}
+
+extern void set_frustum_planes(const Frustum &frustum);
 
 void RandomGrass::generateGPUGrass(const LandMask &land_mask, const Frustum &frustum, const Point3 &view_dir, TMatrix4 viewTm,
   TMatrix4 projTm, Point3 view_pos)
@@ -1151,16 +1143,6 @@ void RandomGrass::generateGPUGrass(const LandMask &land_mask, const Frustum &fru
 
   d3d::set_buffer(STAGE_CS, 8, layerDataVS.getBuf());
 
-  static int random_grass_use_bvhVarId = ::get_shader_variable_id("random_grass_use_bvh", true);
-  static int random_grass_bvh_max_countVarId = ::get_shader_variable_id("random_grass_bvh_max_count", true);
-
-  bool useBvhConnection = bvhConnection && bvhConnection->isReady();
-  ShaderGlobal::set_int(random_grass_use_bvhVarId, useBvhConnection ? 1 : 0);
-
-  if (useBvhConnection && bvhConnection->prepare())
-    ShaderGlobal::set_int(random_grass_bvh_max_countVarId,
-      bvhConnection->getInstancesBuffer() ? bvhConnection->getInstancesBuffer()->getNumElements() : 0);
-
   for (unsigned int lodIdx = 0; lodIdx < maxLodCount; ++lodIdx)
   {
     if (combinedLods[lodIdx].instancesCount == 0)
@@ -1199,13 +1181,6 @@ void RandomGrass::generateGPUGrass(const LandMask &land_mask, const Frustum &fru
 
     d3d::set_rwbuffer(STAGE_CS, 6, combinedLods[lodIdx].grassInstances.getBuf());
 
-    if (useBvhConnection && bvhConnection->getInstanceCounter() && bvhConnection->getMappingsBuffer())
-    {
-      d3d::set_rwbuffer(STAGE_CS, 2, bvhConnection->getInstanceCounter().getBuf());
-      d3d::set_rwbuffer(STAGE_CS, 3, bvhConnection->getInstancesBuffer().getBuf());
-      d3d::set_buffer(STAGE_CS, 12, bvhConnection->getMappingsBuffer().getBuf());
-    }
-
     randomGrassGenerator->dispatch_indirect(combinedLods[lodIdx].grassGenerateIndirect.getBuf(), 0);
 
     d3d::resource_barrier({combinedLods[lodIdx].grassInstancesIndirect.getBuf(), RB_RO_INDIRECT_BUFFER});
@@ -1218,9 +1193,6 @@ void RandomGrass::generateGPUGrass(const LandMask &land_mask, const Frustum &fru
   d3d::set_rwbuffer(STAGE_CS, 6, 0);
 
   grassBufferGenerated = true;
-
-  if (useBvhConnection)
-    bvhConnection->done();
 }
 
 void RandomGrass::draw(const LandMask &land_mask, bool opaque, int startLod, int lodCount)
@@ -1242,13 +1214,6 @@ void RandomGrass::draw(const LandMask &land_mask, bool opaque, int startLod, int
     {
       if (combinedLods[lodIdx].instancesCount == 0 || !combinedLods[lodIdx].lodIb || !combinedLods[lodIdx].lodVb)
         continue;
-
-      static int maxInstancesVarId = ::get_shader_variable_id("max_instances");
-      static int layersCountVarId = ::get_shader_variable_id("layers_count");
-
-      //-1 bias for clamp in shader
-      ShaderGlobal::set_int(maxInstancesVarId, combinedLods[lodIdx].instancesCount - 1);
-      ShaderGlobal::set_int(layersCountVarId, layers.size() - 1);
 
       d3d::setind(combinedLods[lodIdx].lodIb.getBuf());
       d3d::setvsrc_ex(0, combinedLods[lodIdx].lodVb.getBuf(), 0, sizeof(CellVertex));

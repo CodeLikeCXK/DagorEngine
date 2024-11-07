@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <math/dag_mathBase.h>
 #include "hmlAlignBrush.h"
 #include "../hmlPlugin.h"
@@ -7,7 +5,7 @@
 #include <ioSys/dag_dataBlock.h>
 
 
-void HmapAlignLandBrush::fillParams(PropPanel::ContainerPropertyControl &panel)
+void HmapAlignLandBrush::fillParams(PropPanel2 &panel)
 {
   HmapLandBrush::fillParams(panel);
 
@@ -21,7 +19,7 @@ void HmapAlignLandBrush::fillParams(PropPanel::ContainerPropertyControl &panel)
 }
 
 
-void HmapAlignLandBrush::updateToPanel(PropPanel::ContainerPropertyControl &panel)
+void HmapAlignLandBrush::updateToPanel(PropPanel2 &panel)
 {
   HmapLandBrush::updateToPanel(panel);
 
@@ -35,7 +33,7 @@ void HmapAlignLandBrush::updateToPanel(PropPanel::ContainerPropertyControl &pane
 }
 
 
-bool HmapAlignLandBrush::updateFromPanelRef(PropPanel::ContainerPropertyControl &panel, int pid)
+bool HmapAlignLandBrush::updateFromPanelRef(PropPanel2 &panel, int pid)
 {
   switch (pid)
   {

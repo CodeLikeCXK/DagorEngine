@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <signal.h>
 #include <startup/dag_startupTex.h>
 #include <startup/dag_globalSettings.h>

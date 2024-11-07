@@ -1,5 +1,6 @@
 StrictCompile = yes ;
 include $(Root)/prog/_jBuild/defaults.jam ;
+if $(GLOBAL_DependOnJam) { DependOnJams += $(Root)/prog/engine/memory/jamfile-mem ; } # to handle depjam case
 
 UseMemoryDebugLevel ?= def ;
 switch $(UseMemoryDebugLevel)
@@ -30,14 +31,14 @@ Sources +=
   physMem.cpp
 ;
 
-if $(KernelLinkage) != dynamic && $(Config) != dbg { UseProgLibs += engine/memory/rtlOverride ; }
+if $(DriverLinkage) != dynamic && $(Config) != dbg { UseProgLibs += engine/memory/rtlOverride ; }
 
-if $(Platform) in macOS iOS tvOS {
+if $(Platform) in macosx iOS tvOS {
   Sources +=
     macMemInit.m
   ;
 }
-if $(Platform) in windows xboxOne scarlett {
+if $(Platform) in win32 win64 xboxOne scarlett {
   Sources +=
     win32MoreCore.cpp
     dagmem_start.c
@@ -52,6 +53,6 @@ if $(Platform) in ps4 ps5 {
   }
 }
 
-CPPopt += -D__B_KERNEL_LIB ;
+CPPopt += -D__B_MINICORE ;
 
 include $(Root)/prog/_jBuild/build.jam ;

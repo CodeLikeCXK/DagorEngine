@@ -1,5 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
+#include <debug/dag_debug.h>
 #include "daProfilerInternal.h"
 #include "stl/daProfilerStl.h"
 #include "daProfilePlatform.h"
@@ -89,7 +88,7 @@ void ProfilerData::copyGpuEvents(const uint64_t timeCpuStart, const uint64_t tim
       int64_t cpuRef, gpuRef;
       if (!gpu_cpu_ticks_ref(cpuRef, gpuRef)) // can't calibrate clock
       {
-        report_logerr("can't calibrate gpu clock");
+        logerr("can't calibrate gpu clock");
         return;
       }
       cpu_gpu_clock = ClockCalibration{cpuRef, cpu_frequency(), gpuRef, gpu_frequency()};
@@ -163,9 +162,6 @@ size_t ProfilerData::prepareDump(unique_ptr<Dump> &&dump_)
 
     copyGpuEvents(timeStart, timeEnd, dump.gpuEvents, dump.cpuGpuClock);
   }
-
-  uniqueEvents.forEachChunk([&](const auto *begin, const auto *end) { dump.uniqueEvents.append(begin, end); });
-  dump.uniqueEventsFrames = uniqueEventsFrames;
 
   if (dump.type != Dump::Type::Spike)
     dump.stacks.reserve(stackSamples.approximateSize());

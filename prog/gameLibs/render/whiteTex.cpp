@@ -1,7 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <render/whiteTex.h>
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
 #include <image/dag_texPixel.h>
 #include <startup/dag_restart.h>
 #include <generic/dag_initOnDemand.h>

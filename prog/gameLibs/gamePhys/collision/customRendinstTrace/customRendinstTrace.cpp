@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <landMesh/lmeshManager.h>
 #include <math/dag_bounds2.h>
 #include "../collisionGlobals.h"

@@ -1,7 +1,9 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
+
 #pragma once
 
 #include <math/dag_Point3.h>
@@ -25,8 +27,8 @@ public:
   ~Grassify();
 
   void generate(const Point3 &pos, const TMatrix &view_itm, BaseTexture *grass_mask, IRandomGrassRenderHelper &grassRenderHelper,
-    const GPUGrassBase &gpuGrassBase);
-  void generateGrassMask(IRandomGrassRenderHelper &grassRenderHelper);
+    GrassPreRenderCallback pre_render_cb, const GPUGrassBase &gpuGrassBase);
+  void generateGrassMask(IRandomGrassRenderHelper &grassRenderHelper, GrassPreRenderCallback pre_render_cb);
 
 private:
   eastl::unique_ptr<GrassMaskSliceHelper> grassMaskHelper;

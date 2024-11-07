@@ -1,17 +1,13 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <osApiWrappers/dag_files.h>
 
 // TODO: mmap is deprecated on PS5 and it is suggested to use APR instead
 #if _TARGET_C3 | _TARGET_C2
 
-#elif _TARGET_C1
-
 #else
-#define DAG_MMAP_THRESHOLD -1 // Always
+#define DAG_HAVE_MMAP 1
 #endif
 
-#if DAG_MMAP_THRESHOLD
+#if DAG_HAVE_MMAP
 #if _TARGET_PC_WIN | _TARGET_XBOX
 #include <windows.h>
 #include <io.h>
@@ -29,7 +25,7 @@
 
 #endif
 
-#if (_TARGET_PC_WIN | _TARGET_XBOX) & DAG_MMAP_THRESHOLD
+#if (_TARGET_PC_WIN | _TARGET_XBOX) & DAG_HAVE_MMAP
 static int getpagesize()
 {
   SYSTEM_INFO sysi;
@@ -63,7 +59,7 @@ const void *df_mmap(file_ptr_t fp, int *flen, int length, int offset)
     length = *flen;
   if ((offset + length) > *flen)
     length = *flen - offset;
-#if DAG_MMAP_THRESHOLD
+#if DAG_HAVE_MMAP
   uint64_t pa_offs = (base + offset) & ALLOC_MASK;
   int pa_diff = (base + offset) - pa_offs;
 #if _TARGET_C1
@@ -77,18 +73,14 @@ const void *df_mmap(file_ptr_t fp, int *flen, int length, int offset)
     return NULL;
   void *ret = MapViewOfFileEx(hmap, FILE_MAP_READ, HIDWORD(pa_offs), LODWORD(pa_offs), length + pa_diff, NULL);
   CloseHandle(hmap);
+#else
+  void *ret = mmap(NULL, (size_t)(length + pa_diff), PROT_READ, MAP_SHARED, fd, (off_t)pa_offs);
+  if (ret == MAP_FAILED)
+    ret = NULL;
+#endif
   return ret ? (char *)ret + pa_diff : NULL;
 #else
-  if (DAG_MMAP_THRESHOLD < 0 || length < DAG_MMAP_THRESHOLD)
-  {
-    void *ret = mmap(NULL, (size_t)(length + pa_diff), PROT_READ, MAP_SHARED, fd, (off_t)pa_offs);
-    if (ret == MAP_FAILED)
-      ret = NULL;
-    return ret ? (char *)ret + pa_diff : NULL;
-  }
-#endif
-#endif
-  void *mem = malloc(length); //-V779
+  void *mem = malloc(length);
   if (!mem)
     return NULL;
   if (offset)
@@ -99,27 +91,27 @@ const void *df_mmap(file_ptr_t fp, int *flen, int length, int offset)
     return NULL;
   }
   return mem;
+#endif
 }
 
 void df_unmap(const void *start, int length)
 {
-  (void)length;
-  if (!start || RomFileReader::munmap(start))
+  if (!start)
     return;
-#if DAG_MMAP_THRESHOLD
+  if (RomFileReader::munmap(start))
+    return;
+#if DAG_HAVE_MMAP
   void *pa_start = (void *)(((uintptr_t)(void *)start) & ALLOC_MASK);
 #if _TARGET_PC_WIN | _TARGET_XBOX
   UnmapViewOfFile(pa_start);
-  return;
+  (void)(length);
 #else
-  if (DAG_MMAP_THRESHOLD < 0 || length < DAG_MMAP_THRESHOLD)
-    munmap(pa_start, ((char *)start + length) - (char *)pa_start);
-  else
+  munmap(pa_start, ((char *)start + length) - (char *)pa_start);
 #endif
+#else
+  free((void *)start);
+  (void)length;
 #endif
-  {
-    free((void *)start); //-V779
-  }
 }
 
 #define EXPORT_PULL dll_pull_osapiwrappers_mmap

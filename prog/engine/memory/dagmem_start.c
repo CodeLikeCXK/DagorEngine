@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <supp/dag_null.h>
 
 extern int __cdecl dagor_memory_real_init(void);

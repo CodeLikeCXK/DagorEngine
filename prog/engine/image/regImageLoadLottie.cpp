@@ -1,5 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
+#include <3d/dag_drv3dCmd.h>
 #include <ioSys/dag_dataBlock.h>
 #include <gui/dag_stdGuiRender.h>
 #include <osApiWrappers/dag_miscApi.h>
@@ -269,7 +268,7 @@ struct LottieRenderCommand
 // this thread resolve command to load lotti animations, and their render frames
 struct LottieRenderThread final : public DaThread
 {
-  LottieRenderThread() : DaThread("LottieRenderThread", DEFAULT_STACK_SZ, 0, WORKER_THREADS_AFFINITY_MASK) {}
+  LottieRenderThread() : DaThread("LottieRenderThread") {}
 
   bool execOneCommand()
   {
@@ -397,7 +396,7 @@ struct LottieRenderThread final : public DaThread
 
   void execute() override
   {
-    while (!isThreadTerminating())
+    while (!interlocked_acquire_load(terminating))
     {
       while (execOneCommand())
         ;
@@ -414,7 +413,7 @@ struct LottieRenderThread final : public DaThread
       for (auto &anim : animations)
       {
         // it's loop here for all animations and frame render make a time, break it when thread want stop
-        if (isThreadTerminating())
+        if (interlocked_acquire_load(terminating))
           return;
 
         if (anim.second.render(curtime))
@@ -569,9 +568,7 @@ struct LottieAnimationRenderer
       animationsPresent.insert({propsHash, animDesc});
 
       if (!renderThread.isThreadStarted()) // Start thread on first usage
-      {
         renderThread.start();
-      }
 
       renderThread.addCommand(LottieRenderCommand::ADD_CONFIG, pic_props);
 

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "webutil.h"
 #include <stdio.h>
 #include <ioSys/dag_genIo.h>

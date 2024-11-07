@@ -45,8 +45,7 @@ shader globe_model
     INIT_STATIC_SHADOW_BASE_STCODE(ps)
   }
 
-  INIT_HDR(ps)
-  USE_HDR(ps)
+  SKY_HDR()
 
   USE_AND_INIT_VIEW_VEC_VS()
 

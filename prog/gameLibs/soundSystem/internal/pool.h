@@ -1,4 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef _DAGOR_GAMELIB_SOUNDSYSTEM_POOL_H_
+#define _DAGOR_GAMELIB_SOUNDSYSTEM_POOL_H_
 #pragma once
 
 #include <EASTL/type_traits.h>
@@ -324,3 +325,5 @@ public:
   Pool() { init_array(fixedArray, array_size); }
 }; // class Pool
 } // namespace sndsys
+
+#endif

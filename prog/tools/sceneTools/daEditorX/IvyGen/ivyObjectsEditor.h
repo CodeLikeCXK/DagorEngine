@@ -1,4 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright 2023 by Gaijin Games KFT, All rights reserved.
+#ifndef _DE2_PLUGIN_IVYGEN_OBJEDITOR_H_
+#define _DE2_PLUGIN_IVYGEN_OBJEDITOR_H_
 #pragma once
 
 #include <oldEditor/de_interface.h>
@@ -21,7 +23,7 @@ public:
   virtual ~IvyObjectEditor();
 
   // ObjectEditor interface implementation
-  virtual void fillToolBar(PropPanel::ContainerPropertyControl *toolbar);
+  virtual void fillToolBar(PropertyContainerControlBase *toolbar);
   virtual void updateToolbarButtons();
 
   // virtual void handleCommand(int cmd);
@@ -59,7 +61,7 @@ public:
 
   inline bool isCloneMode() { return cloneMode; }
 
-  virtual void onClick(int pcb_id, PropPanel::ContainerPropertyControl *panel);
+  virtual void onClick(int pcb_id, PropPanel2 *panel);
 
 protected:
   shaders::OverrideStateId zFuncLessStateId;
@@ -73,3 +75,5 @@ protected:
   DynRenderBuffer *ptDynBuf;
   Point3 locAx[3];
 };
+
+#endif

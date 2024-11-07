@@ -1,4 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __GAIJIN_AUTOCOMPLETITION__
+#define __GAIJIN_AUTOCOMPLETITION__
 #pragma once
 
 #include <generic/dag_tab.h>
@@ -41,3 +42,5 @@ private:
 
   ScriptEditor *ed;
 };
+
+#endif //__GAIJIN_AUTOCOMPLETITION__

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <osApiWrappers/dag_miscApi.h>
 #include <osApiWrappers/dag_lockProfiler.h>
 #include <osApiWrappers/dag_progGlobals.h>
@@ -150,33 +148,6 @@ int get_local_time(DagorDateTime *outTime)
   return ret;
 }
 
-int get_timezone_minutes(long &outTimezone)
-{
-  int ret = 0;
-#if _TARGET_PC_WIN
-  TIME_ZONE_INFORMATION tzi{};
-  // https://learn.microsoft.com/en-us/windows/win32/api/timezoneapi/nf-timezoneapi-gettimezoneinformation
-  DWORD res = GetTimeZoneInformation(&tzi);
-  if (res == TIME_ZONE_ID_INVALID)
-    return ret;
-
-  outTimezone = tzi.Bias;
-  if (res == TIME_ZONE_ID_STANDARD)
-    outTimezone += tzi.StandardBias;
-  else if (res == TIME_ZONE_ID_DAYLIGHT)
-    outTimezone += tzi.DaylightBias;
-
-  // GetTimeZoneInformation returns Bias from formula: UTC = local + Bias
-  // but we need local = UTC + Bias
-  // so the sign is wrong
-  outTimezone = -outTimezone;
-  ret = 1;
-#endif
-  // TODO: implement for other platforms
-  G_UNUSED(outTimezone);
-  return ret;
-}
-
 int get_process_uid()
 {
 #if _TARGET_PC_WIN
@@ -201,15 +172,13 @@ const char *get_platform_string_by_id(TargetPlatform id)
 
 TargetPlatform get_platform_id_by_string(const char *name)
 {
-  if (name != nullptr && name[0] != 0)
+  if (name)
   {
     for (int i = TP_WIN32; i < TP_TOTAL; ++i)
     {
-      if (strcmp(name, target_platform_names[i]) == 0)
+      if (!strcmp(name, target_platform_names[i]))
         return (TargetPlatform)i;
     }
-    if (strcmp(name, "win32_wow64") == 0)
-      return TP_WIN32;
   }
 
   return TP_UNKNOWN;
@@ -217,22 +186,13 @@ TargetPlatform get_platform_id_by_string(const char *name)
 
 const char *get_platform_string_id() { return get_platform_string_by_id(get_platform_id()); }
 
-void *get_console_window_handle()
-{
-#if _TARGET_PC_WIN
-  return GetConsoleWindow();
-#else
-  return nullptr;
-#endif
-}
-
-void flash_window(void *wnd_handle, bool always_flash)
+void flash_window(void *wnd_handle)
 {
 #if _TARGET_PC_WIN
   if (!wnd_handle)
     wnd_handle = win32_get_main_wnd();
 
-  if (always_flash || GetForegroundWindow() != (HWND)wnd_handle)
+  if (GetForegroundWindow() != (HWND)wnd_handle)
   {
     FLASHWINFO flashInfo;
     memset(&flashInfo, 0, sizeof(flashInfo));
@@ -246,9 +206,9 @@ void flash_window(void *wnd_handle, bool always_flash)
   }
 #else
   (void)wnd_handle;
-  (void)always_flash;
 #endif
 }
+
 
 #if _TARGET_PC_WIN
 bool get_version_ex(OSVERSIONINFOEXW *osversioninfo)
@@ -273,23 +233,13 @@ bool get_version_ex(OSVERSIONINFOEXW *osversioninfo)
 }
 #endif
 
-WindowsVersion get_windows_version()
-{
-#if _TARGET_PC_WIN
-  OSVERSIONINFOEXW osvi{};
-  if (get_version_ex(&osvi))
-    return {osvi.dwMajorVersion, osvi.dwMinorVersion, osvi.dwBuildNumber};
-#endif
-  return {};
-}
-
 bool is_debugger_present()
 {
 #if DAGOR_DBGLEVEL == 0
   return false;
 #elif _TARGET_C1 | _TARGET_C2
 
-#elif _TARGET_PC_WIN || _TARGET_XBOX
+#elif (_TARGET_PC_WIN && !defined(STARFORCE_PROTECT)) || _TARGET_XBOX
   return ::IsDebuggerPresent() != 0;
 #elif _TARGET_PC_LINUX
   int statusFd = open("/proc/self/status", O_RDONLY);
@@ -426,7 +376,7 @@ bool detect_os_compatibility_mode(char *os_real_name, size_t os_real_name_size)
 bool detect_os_compatibility_mode(char *, size_t) { return false; }
 #endif
 
-#include <supp/dag_define_KRNLIMP.h>
+#include <supp/dag_define_COREIMP.h>
 
 static int64_t main_thread_id = -1;
 
@@ -480,8 +430,7 @@ const char *get_console_model_revision(ConsoleModel model)
 {
   switch (model)
   {
-    case ConsoleModel::PS4_PRO:
-    case ConsoleModel::PS5_PRO: return "PRO";
+    case ConsoleModel::PS4_PRO: return "PRO";
     case ConsoleModel::XBOXONE_X: return "X";
     case ConsoleModel::XBOXONE_S: return "S";
     case ConsoleModel::XBOX_LOCKHART: return "LOCKHART";

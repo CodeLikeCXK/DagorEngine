@@ -1,6 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-#pragma once
-
 #include <osApiWrappers/dag_globalMutex.h>
 #include <generic/dag_tab.h>
 #include <util/dag_simpleString.h>

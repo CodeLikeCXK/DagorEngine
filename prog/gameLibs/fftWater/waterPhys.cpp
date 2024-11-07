@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <perfMon/dag_cpuFreq.h>
 #include <osApiWrappers/dag_atomic.h>
 #include <osApiWrappers/dag_cpuJobs.h>
@@ -9,7 +7,6 @@
 #include <math/dag_adjpow2.h>
 #include <fftWater/fftWater.h>
 #include <math/integer/dag_IPoint3.h>
-#include <atomic>
 
 #define THRESHOLD_TO_SWITCH_OFF_WAVES 0.2
 
@@ -102,11 +99,11 @@ WaterNVPhysics::WaterNVPhysics(const NVWaveWorks_FFT_CPU_Simulation::Params &p, 
   debug("totalNCount = %d", totalNCount);
   lastTick = 0;
   updatingFifo = -1;
-  forceActualWaves = false;
+  setCascades(p);
   endUpdateHtJobIdx = totalNCount;
   endFFTJobIdx = endUpdateHtJobIdx + totalNCount * 3;
   totalJobSize = endFFTJobIdx + totalNCount;
-  setCascades(p);
+  forceActualWaves = false;
   reset();
 }
 
@@ -121,8 +118,6 @@ void WaterNVPhysics::reinit(const Point2 &wind_dir, float wind_speed, float peri
 }
 
 bool WaterNVPhysics::isAsyncRunning() const { return interlocked_acquire_load(this->done) == 0; }
-
-void WaterNVPhysics::wait() { threadpool::wait(this); }
 
 void WaterNVPhysics::increaseTime(double time)
 {
@@ -301,8 +296,6 @@ int WaterNVPhysics::getDisplaceData(int destFifo, int start, int count)
     for (int i = 0; i < numCascades; ++i)
       cascades[i].cascadeMaxZ[destFifo] = 0.f;
 
-  float allFifoMaxZLocal = allFifoMaxZ.load();
-
   int totalComputed = 0;
   for (int i = 0; i < numCascades; ++i)
   {
@@ -328,9 +321,9 @@ int WaterNVPhysics::getDisplaceData(int destFifo, int start, int count)
       fifoMaxZ[destFifo] = 0.f;
       for (int i = 0; i < numCascades; ++i)
         fifoMaxZ[destFifo] += cascades[i].cascadeMaxZ[destFifo];
-      allFifoMaxZLocal = 0.f;
+      allFifoMaxZ = 0.f;
       for (int fifo = 0; fifo < MAX_FIFO; fifo++)
-        allFifoMaxZLocal = max(allFifoMaxZLocal, fifoMaxZ[fifo]);
+        allFifoMaxZ = max(allFifoMaxZ, fifoMaxZ[fifo]);
     }
 
     totalComputed += num;
@@ -339,9 +332,6 @@ int WaterNVPhysics::getDisplaceData(int destFifo, int start, int count)
     start = 0;
     count -= num;
   }
-
-  allFifoMaxZ.store(allFifoMaxZLocal);
-
   return totalComputed;
 }
 
@@ -479,6 +469,7 @@ void WaterNVPhysics::calcWaveHeight()
 int WaterNVPhysics::intersectRayWithOcean(double time, Point3 &result, float &T, const Point3 &in_position, const Point3 &direction,
   Point3 *out_displacement, bool matchRenderGrid)
 {
+  G_ASSERT(cascades != nullptr && !noActualWaves);
   vec3f test_point_xz, old_test_point_xz, displacements;
   float test_point_ray_height;   // height above water
   float test_point_water_height; // height above water
@@ -499,11 +490,9 @@ int WaterNVPhysics::intersectRayWithOcean(double time, Point3 &result, float &T,
   //  return 0;
 
   // getting to the top edge of volume where we can start
-  // Do not extend the maxSeaLevel for frame to frame consistency.
-  float allFifoMaxZLocal = allFifoMaxZ.load();
-  float currentMaxSeaLevel = min(maxSeaLevel, seaLevel + allFifoMaxZLocal);
+  float currentMaxSeaLevel = min(maxSeaLevel, seaLevel + allFifoMaxZ); // Do not extend the maxSeaLevel for frame to frame consistency.
   if (waterHeightmap)
-    currentMaxSeaLevel = waterHeightmap->heightMax + allFifoMaxZLocal;
+    currentMaxSeaLevel = waterHeightmap->heightMax + allFifoMaxZ;
   vec3f position = v_ldu(&in_position.x);
   const vec3f v_dir = v_ldu(&direction.x);
   if (in_position.y > currentMaxSeaLevel && direction.y < 0)
@@ -646,7 +635,7 @@ int WaterNVPhysics::intersectSegment(double time, const Point3 &vStart, const Po
 {
   // G_ASSERT(!check_nan(vStart));
   // G_ASSERT(!check_nan(vEnd));
-  if (!cascades && !waterHeightmap)
+  if (!cascades)
   {
     if ((vStart.y >= seaLevel) == (vEnd.y >= seaLevel)) // ray is below or above water
       return 0;
@@ -660,10 +649,9 @@ int WaterNVPhysics::intersectSegment(double time, const Point3 &vStart, const Po
   Point3 direction = vEnd - vStart;
   Point3 result;
   // early out if start and end are both above possible water volume
-  float allFifoMaxZLocal = allFifoMaxZ.load();
-  float currentMaxSeaLevel = min(maxSeaLevel, seaLevel + allFifoMaxZLocal);
+  float currentMaxSeaLevel = min(maxSeaLevel, seaLevel + allFifoMaxZ);
   if (waterHeightmap)
-    currentMaxSeaLevel = waterHeightmap->heightMax + allFifoMaxZLocal;
+    currentMaxSeaLevel = waterHeightmap->heightMax + allFifoMaxZ;
   if ((vStart.y > currentMaxSeaLevel) && (vEnd.y > currentMaxSeaLevel))
     return 0;
 

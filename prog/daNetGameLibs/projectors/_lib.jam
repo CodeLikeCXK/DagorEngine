@@ -1,5 +1,0 @@
-if $(HaveRenderer) = yes {
-  gamePulls += framework_projectors_pull ;
-  AddIncludes +=  $(Root)/prog/gameLibs/render/daBfg ;
-  UseProgLibs += daNetGameLibs/projectors ;
-}

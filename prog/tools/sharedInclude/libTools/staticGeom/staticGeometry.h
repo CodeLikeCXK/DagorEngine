@@ -1,5 +1,8 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright 2023 by Gaijin Games KFT, All rights reserved.
+#ifndef _GAIJIN_DAGORED_SHARED_STATGEOMOBJ_H
+#define _GAIJIN_DAGORED_SHARED_STATGEOMOBJ_H
 #pragma once
+
 
 #include <math/dag_color.h>
 #include <math/dag_bounds3.h>
@@ -241,3 +244,6 @@ public:
 
   inline int isNonTopLod() { return flags & FLG_NON_TOP_LOD; }
 };
+
+
+#endif

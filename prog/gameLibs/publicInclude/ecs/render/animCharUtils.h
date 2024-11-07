@@ -1,16 +1,9 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
-
-#include <EASTL/functional.h>
-
-class ShaderMaterial;
-namespace AnimV20
-{
-class AnimcharRendComponent;
-}
 
 bool recreate_material_with_new_params(AnimV20::AnimcharRendComponent &animchar_render,
   eastl::function<void(ShaderMaterial *)> &&shader_var_setter);

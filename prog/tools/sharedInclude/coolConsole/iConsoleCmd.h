@@ -1,5 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __GAIJIN_COOL_CONSOLE_ICONSOLE_CMD__
+#define __GAIJIN_COOL_CONSOLE_ICONSOLE_CMD__
 #pragma once
+
 
 #include <generic/dag_span.h>
 #include <math/dag_Point3.h>
@@ -30,3 +32,6 @@ protected:
     return (!stricmp(str, "1") || !stricmp(str, "true") || !stricmp(str, "yes") || !stricmp(str, "on"));
   }
 };
+
+
+#endif //__GAIJIN_COOL_CONSOLE_ICONSOLE_CMD__

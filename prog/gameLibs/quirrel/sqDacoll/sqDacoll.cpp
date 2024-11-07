@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <bindQuirrelEx/bindQuirrelEx.h>
 #include <sqModules/sqModules.h>
 
@@ -44,11 +42,10 @@ void sqrat_bind_dacoll_trace_lib(SqModules *module_mgr)
 
   Sqrat::Table nsTbl(vm);
   ///@module dacoll.trace
-  nsTbl //
-    .Func("rayhit_normalized", sq_dacoll_rayhit_normalized)
-    // traceray_normalized(from:Point3, dir:Point3, dist:float) -> float|null
-    .SquirrelFunc("traceray_normalized", sq_dacoll_traceray_normalized, 4, ".xxf|i")
-    /**/;
+  nsTbl.Func("rayhit_normalized", sq_dacoll_rayhit_normalized)
+    .SquirrelFunc("traceray_normalized", sq_dacoll_traceray_normalized, 4, ".xxf|i") // traceray_normalized(from:Point3, dir:Point3,
+                                                                                     // dist:float) -> float|null
+    ;
 
   module_mgr->addNativeModule("dacoll.trace", nsTbl);
 }

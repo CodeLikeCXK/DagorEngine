@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <daECS/core/internal/eventsDb.h>
 #include <debug/dag_logSys.h>
 namespace ecs

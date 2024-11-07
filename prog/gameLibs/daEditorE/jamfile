@@ -10,8 +10,7 @@ include $(Root)/prog/_jBuild/defaults.jam ;
 
 AddIncludes =
   $(Root)/prog/gameLibs/publicInclude
-  $(Root)/prog/tools/sharedInclude # FIXME_BROKEN_DEP
-  $(Root)/prog/1stPartyLibs/jsoncpp/include
+  $(Root)/prog/tools/sharedInclude
 ;
 
 Sources =

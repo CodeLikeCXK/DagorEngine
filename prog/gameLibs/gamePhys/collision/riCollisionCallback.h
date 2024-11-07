@@ -1,6 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
-
 #include <rendInst/rendInstGen.h>
 #include <gamePhys/collision/rendinstCollision.h>
 

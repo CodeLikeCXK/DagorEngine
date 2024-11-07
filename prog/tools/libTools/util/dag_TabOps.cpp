@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <libTools/containers/dag_TabOps.h>
 
 #include <generic/dag_tab.h>

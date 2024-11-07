@@ -1,7 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "kbd_private.h"
-#include <drv/hid/dag_hiKeybIds.h>
+#include <humanInput/dag_hiKeybIds.h>
 #include <string.h>
 
 unsigned char HumanInput::key_to_shift_bit[256];

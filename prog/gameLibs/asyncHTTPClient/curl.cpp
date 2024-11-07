@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <asyncHTTPClient/asyncHTTPClient.h>
 
 #include <debug/dag_log.h>
@@ -8,7 +6,6 @@
 #include <osApiWrappers/dag_critSec.h>
 #include <osApiWrappers/dag_miscApi.h>
 #include <osApiWrappers/dag_threads.h>
-#include <osApiWrappers/dag_events.h>
 #include <perfMon/dag_cpuFreq.h>
 #include <util/dag_delayedAction.h>
 #include <math/random/dag_random.h>
@@ -26,8 +23,8 @@
 #endif
 
 #if _TARGET_XBOX
-#include <osApiWrappers/xbox/network.h>
 #include <xbox/xbox.h>
+#include <xbox/network.h>
 #endif
 
 #if _TARGET_PC_WIN
@@ -39,11 +36,7 @@
 
 #endif
 
-#if _TARGET_C3
-
-#endif
-
-#define debug(...) logmessage(_MAKE4C('HTTP'), __VA_ARGS__)
+#define LOGLEVEL_DEBUG _MAKE4C('HTTP')
 #define DEBUG_VERBOSE(...) \
   do                       \
   {                        \
@@ -52,6 +45,10 @@
       debug(__VA_ARGS__);  \
     }                      \
   } while (0)
+
+#if _TARGET_C3
+
+#endif
 
 namespace httprequests
 {
@@ -512,7 +509,7 @@ static size_t header_callback(char *ptr, size_t size, size_t nmemb, void *userda
 {
   RequestState *context = (RequestState *)userdata;
   size_t nbytes = size * nmemb;
-  if (DAGOR_LIKELY(strcmp(ptr, "\r\n") != 0))
+  if (EASTL_LIKELY(strcmp(ptr, "\r\n") != 0))
     context->addResponseHeader(make_span(ptr, nbytes));
   else
     context->finishResponseHeader();
@@ -724,25 +721,18 @@ static void poll_on_idle_cycle(void *) { httprequests::poll(); }
 struct CurlPollThread final : public DaThread
 {
   int64_t thread_id = 0;
-  os_event_t event;
 
-  CurlPollThread() : DaThread("CurlPollThread", 128 << 10, 0, WORKER_THREADS_AFFINITY_MASK) { os_event_create(&event); }
-  ~CurlPollThread() { os_event_destroy(&event); }
+  CurlPollThread() : DaThread("CurlPollThread") {}
 
   void execute() override
   {
     thread_id = get_current_thread_id();
-    while (!isThreadTerminating())
+    while (!terminating)
     {
-      // Thread will be blocked until event is set or 10ms timeout elapsed
-      // We need to make thread alertable because Sleep is not guaranteed
-      // to wake up at any specific interval
-      os_event_wait(&event, 10);
       httprequests::poll();
+      sleep_msec(10);
     }
   }
-
-  void wakeup() { os_event_set(&event); }
 };
 
 static eastl::unique_ptr<CurlPollThread> g_poll_thread;
@@ -751,10 +741,7 @@ static eastl::unique_ptr<CurlPollThread> g_poll_thread;
 void poll()
 {
   if (g_poll_thread && g_poll_thread->thread_id != get_current_thread_id())
-  {
-    g_poll_thread->wakeup();
     return;
-  }
 
   TIME_PROFILE(http_requests_poll);
 
@@ -810,7 +797,8 @@ void init_async(InitAsyncParams const &params)
     if (pollInThread)
     {
       g_poll_thread.reset(new CurlPollThread);
-      G_VERIFY(g_poll_thread->start());
+      if (g_poll_thread->start())
+        g_poll_thread->setAffinity(WORKER_THREADS_AFFINITY_MASK);
     }
     else
       register_regular_action_to_idle_cycle(&poll_on_idle_cycle, NULL);

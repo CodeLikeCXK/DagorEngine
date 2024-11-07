@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <ioSys/dag_dataBlock.h>
 #include <sceneBuilder/nsb_StdTonemapper.h>
 #include <debug/dag_debug.h>

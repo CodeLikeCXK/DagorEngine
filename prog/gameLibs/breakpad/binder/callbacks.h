@@ -1,4 +1,12 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+/*
+ * Dagor Engine 3 - Game Libraries
+ * Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+ *
+ * (for conditions of use see prog/license.txt)
+ */
+
+#ifndef DAGOR2_GAMELIBS_BREAKPAD_BINDER_CALLBACKS_H_
+#define DAGOR2_GAMELIBS_BREAKPAD_BINDER_CALLBACKS_H_
 #pragma once
 
 #if _TARGET_PC_WIN
@@ -27,3 +35,5 @@ filter_cb_t get_filter_cb();
 minidump_cb_t get_upload_cb();
 
 } // namespace breakpad
+
+#endif // DAGOR2_GAMELIBS_BREAKPAD_BINDER_CALLBACKS_H_

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "timers.h"
 
 #include <sqrat.h>
@@ -75,7 +73,8 @@ static int find_callback_timer(const Sqrat::Object &handler)
   {
     HSQOBJECT fh = callback_timers[i].func.GetFunc();
 
-    if (::sq_direct_is_equal(vm, &fh, &o))
+    SQInteger cmpRes = 0;
+    if (::sq_direct_cmp(vm, &fh, &o, &cmpRes) && cmpRes == 0)
       return i;
   }
   return -1;
@@ -175,13 +174,11 @@ static SQInteger clear_timer(HSQUIRRELVM vm)
 void bind_timers(Sqrat::Table &exports)
 {
   ///@module ecs
-  exports //
-    .Func("set_callback_timer", set_callback_timer)
+  exports.Func("set_callback_timer", set_callback_timer)
     .Func("set_callback_timer_rt", set_callback_timer_rt)
     .Func("clear_callback_timer", clear_callback_timer)
     .SquirrelFunc("set_timer", set_timer, 2, ".t")
-    .SquirrelFunc("clear_timer", clear_timer, 2, ".t")
-    /**/;
+    .SquirrelFunc("clear_timer", clear_timer, 2, ".t");
 }
 
 

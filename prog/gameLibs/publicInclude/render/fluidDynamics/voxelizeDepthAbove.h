@@ -1,7 +1,3 @@
-//
-// Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-//
 #pragma once
 
 #include <shaders/dag_computeShaders.h>
@@ -18,8 +14,7 @@ public:
   Voxelizer(float world_box_width, float meters_per_voxel_xz = 1.0f, int num_slices = 8, int num_cascades = 3);
 
   void prepareWorldBox(const Point3 &world_pos, const Point2 &world_y_min_max);
-  void voxelizeDepthAbove(const BBox2 &area);
-  void setTransformVars();
+  void voxelizeDepthAbove();
   TEXTUREID getVoxelTexId() const;
   TEXTUREID getBoundaryTexId(int cascade) const;
   Point3 getVoxelTC(const Point3 &world_pos);

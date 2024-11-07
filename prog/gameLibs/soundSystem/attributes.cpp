@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <osApiWrappers/dag_critSec.h>
 #include <osApiWrappers/dag_localConv.h>
 #include <EASTL/string.h>
@@ -82,11 +80,6 @@ static int get_user_label_idx(const FMOD::Studio::EventDescription &event_descri
 EventAttributes make_event_attributes(const FMOD::Studio::EventDescription &event_description)
 {
   TIME_PROFILE_DEV(make_event_attributes);
-#if DAGOR_DBGLEVEL > 0
-  FMOD_GUID id = {};
-  SOUND_VERIFY(event_description.getID(&id));
-  G_ASSERT(banks::is_valid_event(*reinterpret_cast<FMODGUID *>(&id)));
-#endif
   return EventAttributes(get_event_max_distance_impl(event_description), is_event_oneshot_impl(event_description),
     is_event_3d_impl(event_description), has_sustain_point_impl(event_description), get_user_label_idx(event_description));
 }
@@ -113,8 +106,8 @@ void make_and_add_event_attributes(const char *path, size_t path_len, const FMOD
   EventAttributes &event_attributes)
 {
   TIME_PROFILE_DEV(make_and_cache_event_attributes);
-  event_attributes = make_event_attributes(event_description);
   SNDSYS_ATTRIBUTES_BLOCK;
+  event_attributes = make_event_attributes(event_description);
   g_path_attributes.emplace(hash_fun(path, path_len), event_attributes);
 #if DAGOR_DBGLEVEL > 0
   char buf[DAGOR_MAX_PATH];
@@ -129,8 +122,8 @@ void make_and_add_event_attributes(const FMODGUID &event_id, const FMOD::Studio:
   EventAttributes &event_attributes)
 {
   TIME_PROFILE_DEV(make_and_cache_event_attributes);
-  event_attributes = make_event_attributes(event_description);
   SNDSYS_ATTRIBUTES_BLOCK;
+  event_attributes = make_event_attributes(event_description);
   g_guid_attributes.emplace(hash_fun(event_id), event_attributes);
 }
 

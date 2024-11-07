@@ -1,8 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <math/dag_TMatrix4.h>
-#include <drv/dag_vr.h>
+#include <drivers/dag_vr.h>
 #include <EASTL/optional.h>
 #include <3d/dag_stereoIndex.h>
 

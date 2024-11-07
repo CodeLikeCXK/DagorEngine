@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <daECS/net/message.h>
 #include <EASTL/functional.h>
 #include <EASTL/vector_set.h>
@@ -59,18 +57,14 @@ uint32_t MessageClass::init(bool server)
 {
   if (!classLinkList)
     return 0;
-  auto is_outgoing = [server](const MessageClass *cls) {
-    MessageRouting rout = cls->routing;
-    return server ? (rout == ROUTING_SERVER_TO_CLIENT)
-                  : (rout == ROUTING_CLIENT_TO_SERVER || rout == ROUTING_CLIENT_CONTROLLED_ENTITY_TO_SERVER);
-  };
   clear_net_msg_handlers();
   MessageClassesesVec outgoingMessageClasses;
   incomingMessageClasses.clear();
   incomingMessageClasses.reserve(64);
   outgoingMessageClasses.reserve(64);
-  size_t nmc = 0, maxMesageClassLen = 0;
-  for (const MessageClass *cls = classLinkList; cls; cls = cls->next)
+  uint32_t nmc = 0;
+  size_t maxMesageClassLen = 0;
+  for (MessageClass *cls = classLinkList; cls; cls = cls->next)
   {
     MessageRouting rout = cls->routing;
     if (rout == ROUTING_SERVER_TO_CLIENT && !cls->rcptFilter)
@@ -79,23 +73,18 @@ uint32_t MessageClass::init(bool server)
         cls->classHash);
       continue;
     }
-    bool outgoing = is_outgoing(cls);
-    if (!(cls->flags & MF_OPTIONAL))
-    {
-      auto ins = (outgoing ? outgoingMessageClasses : incomingMessageClasses).insert(cls);
-      G_ASSERTF(ins.second, "Net messages hash collision %x for %s/%s!", cls->classHash, (*ins.first)->debugClassName,
-        cls->debugClassName);
-      G_UNUSED(ins);
-      ++nmc;
-    }
+    bool outgoing = (server ? (rout == ROUTING_SERVER_TO_CLIENT)
+                            : (rout == ROUTING_CLIENT_TO_SERVER || rout == ROUTING_CLIENT_CONTROLLED_ENTITY_TO_SERVER));
+    auto ins = (outgoing ? outgoingMessageClasses : incomingMessageClasses).insert(cls);
+    G_ASSERTF(ins.second, "Net messages hash collision %x for %s/%s!", cls->classHash, (*ins.first)->debugClassName,
+      cls->debugClassName);
+    G_UNUSED(ins);
     if (cls->msgSinkHandler && !outgoing)
       register_net_msg_handler(*cls, cls->msgSinkHandler);
     if (cls->debugClassName)
       maxMesageClassLen = eastl::max(maxMesageClassLen, strlen(cls->debugClassName));
+    ++nmc;
   }
-  for (const MessageClass *cls = classLinkList; cls; cls = cls->next) // 2nd pass for optionals
-    if (cls->flags & MF_OPTIONAL)
-      (is_outgoing(cls) ? outgoingMessageClasses : incomingMessageClasses).getContainer().push_back(cls);
   for (int i = 0; i < incomingMessageClasses.size(); ++i)
     const_cast<MessageClass *>(incomingMessageClasses[i])->classId = i; // for receival (getById)
   for (int i = 0; i < outgoingMessageClasses.size(); ++i)
@@ -142,8 +131,7 @@ uint32_t MessageClass::calcNumMessageClasses()
 {
   uint32_t nmc = 0;
   for (const MessageClass *cls = classLinkList; cls; cls = cls->next)
-    if (!(cls->flags & MF_OPTIONAL))
-      ++nmc;
+    ++nmc;
   return nmc;
 }
 

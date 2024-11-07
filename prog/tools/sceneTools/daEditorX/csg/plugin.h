@@ -1,5 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __GAIJIN_IVYGEN_PLUGIN__
+#define __GAIJIN_IVYGEN_PLUGIN__
 #pragma once
+
 
 #include <oldEditor/de_interface.h>
 #include <oldEditor/de_clipping.h>
@@ -63,8 +65,6 @@ public:
   virtual void *queryInterfacePtr(unsigned huid);
 
   virtual bool onPluginMenuClick(unsigned id) { return false; }
-  virtual void handleViewportAcceleratorCommand(unsigned id) override;
-  virtual void registerMenuAccelerators() override;
 
   virtual void gatherStaticVisualGeometry(StaticGeometryContainer &cont) {}
 
@@ -77,3 +77,6 @@ public:
 private:
   bool isVisible;
 };
+
+
+#endif //__GAIJIN_IVYGEN_PLUGIN__

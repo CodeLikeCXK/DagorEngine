@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <osApiWrappers/dag_unicode.h>
 #include <generic/dag_tab.h>
 #include <util/dag_globDef.h>
@@ -8,7 +6,9 @@
 #if _TARGET_PC_WIN && defined(_MSC_VER)
 #include <windows.h>
 #endif
-#include <supp/dag_alloca.h>
+#if _TARGET_PC_WIN | _TARGET_XBOX
+#include <malloc.h>
+#endif
 
 
 wchar_t *convert_utf8_to_u16(const char *s, int len)

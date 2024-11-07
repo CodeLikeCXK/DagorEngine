@@ -1,4 +1,0 @@
-return {
-  get_cur_cam_entity = @() 0
-  set_scene_camera_entity = @(...) 0
-}

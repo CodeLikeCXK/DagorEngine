@@ -1,5 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
+// Copyright 2023 by Gaijin Games KFT, All rights reserved.
 #include <math/dag_Point4.h>
 #include <shaders/dag_shSkinMesh.h>
 #include <shaders/dag_dynSceneRes.h>

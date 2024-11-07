@@ -1,11 +1,8 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <daRg/dag_events.h>
 #include <daRg/dag_guiScene.h>
 #include <sqrat.h>
 #include <startup/dag_globalSettings.h>
 #include <EASTL/algorithm.h>
-#include <json/value.h>
 
 #include "actionData.h"
 
@@ -15,7 +12,7 @@ static const size_t MAX_SCENES = 2;
 static darg::IGuiScene *darg_scenes[MAX_SCENES] = {nullptr, nullptr};
 
 
-static void ui_action_triggered_cb(dainput::action_handle_t action, bool action_terminated, int dur_ms)
+static bool ui_action_triggered_cb(dainput::action_handle_t action, bool action_terminated, int dur_ms)
 {
   if (dainput::event_logs && dainput::logscreen)
   {
@@ -35,31 +32,37 @@ static void ui_action_triggered_cb(dainput::action_handle_t action, bool action_
     if (!scene)
       continue;
 
-    Json::Value data;
+    bool processed = false;
+    Sqrat::Table data(scene->getScriptVM());
     if (!action_terminated)
     {
       if ((action & dainput::TYPEGRP__MASK) == dainput::TYPEGRP_AXIS)
       {
         const auto &as = dainput::get_analog_axis_action_state(action);
-        data["active"] = as.bActive;
-        data["x"] = as.x;
+        data.SetValue("active", as.bActive);
+        data.SetValue("x", as.x);
       }
       else if ((action & dainput::TYPEGRP__MASK) == dainput::TYPEGRP_STICK)
       {
         const auto &as = dainput::get_analog_stick_action_state(action);
-        data["active"] = as.bActive;
-        data["x"] = as.x;
-        data["y"] = as.y;
+        data.SetValue("active", as.bActive);
+        data.SetValue("x", as.x);
+        data.SetValue("y", as.y);
       }
-      scene->getEvents().postEvent(dainput::get_action_name(action), data);
+      processed = scene->getEvents().sendEvent(dainput::get_action_name(action), data);
     }
     else
     {
-      data["dur"] = dur_ms;
-      data["appActive"] = dgs_app_active;
-      scene->getEvents().postEvent(String(0, "%s:end", dainput::get_action_name(action)), data);
+      data.SetValue("dur", dur_ms);
+      data.SetValue("appActive", dgs_app_active);
+      processed = scene->getEvents().sendEvent(String(0, "%s:end", dainput::get_action_name(action)), data);
     }
+
+    if (processed)
+      break;
   }
+
+  return false;
 }
 
 
@@ -71,17 +74,17 @@ static void report_clicks_cb(unsigned dev_mask, unsigned total_clicks)
     dainput::logscreen(String(0, "dev=%d clicks=%d [daRg scene=%p | %p]", dev_mask, total_clicks, darg_scenes[0], darg_scenes[1]));
   }
 
-  if (darg_scenes[0] || darg_scenes[1])
+  for (darg::IGuiScene *scene : darg_scenes)
   {
-    Json::Value data;
-    data["dev_mask"] = dev_mask;
-    data["clicks"] = total_clicks;
+    if (!scene)
+      continue;
 
-    for (darg::IGuiScene *scene : darg_scenes)
-    {
-      if (scene)
-        scene->getEvents().postEvent("dainput::click", data);
-    }
+    Sqrat::Table data(scene->getScriptVM());
+    data.SetValue("dev_mask", dev_mask);
+    data.SetValue("clicks", total_clicks);
+    bool processed = scene->getEvents().sendEvent("dainput::click", data);
+    if (processed)
+      break;
   }
 }
 

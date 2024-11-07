@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "../av_plugin.h"
 #include "../av_appwnd.h"
 
@@ -13,8 +11,8 @@
 
 #include <debug/dag_debug.h>
 
-#include <propPanel/control/container.h>
-#include <propPanel/c_control_event_handler.h>
+#include <propPanel2/c_panel_base.h>
+#include <propPanel2/c_control_event_handler.h>
 
 #include "fastPhys.h"
 #include "fastPhysObject.h"
@@ -30,7 +28,9 @@ enum
 
 //------------------------------------------------------------------
 
-FastPhysPlugin::FastPhysPlugin() : mFastPhysEditor(*this), mActionTree(NULL), mActionTreeCB(NULL), propPanel(NULL), mAsset(NULL) {}
+FastPhysPlugin::FastPhysPlugin() :
+  mFastPhysEditor(*this), hwndPanel(NULL), mActionTree(NULL), mActionTreeCB(NULL), propPanel(NULL), mAsset(NULL)
+{}
 
 
 FastPhysPlugin::~FastPhysPlugin() {}
@@ -39,7 +39,7 @@ FastPhysPlugin::~FastPhysPlugin() {}
 bool FastPhysPlugin::supportAssetType(const DagorAsset &asset) const { return strcmp(asset.getTypeStr(), "fastPhys") == 0; }
 
 
-void FastPhysPlugin::addTreeAction(PropPanel::TLeafHandle parent, FpdAction *action)
+void FastPhysPlugin::addTreeAction(TLeafHandle parent, FpdAction *action)
 {
   G_ASSERT(action);
 
@@ -50,7 +50,7 @@ void FastPhysPlugin::addTreeAction(PropPanel::TLeafHandle parent, FpdAction *act
   else
     name = action->actionName.str();
 
-  PropPanel::TLeafHandle cur = mActionTree->addItem(name.str(), nullptr, parent, action);
+  TLeafHandle cur = mActionTree->addItem(name.str(), -1, parent, action);
 
   FpdContainerAction *c_action = FastPhysEditor::getContainerAction(action);
 
@@ -79,7 +79,7 @@ void FastPhysPlugin::refillActionTree()
 
   clearTree();
 
-  PropPanel::TLeafHandle root = mActionTree->addItem("Actions", nullptr, mActionTree->getRoot(), NULL);
+  TLeafHandle root = mActionTree->addItem("Actions", -1, mActionTree->getRoot(), NULL);
 
   if (mFastPhysEditor.initAction)
     addTreeAction(root, mFastPhysEditor.initAction);
@@ -96,9 +96,12 @@ bool FastPhysPlugin::begin(DagorAsset *asset)
   mAsset = asset;
   IWndManager &manager = getWndManager();
   manager.registerWindowHandler(this);
+  hwndPanel = getAdditinalPropWindow();
+  G_ASSERT(hwndPanel);
+  manager.fixWindow(hwndPanel, true);
 
   propPanel = new FPPanel(*this);
-  manager.setWindowType(nullptr, WINDOW_TYPE_ACTIONS_TREE);
+  manager.setWindowType(hwndPanel, WINDOW_TYPE_ACTIONS_TREE);
 
   mFastPhysEditor.initUi(GUI_PLUGIN_TOOLBAR_ID);
 
@@ -124,36 +127,41 @@ bool FastPhysPlugin::end()
   del_it(propPanel);
 
   IWndManager &manager = getWndManager();
-  manager.removeWindow(mActionTree);
+  manager.setWindowType(hwndPanel, CLIENT_WINDOW_TYPE_NONE);
   manager.unregisterWindowHandler(this);
 
   return true;
 }
 
 
-void *FastPhysPlugin::onWmCreateWindow(int type)
+IWndEmbeddedWindow *FastPhysPlugin::onWmCreateWindow(void *handle, int type)
 {
   switch (type)
   {
     case WINDOW_TYPE_ACTIONS_TREE:
     {
       if (mActionTree)
-        return nullptr;
+        return NULL;
 
+      IWndManager &manager = getWndManager();
+      manager.setCaption(handle, "Actions Tree");
+
+      unsigned w, h;
+      manager.getWindowClientSize(handle, w, h);
       mActionTreeCB = new ActionsTreeCB(*this);
-      mActionTree = new PropPanel::TreeBaseWindow(mActionTreeCB, nullptr, 0, 0, hdpi::_pxActual(0), hdpi::_pxActual(0), "", false);
+      mActionTree = new TreeBaseWindow(mActionTreeCB, handle, 0, 0, hdpi::_pxActual(w), hdpi::_pxActual(h), "", false);
 
       return mActionTree;
     }
   }
 
-  return nullptr;
+  return NULL;
 }
 
 
-bool FastPhysPlugin::onWmDestroyWindow(void *window)
+bool FastPhysPlugin::onWmDestroyWindow(void *handle)
 {
-  if (mActionTree && mActionTree == window)
+  if (mActionTree && mActionTree->getParentWindowHandle() == handle)
   {
     del_it(mActionTree);
     del_it(mActionTreeCB);
@@ -161,7 +169,7 @@ bool FastPhysPlugin::onWmDestroyWindow(void *window)
     return true;
   }
 
-  return false;
+  return NULL;
 }
 
 /*
@@ -185,7 +193,7 @@ void FastPhysPlugin::updateActionPanel()
 {
   if (mActionTree)
   {
-    PropPanel::TLeafHandle sr = mActionTree->getRoot();
+    TLeafHandle sr = mActionTree->getRoot();
 
     IFPObject *wobj = mFastPhysEditor.getSelObject();
 
@@ -225,7 +233,7 @@ void FastPhysPlugin::refillPanel()
 }
 
 
-void FastPhysPlugin::fillPropPanel(PropPanel::ContainerPropertyControl &panel) { refillPanel(); }
+void FastPhysPlugin::fillPropPanel(PropertyContainerControlBase &panel) { refillPanel(); }
 
 
 void FastPhysPlugin::handleKeyPress(IGenViewportWnd *wnd, int vk, int modif) { mFastPhysEditor.handleKeyPress(wnd, vk, modif); }
@@ -273,17 +281,6 @@ bool FastPhysPlugin::getSelectionBox(BBox3 &box) const
   }
 
   return false;
-}
-
-
-void FastPhysPlugin::updateImgui()
-{
-  DAEDITOR3.imguiBegin("Actions Tree");
-
-  if (mActionTree)
-    mActionTree->updateImgui();
-
-  DAEDITOR3.imguiEnd();
 }
 
 

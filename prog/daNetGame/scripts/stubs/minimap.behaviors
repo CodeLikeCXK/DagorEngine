@@ -1,5 +1,0 @@
-return {
-  Minimap = "Minimap"
-  MinimapInput = "MinimapInput"
-  MinimapCanvasPolygon = "MinimapCanvasPolygon"
-}

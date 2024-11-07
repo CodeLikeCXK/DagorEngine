@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -9,12 +10,12 @@
 #include <generic/dag_smallTab.h>
 #include <math/dag_TMatrix.h>
 #include <math/dag_bounds3.h>
+#include <math/dag_Point4.h>
 #include <math/dag_vecMathCompatibility.h>
 #include <util/dag_roNameMap.h>
 #include <startup/dag_globalSettings.h>
 #include <EASTL/unique_ptr.h>
 #include <EASTL/optional.h>
-#include <EASTL/fixed_function.h>
 #include <shaders/dag_bindposeBufferManager.h>
 
 
@@ -100,35 +101,14 @@ public:
     }
 
     for (int skinNo = 0; skinNo < skins.size(); skinNo++)
-      skins_cb(skins[skinNo]->getMesh(), skinNodes[skinNo], skinNo);
+      skins_cb(skins[skinNo]->getMesh(), skinNodes[skinNo]);
   }
 
   dag::ConstSpan<PatchablePtr<ShaderSkinnedMeshResource>> getSkinMeshes() const { return skins; }
   dag::ConstSpan<PatchablePtr<ShaderSkinnedMeshResource>> getSkins() const { return skins; }
   dag::ConstSpan<int> getSkinNodes() const { return skinNodes; }
+  dag::Vector<int> getNodesWithMaterials(dag::ConstSpan<const char *> material_names) const;
   int getSkinsCount() const { return skins.size(); }
-
-  void findRigidNodesWithMaterials(dag::ConstSpan<const char *> material_names,
-    const eastl::fixed_function<2 * sizeof(void *), void(int)> &cb) const;
-  void findSkinNodesWithMaterials(dag::ConstSpan<const char *> material_names,
-    const eastl::fixed_function<2 * sizeof(void *), void(int)> &cb) const;
-
-  template <typename T>
-  void findRigidNodesWithMaterials(dag::ConstSpan<const char *> material_names, const T &cb) const
-  {
-    auto checkRigid = [&](const RigidObject &ro) {
-      for (auto &elem : ro.mesh->getMesh()->getAllElems())
-        for (auto name : material_names)
-          if (strcmp(elem.mat->getShaderClassName(), name) == 0)
-          {
-            cb(ro.nodeId);
-            return;
-          }
-    };
-
-    for (auto &ro : rigids)
-      checkRigid(ro);
-  }
 
   struct RigidObject;
   dag::ConstSpan<RigidObject> getRigidsConst() const { return rigids; }
@@ -174,7 +154,7 @@ public:
 
 protected:
   Ptr<DynSceneResNameMapResource> names;
-  int resSize, _resv0 = 0;
+  int resSize, _deprecatedMaxMatPassNum = 1;
 
   PATCHABLE_32BIT_PAD32(_resv);
 
@@ -247,7 +227,6 @@ public:
   DynamicRenderableSceneLodsResource *clone() const;
   void updateShaderElems();
   void updateBindposes();
-  static void closeBindposeBuffer();
 
   inline BBox3 getLocalBoundingBox() const { return bbox; }
 
@@ -282,12 +261,6 @@ public:
   static void finalizeDuplicateMaterial(dag::Span<ShaderMaterial *> new_mat);
 
   static const char *getStaticClassName() { return "dynModel"; }
-
-  uint32_t getBvhId() const { return bvhId; }
-  void setBvhId(uint32_t id) const { bvhId = id; }
-
-private:
-  mutable uint32_t bvhId = 0;
 
 public:
   struct Lod
@@ -378,11 +351,6 @@ public:
   }
   int getInstanceRefCount() const { return interlocked_acquire_load(instanceRefCount); }
 
-  unsigned incQlReloadCnt() { return interlocked_increment(qlReloadCnt); }
-  unsigned getQlReloadCnt() const { return interlocked_acquire_load(qlReloadCnt); }
-  unsigned incQlDiscardCnt() { return interlocked_increment(qlDiscardCnt); }
-  unsigned getQlDiscardCnt() const { return interlocked_acquire_load(qlDiscardCnt); }
-
 protected:
   void setQlReqLod(uint16_t new_lod) { interlocked_release_store(qlReqLod, new_lod); }
   void setQlReqLFU(int frame_no) { interlocked_release_store(qlReqLFU, frame_no); }
@@ -412,12 +380,10 @@ protected:
   uint32_t packedFields;
   int instanceRefCount;
   volatile unsigned short qlReqLod = qlReqLodInitialValue, qlReqLodPrev = qlReqLodInitialValue;
-  volatile unsigned short qlReloadCnt = 0, qlDiscardCnt = 0;
   int qlReqLFU = 0;
   mutable DynamicRenderableSceneLodsResource *nextClonedRes = nullptr;
   mutable Ptr<DynamicRenderableSceneLodsResource> originalRes;
   PATCHABLE_32BIT_PAD32(_resv[3]);
-  PATCHABLE_64BIT_PAD32(_resv[2]);
 
 public:
   PatchableTab<Lod> lods;
@@ -609,10 +575,10 @@ public:
   }
 
   // Choose LOD by squared distance from camera pos, returns index of choosed LOD
-  int chooseLodByDistSq(float dist_sq, float dist_mul = 1.0f);
+  int chooseLodByDistSq(float dist_sq);
 
   // Choose LOD by distance from camera pos, returns index of choosed LOD
-  int chooseLod(const Point3 &camera_pos, float dist_mul = 1.0f);
+  int chooseLod(const Point3 &camera_pos);
 
   void setLod(int lod);
   inline void setCurrentLod(int lod);
@@ -677,10 +643,7 @@ public:
 
   void clipNodes(const Frustum &frustum, dag::Vector<int, framemem_allocator> &node_list);
 
-  void findRigidNodesWithMaterials(dag::ConstSpan<const char *> material_names,
-    const eastl::fixed_function<2 * sizeof(void *), void(int)> &cb) const;
-
-  uint32_t getUniqueId() const { return uniqueId; }
+  eastl::optional<dag::Vector<int>> getNodesWithMaterials(dag::ConstSpan<const char *> material_names) const;
 
 protected:
   Ptr<DynamicRenderableSceneResource> sceneResource;
@@ -698,8 +661,6 @@ protected:
   Point3 origin;
   Point3 originPrev;
   BBox3 bbox;
-
-  uint32_t uniqueId;
 
   enum Offsets
   {

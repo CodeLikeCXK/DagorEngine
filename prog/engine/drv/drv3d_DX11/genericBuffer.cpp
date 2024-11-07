@@ -1,11 +1,8 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
+#include <3d/dag_drv3dCmd.h>
 #include "validation.h"
 
 #include "driver.h"
 #include "buffers.h"
-#include <drv/3d/dag_vertexIndexBuffer.h>
-#include <drv/3d/dag_shaderConstants.h>
 
 static void set_buffer_name(ID3D11Buffer *buffer, const char *name)
 {
@@ -129,11 +126,11 @@ bool GenericBuffer::createSrv()
 #if DAGOR_DBGLEVEL > 0
       if (!is_good_buffer_structure_size(structSize))
       {
-        D3D_ERROR("The structure size of %u of buffer %s has a hardware unfriendly size and "
-                  "probably results in degraded performance. For some platforms it might requires "
-                  "the shader compiler to restructure the structure type to avoid layout violations "
-                  "and on other platforms it results in wasted memory as the memory manager has to "
-                  "insert extra padding to align the buffer properly.",
+        logerr("The structure size of %u of buffer %s has a hardware unfriendly size and "
+               "probably results in degraded performance. For some platforms it might requires "
+               "the shader compiler to restructure the structure type to avoid layout violations "
+               "and on other platforms it results in wasted memory as the memory manager has to "
+               "insert extra padding to align the buffer properly.",
           structSize, getResName());
       }
 #endif
@@ -171,7 +168,7 @@ ID3D11ShaderResourceView *GenericBuffer::getResView()
 
   if (!structSize)
   {
-    D3D_ERROR("getSrv on unstructured buffer");
+    logerr("getSrv on unstructured buffer");
     return NULL;
   }
 
@@ -207,11 +204,11 @@ bool GenericBuffer::createUav()
 #if DAGOR_DBGLEVEL > 0
       if (!is_good_buffer_structure_size(structSize))
       {
-        D3D_ERROR("The structure size of %u of buffer %s has a hardware unfriendly size and "
-                  "probably results in degraded performance. For some platforms it might requires "
-                  "the shader compiler to restructure the structure type to avoid layout violations "
-                  "and on other platforms it results in wasted memory as the memory manager has to "
-                  "insert extra padding to align the buffer properly.",
+        logerr("The structure size of %u of buffer %s has a hardware unfriendly size and "
+               "probably results in degraded performance. For some platforms it might requires "
+               "the shader compiler to restructure the structure type to avoid layout violations "
+               "and on other platforms it results in wasted memory as the memory manager has to "
+               "insert extra padding to align the buffer properly.",
           structSize, getResName());
       }
 #endif
@@ -267,7 +264,7 @@ bool GenericBuffer::createStructured(uint32_t struct_size, uint32_t elements, ui
   G_ASSERT(struct_size == 4 || !(buf_flags & SBCF_MISC_ALLOW_RAW));
   if (bool(buf_flags & SBCF_MISC_STRUCTURED) && bool(buf_flags & SBCF_MISC_DRAWINDIRECT))
   {
-    D3D_ERROR("indirect buffer can't be structured one, check <%s>", statName_);
+    logerr("indirect buffer can't be structured one, check <%s>", statName_);
     G_ASSERTF(0, "indirect buffer can't be structured one, <%s>", statName_);
   }
   G_ASSERTF(buf_format == 0 || ((buf_flags & (SBCF_BIND_VERTEX | SBCF_BIND_INDEX | SBCF_MISC_STRUCTURED | SBCF_MISC_ALLOW_RAW)) == 0),
@@ -288,9 +285,7 @@ bool GenericBuffer::recreateBuf(Sbuffer *sb)
 {
   bool result = true;
   TEXQL_ON_BUF_ALLOC(this);
-  if (!(bufFlags & SBCF_DYNAMIC) && rld)
-    ; // delayed recreation, don't alloc buffer here
-  else if (bufFlags & (SBCF_BIND_INDEX | SBCF_BIND_VERTEX))
+  if (bufFlags & (SBCF_BIND_INDEX | SBCF_BIND_VERTEX))
   {
     result |= createBuf();
   }
@@ -387,7 +382,6 @@ bool GenericBuffer::copyTo(Sbuffer *dest, uint32_t dst_ofs_bytes, uint32_t src_o
   ContextAutoLock contextLock;
   disable_conditional_render_unsafe();
   dx_context->CopySubresourceRegion(destvb->buffer, 0, dst_ofs_bytes, 0, 0, buffer, 0, &box);
-  destvb->internalState = UPDATED_BY_COPYTO;
   return true;
 }
 bool GenericBuffer::copyTo(Sbuffer *dest)
@@ -395,12 +389,13 @@ bool GenericBuffer::copyTo(Sbuffer *dest)
   if (!dest)
     return false;
   GenericBuffer *destvb = (GenericBuffer *)dest;
+  G_ASSERTF((dest->getFlags() & SBCF_BIND_MASK) != SBCF_BIND_VERTEX && (dest->getFlags() & SBCF_BIND_MASK) != SBCF_BIND_INDEX,
+    "destination index/vertex buffer can be immutable");
   if (!destvb->buffer)
     return false;
   ContextAutoLock contextLock;
   disable_conditional_render_unsafe();
   dx_context->CopyResource(destvb->buffer, buffer);
-  destvb->internalState = UPDATED_BY_COPYTO;
   return true;
 }
 
@@ -414,7 +409,7 @@ bool GenericBuffer::updateData(uint32_t ofs_bytes, uint32_t size_bytes, const vo
   if (device_is_lost != S_OK)
   {
     if (gpuAcquireRefCount && gpuThreadId == GetCurrentThreadId())
-      D3D_ERROR("buffer lock in updateData during reset %s", getResName());
+      logerr("buffer lock in updateData during reset %s", getResName());
     return false;
   }
   if (!buffer && (bufFlags & SBCF_DYNAMIC) == 0)
@@ -423,7 +418,7 @@ bool GenericBuffer::updateData(uint32_t ofs_bytes, uint32_t size_bytes, const vo
   {
     if ((bufFlags & SBCF_DYNAMIC) == 0)
       return updateDataWithLock(ofs_bytes, size_bytes, src, lockFlags); // case of delayed create.
-    D3D_ERROR("buffer not created %s", getResName());
+    logerr("buffer not created %s", getResName());
     return false;
   }
   if ((bufFlags &
@@ -500,7 +495,7 @@ void *GenericBuffer::lock(uint32_t ofs_bytes, uint32_t size_bytes, int flags)
   if (device_is_lost != S_OK)
   {
     if (gpuAcquireRefCount && gpuThreadId == GetCurrentThreadId())
-      D3D_ERROR("buffer lock during reset %s", getResName());
+      logerr("buffer lock during reset %s", getResName());
     return NULL;
   }
 
@@ -521,7 +516,7 @@ void *GenericBuffer::lock(uint32_t ofs_bytes, uint32_t size_bytes, int flags)
         createStagingBuffer(stagingBuffer);
         if (!stagingBuffer)
         {
-          D3D_ERROR("Could not create staging buffer");
+          logerr("Could not create staging buffer");
           return nullptr;
         }
       }
@@ -604,9 +599,7 @@ void *GenericBuffer::lock(uint32_t ofs_bytes, uint32_t size_bytes, int flags)
 
   if (bufferToLock == stagingBuffer)
   {
-    // clang-format off
-    if ( (!(flags & VBLOCK_WRITEONLY) && ((internalState != BUFFER_COPIED) || (flags & VBLOCK_DELAYED)))
-      || (internalState == UPDATED_BY_COPYTO) )
+    if (!(flags & VBLOCK_WRITEONLY) && ((internalState != BUFFER_COPIED) || (flags & VBLOCK_DELAYED)))
     {
       ContextAutoLock contextLock;
       disable_conditional_render_unsafe();
@@ -617,9 +610,7 @@ void *GenericBuffer::lock(uint32_t ofs_bytes, uint32_t size_bytes, int flags)
     {
       return NULL;
     }
-    // clang-format on
   }
-
 
   ContextAutoLock contextLock;
   HRESULT hr = dx_context->Map(bufferToLock, NULL, mapType, 0, &lockMsr);
@@ -645,7 +636,7 @@ int GenericBuffer::unlock()
     if (!buffer)
     {
       if (!createBuf())
-        D3D_ERROR("can't create delayed buffer: %s", dx11_error(last_hres));
+        logerr("can't create delayed buffer: %s", dx11_error(last_hres));
     }
     else
     {
@@ -723,14 +714,14 @@ void GenericBuffer::removeFromStates()
   {
     if (g_render_state.nextVertexInput.vertexStream[i].source == this)
     {
-      D3D_ERROR("Deleting buffer that is still in render '%s'", getResName());
+      logerr("Deleting buffer that is still in render '%s'", getResName());
       d3d::setvsrc_ex(i, nullptr, 0, 0);
     }
   }
 
   if (g_render_state.nextVertexInput.indexBuffer == this)
   {
-    D3D_ERROR("Deleting buffer that is still in render '%s'", getResName());
+    logerr("Deleting buffer that is still in render '%s'", getResName());
     d3d::setind(nullptr);
   }
   if (buffer && (bufFlags & SBCF_BIND_CONSTANT))

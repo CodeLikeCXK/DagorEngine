@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <datacache/datacache.h>
 #include "file/filebackend.h"
 #include "web/webbackend.h"

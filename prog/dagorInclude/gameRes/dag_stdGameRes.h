@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -37,5 +38,5 @@ void gameres_append_desc(DataBlock &desc, const char *desc_fn, const char *pkg_f
 void gameres_patch_desc(DataBlock &desc, const char *patch_desc_fn, const char *pkg_folder, const char *desc_fn);
 void gameres_final_optimize_desc(DataBlock &desc, const char *label);
 
-void register_stub_gameres_factories(dag::ConstSpan<unsigned> stubbed_types, bool report_stubs_as_loaded);
+void register_stub_gameres_factories(dag::ConstSpan<unsigned> stubbed_types);
 void terminate_stub_gameres_factories();

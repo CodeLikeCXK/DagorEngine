@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <render/daBfg/stateRequest.h>
 #include <frontend/internalRegistry.h>
 #include <shaders/dag_shaderBlock.h>
@@ -11,7 +9,7 @@ namespace dabfg
 StateRequest::StateRequest(InternalRegistry *reg, NodeNameId nodeId) : id{nodeId}, registry{reg}
 {
   auto &reqs = registry->nodes[id].stateRequirements;
-  if (DAGOR_UNLIKELY(reqs.has_value()))
+  if (EASTL_UNLIKELY(reqs.has_value()))
   {
     logerr("Global state requested twice on '%s' frame graph node!"
            " Ignoring one of the requests!",
@@ -24,7 +22,7 @@ StateRequest StateRequest::setFrameBlock(const char *block) &&
 {
   int previousValue = eastl::exchange(registry->nodes[id].shaderBlockLayers.frameLayer, ShaderGlobal::getBlockId(block));
 
-  if (DAGOR_UNLIKELY(previousValue != -1))
+  if (EASTL_UNLIKELY(previousValue != -1))
   {
     logerr("Block requested to be set to layer 'FRAME' twice within"
            " '%s' frame graph node! Ignoring one of the requests!",
@@ -38,7 +36,7 @@ StateRequest StateRequest::setSceneBlock(const char *block) &&
 {
   int previousValue = eastl::exchange(registry->nodes[id].shaderBlockLayers.sceneLayer, ShaderGlobal::getBlockId(block));
 
-  if (DAGOR_UNLIKELY(previousValue != -1))
+  if (EASTL_UNLIKELY(previousValue != -1))
   {
     logerr("Block requested to be set to layer 'SCENE' twice within"
            " '%s' frame graph node! Ignoring one of the requests!",
@@ -52,7 +50,7 @@ StateRequest StateRequest::setObjectBlock(const char *block) &&
 {
   int previousValue = eastl::exchange(registry->nodes[id].shaderBlockLayers.objectLayer, ShaderGlobal::getBlockId(block));
 
-  if (DAGOR_UNLIKELY(previousValue != -1))
+  if (EASTL_UNLIKELY(previousValue != -1))
   {
     logerr("Block requested to be set to layer 'OBJECT' twice within"
            " '%s' frame graph node! Ignoring one of the requests!",
@@ -68,9 +66,18 @@ StateRequest StateRequest::allowWireframe() &&
   return *this;
 }
 
-StateRequest StateRequest::vrs(VrsSettings vrs) &&
+StateRequest StateRequest::allowVrs(VrsRequirements vrs) &&
 {
-  registry->nodes[id].stateRequirements->vrsState = VrsStateRequirements{vrs.rateX, vrs.rateY, vrs.vertexCombiner, vrs.pixelCombiner};
+  if (!vrs.rateTexture.has_value())
+  {
+    registry->nodes[id].stateRequirements->vrsState.reset();
+    return *this;
+  }
+
+  const auto rateTexId = vrs.rateTexture->resUid.resId;
+  eastl::move(*vrs.rateTexture).texture().atStage(dabfg::Stage::ALL_GRAPHICS).useAs(dabfg::Usage::VRS_RATE_TEXTURE);
+  registry->nodes[id].stateRequirements->vrsState =
+    VrsStateRequirements{vrs.rateX, vrs.rateY, rateTexId, vrs.vertexCombiner, vrs.pixelCombiner};
   return *this;
 }
 

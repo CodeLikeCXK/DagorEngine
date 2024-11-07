@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <util/dag_globDef.h>
@@ -46,7 +45,7 @@ public:
     insz = strm.avail_in;
     outp = strm.next_out;
     outsz = strm.avail_out;
-    if (err != Z_OK && err != Z_STREAM_END && err != Z_BUF_ERROR)
+    if (err != Z_OK && err != Z_STREAM_END)
       DAG_FATAL("zlib error %d in %s", err, "deflate");
     return err;
   }
@@ -71,37 +70,27 @@ public:
     compressedTotal = 0;
   }
 
-  void pack(void *inp, unsigned sz, bool finish) { packZflush(inp, sz, finish ? Z_FINISH : Z_NO_FLUSH); }
-  void packZflush(void *inp, unsigned sz, int flush)
+  void pack(void *inp, unsigned sz, bool finish)
   {
     uncompressedTotal += sz;
 
-    while (sz || flush != Z_NO_FLUSH)
+    while (sz || finish)
     {
       void *op = &buf[0];
       unsigned osz = data_size(buf);
-      int err = ZLibPacker::pack(inp, sz, op, osz, flush);
+      int err = ZLibPacker::pack(inp, sz, op, osz, finish ? Z_FINISH : Z_NO_FLUSH);
       unsigned l = data_size(buf) - osz;
       if (l != 0)
       {
         callback->write(&buf[0], l);
         compressedTotal += l;
       }
-      if (err == Z_BUF_ERROR)
-      {
-        if (data_size(buf) < osz)
-          buf.resize(osz);
-        else if (sz == 0)
-          break;
-        continue;
-      }
-
 
       while (err == Z_OK && osz == 0)
       {
         op = &buf[0];
         osz = data_size(buf);
-        err = ZLibPacker::pack(inp, sz, op, osz, flush);
+        err = ZLibPacker::pack(inp, sz, op, osz, finish ? Z_FINISH : Z_NO_FLUSH);
         l = data_size(buf) - osz;
         if (l != 0)
         {

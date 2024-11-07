@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <quirrel/quirrel_json/jsoncpp.h>
 #include <json/json.h>
 
@@ -104,7 +102,7 @@ Json::Value quirrel_to_jsoncpp(Sqrat::Object obj)
       }
       else
       {
-        eastl::string jkey = json_val_to_string(sqval_to_json(eastl::move(sqKey)));
+        eastl::string jkey = json_val_to_string(sqval_to_json(sqKey));
         jobj[jkey] = sqval_to_json(Sqrat::Object(iter.getValue(), vm));
       }
     }

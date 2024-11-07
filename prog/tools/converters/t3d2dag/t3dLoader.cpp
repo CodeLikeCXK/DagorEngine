@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 /***********      .---.         .-"-.      *******************\
 * -------- *     /   ._.       / ґ ` \     * ---------------- *
 * Author's *     \_  (__\      \_°v°_/     * humus@rogers.com *

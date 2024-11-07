@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "das_ecs.h"
 #include <daECS/core/componentsMap.h>
 #include <dasModules/dasModulesCommon.h>

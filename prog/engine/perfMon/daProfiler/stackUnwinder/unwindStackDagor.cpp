@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <osApiWrappers/dag_stackHlpEx.h>
 
 // uses dagor functions for stack unwinding. not safe in win64!

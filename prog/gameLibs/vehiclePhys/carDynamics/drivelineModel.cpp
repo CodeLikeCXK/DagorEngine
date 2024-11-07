@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <vehiclePhys/carDynamics/carModel.h>
 #include <ioSys/dag_dataBlock.h>
 #include <perfMon/dag_graphStat.h>

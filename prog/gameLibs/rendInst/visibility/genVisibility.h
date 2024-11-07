@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <rendInst/rendInstGenRender.h>
@@ -9,11 +8,6 @@
 #include <generic/dag_tab.h>
 #include <generic/dag_carray.h>
 
-
-namespace rendinst
-{
-extern Point3_vec4 dir_from_sun;
-}
 
 enum
 {

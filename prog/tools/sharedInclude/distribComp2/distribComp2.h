@@ -1,4 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright 2023 by Gaijin Games KFT, All rights reserved.
+#ifndef _GAIJIN_DAGOR_DISTRIBCOMP2_H
+#define _GAIJIN_DAGOR_DISTRIBCOMP2_H
 #pragma once
 
 // forward declarations for external classes
@@ -220,3 +222,5 @@ int getTaskTypeId(int idx);
 const char *getTaskTypeDescription(int idx);
 const char *getTaskTypeDescriptionByFourCC(int four_cc);
 } // namespace DistribCompProvider2
+
+#endif

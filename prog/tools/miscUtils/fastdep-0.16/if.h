@@ -1,5 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-#pragma once
+#ifndef IF_H_
+#define IF_H_
 
 #include "element.h"
 
@@ -79,3 +79,5 @@ private:
   std::vector<Sequence *> Seq;
   Sequence *Else;
 };
+
+#endif

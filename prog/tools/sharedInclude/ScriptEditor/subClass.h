@@ -1,4 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __GAIJIN_SUBCLASS__
+#define __GAIJIN_SUBCLASS__
 #pragma once
 
 #include <util/dag_string.h>
@@ -49,3 +50,6 @@ private:
   int autoGenFrom, autoGenTill; // temp
   Tab<String> childNames;       // temp
 };
+
+
+#endif //__GAIJIN_SUBCLASS__

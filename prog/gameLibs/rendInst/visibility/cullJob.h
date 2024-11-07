@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <atomic>
@@ -17,8 +16,6 @@ class Occlusion;
 
 namespace rendinst
 {
-
-const float texStreamingLargeRiRad = 50;
 
 struct CullJobSharedState
 {
@@ -81,12 +78,11 @@ public:
           const scene::pool_index poolId = scene::get_node_pool(m);
           const auto &riPool = poolInfo[poolId];
           float dist = v_extract_x(distSqScaled);
+          unsigned lod = find_lod<rendinst::RiExtraPool::MAX_LODS>(riPool.distSqLOD, dist);
           const unsigned llm = riPool.lodLimits >> ((ri_game_render_mode + 1) * 8);
           const unsigned min_lod = llm & 0xF, max_lod = (llm >> 4) & 0xF;
-          if (riPool.distSqLOD[max_lod] <= dist * rendinst::render::riExtraLodsShiftDistMulForCulling)
+          if (lod > max_lod)
             return;
-
-          unsigned lod = find_lod<rendinst::RiExtraPool::MAX_LODS>(riPool.distSqLOD, dist);
           lod = clamp(lod, min_lod, max_lod);
           int cnt_idx = poolId * rendinst::RiExtraPool::MAX_LODS + lod;
           int new_sz = riexDataCnt[cnt_idx].fetch_add(RIEXTRA_VECS_COUNT) + RIEXTRA_VECS_COUNT;
@@ -97,13 +93,8 @@ public:
             return;
           }
 
-          vec4f rad = scene::get_node_bsphere_vrad(m);
-          float floatRad = v_extract_w(rad);
-          if (floatRad > texStreamingLargeRiRad && dist > 0)
-          {
-            float texLevelDist = max(0.0f, sqrt(dist) - floatRad);
-            dist = texLevelDist * texLevelDist;
-          }
+          vec4f *addData = v.riexData[lod].data()[poolId].data() + (new_sz - RIEXTRA_VECS_COUNT);
+          const int32_t *userData = tiled_scene.getUserData(ni);
           const uint32_t curDistSq = interlocked_relaxed_load(*(const uint32_t *)(v.minSqDistances[lod].data() + poolId));
           const uint32_t distI = bitwise_cast<uint32_t>(dist); // since squared distance is positive, it is fine to compare in ints
                                                                // (bitwise representation of floats will still be in same order)
@@ -113,10 +104,16 @@ public:
             // used only for texture lod selection so, even a bit randomly it should work with relaxed load/store
             interlocked_relaxed_store(*(uint32_t *)(v.minSqDistances[lod].data() + poolId), distI);
           }
-          vec4f *addData = v.riexData[lod].data()[poolId].data() + (new_sz - RIEXTRA_VECS_COUNT);
-          rendinst::render::write_ri_extra_per_instance_data(addData, tiled_scene, poolId, ni, m, riPool.isDynamic);
+          if (userData)
+            eastl::copy_n(userData, tiled_scene.getUserDataWordCount(), (uint32_t *)(addData + rendinst::render::ADDITIONAL_DATA_IDX));
+          v_mat44_transpose_to_mat43(*(mat43f *)addData, m);
+          uint32_t perDataBufferOffset = poolId * (sizeof(rendinst::render::RiShaderConstBuffers) / sizeof(vec4f)) + 1;
+          vec4i extraData = v_make_vec4i(0, perDataBufferOffset, (poolId << 1) | uint32_t(riPool.isDynamic), 0);
+          addData[rendinst::render::ADDITIONAL_DATA_IDX] =
+            v_perm_ayzw(v_cast_vec4f(extraData), addData[rendinst::render::ADDITIONAL_DATA_IDX]);
 
           const uint32_t id = new_sz / RIEXTRA_VECS_COUNT - 1;
+          vec4f rad = scene::get_node_bsphere_vrad(m);
           rad = v_div_x(distSqScaled, v_mul_x(rad, rad));
           float sdist = v_extract_x(rad);
           if (sortLarge && lod < LARGE_LOD_CNT && (scene::check_node_flags(m, RendinstTiledScene::LARGE_OCCLUDER)))

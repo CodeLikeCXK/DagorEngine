@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <gamePhys/common/kinematics.h>
 
 #include <math/dag_Quat.h>

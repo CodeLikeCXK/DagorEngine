@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <levelSplines/splineRoads.h>
 #include <memory/dag_framemem.h>
 

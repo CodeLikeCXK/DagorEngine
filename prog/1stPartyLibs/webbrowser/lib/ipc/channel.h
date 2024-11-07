@@ -1,6 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
-
 #include "socket.h"
 
 #include "../log.h"
@@ -55,6 +53,7 @@ public:
   virtual ~Channel();
 
 public:
+  bool create(const Socket& s);
   bool connect(unsigned short);
   void shutdown();
 

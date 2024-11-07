@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -14,30 +15,23 @@
 namespace resptr_detail
 {
 
-using key_t = uint64_t;
+using key_t = uint32_t;
 
 class ResizableManagedTex : public ManagedTex
 {
-public:
-  using AliasMap = eastl::vector_map<key_t, UniqueTex>;
-
 protected:
-  AliasMap mAliases;
-  key_t currentKey = 0;
-  resid_t lastMResId = Helper<ManagedTex>::BAD_ID;
+  eastl::vector_map<key_t, UniqueTex> mAliases;
 
   void swap(ResizableManagedTex &other)
   {
     ManagedTex::swap(other);
     eastl::swap(mAliases, other.mAliases);
-    eastl::swap(currentKey, other.currentKey);
-    eastl::swap(lastMResId, other.lastMResId);
   }
+
   ResizableManagedTex() = default;
 
 public:
-  void calcKey();
-  void resize(int width, int height, int d = 1);
+  void resize(int width, int height);
 };
 
 class ResizableManagedTexHolder : public ManagedResHolder<ResizableManagedTex>
@@ -46,10 +40,10 @@ protected:
   ResizableManagedTexHolder() = default;
 
 public:
-  void resize(int width, int height, int d = 1)
+  void resize(int width, int height)
   {
-    ResizableManagedTex::resize(width, height, d);
-    setVar();
+    this->ResizableManagedTex::resize(width, height);
+    this->setVar();
   }
 };
 

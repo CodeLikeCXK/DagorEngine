@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <osApiWrappers/dag_files.h>
 #include <osApiWrappers/dag_direct.h>
 #include <osApiWrappers/dag_fileIoErr.h>
@@ -590,7 +588,7 @@ file_ptr_t df_mkstemp(char *templ)
   for (int i = 0; i < 16; ++i)
   {
     for (char *c = beg; *c; ++c)
-      *c = rndchars[grnd() % (sizeof(rndchars) - 1)];
+      *c = rndchars[grnd() % sizeof(rndchars)];
     fd = open(templ, O_RDWR | O_CREAT | O_EXCL, 0600);
     if (fd >= 0 || errno != EEXIST)
       break;

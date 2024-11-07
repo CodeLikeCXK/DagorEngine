@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "riGen/riGenData.h"
 
 #include <gameRes/dag_gameResSystem.h>
@@ -8,7 +6,6 @@
 #include <image/dag_texPixel.h>
 #include <math/dag_mesh.h>
 #include <generic/dag_tabWithLock.h>
-#include <drv/3d/dag_texture.h>
 
 
 static void build_stub_ri_mesh(Mesh &m)

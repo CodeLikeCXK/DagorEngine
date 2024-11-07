@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <math/dag_adjpow2.h>
 #include <math/random/dag_random.h>
 #include <math/dag_rayIntersectSphere.h>
@@ -7,14 +5,9 @@
 #include <daSkies2/daSkies.h>
 #include <shaders/dag_shaders.h>
 #include <shaders/dag_shaderVar.h>
-#include <drv/3d/dag_renderTarget.h>
-#include <drv/3d/dag_shaderConstants.h>
-#include <drv/3d/dag_buffers.h>
-#include <drv/3d/dag_texture.h>
-#include <drv/3d/dag_tex3d.h>
-#include <drv/3d/dag_driver.h>
-#include <drv/3d/dag_info.h>
-#include <drv/3d/dag_commands.h>
+#include <3d/dag_tex3d.h>
+#include <3d/dag_drv3d.h>
+#include <3d/dag_drv3dCmd.h>
 #include <util/dag_simpleString.h>
 #include <math/dag_Point3.h>
 #include <vecmath/dag_vecMath.h>
@@ -33,8 +26,6 @@
 #include <gameRes/dag_gameResSystem.h>
 #include <gameRes/dag_stdGameRes.h>
 #include <math/dag_mathUtils.h>
-#include <math/dag_frustum.h>
-#include <3d/dag_textureIDHolder.h>
 
 #define USE_CONSOLE_BOOL_VAL         CONSOLE_BOOL_VAL
 #define USE_CONSOLE_INT_VAL          CONSOLE_INT_VAL
@@ -66,8 +57,7 @@ static uint32_t noAlphaSkyHdrFmt = TEXFMT_R11G11B10F;
   VAR(strata_pos_x, false)                  \
   VAR(strata_pos_z, false)                  \
   VAR(skies_use_2d_shadows, true)           \
-  VAR(lowres_sky, true)                     \
-  VAR(skies_has_clouds, false)
+  VAR(lowres_sky, false)
 // VAR(infinite_skies)
 
 #define VAR(a, opt) static ShaderVariableInfo a##VarId;
@@ -249,9 +239,12 @@ void DaSkies::prepare(const Point3 &dir_to_sun, bool force_update, float dt)
     }
     ShaderGlobal::set_color4(light_shadow_dirVarId, P3D(getPrimarySunDir()), 0); // we set it always, even if prepareLighting hasn't
                                                                                  // done anything
+
+    ShaderGlobal::set_int(get_shader_variable_id("skies_has_clouds"), 1); // todo: only if there are enough clouds in the skies. todo:
+                                                                          // gpu readback of filled layers
   }
-  ShaderGlobal::set_int(skies_has_cloudsVarId, !!clouds); // todo: only if there are enough clouds in the skies. todo: // gpu readback
-                                                          // of filled layers
+  else
+    ShaderGlobal::set_int(get_shader_variable_id("skies_has_clouds"), 0);
 }
 
 void DaSkies::projectUses2DShadows(bool on)
@@ -278,11 +271,8 @@ void DaSkies::setStrataCloudsTexture(const char *tex_name)
 
   strataClouds.close();
   strataClouds = dag::get_tex_gameres(tex_name, "strata_clouds");
-  if (strataClouds)
-    strataClouds->disableSampler();
   prefetch_managed_texture(strataClouds.getTexId());
   strataClouds.setVar();
-  ShaderGlobal::set_sampler(::get_shader_variable_id("strata_clouds_samplerstate"), d3d::request_sampler({}));
 }
 
 void DaSkies::renderStrataClouds(const Point3 &origin, const TMatrix &view_tm, const TMatrix4 &proj_tm, bool panorama)
@@ -320,7 +310,7 @@ void DaSkies::skiesDataScatteringVolumeBarriers(SkiesData *data)
 }
 
 void DaSkies::changeSkiesData(int sky_detail_level, int clouds_detail_level, bool fly_through_clouds, int targetW, int targetH,
-  SkiesData *data, CloudsResolution clouds_resolution, bool use_blurred_clouds)
+  SkiesData *data, CloudsResolution clouds_resolution)
 {
   if (cpuOnly)
     return;
@@ -341,7 +331,7 @@ void DaSkies::changeSkiesData(int sky_detail_level, int clouds_detail_level, boo
     clouds_detail_level = 0; // just force fullres no matter what
 
   sky_detail_level = clamp(sky_detail_level, 0, 3);
-  clouds_detail_level = clamp((int)clouds_detail_level, 0, 4);
+  clouds_detail_level = clamp((int)clouds_detail_level, 0, 3);
   if (data->tw == targetW && data->th == targetH && data->flyThrough == fly_through_clouds &&
       data->skyDetailLevel == sky_detail_level && data->cloudsDetailLevel == clouds_detail_level)
     return;
@@ -364,24 +354,17 @@ void DaSkies::changeSkiesData(int sky_detail_level, int clouds_detail_level, boo
     int skyW = (targetW >> data->skyDetailLevel), skyH = (targetH >> data->skyDetailLevel);
     String name(128, "%s_lowres_sky", data->base_name);
     if (d3d::get_driver_code().is(d3d::dx11))
-      d3d::driver_command(Drv3dCommand::D3D_FLUSH);
+      d3d::driver_command(DRV3D_COMMAND_D3D_FLUSH, NULL, NULL, NULL);
     data->lowresSkies = dag::create_tex(NULL, skyW, skyH, TEXCF_RTARGET | noAlphaSkyHdrFmt, 1, name);
-    {
-      d3d::SamplerInfo smpInfo;
-      smpInfo.address_mode_u = smpInfo.address_mode_v = smpInfo.address_mode_w = d3d::AddressMode::Clamp;
-      ShaderGlobal::set_sampler(::get_shader_variable_id("lowres_sky_samplerstate"), d3d::request_sampler(smpInfo));
-    }
     if (data->lowresSkies)
-      data->lowresSkies->disableSampler();
+      data->lowresSkies->texaddr(TEXADDR_CLAMP);
   }
 
   data->cloudsDetailLevel = clouds_detail_level;
-  // clouds_detail_level: 3, 4 -- mobile low quality
-  const int divider = clouds_detail_level >= 3 ? clouds_detail_level : (1 << clouds_detail_level);
   // have to keep legacy behav because of config files
   if (clouds_detail_level > 0 || clouds_resolution == CloudsResolution::ForceFullresClouds)
-    data->clouds.init(targetW / divider, targetH / divider, data->base_name, fly_through_clouds, clouds_resolution,
-      use_blurred_clouds);
+    data->clouds.init(targetW >> clouds_detail_level, targetH >> clouds_detail_level, data->base_name, fly_through_clouds,
+      clouds_resolution);
   else
     data->clouds.close();
 }
@@ -464,11 +447,8 @@ void DaSkies::initCloudsRender(bool useHole)
   clouds->init(useHole);
   strataClouds.close();
   strataClouds = dag::get_tex_gameres("strata_clouds_simple", "strata_clouds");
-  if (strataClouds)
-    strataClouds->disableSampler();
   prefetch_managed_texture(strataClouds.getTexId());
   strataClouds.setVar();
-  ShaderGlobal::set_sampler(::get_shader_variable_id("strata_clouds_samplerstate"), d3d::request_sampler({}));
 
   //==ddsx::tex_pack2_perform_delayed_data_loading();
 
@@ -654,7 +634,6 @@ void DaSkies::prepareSkyAndClouds(bool infinite, const DPoint3 &origin, const DP
   {
     if ((update_sky || panoramaValid == PANORAMA_INVALID) && updatePanorama(origin, view_tm, proj_tm))
       useFog(origin, data, view_tm, proj_tm, false);
-    clouds->setCloudsOffsetVars(data->clouds);
     return;
   }
   if (update_sky)
@@ -669,7 +648,6 @@ void DaSkies::prepareSkyAndClouds(bool infinite, const DPoint3 &origin, const DP
       {
         TIME_D3D_PROFILE(render_sky);
         d3d::set_render_target(data->lowresSkies.getTex2D(), 0);
-        d3d::clearview(CLEAR_DISCARD_TARGET, 0, 0, 0);
         skies.renderSky();
 
         if (aurora)
@@ -730,7 +708,7 @@ void DaSkies::renderSky(SkiesData *data, const TMatrix &view_tm, const TMatrix4 
   }
 
   useFog(origin, data, view_tm, proj_tm, false);
-  if (canRenderStars())
+  if (skyStars)
   {
     const float sunHighBrightness = brightness(getCpuSunSky(Point3(0, moon_check_ht, 0), real_skies_sun_light_dir));
     if (data->shouldRenderStars)
@@ -762,7 +740,7 @@ void DaSkies::renderSky(SkiesData *data, const TMatrix &view_tm, const TMatrix4 
 void DaSkies::renderStars(const Driver3dPerspective &persp, const Point3 &origin, float stars_intensity_mul)
 {
   G_UNREFERENCED(origin);
-  if (canRenderStars())
+  if (skyStars)
     skyStars->renderStars(persp, 0, starsLatitude, starsLongtitude, starsJulianDay, initialAzimuthAngle, stars_intensity_mul);
 }
 
@@ -907,8 +885,6 @@ void DaSkies::setUseCloudsHole(bool set)
     clouds->setUseHole(set);
 }
 
-bool DaSkies::getUseCloudsHole() const { return clouds ? clouds->getUseHole() : false; }
-
 Point2 DaSkies::getCloudsHolePosition() const
 {
   if (!clouds)
@@ -921,12 +897,6 @@ void DaSkies::setCloudsHolePosition(const Point2 &p)
   if (!clouds)
     return;
   return clouds->setHole(p);
-}
-
-void DaSkies::setExternalWeatherTexture(TEXTUREID tid)
-{
-  if (clouds)
-    clouds->setExternalWeatherTexture(tid);
 }
 
 // todo: implement on client

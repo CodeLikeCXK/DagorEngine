@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "compositeAssetCreator.h"
 
 #include "assetBuildCache.h"
@@ -9,28 +7,32 @@
 #include <assets/asset.h>
 #include <libTools/util/strUtil.h>
 #include <osApiWrappers/dag_files.h>
-#include <propPanel/commonWindow/dialogWindow.h>
+#include <propPanel2/comWnd/dialog_window.h>
 
 namespace
 {
 
-class NewCompositeNamePickerDialog : public PropPanel::DialogWindow
+class NewCompositeNamePickerDialog : public CDialogWindow
 {
 public:
-  NewCompositeNamePickerDialog(void *phandle, hdpi::Px w, hdpi::Px h) : DialogWindow(phandle, w, h, "Create composit")
+  NewCompositeNamePickerDialog(void *phandle, hdpi::Px w, hdpi::Px h) : CDialogWindow(phandle, w, h, "Create composit")
   {
-    propertiesPanel->createEditBox(NAME_CONTROL_ID, "Name");
-    propertiesPanel->createStatic(ERROR_LINE1_CONTROL_ID, "");
-    propertiesPanel->createStatic(ERROR_LINE2_CONTROL_ID, "");
-    buttonsPanel->setText(PropPanel::DIALOG_ID_OK, "Create");
-
-    setInitialFocus(PropPanel::DIALOG_ID_NONE);
-    propertiesPanel->setFocusById(NAME_CONTROL_ID);
+    mPropertiesPanel->createEditBox(NAME_CONTROL_ID, "Name");
+    mPropertiesPanel->createStatic(ERROR_LINE1_CONTROL_ID, "");
+    mPropertiesPanel->createStatic(ERROR_LINE2_CONTROL_ID, "");
+    mButtonsPanel->setText(DIALOG_ID_OK, "Create");
   }
 
   const String &getPickedName() const { return pickedName; }
 
 private:
+  virtual void show() override
+  {
+    CDialogWindow::show();
+
+    getPanel()->setFocusById(NAME_CONTROL_ID);
+  }
+
   virtual bool onOk() override
   {
     String name(getPanel()->getText(NAME_CONTROL_ID).c_str());
@@ -90,7 +92,7 @@ String CompositeAssetCreator::pickName()
 {
   eastl::unique_ptr<NewCompositeNamePickerDialog> dialog =
     eastl::make_unique<NewCompositeNamePickerDialog>(nullptr, hdpi::_pxScaled(400), hdpi::_pxScaled(180));
-  if (dialog->showDialog() != PropPanel::DIALOG_ID_OK)
+  if (dialog->showDialog() != DIALOG_ID_OK)
     return String();
 
   return dialog->getPickedName();

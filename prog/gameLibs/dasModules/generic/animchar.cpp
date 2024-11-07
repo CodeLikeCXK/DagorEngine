@@ -1,10 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <dasModules/aotAnimchar.h>
 #include <dasModules/aotDagorMath.h>
 #include <dasModules/dasMacro.h>
-#include <dasModules/dasDataBlock.h>
-#include <anim/dag_animBlend.h>
+
 
 struct NameIdPairAnnotation : das::ManagedStructureAnnotation<das::NameIdPair, false>
 {
@@ -123,7 +120,6 @@ struct AnimBlendNodeLeafAnnotation : das::ManagedStructureAnnotation<AnimV20::An
 
     addProperty<DAS_BIND_MANAGED_PROP(isAdditive)>("isAdditive");
     addProperty<DAS_BIND_MANAGED_PROP(isAnimationIgnored)>("isAnimationIgnored");
-    addProperty<DAS_BIND_MANAGED_PROP(getBnlId)>("bnlId", "getBnlId");
   }
 };
 
@@ -132,7 +128,6 @@ struct AnimPostBlendCtrlAnnotation : das::ManagedStructureAnnotation<AnimV20::An
   AnimPostBlendCtrlAnnotation(das::ModuleLibrary &ml) : ManagedStructureAnnotation("AnimPostBlendCtrl", ml)
   {
     cppName = " ::AnimV20::AnimPostBlendCtrl";
-    addProperty<DAS_BIND_MANAGED_PROP(getPbcId)>("pbcId", "getPbcId");
   }
 };
 
@@ -453,8 +448,6 @@ public:
       "::AnimV20::addEnumValue");
     das::addExtern<DAS_BIND_FUN(::AnimV20::getEnumValueByName)>(*this, lib, "animV20_get_enum_value_by_name",
       das::SideEffects::accessExternal, "::AnimV20::getEnumValueByName");
-    das::addExtern<DAS_BIND_FUN(::AnimV20::getEnumName)>(*this, lib, "animV20_get_enum_name_by_id", das::SideEffects::accessExternal,
-      "::AnimV20::getEnumName");
     das::addExtern<DAS_BIND_FUN(animchar_get_res_name)>(*this, lib, "animchar_get_res_name", das::SideEffects::none,
       "bind_dascript::animchar_get_res_name")
       ->arg("animchar");
@@ -476,8 +469,6 @@ public:
       "bind_dascript::scene_instance_is_node_visible");
     das::addExtern<DAS_BIND_FUN(scene_instance_get_local_bounding_box)>(*this, lib, "scene_instance_get_local_bounding_box",
       das::SideEffects::modifyArgument, "bind_dascript::scene_instance_get_local_bounding_box");
-    das::addExtern<DAS_BIND_FUN(calc_world_box)>(*this, lib, "calc_world_box", das::SideEffects::modifyArgument,
-      "bind_dascript::calc_world_box");
     using method_getNodeWtm = DAS_CALL_MEMBER(DynamicRenderableSceneInstance::getNodeWtm);
     das::addExtern<DAS_CALL_METHOD(method_getNodeWtm), das::SimNode_ExtFuncCallRef>(*this, lib, "scene_instance_getNodeWtm",
       das::SideEffects::none, DAS_CALL_MEMBER_CPP(DynamicRenderableSceneInstance::getNodeWtm));
@@ -495,10 +486,6 @@ public:
       "AnimCharV20::getSlotId");
     das::addExtern<DAS_BIND_FUN(AnimCharV20::addSlotId)>(*this, lib, "animchar_addSlotId", das::SideEffects::modifyExternal,
       "AnimCharV20::addSlotId");
-
-    using method_setTraceContext = DAS_CALL_MEMBER(::AnimCharV20::AnimcharBaseComponent::setTraceContext);
-    das::addExtern<DAS_CALL_METHOD(method_setTraceContext)>(*this, lib, "animchar_setTraceContext", das::SideEffects::modifyArgument,
-      DAS_CALL_MEMBER_CPP(::AnimCharV20::AnimcharBaseComponent::setTraceContext));
 
     das::addExtern<DAS_BIND_FUN(anim_graph_getStateIdx)>(*this, lib, "anim_graph_getStateIdx", das::SideEffects::none,
       "bind_dascript::anim_graph_getStateIdx");
@@ -524,20 +511,11 @@ public:
     das::addExtern<DAS_BIND_FUN(anim_graph_getStRec)>(*this, lib, "anim_graph_getStRec", das::SideEffects::worstDefault,
       "bind_dascript::anim_graph_getStRec");
 
-    das::addExtern<DAS_BIND_FUN(animchar_getDebugBlenderState)>(*this, lib, "animchar_getDebugBlenderState",
-      das::SideEffects::accessExternal, "bind_dascript::animchar_getDebugBlenderState");
-
-    das::addExtern<DAS_BIND_FUN(animchar_getAnimBlendNodeWeights)>(*this, lib, "animchar_getAnimBlendNodeWeights",
-      das::SideEffects::accessExternal, "bind_dascript::animchar_getAnimBlendNodeWeights");
-
     das::addExtern<DAS_BIND_FUN(AnimFifo3Queue_get_node)>(*this, lib, "AnimFifo3Queue_get_node", das::SideEffects::modifyArgument,
       "bind_dascript::AnimFifo3Queue_get_node");
 
     das::addExtern<DAS_BIND_FUN(AnimBlendCtrl_1axis_getChildren)>(*this, lib, "AnimBlendCtrl_1axis_getChildren",
       das::SideEffects::worstDefault, "bind_dascript::AnimBlendCtrl_1axis_getChildren");
-
-    das::addExtern<DAS_BIND_FUN(AnimData_get_source_anim_data)>(*this, lib, "AnimData_get_source_anim_data",
-      das::SideEffects::accessExternal, "bind_dascript::AnimData_get_source_anim_data");
 
     das::addExtern<DAS_BIND_FUN(AnimBlendNodeLeaf_get_anim<::AnimV20::AnimBlendNodeLeaf>)>(*this, lib, "AnimBlendNodeLeaf_get_anim",
       das::SideEffects::modifyArgument, "bind_dascript::AnimBlendNodeLeaf_get_anim< ::AnimV20::AnimBlendNodeLeaf>");
@@ -624,10 +602,6 @@ public:
     das::addExtern<DAS_CALL_METHOD(method_setTmWithOfs)>(*this, lib, "animchar_setTmWithOfs", das::SideEffects::modifyArgument,
       DAS_CALL_MEMBER_CPP(::AnimCharV20::AnimcharBaseComponent::setTmWithOfs));
 
-    using method_cloneTo = DAS_CALL_MEMBER(::AnimCharV20::AnimcharBaseComponent::cloneTo);
-    das::addExtern<DAS_CALL_METHOD(method_cloneTo)>(*this, lib, "animchar_cloneTo", das::SideEffects::modifyArgument,
-      DAS_CALL_MEMBER_CPP(::AnimCharV20::AnimcharBaseComponent::cloneTo));
-
     using method_forcePostRecalcWtm = DAS_CALL_MEMBER(::AnimCharV20::AnimcharBaseComponent::forcePostRecalcWtm);
     das::addExtern<DAS_CALL_METHOD(method_forcePostRecalcWtm)>(*this, lib, "animchar_forcePostRecalcWtm",
       das::SideEffects::modifyArgument, DAS_CALL_MEMBER_CPP(::AnimCharV20::AnimcharBaseComponent::forcePostRecalcWtm));
@@ -667,8 +641,6 @@ public:
 
     das::addExtern<DAS_BIND_FUN(animchar_render_prepareSphere)>(*this, lib, "animchar_render_prepareSphere", das::SideEffects::none,
       "bind_dascript::animchar_render_prepareSphere");
-    das::addExtern<DAS_BIND_FUN(animchar_render_calcWorldBox), das::SimNode_ExtFuncCallAndCopyOrMove>(*this, lib,
-      "animchar_render_calcWorldBox", das::SideEffects::none, "bind_dascript::animchar_render_calcWorldBox");
 
 
 #define DAS_BIND_MEMBER(fn, side_effect, name)                                                       \
@@ -681,7 +653,6 @@ public:
     DAS_BIND_MEMBER(::AnimV20::AnimationGraph::getParamType, das::SideEffects::none, "anim_graph_getParamType")
     DAS_BIND_MEMBER(::AnimV20::AnimationGraph::getAnimNodeName, das::SideEffects::none, "anim_graph_getAnimNodeName")
     DAS_BIND_MEMBER(::AnimV20::AnimationGraph::getStateName, das::SideEffects::none, "anim_graph_getStateName")
-    DAS_BIND_MEMBER(::AnimV20::AnimationGraph::getStateNameByStateIdx, das::SideEffects::none, "anim_graph_getStateNameByStateIdx")
     DAS_BIND_MEMBER(::AnimV20::AnimationGraph::getBlendNodeName, das::SideEffects::none, "anim_graph_getBlendNodeName")
 
     DAS_BIND_MEMBER(::AnimV20::IAnimStateHolder::getParamIdValid, das::SideEffects::none, "anim_state_holder_getParamIdValid")

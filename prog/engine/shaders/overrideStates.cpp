@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <shaders/dag_overrideStates.h>
 #include <util/dag_generationReferencedData.h>
 #include <EASTL/optional.h>

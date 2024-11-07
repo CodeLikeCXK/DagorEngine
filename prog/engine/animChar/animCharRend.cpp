@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <animChar/dag_animCharacter2.h>
 #include <generic/dag_tab.h>
 #include <shaders/dag_shaders.h>
@@ -7,7 +5,7 @@
 #include <3d/dag_render.h>
 #include <math/dag_geomTree.h>
 #include <math/dag_geomTreeMap.h>
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
 #include <gameRes/dag_stdGameRes.h>
 #include <gameRes/dag_gameResSystem.h>
 #include <ioSys/dag_dataBlock.h>
@@ -24,7 +22,7 @@
 
 using namespace AnimV20;
 
-#define debug(...) logmessage(_MAKE4C('ANIM'), __VA_ARGS__)
+#define LOGLEVEL_DEBUG _MAKE4C('ANIM')
 
 // global TM data
 namespace AnimCharV20
@@ -159,16 +157,16 @@ vec4f AnimcharRendComponent::prepareSphere(const AnimcharFinalMat44 &finalWtm) c
   for (int i = 0; i < nodeMap.size(); i++)
     if (nodeMap[i].nodeIdx != dag::Index16(0))
       max_dist2 = v_max(max_dist2, v_length3_sq(v_sub(c, finalWtm.nwtm[nodeMap[i].nodeIdx.index()].col3)));
-  return v_perm_xyzd(finalWtm.bsph, v_max(finalWtm.bsph, v_add(v_sqrt(max_dist2), v_splats(bsphRadExpand))));
+  return v_perm_xyzd(finalWtm.bsph, v_max(finalWtm.bsph, v_add(v_sqrt4(max_dist2), v_splat4(&bsphRadExpand))));
 }
 
 uint16_t AnimcharRendComponent::beforeRender(const AnimcharFinalMat44 &finalWtm, vec4f &out_rendBsph, bbox3f &out_rendBbox,
-  const Frustum &f, float inv_wk_sq, Occlusion *occl, const Point3 &cam_pos, float lodDistMul)
+  const Frustum &f, float inv_wk_sq, Occlusion *occl, const Point3 &cam_pos)
 {
   sceneBeforeRenderedCalled = false;
   out_rendBsph = finalWtm.bsph;
   visBits &= VISFLG_RENDERABLE;
-  // DEBUG_CTX("beforeRender (vis=%d)", visBits);
+  // debug_ctx("beforeRender (vis=%d)", visBits);
   if (!visBits || !scene)
     return visBits;
 
@@ -210,27 +208,26 @@ uint16_t AnimcharRendComponent::beforeRender(const AnimcharFinalMat44 &finalWtm,
   {
     prepareForRender(finalWtm, out_rendBbox);
     if (!nodeMap.size())
-      scene->chooseLod(cam_pos, lodDistMul);
+      scene->chooseLod(cam_pos);
     else
     {
       vec3f cam_to_obj = v_sub(v_sub(v_ldu(&cam_pos.x), v_ldu(&scene->getOrigin().x)), out_rendBsph);
-      scene->chooseLodByDistSq(v_extract_x(v_length3_sq_x(cam_to_obj)), lodDistMul);
+      scene->chooseLodByDistSq(v_extract_x(v_length3_sq_x(cam_to_obj)));
     }
     scene->setDisableAutoChooseLod(true);
   }
 
   // todo: we should not actually prepare at all, only do that for each render.
-  // DEBUG_CTX("  visBits=%02X, d2=%.3f, noRenderDist=%.3f noAnimDist2=%.3f", visBits, dist2, noRenderDist, noAnimDist2);
+  // debug_ctx("  visBits=%02X, d2=%.3f, noRenderDist=%.3f noAnimDist2=%.3f", visBits, dist2, noRenderDist, noAnimDist2);
   return visBits;
 }
-uint16_t AnimcharRendComponent::beforeRenderLegacy(const AnimcharFinalMat44 &finalWtm, vec4f &out_rendBsph, bbox3f &out_rendBbox,
-  float lodDistMul = 1.0f)
+uint16_t AnimcharRendComponent::beforeRenderLegacy(const AnimcharFinalMat44 &finalWtm, vec4f &out_rendBsph, bbox3f &out_rendBbox)
 {
   // G_ASSERTF(AnimCharV20::prepared_in_frame == dagor_frame_no(),
   //   "AnimCharV20::prepareGlobTm() or AnimCharV20::prepareFrustum() last called on frame %d, but current is %d",
   //   AnimCharV20::prepared_in_frame, dagor_frame_no());
   return beforeRender(finalWtm, out_rendBsph, out_rendBbox, AnimCharV20::context.frustum, AnimcharRendComponent::invWkSq,
-    AnimCharV20::context.occlusion, AnimCharV20::context.viewPos, lodDistMul);
+    AnimCharV20::context.occlusion, AnimCharV20::context.viewPos);
 }
 
 bool AnimcharRendComponent::check_visibility_legacy(uint16_t vis_bits, bbox3f_cref bbox)
@@ -244,7 +241,7 @@ bool AnimcharRendComponent::check_visibility_legacy(uint16_t vis_bits, bbox3f_cr
 
 void AnimcharRendComponent::render(const Point3 &view_pos, real transp)
 {
-  // DEBUG_CTX("render (scene=%p, visBits=%02X)", scene, visBits);
+  // debug_ctx("render (scene=%p, visBits=%02X)", scene, visBits);
   if (!sceneBeforeRenderedCalled)
     scene->beforeRender(view_pos);
   scene->render(transp);
@@ -263,7 +260,7 @@ Point3 AnimcharRendComponent::getNodePosForBone(uint32_t bone_id) const
 
 void AnimcharRendComponent::renderTrans(const Point3 &view_pos, real transp)
 {
-  // DEBUG_CTX("renderTrans (scene=%p, visBits=%02X)", scene, visBits);
+  // debug_ctx("renderTrans (scene=%p, visBits=%02X)", scene, visBits);
   if (!sceneBeforeRenderedCalled)
     scene->beforeRender(view_pos);
   scene->renderTrans(transp);
@@ -289,8 +286,6 @@ void AnimcharRendComponent::setSceneInstance(DynamicRenderableSceneInstance *ins
   if (nodeMap.isIncomplete())
     patchInvalidInstanceNodes();
 }
-
-void AnimcharRendComponent::updateLodResFromSceneInstance() { lodres = scene->getLodsResource(); }
 
 bool AnimcharRendComponent::load(const AnimCharCreationProps &props, int modelId, const GeomNodeTree &tree,
   const AnimcharFinalMat44 &finalWtm)
@@ -345,9 +340,9 @@ void AnimcharRendComponent::loadData(const AnimCharCreationProps &props, Dynamic
 
 bool AnimcharRendComponent::validateNodeMap() const
 {
-  String err(framemem_ptr());
+  String err;
   char buf[512];
-  Bitarray mask(framemem_ptr());
+  Bitarray mask;
   mask.resize(lodres->getNames().node.nameCount());
 
   mask.reset();

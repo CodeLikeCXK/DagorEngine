@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include "multiPointData.h"
@@ -91,7 +90,6 @@ class rendinst::gen::land::SingleEntityPlaces
 {
 public:
   SingleEntityPlaces() : entityIdx(-1), tm(midmem) {}
-  SingleEntityPlaces(SingleEntityPlaces &&) = default;
   ~SingleEntityPlaces() { clear(); }
 
   void clear() { tm.clear(); }

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "if.h"
 #include "compileState.h"
 #include "expression.h"

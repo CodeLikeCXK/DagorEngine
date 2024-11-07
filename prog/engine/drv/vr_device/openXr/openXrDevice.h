@@ -1,8 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
-#include <drv/dag_vr.h>
-#include <drv/3d/dag_commands.h>
+#include "drivers/dag_vr.h"
+#include "3d/dag_drv3dCmd.h"
 #include "3d/dag_texMgr.h"
 #include "osApiWrappers/dag_events.h"
 #include "osApiWrappers/dag_threads.h"
@@ -30,7 +29,7 @@
 #endif // _TARGET_PC_WIN
 
 #if _TARGET_ANDROID
-#include <drv/3d/dag_consts.h>
+#include <3d/dag_drv3dConsts.h>
 #include <supp/dag_android_native_app_glue.h>
 
 #include "vulkan/vulkan.h"
@@ -144,6 +143,8 @@ private:
   bool initialized = false;
 
   RenderingAPI renderingAPI;
+
+  State currentState = State::Uninitialized;
 
   eastl::vector<XrExtensionProperties> supportedExtensions;
   eastl::vector<XrEnvironmentBlendMode> supportedBlendModes;

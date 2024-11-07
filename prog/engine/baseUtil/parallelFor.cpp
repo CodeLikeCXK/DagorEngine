@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <util/dag_parallelFor.h>
 #include <util/dag_parallelForInline.h>
 

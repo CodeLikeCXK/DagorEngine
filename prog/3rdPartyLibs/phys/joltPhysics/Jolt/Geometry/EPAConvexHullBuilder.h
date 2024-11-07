@@ -152,7 +152,7 @@ public:
 		{
 			// Destruct triangle
 			inT->~Triangle();
-#ifdef JPH_DEBUG
+#ifdef _DEBUG
 			memset(inT, 0xcd, sizeof(Triangle));
 #endif
 
@@ -567,7 +567,7 @@ private:
 	{
 		if (inT->mRemoved)
 		{
-			// Validate that removed triangles are not connected to anything
+			// Valdiate that removed triangles are not connected to anything
 			for (const Edge &my_edge : inT->mEdge)
 				JPH_ASSERT(my_edge.mNeighbourTriangle == nullptr);
 		}

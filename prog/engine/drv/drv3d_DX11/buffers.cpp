@@ -1,14 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 
-#include <mutex>
-
-#include <drv/3d/dag_dispatchMesh.h>
-#include <drv/3d/dag_dispatch.h>
-#include <drv/3d/dag_draw.h>
-#include <drv/3d/dag_vertexIndexBuffer.h>
-#include <drv/3d/dag_shaderConstants.h>
-#include <drv/3d/dag_buffers.h>
-#include <drv/3d/dag_info.h>
 #include <util/dag_string.h>
 #include <util/dag_watchdog.h>
 
@@ -23,7 +13,6 @@
 #include <validation.h>
 
 #include <validate_sbuf_flags.h>
-#include "resource_size_info.h"
 
 #define USE_NVAPI_MULTIDRAW 0 // GPU hangs on SLI and under the Nsight.
 #if HAS_NVAPI && USE_NVAPI_MULTIDRAW
@@ -48,7 +37,7 @@ struct BufferList : ObjectPoolWithLock<ObjectProxyPtr<BufferType>, N>
       buf->handle = safeAllocAndSet(e);
       if (buf->handle != BAD_HANDLE)
         return true;
-      D3D_ERROR("Not enough handles for IB/VB buffer");
+      logerr("Not enough handles for IB/VB buffer");
     }
     return false;
   }
@@ -62,7 +51,7 @@ struct BufferList : ObjectPoolWithLock<ObjectProxyPtr<BufferType>, N>
       buf->handle = safeAllocAndSet(e);
       if (buf->handle != BAD_HANDLE)
         return true;
-      D3D_ERROR("Not enough handles for IB/VB buffer");
+      logerr("Not enough handles for IB/VB buffer");
     }
     return false;
   }
@@ -289,26 +278,17 @@ void close_buffers()
   g_inline_index_buffer.destroy();
 }
 
-void gather_buffers_to_recreate(FramememResourceSizeInfoCollection &collection)
+void recreate_buffers()
 {
-  debug("gather_buffers_to_recreate: %d", g_buffers.totalUsed());
+  debug("recreate_buffers: %d", g_buffers.totalUsed());
   ITERATE_OVER_OBJECT_POOL(g_buffers, i)
-    if (auto buf = g_buffers[i].obj)
+    if (g_buffers[i].obj != NULL)
     {
-      collection.push_back({(uint32_t)buf->ressize(), (uint32_t)i, false, buf->rld != nullptr});
+      g_buffers[i].obj->recreateBuf(g_buffers[i].obj);
+      watchdog_kick();
     }
   ITERATE_OVER_OBJECT_POOL_RESTORE(g_buffers)
 }
-
-void recreate_buffer(uint32_t index)
-{
-  std::lock_guard lock(g_buffers);
-  if (!g_buffers.isEntryUsed(index))
-    return;
-  if (auto buf = g_buffers[index].obj)
-    buf->recreateBuf(buf);
-}
-
 } // namespace drv3d_dx11
 
 Vbuffer *d3d::create_vb(int size, int flg, const char *name)
@@ -421,10 +401,10 @@ static inline void set_primitive_type_unsafe(RenderState &rs, uint32_t prim_type
           (rs.hdgBits & (HAS_HS | HAS_DS)) != 0))
     {
 #if DAGOR_DBGLEVEL > 0
-      D3D_ERROR("Invalid primitive topology %u for draw call encountered. Geometry stage active %s, "
-                "Hull stage active %s, "
-                "Domain stage active %s, "
-                "Hull topology %u",
+      logerr("Invalid primitive topology %u for draw call encountered. Geometry stage active %s, "
+             "Hull stage active %s, "
+             "Domain stage active %s, "
+             "Hull topology %u",
         result_type, ((rs.hdgBits & HAS_GS) != 0) ? "yes" : "no", ((rs.hdgBits & HAS_HS) != 0) ? "yes" : "no",
         ((rs.hdgBits & HAS_DS) != 0) ? "yes" : "no", (unsigned)rs.hullTopology);
 #endif
@@ -608,7 +588,7 @@ bool d3d::draw_indirect(int prim_type, Sbuffer *args, uint32_t byte_offset)
   vb = (GenericBuffer *)args;
   if (!(vb->bufFlags & SBCF_MISC_DRAWINDIRECT))
   {
-    D3D_ERROR("can not draw from non drawindirect buffer");
+    logerr("can not draw from non drawindirect buffer");
     return false;
   }
   G_ASSERT(vb->buffer);
@@ -639,7 +619,7 @@ bool d3d::draw_indexed_indirect(int prim_type, Sbuffer *args, uint32_t byte_offs
   vb = (GenericBuffer *)args;
   if (!(vb->bufFlags & SBCF_MISC_DRAWINDIRECT))
   {
-    D3D_ERROR("can not draw from non drawindirect buffer");
+    logerr("can not draw from non drawindirect buffer");
     return false;
   }
   G_ASSERT(vb->buffer);
@@ -669,7 +649,7 @@ bool d3d::multi_draw_indirect(int prim_type, Sbuffer *args, uint32_t draw_count,
   vb = (GenericBuffer *)args;
   if (!(vb->bufFlags & SBCF_MISC_DRAWINDIRECT))
   {
-    D3D_ERROR("can not draw from non drawindirect buffer");
+    logerr("can not draw from non drawindirect buffer");
     return false;
   }
   G_ASSERT(vb->buffer);
@@ -705,7 +685,7 @@ bool d3d::multi_draw_indexed_indirect(int prim_type, Sbuffer *args, uint32_t dra
   vb = (GenericBuffer *)args;
   if (!(vb->bufFlags & SBCF_MISC_DRAWINDIRECT))
   {
-    D3D_ERROR("can not draw from non drawindirect buffer");
+    logerr("can not draw from non drawindirect buffer");
     return false;
   }
   G_ASSERT(vb->buffer);
@@ -760,7 +740,7 @@ bool d3d::dispatch_indirect(Sbuffer *args, uint32_t offset, GpuPipeline gpu_pipe
   G_ASSERT(vb->buffer);
   if (!(vb->bufFlags & SBCF_MISC_DRAWINDIRECT))
   {
-    D3D_ERROR("can not dispatch from non drawindirect buffer");
+    logerr("can not dispatch from non drawindirect buffer");
     return false;
   }
 
@@ -854,13 +834,13 @@ bool d3d::set_buffer(unsigned shader_stage, unsigned slot, Sbuffer *buffer)
 #if DAGOR_DBGLEVEL > 0
                                                                                  // todo: this check to be removed
     if ((buffer->getFlags() & (SBCF_BIND_UNORDERED | SBCF_BIND_SHADER_RES)) == SBCF_BIND_UNORDERED)
-      D3D_ERROR("buffer %s is without SBCF_BIND_SHADER_RES flag and can't be used in SRV. Deprecated, fixme!", buffer->getBufName());
+      logerr("buffer %s is without SBCF_BIND_SHADER_RES flag and can't be used in SRV. Deprecated, fixme!", buffer->getBufName());
 #endif
   }
 
   if (slot >= MAX_RESOURCES) // these are not samplers!
   {
-    D3D_ERROR("invalid slot number %d", slot);
+    logerr("invalid slot number %d", slot);
     return false;
   }
 
@@ -902,7 +882,7 @@ bool d3d::set_rwbuffer(unsigned shader_stage, unsigned slot, Sbuffer *buffer)
 {
   if (featureLevelsSupported < D3D_FEATURE_LEVEL_11_1 && shader_stage != STAGE_CS && shader_stage != STAGE_PS)
   {
-    D3D_ERROR("currently unsupported set buffers to other stages than Cs and Ps");
+    logerr("currently unsupported set buffers to other stages than Cs and Ps");
     return false;
   }
   if (shader_stage == STAGE_VS)
@@ -914,12 +894,11 @@ bool d3d::set_rwbuffer(unsigned shader_stage, unsigned slot, Sbuffer *buffer)
 #if DAGOR_DBGLEVEL > 0
                                                                                  // todo: this check to be removed
     if ((buffer->getFlags() & (SBCF_BIND_UNORDERED | SBCF_BIND_SHADER_RES)) == SBCF_BIND_SHADER_RES)
-      D3D_ERROR("buffer %s is without SBCF_BIND_UNORDERED flag and can't be used in UAV. Deprecated, fixme!", buffer->getBufName());
+      logerr("buffer %s is without SBCF_BIND_UNORDERED flag and can't be used in UAV. Deprecated, fixme!", buffer->getBufName());
 #endif
     remove_buffer_from_slot(buffer);
     vb = (GenericBuffer *)buffer;
     G_ASSERT(vb->uav);
-    remove_view_from_uav_ignore_slot(shader_stage, slot, vb->uav);
   }
 
   if (vb)

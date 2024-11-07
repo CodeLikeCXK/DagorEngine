@@ -1,10 +1,11 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
-#include <drv/3d/dag_tex3d.h>
+#include <3d/dag_tex3d.h>
 
 // forward declarations for external classes
 class IGenLoad;

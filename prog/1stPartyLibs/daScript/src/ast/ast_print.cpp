@@ -81,7 +81,6 @@ namespace das {
                 printVarAccess = program->options.getBoolOption("print_var_access");
                 printCStyle = program->options.getBoolOption("print_c_style");
                 printAliases= program->options.getBoolOption("log_aliasing");
-                printFuncUse= program->options.getBoolOption("print_func_use");
             }
         }
         string str() const { return ss.str(); };
@@ -89,7 +88,6 @@ namespace das {
         bool printVarAccess = false;
         bool printCStyle = false;
         bool printAliases = false;
-        bool printFuncUse = false;
     protected:
         void newLine () {
             auto nlPos = ss.tellp();
@@ -215,22 +213,6 @@ namespace das {
     // global
         virtual void preVisitGlobalLet ( const VariablePtr & var ) override {
             Visitor::preVisitGlobalLet(var);
-            if ( printFuncUse ) {
-                if ( var->useFunctions.size() ) {
-                    ss << "// use functions";
-                    for ( auto & ufn : var->useFunctions ) {
-                        ss << " " << ufn->getMangledName();
-                    }
-                    ss << "\n";
-                }
-                if ( var->useGlobalVariables.size() ) {
-                    ss << "// use global variables";
-                    for ( auto & uvar : var->useGlobalVariables ) {
-                        ss << " " << uvar->getMangledName();
-                    }
-                    ss << "\n";
-                }
-            }
             ss  << (var->type->constant ? "let" : "var")
                 << (var->global_shared ? " shared" : "")
                 << (var->private_variable ? " private" : "")
@@ -259,24 +241,38 @@ namespace das {
                 ss << "[nosideeffects]\n";
                 } else {
                     ss << "// ";
-                    if ( fn->userScenario ) { ss << "[user_scenario]"; }
-                    if ( fn->modifyExternal ) { ss << "[modify_external]"; }
-                    if ( fn->modifyArgument ) { ss << "[modify_argument]"; }
-                    if ( fn->accessGlobal ) { ss << "[access_global]"; }
-                    if ( fn->invoke ) { ss << "[invoke]"; }
-                    if ( fn->captureString ) { ss << "[capture_string]"; }
-                    if ( fn->callCaptureString ) { ss << "[call_capture_string]"; }
+                    if ( fn->sideEffectFlags & uint32_t(SideEffects::userScenario) ) {
+                        ss << "[user_scenario]";
+                    }
+                    if ( fn->sideEffectFlags & uint32_t(SideEffects::modifyExternal) ) {
+                        ss << "[modify_external]";
+                    }
+                    if ( fn->sideEffectFlags & uint32_t(SideEffects::modifyArgument) ) {
+                        ss << "[modify_argument]";
+                    }
+                    if ( fn->sideEffectFlags & uint32_t(SideEffects::accessGlobal) ) {
+                        ss << "[access_global]";
+                    }
+                    if ( fn->sideEffectFlags & uint32_t(SideEffects::invoke) ) {
+                        ss << "[invoke]";
+                    }
                     ss << "\n";
                 }
             }
             if ( fn->moreFlags ) {
                 ss << "// ";
-                if ( fn->macroFunction ) { ss << "[macro_function]"; }
-                if ( fn->needStringCast ) { ss << "[need_string_cast]"; }
-                if ( fn->aotHashDeppendsOnArguments ) { ss << "[aot_hash_deppends_on_arguments]"; }
-                if ( fn->requestJit ) { ss << "[jit]"; }
-                if ( fn->requestNoJit ) { ss << "[no_jit]"; }
-                if ( fn->nodiscard ) { ss << "[nodiscard]"; }
+                if ( fn->macroFunction ) {
+                    ss << "[macro_function]";
+                }
+                if ( fn->needStringCast ) {
+                    ss << "[need_string_cast]";
+                }
+                if ( fn->aotHashDeppendsOnArguments ) {
+                    ss << "[aot_hash_deppends_on_arguments]";
+                }
+                if ( fn->requestJit ) {
+                    ss << "[jit]";
+                }
                 ss << "\n";
             }
             if ( fn->fastCall ) { ss << "[fastcall]\n"; }
@@ -309,31 +305,12 @@ namespace das {
                     }
                 }
             }
-            if ( printFuncUse ) {
-                if ( fn->useFunctions.size() ) {
-                    ss << "// use functions";
-                    for ( auto & ufn : fn->useFunctions ) {
-                        ss << " " << ufn->getMangledName();
-                    }
-                    ss << "\n";
-                }
-                if ( fn->useGlobalVariables.size() ) {
-                    ss << "// use global variables";
-                    for ( auto & uvar : fn->useGlobalVariables ) {
-                        ss << " " << uvar->getMangledName();
-                    }
-                    ss << "\n";
-                }
-            }
-            if ( fn->fromGeneric ) {
-                ss << "// from generic " << fn->fromGeneric->describe() << "\n";
-            }
             ss << "def " << (fn->privateFunction ? "private " : "public ") << fn->name;
-            if ( fn->arguments.size() ) ss << "(";
+            if ( fn->arguments.size() ) ss << " ( ";
         }
         virtual void preVisitFunctionBody ( Function * fn,Expression * expr ) override {
             Visitor::preVisitFunctionBody(fn,expr);
-            if ( fn->arguments.size() ) ss << ")";
+            if ( fn->arguments.size() ) ss << " )";
             if ( fn->result && !fn->result->isVoid() ) ss << " : " << fn->result->describe();
             ss << "\n";
         }
@@ -464,10 +441,7 @@ namespace das {
     // string builder
         virtual void preVisit ( ExprStringBuilder * expr ) override {
             Visitor::preVisit(expr);
-            ss << "string_builder";
-            if ( expr->isTempString )
-                ss << "_temp";
-            ss << "(";
+            ss << "string_builder(";
         }
         virtual ExpressionPtr visitStringBuilderElement ( ExprStringBuilder * sb, Expression * expr, bool last ) override {
             if ( !last ) ss << ", ";
@@ -681,7 +655,6 @@ namespace das {
             if ( call->rtti_isInvoke() ) {
                 auto * inv = (ExprInvoke *) call;
                 if ( printAliases && inv->doesNotNeedSp ) ss << " /*no_sp*/ ";
-                if ( inv->isInvokeMethod ) ss << "/*method*/";
             }
             ss << "(";
         }
@@ -1209,13 +1182,7 @@ namespace das {
     // array comprehension
         virtual void preVisit ( ExprArrayComprehension * expr ) override {
             Visitor::preVisit(expr);
-            if ( expr->generatorSyntax ) {
-                ss << "[[";
-            } else if ( expr->tableSyntax ) {
-                ss << "{";
-            } else {
-                ss << "[{";
-            }
+            ss << (expr->generatorSyntax ? "[[" : "[{");
         }
         virtual void preVisitArrayComprehensionSubexpr ( ExprArrayComprehension * expr, Expression * subexpr ) override {
             Visitor::preVisitArrayComprehensionSubexpr(expr, subexpr);
@@ -1226,13 +1193,7 @@ namespace das {
             ss << "; where ";
         }
         virtual ExpressionPtr visit ( ExprArrayComprehension * expr ) override {
-            if ( expr->generatorSyntax ) {
-                ss << "]]";
-            } else if ( expr->tableSyntax ) {
-                ss << "}";
-            } else {
-                ss << "}]";
-            }
+            ss << (expr->generatorSyntax ? "]]" : "}]");
             return Visitor::visit(expr);
         }
     // quote
@@ -1246,7 +1207,7 @@ namespace das {
         }
     protected:
         TextWriter          ss;
-        uint64_t            lastNewLine = -1ul;
+        int                 lastNewLine = -1;
         int                 tab = 0;
     };
 
@@ -1256,7 +1217,7 @@ namespace das {
     }
 
     template <typename TT>
-    __forceinline StringWriter&  print ( StringWriter& stream, const TT & value ) {
+    __forceinline TextWriter&  print ( TextWriter& stream, const TT & value ) {
         SetPrinterFlags flags;
         const_cast<TT&>(value).visit(flags);
         Printer log(nullptr);
@@ -1265,7 +1226,7 @@ namespace das {
         return stream;
     }
 
-    StringWriter& operator<< (StringWriter& stream, const Program & program) {
+    TextWriter& operator<< (TextWriter& stream, const Program & program) {
         bool any = false;
         program.library.foreach([&](Module * pm) {
             if ( !pm->name.empty() && pm->name!="$" ) {
@@ -1284,11 +1245,11 @@ namespace das {
         return stream;
     }
 
-    StringWriter& operator<< (StringWriter& stream, const Expression & expr) {
+    TextWriter& operator<< (TextWriter& stream, const Expression & expr) {
         return print(stream,expr);
     }
 
-    StringWriter& operator<< (StringWriter& stream, const Function & func) {
+    TextWriter& operator<< (TextWriter& stream, const Function & func) {
         return print(stream,func);
     }
 }

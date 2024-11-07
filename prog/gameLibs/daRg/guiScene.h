@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <daRg/dag_guiScene.h>
@@ -19,14 +18,14 @@
 #include "sceneStatus.h"
 #include "touchPointers.h"
 
-#include <drv/hid/dag_hiDecl.h>
-#include <drv/hid/dag_hiXInputMappings.h>
+#include <humanInput/dag_hiDecl.h>
+#include <humanInput/dag_hiXInputMappings.h>
 #include <osApiWrappers/dag_wndProcComponent.h>
 #include <gui/dag_stdGuiRender.h>
 #include <EASTL/vector_set.h>
 #include <EASTL/unique_ptr.h>
 #include <memory/dag_fixedBlockAllocator.h>
-#include <osApiWrappers/dag_critSec.h>
+
 
 class SqModules;
 class TextureIDHolder;
@@ -90,7 +89,6 @@ public:
   virtual void buildRender() override;
   virtual void buildPanelRender(int panel_idx) override;
   virtual void flushRender() override;
-  virtual void flushPanelRender() override;
   virtual void refreshGuiContextState() override;
 
   // returns a combination of BehaviorResult flags
@@ -112,8 +110,6 @@ public:
 
   virtual void onKeyboardLayoutChanged(const char *layout) override;
   virtual void onKeyboardLocksChanged(unsigned locks) override;
-
-  virtual Element *traceInputHit(InputDevice device, Point2 pos) override;
 
   virtual void queueScriptHandler(BaseScriptHandler *h) override;
   void callScriptHandlers(bool is_shutdown = false);
@@ -159,7 +155,6 @@ public:
 
   // for WT mouse mode management
   virtual bool hasActiveCursor() override { return activeCursor != nullptr; }
-  virtual bool getForcedCursorMode(bool &out_value) override;
 
   virtual void activateProfiler(bool on) override;
   virtual Profiler *getProfiler() override { return profiler.get(); }
@@ -175,8 +170,6 @@ public:
   void updateHover();
 
   virtual bool sendEvent(const char *id, const Sqrat::Object &data) override;
-  virtual void postEvent(const char *id, const Json::Value &data) override;
-  void processPostedEvents();
 
   SceneConfig *getConfig() { return &config; }
 
@@ -205,21 +198,22 @@ public:
 
   IPoint2 getDeviceScreenSize() const { return deviceScreenSize; }
 
-  void renderPanelTo(int panel_idx, BaseTexture *dst) override;
   void updateSpatialElements(const VrSceneData &vr_scene) override;
-  void refreshVrCursorProjections() override;
   bool hasAnyPanels() override;
-  bool worldToPanelPixels(int panel_idx, const Point3 &world_target_pos, const Point3 &world_cam_pos, Point2 &out_panel_pos) override;
 
-  const eastl::vector_map<int, eastl::unique_ptr<PanelData>> &getPanels() const { return panels; }
+  const eastl::vector<PanelData> &getPanels() const { return panels; }
 
   bool haveActiveCursorOnPanels() const override;
-  bool isAnyPanelPointedAtWithHand(int hand) const override { return spatialInteractionState.wasPanelHit(hand); }
+  eastl::optional<float> isAnyPanelPointedAtWithHand(int hand) const override { return spatialInteractionState.hitDistances[hand]; }
   bool isAnyPanelTouchedWithHand(int hand) const override { return spatialInteractionState.isHandTouchingPanel[hand]; }
 
   void spawnDebugRenderBox(const BBox2 &box, E3DCOLOR fillColor, E3DCOLOR borederColor, float life_time);
 
 private:
+  // Element* hitTestTrace(int bhv_flags, float x, float y) const;
+
+  void renderThreadBeforeRender(float dt);
+
   void blurWorld();
 
   void clear(bool exiting);
@@ -235,18 +229,10 @@ private:
   bool updateHotkeys();
   void updateJoystickAxesObservables();
 
-  enum class FlushPart
-  {
-    MainScene,
-    Panel
-  };
-  void flushRenderImpl(FlushPart part);
-
   void renderProfileStats();
   void renderXmbDebug();
   void renderDirPadNavDebug();
   void renderInputStackDebug();
-  void renderInternalCursor();
 
   static SQInteger set_timer(HSQUIRRELVM vm, bool periodic, bool reuse);
   void clearTimer(const Sqrat::Object &id_);
@@ -287,7 +273,6 @@ private:
   static SQInteger add_panel(HSQUIRRELVM vm);
   static SQInteger remove_panel(HSQUIRRELVM vm);
   static SQInteger mark_panel_dirty(HSQUIRRELVM vm);
-  static SQInteger force_cursor_active(HSQUIRRELVM vm);
 
   sqfrp::ScriptValueObservable *getCursorPresentObservable() { return cursorPresent.get(); }
   sqfrp::ScriptValueObservable *getCursorOverScrollObservable() { return cursorOverStickScroll.get(); }
@@ -311,12 +296,6 @@ private:
 
   void scriptSetSceneInputActive(bool active);
   void applyInputActivityChange();
-
-  bool isCursorForcefullyEnabled();
-  bool isCursorForcefullyDisabled();
-
-  void requestHoverUpdate();
-  void applyPendingHoverUpdate();
 
 public:
   eastl::unique_ptr<sqfrp::ObservablesGraph> frpGraph;
@@ -359,7 +338,6 @@ private:
   StringKeys *stringKeys = nullptr;
 
   Cursor *activeCursor = nullptr;
-  Sqrat::Object forcedCursorMode; // null|false|true
   eastl::unique_ptr<sqfrp::ScriptValueObservable> cursorPresent, cursorOverStickScroll, cursorOverClickable;
   eastl::unique_ptr<sqfrp::ScriptValueObservable> hoveredClickableInfo;
   eastl::unique_ptr<sqfrp::ScriptValueObservable> keyboardLayout, keyboardLocks;
@@ -407,16 +385,8 @@ private:
 
   friend class GamepadCursor;
 
-  enum class UpdateHoverRequestState
-  {
-    None,
-    WaitingForRender,
-    NeedToUpdate
-  };
 
-  UpdateHoverRequestState updateHoverRequestState = UpdateHoverRequestState::None;
-
-  eastl::vector_map<int, eastl::unique_ptr<PanelData>> panels;
+  eastl::vector<PanelData> panels;
 
   static constexpr int NUM_VR_POINTERS = 2;
   struct SpatialInteractionState
@@ -448,19 +418,12 @@ private:
   TouchPointers touchPointers;
 
   bool panelBufferInitialized = false;
-  void ensurePanelBufferInitialized();
 
   eastl::vector<DebugRenderBox> debugRenderBoxes;
 
   mutable volatile int apiThreadId = 0;
   mutable void *threadCheckCallStack[32];
   friend class ApiThreadCheck;
-
-  bool dbgIsInUpdateHover = false;
-  bool dbgIsInTryRestoreSavedXmbFocus = false;
-
-  eastl::vector<eastl::pair<eastl::string, Json::Value>> postedEventsQueue, workingPostedEventsQueue;
-  WinCritSec postedEventsQueueCs;
 };
 
 } // namespace darg

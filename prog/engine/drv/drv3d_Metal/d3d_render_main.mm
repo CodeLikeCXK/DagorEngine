@@ -1,20 +1,17 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 
 #if _TARGET_PC_MACOSX
 #import <AppKit/NSWindow.h>
 #import <AppKit/NSScreen.h>
 #import <AppKit/NSCursor.h>
-#include <drv/3d/dag_platform_pc.h>
+#include <3d/dag_drv3d_pc.h>
 #else
 #import <UIKit/UIKit.h>
-#include <drv/hid/dag_hiCreate.h>
+#include <humanInput/dag_hiCreate.h>
 #endif
 
 #include <CoreFoundation/CoreFoundation.h>
 
-#include <drv/3d/dag_commands.h>
-#include <drv/3d/dag_info.h>
-#include <drv/3d/dag_renderTarget.h>
+#include <3d/dag_drv3dCmd.h>
 #include <3d/tql.h>
 #include <osApiWrappers/setProgGlobals.h>
 #include <osApiWrappers/dag_wndProcCompMsg.h>
@@ -39,6 +36,8 @@ using namespace drv3d_metal;
 extern bool get_metal_settings_resolution(int &width, int &height, bool& is_retina, int def_width, int def_height, bool &out_is_auto);
 extern int get_retina_mode();
 extern bool get_allow_intel4000();
+
+extern Tab<drv3d_metal::Texture*> tmp_depth;
 
 extern bool metal_use_queries;
 
@@ -129,6 +128,13 @@ bool d3d::init_driver()
 
 void d3d::release_driver()
 {
+  for (int i = 0; i < tmp_depth.size(); i++)
+  {
+    tmp_depth[i]->release();
+  }
+
+  tmp_depth.clear();
+
   TEXQL_SHUTDOWN_TEX();
 
   // we just need pointers
@@ -347,7 +353,7 @@ bool d3d::enable_vsync(bool) { return true; }
 /// many captures can be followed by only one end_fast_capture_screen()
 void *d3d::fast_capture_screen(int &width, int &height, int &stride_bytes, int &format)
 {
-  render.acquireOwnerShip();
+  render.aquareOwnerShip();
   render.save_backBuffer = true;
   render.flush(true);
   render.releaseOwnerShip();

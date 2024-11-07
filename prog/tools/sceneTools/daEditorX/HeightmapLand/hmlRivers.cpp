@@ -1,10 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "hmlPlugin.h"
-#include <EditorCore/ec_IEditorCore.h>
+#include <dllPluginCore/core.h>
 #include <libTools/staticGeom/geomObject.h>
-
-using editorcore_extapi::dagGeom;
 
 void HmapLandPlugin::rebuildRivers()
 {

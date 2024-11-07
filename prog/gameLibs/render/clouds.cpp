@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <shaders/dag_shaders.h>
 #include <3d/dag_texMgr.h>
 #include <math/dag_Point2.h>

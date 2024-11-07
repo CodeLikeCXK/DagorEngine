@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "plugin_scn.h"
 #include "strmlevel.h"
 #include <sceneRay/dag_sceneRay.h>
@@ -15,14 +13,12 @@
 #include <de3_entityFilter.h>
 
 #include <libTools/util/strUtil.h>
-#include <propPanel/commonWindow/dialogWindow.h>
-#include <propPanel/control/menu.h>
+#include <propPanel2/comWnd/dialog_window.h>
 #include <sepGui/wndPublic.h>
 #include <winGuiWrapper/wgw_dialogs.h>
 #include <perfMon/dag_visClipMesh.h>
 #include <scene/dag_physMat.h>
 #include <osApiWrappers/dag_direct.h>
-#include <drv/3d/dag_info.h>
 
 using hdpi::_pxScaled;
 
@@ -127,18 +123,18 @@ void BinSceneViewPlugin::setVisible(bool vis)
 bool BinSceneViewPlugin::begin(int toolbar_id, unsigned menu_id)
 {
   // menu
-  PropPanel::IMenu *mainMenu = DAGORED2->getMainMenu();
+  IMenu *mainMenu = DAGORED2->getWndManager()->getMainMenu();
   mainMenu->addItem(menu_id, PID_SET_BIN_DUMP, "Set level binary dump");
   mainMenu->addSeparator(menu_id);
   mainMenu->addItem(menu_id, PID_SET_VIS_SETTS, "Edit visibility settings...");
 
   // toolbar
   toolBarId = toolbar_id;
-  PropPanel::ContainerPropertyControl *toolbar = DAGORED2->getCustomPanel(toolbar_id);
+  PropertyContainerControlBase *toolbar = DAGORED2->getCustomPanel(toolbar_id);
   G_ASSERT(toolbar);
   toolbar->setEventHandler(this);
 
-  PropPanel::ContainerPropertyControl *tool = toolbar->createToolbarPanel(CM_TOOL, "");
+  PropertyContainerControlBase *tool = toolbar->createToolbarPanel(CM_TOOL, "");
 
   tool->createButton(PID_SET_BIN_DUMP, "Set level binary dump");
   tool->setButtonPictures(PID_SET_BIN_DUMP, "import_hm");
@@ -185,7 +181,6 @@ void BinSceneViewPlugin::loadObjects(const DataBlock &blk, const DataBlock &loca
   showLrt = local_data.getBool("showLrt", false);
   showFrtWire = local_data.getBool("showFrtWire", false);
   maxFrtVisDist = local_data.getReal("maxFrtVisDist", 500.0);
-  streamingScene->setLandscapeMirroring(local_data.getBool("useLandMirroring", true));
 
   recentFn.clear();
   if (const DataBlock *b = local_data.getBlockByName("recents"))
@@ -233,7 +228,6 @@ void BinSceneViewPlugin::autoSaveObjects(DataBlock &local_data)
   local_data.setBool("showLrt", showLrt);
   local_data.setBool("showFrtWire", showFrtWire);
   local_data.setReal("maxFrtVisDist", maxFrtVisDist);
-  local_data.setBool("useLandMirroring", streamingScene ? streamingScene->getLandscapeMirroring() : true);
 
   local_data.removeBlock("recents");
   if (recentFn.size())
@@ -269,7 +263,7 @@ void BinSceneViewPlugin::actObjects(float dt)
   }
   if (streamingScene)
   {
-    PropPanel::ContainerPropertyControl *tb = DAGORED2->getCustomPanel(toolBarId);
+    PropertyContainerControlBase *tb = DAGORED2->getCustomPanel(toolBarId);
     if (tb && tb->getBool(PID_SHOW_LANDMESH) != streamingScene->getLandscapeVis())
       tb->setBool(PID_SHOW_LANDMESH, streamingScene->getLandscapeVis());
   }
@@ -419,7 +413,7 @@ void BinSceneViewPlugin::changeLevelBinary(const char *bin_fn)
 
 void BinSceneViewPlugin::setEnvironmentSettings(DataBlock &blk) { streamingScene->setEnvironmentSettings(blk); }
 
-void BinSceneViewPlugin::onClick(int pcb_id, PropPanel::ContainerPropertyControl *panel)
+void BinSceneViewPlugin::onClick(int pcb_id, PropPanel2 *panel)
 {
   onPluginMenuClick(pcb_id);
   switch (pcb_id)
@@ -468,15 +462,15 @@ bool BinSceneViewPlugin::onPluginMenuClick(unsigned id)
   {
     case PID_SET_BIN_DUMP:
     {
-      struct SelectBinDumpDlg : public PropPanel::DialogWindow
+      struct SelectBinDumpDlg : public CDialogWindow
       {
         SelectBinDumpDlg(dag::ConstSpan<SimpleString> recentFn, const char *strm_folder) :
-          DialogWindow(0, _pxScaled(450), _pxScaled(160), "Select binary dump file")
+          CDialogWindow(0, _pxScaled(450), _pxScaled(160), "Select binary dump file")
         {
           Tab<String> filter(midmem);
           filter.push_back() = "Binary dump (*.bin)|*.bin";
 
-          PropPanel::ContainerPropertyControl *recentsRG = getPanel()->createRadioGroup(PID_RECENT_RG, "Recently used files");
+          PropertyContainerControlBase *recentsRG = getPanel()->createRadioGroup(PID_RECENT_RG, "Recently used files");
 
           for (int i = recentFn.size() - 1; i >= 0; i--)
           {
@@ -495,28 +489,26 @@ bool BinSceneViewPlugin::onPluginMenuClick(unsigned id)
           recentsRG->createRadio(-1, "Open new file");
           getPanel()->createFileEditBox(PID_BIN_FILE, "", strm_folder);
           getPanel()->setStrings(PID_BIN_FILE, filter);
-          getPanel()->setInt(PID_BIN_FILE, PropPanel::FS_DIALOG_OPEN_FILE);
+          getPanel()->setInt(PID_BIN_FILE, FS_DIALOG_OPEN_FILE);
 
           getPanel()->setInt(PID_RECENT_RG, recentFn.size() - 1);
-
-          // ImGui::GetMainViewport()->GetCenter() is still zero at this point, let ImGui auto center it for us.
-          autoSize(/*auto_center = */ false);
+          autoSize();
         }
-        virtual void onChange(int pcb_id, PropPanel::ContainerPropertyControl *panel)
+        virtual void onChange(int pcb_id, PropertyContainerControlBase *panel)
         {
           if (pcb_id == PID_BIN_FILE)
             panel->setInt(PID_RECENT_RG, -1);
         }
-        virtual void onDoubleClick(int pcb_id, PropPanel::ContainerPropertyControl *panel)
+        virtual void onDoubleClick(int pcb_id, PropPanel2 *panel)
         {
           if (pcb_id == PID_RECENT_RG && panel->getInt(PID_RECENT_RG) != -1)
-            clickDialogButton(PropPanel::DIALOG_ID_OK);
+            click(DIALOG_ID_OK);
         }
       };
 
       SelectBinDumpDlg *dialog = new SelectBinDumpDlg(recentFn, streamingFolder);
 
-      if (dialog->showDialog() == PropPanel::DIALOG_ID_OK)
+      if (dialog->showDialog() == DIALOG_ID_OK)
       {
         int sel_idx = dialog->getPanel()->getInt(PID_RECENT_RG);
         if (sel_idx == -1)
@@ -544,14 +536,11 @@ bool BinSceneViewPlugin::onPluginMenuClick(unsigned id)
 
     case PID_SET_VIS_SETTS:
     {
-      PropPanel::DialogWindow *dlg = DAGORED2->createDialog(_pxScaled(250), _pxScaled(380), "Set visibility settings");
-      PropPanel::ContainerPropertyControl &panel = *dlg->getPanel();
+      CDialogWindow *dlg = DAGORED2->createDialog(_pxScaled(250), _pxScaled(380), "Set visibility settings");
+      PropPanel2 &panel = *dlg->getPanel();
       panel.createCheckBox(101, "Render static geom", showStaticGeom);
       if (streamingScene)
-      {
         panel.createCheckBox(102, "Render land geom", streamingScene->getLandscapeVis());
-        panel.createCheckBox(1021, "Use Land mirroring", streamingScene->getLandscapeMirroring());
-      }
       panel.createCheckBox(103, "Show navigation mesh", showNavMesh);
       panel.createSeparator(0);
       panel.createCheckBox(201, "Show splines", showSplines);
@@ -564,7 +553,7 @@ bool BinSceneViewPlugin::onPluginMenuClick(unsigned id)
       panel.createCheckBox(304, "Wireframe collision", showFrtWire);
       int ret = dlg->showDialog();
 
-      if (ret == PropPanel::DIALOG_ID_OK)
+      if (ret == DIALOG_ID_OK)
       {
         showStaticGeom = panel.getBool(101);
         showNavMesh = panel.getBool(103);
@@ -578,7 +567,7 @@ bool BinSceneViewPlugin::onPluginMenuClick(unsigned id)
         maxFrtVisDist = panel.getFloat(303);
         showFrtWire = panel.getBool(304);
 
-        PropPanel::ContainerPropertyControl *tb = DAGORED2->getCustomPanel(toolBarId);
+        PropertyContainerControlBase *tb = DAGORED2->getCustomPanel(toolBarId);
         tb->setBool(PID_SHOW_SPLINES, showSplines);
         tb->setBool(PID_SHOW_SPLINE_PTS, showSplinePoints);
         tb->setBool(PID_SHOW_NAVMESH, showNavMesh);
@@ -590,15 +579,6 @@ bool BinSceneViewPlugin::onPluginMenuClick(unsigned id)
         {
           tb->setBool(PID_SHOW_LANDMESH, panel.getBool(102));
           streamingScene->setLandscapeVis(panel.getBool(102));
-          if (panel.getBool(1021) != streamingScene->getLandscapeMirroring())
-          {
-            streamingScene->setLandscapeMirroring(panel.getBool(1021));
-            if (isVisible)
-            {
-              setVisible(false);
-              setVisible(true);
-            }
-          }
         }
 
         DAGORED2->invalidateViewportCache();
@@ -649,7 +629,7 @@ void init_plugin_bin_scn_view()
 {
   if (!DAGORED2->checkVersion())
   {
-    DEBUG_CTX("Incorrect version!");
+    debug_ctx("Incorrect version!");
     return;
   }
   if (DAGORED2->getPluginByName("heightmapLand"))

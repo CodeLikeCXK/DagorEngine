@@ -4,12 +4,16 @@ Root    ?= ../../.. ;
 Location = prog/tools/FontGenerator ;
 include $(Root)/prog/tools/tools_setup.jam ;
 ConsoleExe  = yes ;
+if $(OS) = NT { Platform ?= win64 ; }
 
 TargetType  = exe ;
 Target      = tools/fontgen2 ;
-include $(Root)/prog/tools/tools_setup_outdir_util.jam ;
+
 include $(Root)/prog/_jBuild/defaults.jam ;
-if $(FreeTypeVer) != $(DefFreeTypeVer) { Target = $(Target:S=~ft$(FreeTypeVer)$(Target:S)) ; }
+
+OutDir      = $(Root)/tools/dagor3_cdk/util ;
+if $(Platform) = win64 { OutDir = $(OutDir)64 ; }
+if $(Platform) in linux64 macosx { OutDir = $(OutDir)-$(Platform) ; }
 
 
 Sources =
@@ -48,6 +52,6 @@ UseProgLibs =
 ;
 
 
-if $(Platform) = linux { UseProgLibs += engine/osApiWrappers/messageBox/stub ; }
+if $(Platform) = linux64 { UseProgLibs += engine/osApiWrappers/messageBox/stub ; }
 
 include $(Root)/prog/_jBuild/build.jam ;

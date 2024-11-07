@@ -1,5 +1,5 @@
 ConsoleExe = yes ;
-PlatformArch_windows = x86_64 ;
+Platform = win64 ;
 
 Root    ?= ../../../../.. ;
 Location = prog/tools/sceneTools/customContentTool/extractUtil ;

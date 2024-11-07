@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -58,11 +59,7 @@ class PhysBody
 public:
   PhysBody(PhysWorld *w, float mass, const PhysCollision *coll, const TMatrix &tm = TMatrix::IDENT,
     const PhysBodyCreationData &s = {});
-  PhysBody(PhysBody &&) = default;
-  PhysBody(const PhysBody &) = delete;
   ~PhysBody();
-  PhysBody &operator=(PhysBody &&) = default;
-  PhysBody &operator=(const PhysBody &) = delete;
 
 
   static auto &api() { return jolt_api::body_api(); }
@@ -187,11 +184,11 @@ public:
 
   void setContinuousCollisionMode(bool use);
 
-  // This API is not implemented
-  void setCollisionCallback(IPhysBodyCollisionCallback *) {}
-  constexpr IPhysBodyCollisionCallback *getCollisionCallback() { return nullptr; }
-  constexpr void setPreSolveCallback(PhysBodyPreSolveCallback) {}
-  constexpr PhysBodyPreSolveCallback getPreSolveCallback() { return nullptr; }
+  void setCollisionCallback(IPhysBodyCollisionCallback *cb) { ccb = cb; }
+  IPhysBodyCollisionCallback *getCollisionCallback() { return ccb; }
+
+  void setPreSolveCallback(PhysBodyPreSolveCallback cb) { pcb = cb; }
+  PhysBodyPreSolveCallback getPreSolveCallback() { return pcb; }
 
   void *getUserData() const { return userPtr; }
   void setUserData(void *p) { userPtr = p; }
@@ -211,12 +208,12 @@ public:
   static JPH::RefConst<JPH::Shape> get_shape(JPH::BodyID bid) { return api().GetShape(bid); }
   JPH::RefConst<JPH::Shape> getShape() const { return api().GetShape(bodyId); }
 
-  void drawDebugCollision(unsigned, bool) const {}
-
 protected:
-  static JPH::RefConst<JPH::Shape> create_jolt_collision_shape(const PhysCollision *c, bool dynamic);
+  static JPH::RefConst<JPH::Shape> create_jolt_collision_shape(const PhysCollision *c);
 
   PhysWorld *world = nullptr;
+  IPhysBodyCollisionCallback *ccb = nullptr;
+  PhysBodyPreSolveCallback pcb = nullptr;
 
   int safeMaterialId = 0;
   unsigned short groupMask = 0xFFFFu, layerMask = 0xFFFFu;
@@ -444,7 +441,7 @@ public:
       cdata.posA = to_point3(body_api().GetWorldTransform(pbA->bodyId).Inversed() * cp.mContactPointOn1);
       cdata.posB = to_point3(body_api().GetWorldTransform(pb2 ? pb2->bodyId : cp.mBodyID2).Inversed() * cp.mContactPointOn2);
       c.visualDebugForSingleResult(pbA, pbB, cdata);
-      c.addSingleResult(cdata, (typename C::obj_user_data_t *)userPtrA, (typename C::obj_user_data_t *)userPtrB);
+      c.addSingleResult(cdata, (typename C::obj_user_data_t *)userPtrA, (typename C::obj_user_data_t *)userPtrB, nullptr);
     }
     bool ShouldCollideLocked(const JPH::Body &inBody) const override
     {

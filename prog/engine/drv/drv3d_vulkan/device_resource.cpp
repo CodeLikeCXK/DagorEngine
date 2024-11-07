@@ -1,17 +1,12 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "device_resource.h"
-#include <3d/tql.h>
-#include "globals.h"
-#include "resource_manager.h"
-#include "driver_config.h"
+#include "device.h"
 
 using namespace drv3d_vulkan;
 
 #if VULKAN_RESOURCE_DEBUG_NAMES
 void Resource::setStagingDebugName(Resource *target_resource)
 {
-  if (target_resource && Globals::cfg.debugLevel > 0)
+  if (target_resource && get_device().getDebugLevel() > 0)
   {
     String newDebugName(256, "%s (%s) staging buf", target_resource->getDebugName(), target_resource->resTypeString());
     setDebugName(newDebugName);
@@ -24,12 +19,12 @@ bool Resource::tryAllocMemory(const AllocationDesc &dsc)
   if (memoryId != -1)
     freeMemory();
 
-  memoryId = Globals::Mem::res.allocMemory(dsc);
+  memoryId = get_device().resources.allocMemory(dsc);
   resident = memoryId != -1 ? getMemory().isValid() : false;
   resident |= dsc.objectBaked && getBaseHandle();
   if (!resident && memoryId != -1)
   {
-    Globals::Mem::res.freeMemory(memoryId);
+    get_device().resources.freeMemory(memoryId);
     memoryId = -1;
   }
   return resident;
@@ -41,23 +36,31 @@ bool Resource::tryReuseHandle(const AllocationDesc &dsc)
   return sharedHandle;
 }
 
+void Resource::markForEviction() { evicting = true; }
+
 void Resource::freeMemory()
 {
   if (!isResident())
     return;
 
   G_ASSERT(memoryId != -1);
-  Globals::Mem::res.freeMemory(memoryId);
+  get_device().resources.freeMemory(memoryId);
   memoryId = -1;
   resident = false;
   evicting = false;
 }
 
+bool Resource::isResident() { return resident || !managed; }
+
+bool Resource::isManaged() { return managed; }
+
 const ResourceMemory &Resource::getMemory() const
 {
   G_ASSERT(memoryId != -1);
-  return Globals::Mem::res.getMemory(memoryId);
+  return get_device().resources.getMemory(memoryId);
 }
+
+VulkanHandle Resource::getBaseHandle() const { return handle; }
 
 void Resource::setHandle(VulkanHandle new_handle)
 {
@@ -65,7 +68,7 @@ void Resource::setHandle(VulkanHandle new_handle)
   handle = new_handle;
 }
 
-static const char *resTypeStrings[(uint32_t)ResourceType::COUNT] = {"buffer", "image", "renderPass", "sampler", "heap",
+static const char *resTypeStrings[(uint32_t)ResourceType::COUNT] = {"buffer", "image", "renderPass",
 #if VK_KHR_ray_tracing_pipeline || VK_KHR_ray_query
   "as"
 #endif
@@ -110,27 +113,6 @@ String Resource::printStatLog()
 void Resource::reportOutOfMemory()
 {
   // print full info dump so crash can be analyzed for good
-  Globals::Mem::res.printStats(true, true);
+  get_device().resources.printStats(true, true);
   DAG_FATAL("vulkan: Out of memory. Try lowering graphics settings and/or closing other memory consuming applications");
 }
-
-void Resource::reportToTQL(bool is_allocating)
-{
-  int kbz = tql::sizeInKb(getMemory().size);
-  tql::on_buf_changed(is_allocating, is_allocating ? kbz : -kbz);
-}
-
-#if DAGOR_DBGLEVEL > 0
-void ResourcePlaceableExtend::setHeap(MemoryHeapResource *in_heap)
-{
-  heap = in_heap;
-  heap->onResourcePlace();
-}
-
-void ResourcePlaceableExtend::releaseHeap()
-{
-  if (heap)
-    heap->onResourceRemove();
-  heap = nullptr;
-}
-#endif

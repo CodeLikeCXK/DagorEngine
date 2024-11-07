@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <perfMon/dag_sleepPrecise.h>
 #include <perfMon/dag_perfTimer.h>
 #include <osApiWrappers/dag_miscApi.h>

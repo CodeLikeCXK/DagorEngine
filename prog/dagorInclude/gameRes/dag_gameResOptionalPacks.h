@@ -1,10 +1,11 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
-#include <drv/3d/dag_resId.h>
+#include <3d/dag_resId.h>
 #include <generic/dag_tabFwd.h>
 #include <util/dag_oaHashNameMap.h>
 #include <util/dag_multicastEvent.h>
@@ -24,10 +25,8 @@ extern MulticastEvent<void(const GameResource *, int res_id, const char *res_nam
 
 //! gathers missing optional packs for specified list of gameres (optionally includes missing tex packs for models);
 //! returns true when 1 or more missing packs are written to out_pack_ids
-bool get_missing_packs_for_res(dag::ConstSpan<const char *> res_names, Tab<PackId> &out_pack_ids, bool incl_model_tex = true,
-  bool incl_hq = true);
-bool get_missing_packs_for_res(const FastNameMap &res_names, Tab<PackId> &out_pack_ids, bool incl_model_tex = true,
-  bool incl_hq = true);
+bool get_missing_packs_for_res(dag::ConstSpan<const char *> res_names, Tab<PackId> &out_pack_ids, bool incl_model_tex = true);
+bool get_missing_packs_for_res(const FastNameMap &res_names, Tab<PackId> &out_pack_ids, bool incl_model_tex = true);
 
 //! gathers missing optional tex packs for specified list of textures;
 //! returns true when 1 or more missing packs are written to out_pack_ids

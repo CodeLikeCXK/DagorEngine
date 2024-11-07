@@ -1,6 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
-
 #include <EASTL/bitset.h>
 #include "type_lists.h"
 #include <debug/dag_debug.h>

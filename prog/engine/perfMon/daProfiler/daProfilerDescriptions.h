@@ -1,6 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
-
 #include "daProfilerTypes.h"
 #include <perfMon/dag_daProfilerToken.h>
 
@@ -33,8 +31,7 @@ struct ProfilerDescriptions
   bool empty() const { return count == 0; }
   uint32_t create(const char *name, const char *file_name, int line, uint32_t flags, uint32_t color);
   uint32_t createCopy(const char *name, const char *file_name, int line, uint32_t flags, uint32_t color);
-  const char *getName(uint32_t desc) const;
-  const char *get(uint32_t desc, uint32_t &color_and_flags) const;
+  const char *get(uint32_t desc) const;
   size_t memAllocated() const;
 
 protected:
@@ -85,19 +82,10 @@ inline uint32_t ProfilerDescriptions::createCopy(const char *name, const char *f
   return emplaceInternal(EventDescription{name, file_name, line, (color & 0xFFFFFF) | (flags << 24)});
 }
 
-inline const char *ProfilerDescriptions::getName(uint32_t desc) const
+inline const char *ProfilerDescriptions::get(uint32_t desc) const
 {
   auto ret = storage.safeGet(desc);
   return ret ? ret->name : "!unknown!";
-}
-
-inline const char *ProfilerDescriptions::get(uint32_t desc, uint32_t &color_and_flags) const
-{
-  auto ret = storage.safeGet(desc);
-  if (!ret)
-    return nullptr;
-  color_and_flags = ret->colorAndFlags;
-  return ret->name;
 }
 
 }; // namespace da_profiler

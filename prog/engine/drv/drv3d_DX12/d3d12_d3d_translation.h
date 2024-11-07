@@ -1,9 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
-#include <drv/3d/dag_consts.h>
-#include <drv/3d/dag_sampler.h>
-#include <drv/3d/dag_variableRateShading.h>
+#include <3d/dag_drv3dConsts.h>
+#include <3d/dag_sampler.h>
 
 #include "driver.h"
 

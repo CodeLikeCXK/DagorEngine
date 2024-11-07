@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <regExp/regExp.h>
 #include <ioSys/dag_dataBlock.h>
 #include <ioSys/dag_fileIo.h>
@@ -27,10 +25,6 @@ static bool on_duplicate_loc_key(const char *key)
   if (!allow_dup_keys)
     dup_key_err_count++;
   return dup_key_overwrite;
-}
-static bool is_bad_key_due_to_conflict(const char *name)
-{
-  return strncmp(name, "<<<<<<<", 7) == 0 || strncmp(name, "=======", 7) == 0 || strncmp(name, ">>>>>>>", 7) == 0;
 }
 
 static void scan_files(const char *root_path, const char *src_folder, dag::ConstSpan<SimpleString> wclist,
@@ -349,11 +343,6 @@ public:
         if (strchr(loc_keys[k], '\"'))
         {
           printf("ERR: bad key=<%s> with <\">, task=<%s>\n", loc_keys[k], task_name);
-          bad_keys = true;
-        }
-        else if (is_bad_key_due_to_conflict(loc_keys[k]))
-        {
-          printf("ERR: bad key=\"%s\" (merge conflict?), task=<%s>\n", loc_keys[k], task_name);
           bad_keys = true;
         }
       if (bad_keys)
@@ -1237,11 +1226,6 @@ static bool processTasks(const DataBlock &blk, dag::ConstSpan<char *> targets)
             {
               erase_items(loc_keys, k, 1);
               erase_items(loc_vals, k, 1);
-            }
-            else if (is_bad_key_due_to_conflict(loc_keys[k]))
-            {
-              result = false;
-              printf("ERR: bad key=\"%s\" (merge conflict?), task=<%s>\n", loc_keys[k], name);
             }
 
           if (!loc_keys.size())

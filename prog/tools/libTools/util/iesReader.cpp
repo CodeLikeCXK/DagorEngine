@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <libTools/util/iesReader.h>
 
 #undef _USE_MATH_DEFINES

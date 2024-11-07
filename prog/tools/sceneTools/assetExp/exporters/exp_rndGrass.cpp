@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <assets/assetExporter.h>
 #include <assets/assetRefs.h>
 #include <assets/asset.h>

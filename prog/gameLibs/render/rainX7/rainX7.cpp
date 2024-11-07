@@ -1,14 +1,10 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <gameRes/dag_gameResources.h>
 #include <ioSys/dag_dataBlock.h>
 #include <3d/dag_materialData.h>
 #include <3d/dag_render.h>
 #include <math/dag_TMatrix4more.h>
 #include <math/dag_Point4.h>
-#include <drv/3d/dag_vertexIndexBuffer.h>
-#include <drv/3d/dag_driver.h>
-#include <drv/3d/dag_buffers.h>
+#include <3d/dag_drv3d.h>
 #include <math/random/dag_random.h>
 #include <debug/dag_debug.h>
 

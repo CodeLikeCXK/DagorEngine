@@ -1,14 +1,14 @@
 Root    ?= ../../../../../.. ;
 BreakpadRoot = prog/3rdPartyLibs/breakpad ;
 Location = $(BreakpadRoot)/tools/mac/dump_syms ;
-Platform ?= macOS ;
+Platform ?= macosx ;
 
 FullOOPEnabled = yes ;
 
 TargetType  = exe ;
 include $(Root)/prog/_jBuild/defaults.jam ;
 
-if $(Platform) = macOS {
+if $(Platform) = macosx {
   Target      = 3rdPartyLibs/breakpad/tools/mac/dump_syms ;
 
   AddIncludes += $(Root)/$(BreakpadRoot) ;

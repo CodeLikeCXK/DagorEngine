@@ -1,12 +1,9 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <landMesh/lmeshManager.h>
 #include "lmeshRendererGlue.h"
 #include <shaders/dag_shaders.h>
 #include <shaders/dag_shaderMesh.h>
 #include <generic/dag_sort.h>
-#include <drv/3d/dag_draw.h>
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
 #include <generic/dag_ptrTab.h>
 #include <perfMon/dag_cpuFreq.h>
 #include <supp/dag_prefetch.h>

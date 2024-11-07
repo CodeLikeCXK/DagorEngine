@@ -1,9 +1,9 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-#pragma once
-
 /************************************************************************
   functions on the shaders
 ************************************************************************/
+// Copyright 2023 by Gaijin Games KFT, All rights reserved.
+#ifndef __SHFUNC_H
+#define __SHFUNC_H
 
 #include "shExprTypes.h"
 #include <generic/dag_tab.h>
@@ -32,10 +32,8 @@ enum FunctionId
   BF_SRGBREAD,
   BF_GET_DIMENSIONS,
   BF_GET_VIEWPORT,
-  BF_REQUEST_SAMPLER,
+  BF_CREATE_SAMPLER,
   BF_GET_SIZE,
-  BF_EXISTS_TEX,
-  BF_EXISTS_BUF,
 };
 
 //************************************************************************
@@ -103,9 +101,7 @@ inline const char *getFuncName(FunctionId id)
     case BF_GET_DIMENSIONS: return "BF_GET_DIMENSIONS";
     case BF_GET_SIZE: return "BF_GET_SIZE";
     case BF_GET_VIEWPORT: return "BF_GET_VIEWPORT";
-    case BF_REQUEST_SAMPLER: return "BF_REQUEST_SAMPLER";
-    case BF_EXISTS_TEX: return "BF_EXISTS_TEX";
-    case BF_EXISTS_BUF: return "BF_EXISTS_BUF";
+    case BF_CREATE_SAMPLER: return "BF_CREATE_SAMPLER";
     default: G_ASSERT(0);
   }
   return "<???>";
@@ -114,3 +110,6 @@ inline const char *getFuncName(FunctionId id)
 // return true, if function is dynamic always
 bool isAlwaysDynamic(FunctionId id);
 } // namespace functional
+
+
+#endif //__SHFUNC_H

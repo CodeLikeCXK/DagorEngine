@@ -1,7 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
-#define IMGUI_DEFINE_MATH_OPERATORS
-
 #include "av_appwnd.h"
 
 #include <de3_interface.h>
@@ -16,18 +12,15 @@
 #include <de3_editorEvents.h>
 #include <de3_splineGenSrv.h>
 #include <assets/asset.h>
-#include <assets/assetFolder.h>
 #include <assets/assetMgr.h>
 #include <assets/assetMsgPipe.h>
 #include <assetsGui/av_selObjDlg.h>
-#include <EditorCore/ec_imguiInitialization.h>
 #include <EditorCore/ec_interface.h>
 #include <libTools/util/strUtil.h>
 #include <shaders/dag_shaders.h>
 #include <perfMon/dag_graphStat.h>
-#include <drv/3d/dag_matricesAndPerspective.h>
-#include <drv/3d/dag_driver.h>
-#include <drv/3d/dag_resetDevice.h>
+#include <3d/dag_drv3d.h>
+#include <3d/dag_drv3dReset.h>
 #include <3d/dag_texPackMgr2.h>
 #include <gui/dag_stdGuiRender.h>
 // #include <util/dag_texMetaData.h>
@@ -35,12 +28,11 @@
 #include <startup/dag_globalSettings.h>
 #include <osApiWrappers/dag_direct.h>
 #include <osApiWrappers/dag_miscApi.h>
-#include <propPanel/constants.h>
 #include <util/dag_fastIntList.h>
 #include <debug/dag_debug.h>
 #include <debug/dag_logSys.h>
 #include <regExp/regExp.h>
-#include <imgui/imgui.h>
+
 
 static Tab<IEditorService *> srvPlugins(inimem);
 static Tab<IObjEntityMgr *> entityMgrs(inimem);
@@ -302,17 +294,6 @@ public:
     return assetMgr.findAsset(name, asset_types);
   }
 
-  virtual const DataBlock *getAssetProps(const DagorAsset &asset) override { return &asset.props; }
-
-  virtual String getAssetTargetFilePath(const DagorAsset &asset) override { return asset.getTargetFilePath(); }
-
-  virtual const char *getAssetParentFolderName(const DagorAsset &asset) override
-  {
-    const int folderIndex = asset.getFolderIndex();
-    const DagorAssetFolder &folder = asset.getMgr().getFolder(folderIndex);
-    return folder.folderName;
-  }
-
   virtual const char *resolveTexAsset(const char *tex_asset_name)
   {
     static String tmp;
@@ -383,7 +364,7 @@ public:
     bool open_all_grp)
   {
     static String buf;
-    IWndManager &mgr = *get_app().getWndManager();
+    IWndManager &mgr = get_app().getWndManager();
 
     IGenViewportWnd *viewport = EDITORCORE->getCurrentViewport();
     int _x = 0, _y = 0, _w = hdpi::_pxS(400), _h = hdpi::_pxS(600);
@@ -413,10 +394,10 @@ public:
 
     int ret = dlg.showDialog();
 
-    if (ret == PropPanel::DIALOG_ID_CLOSE)
+    if (ret == DIALOG_ID_CLOSE)
       return NULL;
 
-    if (ret == PropPanel::DIALOG_ID_OK)
+    if (ret == DIALOG_ID_OK)
     {
       buf = dlg.getSelObjName();
       return buf;
@@ -436,25 +417,6 @@ public:
     const char *profile, ILogWriter *log)
   {
     return false;
-  }
-
-  virtual void imguiBegin(const char *name, bool *open, unsigned window_flags) override
-  {
-    editor_core_imgui_begin(name, open, window_flags);
-  }
-
-  virtual void imguiBegin(PropPanel::PanelWindowPropertyControl &panel_window, bool *open, unsigned window_flags) override
-  {
-    panel_window.beforeImguiBegin();
-    imguiBegin(panel_window.getStringCaption(), open, window_flags);
-  }
-
-  virtual void imguiEnd() override { ImGui::End(); }
-
-  virtual Outliner::OutlinerWindow *createOutlinerWindow() override
-  {
-    G_ASSERT(false);
-    return nullptr;
   }
 
   FastNameMap disabledSrvNames;
@@ -664,9 +626,9 @@ class ServicesRenderPlugin : public IGenEditorPlugin, public ILightingChangeClie
 
   virtual bool supportAssetType(const DagorAsset &asset) const { return false; }
 
-  virtual void fillPropPanel(PropPanel::ContainerPropertyControl &panel) {}
+  virtual void fillPropPanel(PropertyContainerControlBase &panel) {}
   virtual void postFillPropPanel() {}
-  virtual void onChange(int pcb_id, PropPanel::ContainerPropertyControl *panel) {}
+  virtual void onChange(int pcb_id, PropertyContainerControlBase *panel) {}
 };
 static ServicesRenderPlugin *srvPlugin = NULL;
 

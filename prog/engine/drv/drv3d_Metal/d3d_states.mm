@@ -1,24 +1,21 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 
-#include <drv/3d/dag_renderStates.h>
-#include <drv/3d/dag_shader.h>
-#include <drv/3d/dag_driver.h>
-#include <drv/3d/dag_info.h>
-#include <drv/3d/dag_query.h>
-#include <drv/3d/dag_variableRateShading.h>
+#include <3d/dag_drv3d.h>
 
 #include "render.h"
-#include <drv/3d/dag_res.h>
+#include <3d/dag_drv3d_res.h>
 #include <util/dag_string.h>
 #include <ioSys/dag_dataBlock.h>
 
 using namespace drv3d_metal;
 
+const bool d3d::HALF_TEXEL_OFS = false;
+const float d3d::HALF_TEXEL_OFSFU = 0.0f;
+
 static int sizeofAccelerationStruct()
 {
-  if (@available(iOS 15.0, macos 12.0, *))
+  if (@available(iOS 15.0, macos 11.0, *))
   {
-    return sizeof(MTLAccelerationStructureUserIDInstanceDescriptor);
+    return sizeof(MTLAccelerationStructureInstanceDescriptor);
   }
   return 0;
 }
@@ -56,6 +53,7 @@ namespace drv3d_metal
     Program::MAX_SIMRT,   //int maxSimRT;
     true, //bool is20ArbitrarySwizzleAvailable;
     32,//minWarpSiz
+    sizeofAccelerationStruct() //raytraceTopAccelerationInstanceElementSize
   };
 
   VSDTYPE debug_vdecl[] =
@@ -120,9 +118,7 @@ const char *d3d::get_driver_name()
   return "Metal";
 }
 
-#if _TARGET_PC_MACOSX
 DriverCode d3d::get_driver_code() { return DriverCode::make(d3d::metal); }
-#endif
 
 const char *d3d::get_device_driver_version()
 {
@@ -160,14 +156,8 @@ const Driver3dDesc &d3d::get_driver_desc()
     metal_use_queries = (vendor != D3D_VENDOR_NVIDIA);
 
     g_device_desc.caps.hasBindless = false;
-    const bool isBindlessAllowed = ::dgs_get_settings()->getBlockByNameEx("metal")->getBool("allowBindless", false);
-    if (@available(macOS 13.0, iOS 16.0, *))
-    {
-      if (isBindlessAllowed)
-        g_device_desc.caps.hasBindless = [render.device supportsFamily:MTLGPUFamilyMetal3];
-    }
-
     g_device_desc.caps.hasUAVOnlyForcedSampleCount = false;
+    g_device_desc.caps.hasNativeRenderPassSubPasses = false;
 
     g_device_desc.shaderModel = 5.0_sm;
 #else //_TARGET_IOS | _TARGET_TVOS
@@ -179,7 +169,6 @@ const Driver3dDesc &d3d::get_driver_desc()
     g_device_desc.caps.hasCompareSampler = [render.device supportsFamily:MTLGPUFamilyApple3];
 #endif
     g_device_desc.caps.hasRenderPassDepthResolve = [render.device supportsFamily:MTLGPUFamilyApple3];
-    g_device_desc.caps.hasBaseVertexSupport = [render.device supportsFamily:MTLGPUFamilyApple3];
     if (g_device_desc.caps.hasRenderPassDepthResolve)
     {
       g_device_desc.depthResolveModes =
@@ -188,32 +177,16 @@ const Driver3dDesc &d3d::get_driver_desc()
         DepthResolveMode::DEPTH_RESOLVE_MODE_MAX;
     }
 
-    G_ASSERT(render.clear_cs_pipeline.threadExecutionWidth > 0);
-    g_device_desc.minWarpSize = render.clear_cs_pipeline.threadExecutionWidth;
-    g_device_desc.maxWarpSize = render.clear_cs_pipeline.threadExecutionWidth;
-    g_device_desc.caps.hasRayAccelerationStructure = false;
-    g_device_desc.caps.hasRayQuery = false;
-    g_device_desc.caps.hasGeometryIndexInRayAccelerationStructure = false;
-    g_device_desc.caps.hasSkipPrimitiveTypeInRayTracingShaders = false;
-    g_device_desc.caps.hasNativeRayTracePipelineExpansion = false;
-    g_device_desc.raytrace.topAccelerationStructureInstanceElementSize = sizeofAccelerationStruct();
-#if D3D_HAS_RAY_TRACING
+#if APPLE_RT_SUPPORTED && D3D_HAS_RAY_TRACING
 #if DAGOR_DBGLEVEL > 0
   const bool isRTAllowed = true;
 #else
   const bool isRTAllowed = ::dgs_get_settings()->getBlockByNameEx("metal")->getBool("allowRt", false);
 #endif
-  if (@available(iOS 17, macOS 12.0, *))
-  {
-    if (isRTAllowed && render.device.supportsRaytracing)
-    {
-      g_device_desc.caps.hasRayAccelerationStructure = true;
-      g_device_desc.caps.hasRayQuery = true;
-      // TODO: may support?
-      // hasGeometryIndexInRayAccelerationStructure
-      // hasSkipPrimitiveTypeInRayTracingShaders
-    }
-  }
+  if (isRTAllowed && render.device.supportsRaytracing)
+    g_device_desc.caps.hasRaytracingT11 = true;
+#else
+  g_device_desc.caps.hasRaytracingT11 = false;
 #endif
 
     desc_prepared = true;
@@ -222,42 +195,33 @@ const Driver3dDesc &d3d::get_driver_desc()
   return g_device_desc;
 }
 
-int d3d::driver_command(Drv3dCommand command, void *par1, void *par2, void *par3)
+int d3d::driver_command(int command, void *par1, void *par2, void *par3)
 {
   switch (command)
   {
-    case Drv3dCommand::D3D_FLUSH:
+    case DRV3D_COMMAND_D3D_FLUSH:
+      break;
+    case DRV3D_COMMAND_FLUSH_STATES:
       @autoreleasepool
       {
-        render.acquireOwnerShip();
-        render.flush(true);
-        render.releaseOwnerShip();
-      }
-      break;
-    case Drv3dCommand::LOGERR_ON_SYNC:
-      render.report_stalls = par1 != nullptr;
-      break;
-    case Drv3dCommand::PROCESS_PENDING_RESOURCE_UPDATED:
-    case Drv3dCommand::FLUSH_STATES:
-      @autoreleasepool
-      {
-        render.acquireOwnerShip();
-        if (par3)
-          render.capture_command_gpu_time = true;
+        render.aquareOwnerShip();
         render.flush(false);
-        render.capture_command_gpu_time = false;
         render.releaseOwnerShip();
       }
       break;
-    case Drv3dCommand::PROCESS_APP_INACTIVE_UPDATE:
+    case DRV3D_COMMAND_PROCESS_APP_INACTIVE_UPDATE:
       @autoreleasepool
       {
-        render.acquireOwnerShip();
+        render.aquareOwnerShip();
         render.endFrame();
         render.releaseOwnerShip();
       }
       break;
-    case Drv3dCommand::GETVISIBILITYBEGIN:
+      //  case DRV3D_COMMAND_GETALLTEXS:
+      //  case DRV3D_COMMAND_SET_STAT3D_HANDLER:
+      //  case DRV3D_COMMAND_GETTEXTUREMEM:
+      //  break;
+    case DRV3D_COMMAND_GETVISIBILITYBEGIN:
     {
       if (!metal_use_queries)
       {
@@ -274,7 +238,7 @@ int d3d::driver_command(Drv3dCommand command, void *par1, void *par2, void *par3
       render.startQuery(q[0]);
       return 0;
     }
-    case Drv3dCommand::GETVISIBILITYEND:
+    case DRV3D_COMMAND_GETVISIBILITYEND:
     {
       if (!metal_use_queries)
       {
@@ -291,7 +255,7 @@ int d3d::driver_command(Drv3dCommand command, void *par1, void *par2, void *par3
       render.finishQuery(q);
       return 0;
     }
-    case Drv3dCommand::GETVISIBILITYCOUNT:
+    case DRV3D_COMMAND_GETVISIBILITYCOUNT:
     {
       if (!metal_use_queries)
       {
@@ -307,7 +271,7 @@ int d3d::driver_command(Drv3dCommand command, void *par1, void *par2, void *par3
 
       return (int)render.getQueryResult(q, par2 ? 0 : 1);
     }
-    case Drv3dCommand::RELEASE_QUERY:
+    case DRV3D_COMMAND_RELEASE_QUERY:
     {
       if (!metal_use_queries)
       {
@@ -325,44 +289,74 @@ int d3d::driver_command(Drv3dCommand command, void *par1, void *par2, void *par3
       q[0] = 0;
       return 0;
     }
-    case Drv3dCommand::ACQUIRE_OWNERSHIP:
-      render.acquireOwnerShip();
+      //  break;
+      //  case DRV3D_COMMAND_ENABLEDEBUGTEXTURES:
+      //  case DRV3D_COMMAND_DISABLEDEBUGTEXTURES:
+      //  break;
+      //  case DRV3D_COMMAND_ENABLE_MT: // ignore
+      //  case DRV3D_COMMAND_DISABLE_MT:// ignore
+      //  break;
+    case DRV3D_COMMAND_ENTER_RESOURCE_LOCK_CS:
+    case DRV3D_COMMAND_LEAVE_RESOURCE_LOCK_CS:
       break;
-    case Drv3dCommand::RELEASE_OWNERSHIP:
+    case DRV3D_COMMAND_ACQUIRE_OWNERSHIP:
+      render.aquareOwnerShip();
+      break;
+    case DRV3D_COMMAND_RELEASE_OWNERSHIP:
       if (par3)
         return render.tryReleaseOwnerShip();
       else
         render.releaseOwnerShip();
       break;
+      //  case DRV3D_COMMAND_PREALLOCATE_RT:
+      //  break;
+      //  case DRV3D_COMMAND_SUSPEND:   // ignore
+      //  break;
+      //  case DRV3D_COMMAND_RESUME:  // ignore
+      //  break;
+      //  case DRV3D_COMMAND_GET_SUSPEND_COUNT: // ignore
+      //  break;
+      //  case DRV3D_COMMAND_GET_MEM_USAGE:
+      //  case DRV3D_COMMAND_GET_AA_LEVEL:
+      //  break;
+      //  case DRV3D_COMMAND_THREAD_ENTER:
+      //  break;
+      //  case DRV3D_COMMAND_THREAD_LEAVE:
+      //  break;
+      //  case DRV3D_COMMAND_GET_GPU_FRAME_TIME:  // ignore
+      //  break;
+      //  case DRV3D_COMMAND_ENTER_RESOURCE_LOCK_CS:
+      //  case DRV3D_COMMAND_LEAVE_RESOURCE_LOCK_CS:
+      //  break;
+      //  case DRV3D_COMMAND_INVALIDATE_STATES: // ignore
+      //  break;
       // vulkan has no no timing queries as of yet
-    case Drv3dCommand::TIMESTAMPFREQ:
-      *reinterpret_cast<uint64_t *>(par1) = render.getGPUTimeStampFreq();
-      return 1;
-    //  case Drv3dCommand::TIMESTAMPISSUE:// ignore
-    case Drv3dCommand::TIMESTAMPGET:
-      {
-        // convert to ms from us
-        if (par3)
-          *reinterpret_cast<uint64_t *>(par3) = render.current_command_gpu_time.load();
-
-        Render::Query *q = static_cast<Render::Query *>(par1);
-        if (q)
+      case D3V3D_COMMAND_TIMESTAMPFREQ:
+        *reinterpret_cast<uint64_t *>(par1) = render.getGPUTimeStampFreq();
+        return 1;
+      //  case D3V3D_COMMAND_TIMESTAMPISSUE:// ignore
+      case D3V3D_COMMAND_TIMESTAMPGET:
         {
-          *reinterpret_cast<uint64_t *>(par2) = render.getQueryResult(q, false);
-          return 1;
+          Render::Query *q = static_cast<Render::Query *>(par1);
+          if (q)
+          {
+            *reinterpret_cast<uint64_t *>(par2) = render.getQueryResult(q, false);
+            return 1;
+          }
         }
-        break;
-      }
-    case Drv3dCommand::TIMECLOCKCALIBRATION:
-      // TODO:: stub, defaults to dx12 defaults
-      if (par1)
-          *reinterpret_cast<uint64_t *>(par1) = 0;
-      if (par2)
-          *reinterpret_cast<uint64_t *>(par2) = 0;
-      if (par3)
-          *reinterpret_cast<int *>(par3) = DRV3D_CPU_FREQ_TYPE_QPC;
-      return 1;
-    case Drv3dCommand::GET_VENDOR:
+      case D3V3D_COMMAND_TIMECLOCKCALIBRATION:
+        // TODO:: stub, defaults to dx12 defaults
+        if (par1)
+            *reinterpret_cast<uint64_t *>(par1) = 0;
+        if (par2)
+            *reinterpret_cast<uint64_t *>(par2) = 0;
+        if (par3)
+            *reinterpret_cast<int *>(par3) = DRV3D_CPU_FREQ_TYPE_QPC;
+        return 1;
+      //  break;
+      //  case DRV3D_COMMAND_GET_SECONDARY_BACKBUFFER:
+      //  break;
+    case DRV3D_COMMAND_GET_VENDOR:
 #if _TARGET_TVOS
     {
       if (par1)
@@ -373,63 +367,49 @@ int d3d::driver_command(Drv3dCommand command, void *par1, void *par2, void *par3
 #endif
       //return drv3d_vulkan::api_state.device.getDeviceVendor();
       break;
-    case Drv3dCommand::START_CAPTURE_FRAME:
+    case DRV3D_COMMAND_START_CAPTURE_FRAME:
     {
-      {
-        MTLCaptureManager *man = [MTLCaptureManager sharedCaptureManager];
-        if (par1 != nullptr)
-        {
-          NSError *error = nil;
-          MTLCaptureDescriptor *desc = [[MTLCaptureDescriptor alloc] init];
-          desc.captureObject = render.device;
-          [man startCaptureWithDescriptor : desc
-                                    error : &error];
-          [desc release];
-        }
-        else
-          [man stopCapture];
-      }
+      render.start_capture = true;
       break;
     }
-    case Drv3dCommand::SET_PIPELINE_COMPILATION_TIME_BUDGET:
+    case DRV3D_COMMAND_SET_PIPELINE_COMPILATION_TIME_BUDGET:
     {
       render.async_pso_compilation = par1 == nullptr;
       break;
     }
-    case Drv3dCommand::GET_PIPELINE_COMPILATION_QUEUE_LENGTH:
+    case DRV3D_COMMAND_GET_PIPELINE_COMPILATION_QUEUE_LENGTH:
     {
       if (par1)
         *static_cast<uint32_t*>(par1) = 1;
       return render.async_pso_compilation_length;
     }
-    case Drv3dCommand::LOAD_PIPELINE_CACHE:
+    case DRV3D_COMMAND_LOAD_PIPELINE_CACHE:
     {
       render.shadersPreCache.loadPreCache();
       break;
     }
-    case Drv3dCommand::IS_HDR_ENABLED:
+    case DRV3D_COMMAND_IS_HDR_ENABLED:
     {
       return (int)render.mainview.hdrEnabled;
     }
-    case Drv3dCommand::INT10_HDR_BUFFER:
+    case DRV3D_COMMAND_INT10_HDR_BUFFER:
       return (int)render.mainview.int10HDRBuffer;
-    case Drv3dCommand::HDR_OUTPUT_MODE:
+    case DRV3D_COMMAND_HDR_OUTPUT_MODE:
     {
       if (render.mainview.hdrEnabled)
         return (int)(render.mainview.int10HDRBuffer ? HdrOutputMode::HDR10_ONLY : HdrOutputMode::HDR_ONLY);
       return (int)HdrOutputMode::SDR_ONLY;
     }
-    case Drv3dCommand::IS_HDR_AVAILABLE:
+    case DRV3D_COMMAND_IS_HDR_AVAILABLE:
     {
       return [render.mainview isHDRAvailable];
     }
-    case Drv3dCommand::SET_HDR:
+    case DRV3D_COMMAND_SET_HDR:
     {
       bool enable = *static_cast<bool*>(par1);
       [render.mainview setHDR: enable];
-      break;
     }
-    case Drv3dCommand::GET_METALFX_UPSCALE_STATE:
+    case DRV3D_COMMAND_GET_METALFX_UPSCALE_STATE:
     {
 #if USE_METALFX_UPSCALE
       return render.upscale.supported ? (int)MtlfxUpscaleState::READY : (int)MtlfxUpscaleState::UNSUPPORTED;
@@ -437,14 +417,12 @@ int d3d::driver_command(Drv3dCommand command, void *par1, void *par2, void *par3
       return (int)MtlfxUpscaleState::UNSUPPORTED;
 #endif
   }
-    case Drv3dCommand::EXECUTE_METALFX_UPSCALE:
+    case DRV3D_COMMAND_EXECUTE_METALFX_UPSCALE:
     {
       MtlFxUpscaleParams *params = static_cast<MtlFxUpscaleParams*>(par1);
       render.executeUpscale((drv3d_metal::Texture*)params->color, (drv3d_metal::Texture*)params->output, (uint32_t)params->colorMode);
       break;
     }
-    default:
-	  break;
   }
 
   return 0;
@@ -454,9 +432,7 @@ bool d3d::setgamma(float p)
 {
   if (render.mainview.hdrEnabled)
     return false;
-  dispatch_async(dispatch_get_main_queue(), ^{
-    [render.mainview setGamma:p];
-  });
+  [render.mainview setGamma:p];
   return true;
 }
 
@@ -475,6 +451,11 @@ bool d3d::reset_device()
   return true;
 }
 
+bool d3d::isVcolRgba()
+{
+  return true;
+}
+
 bool d3d::setstencil(uint32_t ref)
 {
   return render.setStencilRef(ref);
@@ -485,7 +466,7 @@ bool d3d::setstencil(uint32_t ref)
 //returns previous result. switch on/off srgb write to backbuffer (default is off)
 bool d3d::set_srgb_backbuffer_write(bool set)
 {
-  return render.setSrgbBackbuffer(set);
+  return set;
 }
 
 bool d3d::set_msaa_pass()

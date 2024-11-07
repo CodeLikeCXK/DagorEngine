@@ -1,11 +1,8 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "hmlObjectsEditor.h"
 #include "hmlPlugin.h"
 #include "hmlSplineObject.h"
 #include "hmlSplinePoint.h"
 #include "hmlHoleObject.h"
-#include "hmlOutliner.h"
 #include "hmlSplineUndoRedo.h"
 #include "hmlCm.h"
 #include "common.h"
@@ -14,23 +11,17 @@
 #include <de3_objEntity.h>
 #include <de3_randomSeed.h>
 #include <de3_hmapService.h>
-#include <obsolete/dag_cfg.h>
-#include <de3_baseInterfaces.h>
-#include <obsolete/dag_cfg.h>
 
 #include <EditorCore/ec_ObjectCreator.h>
 #include <EditorCore/ec_gridobject.h>
-#include <EditorCore/ec_interface.h>
-#include <EditorCore/ec_outliner.h>
 
-#include <propPanel/commonWindow/dialogWindow.h>
 #include <winGuiWrapper/wgw_dialogs.h>
 #include <winGuiWrapper/wgw_input.h>
 
+#include <dllPluginCore/core.h>
 #include <math/random/dag_random.h>
-#include <math/dag_rayIntersectBox.h>
+
 #include <debug/dag_debug.h>
-#include <physMap/physMap.h>
 
 using hdpi::_pxScaled;
 
@@ -44,29 +35,6 @@ static int splittingFirstPointId, splittingSecondPointId;
 
 inline bool is_creating_entity_mode(int m) { return m == CM_CREATE_ENTITY; }
 
-static SimpleString getMatScript(SplineObject *s)
-{
-  SimpleString res;
-  if (s->points.empty())
-    return res;
-  if (!s->points[0])
-    return res;
-  ISplineGenObj *splineGenObject = s->points[0]->getSplineGen();
-  if (!splineGenObject || !splineGenObject->loftGeom)
-    return res;
-  GeomObject *geomObject = splineGenObject->loftGeom;
-  if (!geomObject->getGeometryContainer())
-    return res;
-  StaticGeometryContainer *sgc = geomObject->getGeometryContainer();
-  if (sgc->nodes.empty())
-    return res;
-  if (!sgc->nodes[0]->mesh)
-    return res;
-  StaticGeometryMesh *mesh = sgc->nodes[0]->mesh;
-  if (!mesh || mesh->mats.empty())
-    return res;
-  return mesh->mats[0]->scriptText;
-}
 
 SplineObject *HmapLandObjectEditor::findSplineAndDirection(IGenViewportWnd *wnd, SplinePointObject *p, bool &dirs_equal,
   SplineObject *excl)
@@ -97,25 +65,6 @@ SplineObject *HmapLandObjectEditor::findSplineAndDirection(IGenViewportWnd *wnd,
 }
 
 
-void HmapLandObjectEditor::registerViewportAccelerators(IWndManager &wndManager)
-{
-  ObjectEditor::registerViewportAccelerators(wndManager);
-
-  wndManager.addViewportAccelerator(CM_SPLINE_REGEN, wingw::V_F1);
-  wndManager.addViewportAccelerator(CM_SPLINE_REGEN_CTRL, wingw::V_F1, true);
-  wndManager.addViewportAccelerator(CM_REBUILD_SPLINES_BITMASK, wingw::V_F2);
-  wndManager.addViewportAccelerator(CM_SELECT_PT, '1', true);
-  wndManager.addViewportAccelerator(CM_SELECT_SPLINES, '2', true);
-  wndManager.addViewportAccelerator(CM_SELECT_ENT, '3', true);
-  wndManager.addViewportAccelerator(CM_SELECT_LT, '4', true);
-  wndManager.addViewportAccelerator(CM_SELECT_SNOW, '5', true);
-  wndManager.addViewportAccelerator(CM_SELECT_NONE, '6', true);
-  wndManager.addViewportAccelerator(CM_SELECT_SPL_ENT, '7', true);
-  wndManager.addViewportAccelerator(CM_HIDE_SPLINES, '0', true);
-  wndManager.addViewportAccelerator(CM_USE_PIXEL_PERFECT_SELECTION, 'Q', true);
-}
-
-
 void HmapLandObjectEditor::handleKeyPress(IGenViewportWnd *wnd, int vk, int modif)
 {
   if (is_creating_entity_mode(getEditMode()) && wingw::is_key_pressed(wingw::V_ALT))
@@ -124,6 +73,32 @@ void HmapLandObjectEditor::handleKeyPress(IGenViewportWnd *wnd, int vk, int modi
     wnd->invalidateCache();
     return;
   }
+
+  if (wingw::is_key_pressed(wingw::V_F1))
+  {
+    onClick(CM_SPLINE_REGEN, NULL);
+    return;
+  }
+
+  if (wingw::is_key_pressed(wingw::V_F2))
+  {
+    onClick(CM_REBUILD_SPLINES_BITMASK, NULL);
+    return;
+  }
+
+  if (wingw::is_key_pressed(wingw::V_CONTROL))
+    switch (vk)
+    {
+      case '1': onClick(CM_SELECT_PT, NULL); return;
+      case '2': onClick(CM_SELECT_SPLINES, NULL); return;
+      case '3': onClick(CM_SELECT_ENT, NULL); return;
+      case '4': onClick(CM_SELECT_LT, NULL); return;
+      case '5': onClick(CM_SELECT_SNOW, NULL); return;
+      case '6': setSelectMode(-1); return;
+      case '7': onClick(CM_SELECT_SPL_ENT, NULL); return;
+      case '0': onClick(CM_HIDE_SPLINES, NULL); return;
+      case 'Q': onClick(CM_USE_PIXEL_PERFECT_SELECTION, nullptr); return;
+    }
   return ObjectEditor::handleKeyPress(wnd, vk, modif);
 }
 
@@ -305,61 +280,8 @@ bool HmapLandObjectEditor::handleMouseMove(IGenViewportWnd *wnd, int x, int y, b
       }
     }
     else
-    {
-      if (showPhysMat)
-      {
-        Tab<RenderableEditableObject *> objs(tmpmem);
-        IEditorCoreEngine::get()->setShowMessageAt(x, y, SimpleString());
-        bool splineHit = false;
-        if (pickObjects(wnd, x, y, objs) && objs.size())
-        {
-          SimpleString matScript;
-          if (SplineObject *s = RTTI_cast<SplineObject>(objs[0]))
-          {
-            splineHit = true;
-            matScript = getMatScript(s);
-          }
-          if (!matScript.empty())
-          {
-            CfgReader c;
-            c.getdiv_text(String(128, "[q]\r\n%s\r\n", matScript.str()), "q");
-            const char *physMatName = c.getstr("phmat", NULL);
-            if (physMatName)
-            {
-              int mat = HmapLandPlugin::hmlService->getPhysMatId(physMatName);
-              if (mat >= 0)
-              {
-                String msg(128, "Spline physMatId = %d, physMat = '%s'", mat, physMatName);
-                IEditorCoreEngine::get()->setShowMessageAt(x, y, SimpleString(msg.c_str()));
-              }
-            }
-          }
-        }
-        if (!splineHit)
-        {
-          if (physMap)
-          {
-            Point3 dir, p0;
-            real dist = MAX_TRACE_DIST;
-            wnd->clientToWorld(Point2(x, y), p0, dir);
-            if (IEditorCoreEngine::get()->traceRay(p0, dir, dist, NULL))
-            {
-              Point3 rayHit = p0 + dir * dist;
-              int mat = physMap->getMaterialAt(Point2(rayHit.x, rayHit.z));
-              if (mat >= 0)
-              {
-                int biomes = HmapLandPlugin::hmlService->getBiomeIndices(rayHit);
-                const char *physMatName = HmapLandPlugin::hmlService->getLandPhysMatName(mat);
-                String msg(128, "physMatId = %d, physMat = '%s', biomeIndices(byWeight) = %d, %d", mat, physMatName, biomes & 0xff,
-                  biomes >> 8);
-                IEditorCoreEngine::get()->setShowMessageAt(x, y, SimpleString(msg.c_str()));
-              }
-            }
-          }
-        }
-      }
       return false;
-    }
+
     updateGizmo();
     wnd->invalidateCache();
   }
@@ -687,7 +609,7 @@ bool HmapLandObjectEditor::handleMouseRBPress(IGenViewportWnd *wnd, int x, int y
   }
   else if (is_creating_entity_mode(getEditMode()))
   {
-    if (buttons & 1) // This is actually MK_LBUTTON.
+    if (buttons & 1)
       return ObjectEditor::handleMouseRBPress(wnd, x, y, inside, buttons, key_modif);
     setCreateBySampleMode(NULL);
     selectNewObjEntity(NULL);
@@ -824,8 +746,9 @@ HmapLandObjectEditor::PlacementRotation HmapLandObjectEditor::buttonIdToPlacemen
   return static_cast<PlacementRotation>(id - CM_ROTATION_X);
 }
 
-void HmapLandObjectEditor::onClick(int pcb_id, PropPanel::ContainerPropertyControl *panel)
+void HmapLandObjectEditor::onClick(int pcb_id, PropPanel2 *panel)
 {
+  bool ctrl_pressed = wingw::is_key_pressed(wingw::V_CONTROL);
   switch (pcb_id)
   {
     case CM_OBJED_MODE_SELECT:
@@ -851,12 +774,7 @@ void HmapLandObjectEditor::onClick(int pcb_id, PropPanel::ContainerPropertyContr
       updateToolbarButtons();
       DAGORED2->repaint();
       break;
-    case CM_SHOW_PHYSMAT:
-      showPhysMat = !showPhysMat;
-      if (!showPhysMat)
-        IEditorCoreEngine::get()->setShowMessageAt(0, 0, SimpleString());
-      break;
-    case CM_SHOW_PHYSMAT_COLORS: showPhysMatColors = !showPhysMatColors; break;
+
     case CM_HILL_UP:
     case CM_HILL_DOWN:
     case CM_ALIGN:
@@ -1072,8 +990,6 @@ void HmapLandObjectEditor::onClick(int pcb_id, PropPanel::ContainerPropertyContr
       getUndoSystem()->accept("Open spline(s)");
     }
     break;
-
-    case CM_SELECT_NONE: setSelectMode(-1); return;
 
     case CM_SELECT_PT:
     case CM_SELECT_SPLINES:
@@ -1348,11 +1264,15 @@ void HmapLandObjectEditor::onClick(int pcb_id, PropPanel::ContainerPropertyContr
       DAGORED2->repaint();
       break;
 
-    case CM_OBJED_SELECT_BY_NAME: showOutlinerWindow(!isOutlinerWindowOpen()); break;
+    case CM_LAYERS_DLG:
+      if (layersDlg.isVisible())
+        layersDlg.hide();
+      else
+        layersDlg.show();
+      break;
 
     case CM_SPLINE_REGEN:
-    case CM_SPLINE_REGEN_CTRL:
-      if (pcb_id == CM_SPLINE_REGEN_CTRL)
+      if (ctrl_pressed)
       {
         int s_num = 0, p_num = 0;
         for (int i = 0; i < selection.size(); i++)
@@ -1372,7 +1292,7 @@ void HmapLandObjectEditor::onClick(int pcb_id, PropPanel::ContainerPropertyContr
 
       updateSplinesGeom();
 
-      if (pcb_id == CM_SPLINE_REGEN_CTRL)
+      if (ctrl_pressed)
         for (int i = 0; i < selection.size(); i++)
           if (LandscapeEntityObject *o = RTTI_cast<LandscapeEntityObject>(selection[i]))
             o->updateEntityPosition(true);
@@ -1388,8 +1308,8 @@ void HmapLandObjectEditor::onClick(int pcb_id, PropPanel::ContainerPropertyContr
     case CM_MOVE_OBJECTS:
       if (objects.size())
       {
-        PropPanel::DialogWindow *dlg = DAGORED2->createDialog(_pxScaled(250), _pxScaled(190), "Move multiple objects...");
-        PropPanel::ContainerPropertyControl &panel = *dlg->getPanel();
+        CDialogWindow *dlg = DAGORED2->createDialog(_pxScaled(250), _pxScaled(190), "Move multiple objects...");
+        PropPanel2 &panel = *dlg->getPanel();
         if (selection.size())
           panel.createStatic(-1, String(0, "Move %d object(s)", selection.size()));
         else
@@ -1398,7 +1318,7 @@ void HmapLandObjectEditor::onClick(int pcb_id, PropPanel::ContainerPropertyContr
         panel.createEditFloat(2, "Move Y", 0);
         panel.createEditFloat(3, "Move Z", 0);
 
-        if (dlg->showDialog() == PropPanel::DIALOG_ID_OK)
+        if (dlg->showDialog() == DIALOG_ID_OK)
         {
           getUndoSystem()->begin();
           moveObjects(selection.size() ? selection : objects, Point3(panel.getFloat(1), panel.getFloat(2), panel.getFloat(3)),
@@ -1414,9 +1334,7 @@ void HmapLandObjectEditor::onClick(int pcb_id, PropPanel::ContainerPropertyContr
   updateGizmo();
   updateToolbarButtons();
 
-  // In the Landscape editor instead of the "Select objects by name" dialog we show the Outliner.
-  if (pcb_id != CM_OBJED_SELECT_BY_NAME)
-    ObjectEditor::onClick(pcb_id, panel);
+  ObjectEditor::onClick(pcb_id, panel);
 }
 
 
@@ -1427,11 +1345,11 @@ void HmapLandObjectEditor::autoAttachSplines()
     FLOAT_EDIT_ID = 100,
   };
 
-  PropPanel::DialogWindow *dialog = DAGORED2->createDialog(_pxScaled(250), _pxScaled(100), "Attach points maximum distance");
-  PropPanel::ContainerPropertyControl *panel = dialog->getPanel();
+  CDialogWindow *dialog = DAGORED2->createDialog(_pxScaled(250), _pxScaled(100), "Attach points maximum distance");
+  PropPanel2 *panel = dialog->getPanel();
   panel->createEditFloat(FLOAT_EDIT_ID, "Attach distance:", 0.3);
 
-  if (dialog->showDialog() == PropPanel::DIALOG_ID_OK)
+  if (dialog->showDialog() == DIALOG_ID_OK)
   {
     double value = panel->getFloat(FLOAT_EDIT_ID);
 
@@ -1522,14 +1440,14 @@ void HmapLandObjectEditor::makeBottomSplines()
     return;
   }
 
-  PropPanel::DialogWindow *dialog = DAGORED2->createDialog(_pxScaled(250), _pxScaled(180), "Bottom splines properties");
-  PropPanel::ContainerPropertyControl *panel = dialog->getPanel();
+  CDialogWindow *dialog = DAGORED2->createDialog(_pxScaled(250), _pxScaled(180), "Bottom splines properties");
+  PropPanel2 *panel = dialog->getPanel();
   panel->createStatic(-1, String(128, "%d polygons selected", poly.size()));
   panel->createEditFloat(1, "Border width:", 40);
   panel->createEditFloat(2, "Underwater depth:", 4);
   panel->createEditFloat(3, "Line tolerance", 0.5);
 
-  if (dialog->showDialog() == PropPanel::DIALOG_ID_OK)
+  if (dialog->showDialog() == DIALOG_ID_OK)
   {
     double border_w = panel->getFloat(1);
     double bottom_y = HmapLandPlugin::self->getWaterSurfLevel() - panel->getFloat(2);
@@ -1633,118 +1551,4 @@ void HmapLandObjectEditor::createObjectBySample(RenderableEditableObject *sample
   getUndoSystem()->accept("Add Entity");
 
   DAEDITOR3.addAssetToRecentlyUsed(o->getProps().entityName);
-}
-
-void HmapLandObjectEditor::onAddObject(RenderableEditableObject &obj)
-{
-  ObjectEditor::onAddObject(obj);
-
-  if (outlinerWindow)
-  {
-    RenderableEditableObject &mainObj = getMainObjectForOutliner(obj);
-    if (&mainObj == &obj)
-      outlinerWindow->onAddObject(mainObj);
-    else
-      outlinerWindow->onObjectSelectionChanged(mainObj);
-  }
-}
-
-void HmapLandObjectEditor::onRemoveObject(RenderableEditableObject &obj)
-{
-  ObjectEditor::onRemoveObject(obj);
-
-  if (outlinerWindow)
-  {
-    RenderableEditableObject &mainObj = getMainObjectForOutliner(obj);
-    if (&mainObj == &obj)
-      outlinerWindow->onRemoveObject(mainObj);
-    else
-      outlinerWindow->onObjectSelectionChanged(mainObj);
-  }
-}
-
-void HmapLandObjectEditor::onRegisteredObjectNameChanged(RenderableEditableObject &object)
-{
-  if (outlinerWindow)
-    outlinerWindow->onRenameObject(object);
-}
-
-void HmapLandObjectEditor::onObjectEntityNameChanged(RenderableEditableObject &object)
-{
-  if (outlinerWindow)
-    outlinerWindow->onObjectAssetNameChanged(object);
-}
-
-void HmapLandObjectEditor::onObjectEditLayerChanged(RenderableEditableObject &object)
-{
-  if (outlinerWindow)
-    outlinerWindow->onObjectEditLayerChanged(object);
-}
-
-void HmapLandObjectEditor::showOutlinerWindow(bool show)
-{
-  if (show == isOutlinerWindowOpen())
-    return;
-
-  if (isOutlinerWindowOpen())
-  {
-    outlinerWindow->saveOutlinerSettings(outlinerSettings);
-    outlinerWindow.reset();
-    outlinerInterface.reset();
-  }
-  else
-  {
-    outlinerWindow.reset(DAEDITOR3.createOutlinerWindow());
-
-    G_ASSERT(!outlinerInterface);
-    outlinerInterface.reset(new HeightmapLandOutlinerInterface(*this));
-
-    outlinerWindow->setTreeInterface(outlinerInterface.get());
-    outlinerWindow->fillTypesAndLayers();
-    outlinerWindow->loadOutlinerSettings(outlinerSettings);
-
-    for (int i = 0; i < objects.size(); ++i)
-      outlinerWindow->onAddObject(*objects[i]);
-  }
-
-  setButton(CM_OBJED_SELECT_BY_NAME, outlinerWindow.get() != nullptr);
-}
-
-void HmapLandObjectEditor::loadOutlinerSettings(const DataBlock &settings)
-{
-  outlinerSettings.setFrom(&settings);
-  if (outlinerWindow)
-    outlinerWindow->loadOutlinerSettings(outlinerSettings);
-}
-
-void HmapLandObjectEditor::saveOutlinerSettings(DataBlock &settings)
-{
-  if (outlinerWindow)
-    outlinerWindow->saveOutlinerSettings(outlinerSettings);
-  settings.setFrom(&outlinerSettings);
-}
-
-RenderableEditableObject &HmapLandObjectEditor::getMainObjectForOutliner(RenderableEditableObject &object)
-{
-  SplinePointObject *splinePoint = RTTI_cast<SplinePointObject>(&object);
-  if (splinePoint && splinePoint->spline)
-    return *splinePoint->spline;
-  else
-    return object;
-}
-
-void HmapLandObjectEditor::updateImgui()
-{
-  ObjectEditor::updateImgui();
-
-  if (!outlinerWindow.get())
-    return;
-
-  bool open = true;
-  DAEDITOR3.imguiBegin("Outliner", &open);
-  outlinerWindow->updateImgui();
-  DAEDITOR3.imguiEnd();
-
-  if (!open)
-    showOutlinerWindow(false);
 }

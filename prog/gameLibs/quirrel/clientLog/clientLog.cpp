@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <sqModules/sqModules.h>
 #include <eventLog/errorLog.h>
 #include <quirrel_json/jsoncpp.h>

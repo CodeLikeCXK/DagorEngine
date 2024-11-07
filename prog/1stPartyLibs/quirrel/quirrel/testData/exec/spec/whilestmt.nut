@@ -1,4 +1,4 @@
-function testy(n) {
+let function testy(n) {
     local a = 0
     while (a < n)
       a += 1

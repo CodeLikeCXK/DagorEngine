@@ -1,10 +1,11 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
-#include <drv/3d/dag_resId.h>
+#include <3d/dag_resId.h>
 #include <EASTL/array.h>
 #include <EASTL/string_view.h>
 #include <EASTL/string.h>
@@ -45,6 +46,6 @@ void debug_render_gbuffer(const class PostFxRenderer &debugRenderer, DeferredRT 
 void debug_render_gbuffer(const class PostFxRenderer &debugRenderer, Texture *depth, int mode = USE_DEBUG_GBUFFER_MODE);
 
 void debug_render_gbuffer_with_vectors(const class DynamicShaderHelper &debugVecShader, DeferredRT &gbuffer,
-  int mode = USE_DEBUG_GBUFFER_MODE, int vec_count = -1, float vec_scale = 0.f);
+  int mode = USE_DEBUG_GBUFFER_MODE);
 void debug_render_gbuffer_with_vectors(const class DynamicShaderHelper &debugVecShader, Texture *depth,
-  int mode = USE_DEBUG_GBUFFER_MODE, int vec_count = -1, float vec_scale = 0.f);
+  int mode = USE_DEBUG_GBUFFER_MODE);

@@ -1,6 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
-#include <drv/3d/dag_texFlags.h>
+#include <3d/dag_texFlags.h>
 #include "vars.h"
 #include <fx/dag_hdrRender.h>
 

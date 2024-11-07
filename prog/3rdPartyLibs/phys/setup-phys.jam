@@ -8,10 +8,14 @@ local _phys_engine = $(PhysEngine) ; _phys_engine ?= $(PhysName) ;
 if $(_phys_engine) in bt BULLET Bullet {
   if ! $(DefBulletSdkVer) { include $(Root)/prog/_jBuild/defaults.jam ; }
   include $(Root)/prog/3rdPartyLibs/phys/phys-bt.jam ;
-  if $(TargetCodeName) { TargetCodeName = $(TargetCodeName)~bt$(BulletSdkVer) ; }
-  if $(TargetType) = lib || ! $(TargetCodeName) { Target = $(Target:S=~bt$(BulletSdkVer)$(Target:S)) ; }
+  if $(BulletSdkVer) != $(DefBulletSdkVer) {
+    if $(TargetCodeName) { TargetCodeName = $(TargetCodeName)~bt$(BulletSdkVer) ; } 
+    if $(TargetType) = lib || ! $(TargetCodeName) { Target = $(Target:S=~bt$(BulletSdkVer)$(Target:S)) ; }
+  }
 } else if $(_phys_engine) in jolt JOLT Jolt {
   include $(Root)/prog/3rdPartyLibs/phys/phys-jolt.jam ;
+  if $(TargetCodeName) { TargetCodeName = $(TargetCodeName)~j ; }
+  if $(TargetType) = lib || ! $(TargetCodeName) { Target = $(Target:S=~j$(Target:S)) ; }
 } else {
   exit unsupported PhysEngine=$(_phys_engine) not defined! ;
 }

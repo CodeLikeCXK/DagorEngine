@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -16,7 +17,6 @@
 #include <util/dag_oaHashNameMap.h>
 #include <util/dag_oaHashNameMap.h>
 #include <util/dag_fastStrMap.h>
-#include <EASTL/hash_map.h>
 #include <util/dag_string.h>
 
 // forward declarations for external classes and structures
@@ -100,9 +100,6 @@ public:
   // validate subref against specific node (e.g. missing Null)
   virtual bool validateNodeNotUsed(AnimationGraph & /*g*/, IAnimBlendNode * /*test_n*/) { return true; }
 
-  // collect blend nodes referenced by this node
-  virtual void collectUsedBlendNodes(AnimationGraph & /*g*/, eastl::hash_map<IAnimBlendNode *, bool> & /*node_map*/) {}
-
   // RTTI interface implementation
   virtual const char *class_name() const { return "IAnimBlendNode"; }
   virtual bool isSubOf(DClassID id) { return id == IAnimBlendNodeCID; }
@@ -157,7 +154,6 @@ public:
   virtual real tellRaw() { return 0; }
   virtual int getTimeScaleParamId(IPureAnimStateHolder & /*st*/) { return timeScaleParamId; }
   bool isAdditive() const { return additive; }
-  int getBnlId() const { return bnlId; }
 
   // creation-time routines
   void setTimeScaleParam(const char *name);
@@ -224,8 +220,6 @@ public:
   AnimPostBlendCtrl(AnimationGraph &graph);
   ~AnimPostBlendCtrl();
 
-  int getPbcId() const { return pbcId; }
-
   virtual void buildBlendingList(BlendCtx &bctx, real w);
   virtual void init(IPureAnimStateHolder &st, const GeomNodeTree &tree) = 0;
   virtual void process(IPureAnimStateHolder &st, real wt, GeomNodeTree &tree, Context &ctx) = 0;
@@ -252,14 +246,21 @@ public:
   static constexpr int MAX_ANIMS_IN_NODE = 16;
 
   // weighted pos and rot channels
+  template <class KEY>
   struct WeightedNode
   {
-    real blendWt[MAX_ANIMS_IN_NODE];
-    uint8_t blendMod[((MAX_ANIMS_IN_NODE + 1 + 7) & ~7) - 1];
+    struct BlendSrc
+    {
+      KEY *k;
+      real t;
+      real w;
+      int interp() { return *(int *)&t; }
+    };
+
+    BlendSrc blendSrc[MAX_ANIMS_IN_NODE];
+    uint8_t blendMod[((MAX_ANIMS_IN_NODE + 8) & ~7) - 1];
     uint8_t readyFlg;
   };
-
-  struct NodeSamplers;
 
   struct NodeWeight
   {
@@ -347,8 +348,8 @@ public:
     dag::Span<real> bnlWt;
     dag::Span<int> bnlCT;
 
-    NodeSamplers *chXfm = NULL;
-    WeightedNode *chPos = NULL, *chScl = NULL, *chRot = NULL;
+    WeightedNode<AnimKeyPoint3> *chPos = NULL, *chScl = NULL;
+    WeightedNode<AnimKeyQuat> *chRot = NULL;
     NodeWeight *wtPos = NULL, *wtScl = NULL, *wtRot = NULL;
     PrsResult *chPrs = NULL;
 
@@ -397,7 +398,15 @@ public:
   AnimBlender();
   ~AnimBlender();
 
-  TlsContext &selectCtx(intptr_t (*irq)(int, intptr_t, intptr_t, intptr_t, void *), void *irq_arg);
+  TlsContext &selectCtx(intptr_t (*irq)(int, intptr_t, intptr_t, intptr_t, void *), void *irq_arg)
+  {
+    TlsContext &tls = getUnpreparedCtx();
+    if (tls.bnlWt.size() != bnl.size() || tls.pbcWt.size() != pbCtrl.size() || tls.readyMark.size() != targetNode.nameCount())
+      tls.rebuildNodeList(bnl.size(), pbCtrl.size(), targetNode.nameCount());
+    tls.irq = irq;
+    tls.irqArg = irq_arg;
+    return tls;
+  }
 
   void buildNodeList();
   void postBlendInit(IPureAnimStateHolder &st, const GeomNodeTree &tree);
@@ -698,8 +707,6 @@ public:
   const DataBlock *getDebugBlenderState(AnimDbgCtx *ctx, IPureAnimStateHolder &st, bool dump_tm);
   const DataBlock *getDebugNodemasks(AnimDbgCtx *ctx);
 
-  void getUsedBlendNodes(eastl::hash_map<IAnimBlendNode *, bool> &usedNodes);
-
   // RTTI
   virtual const char *class_name() const { return "AnimationGraph"; }
   virtual bool isSubOf(DClassID id) { return id == AnimationGraphCID; }
@@ -713,21 +720,17 @@ protected:
 
 extern int getEnumValueByName(const char *name);
 extern int addEnumValue(const char *name);
-extern const char *getEnumName(int name_id);
 
-extern int addIrqId(const char *irq_name);
+extern int getIrqId(const char *irq_name);
 extern const char *getIrqName(int irq_id);
 
-extern void setDebugAnimParam(bool enable);
-extern bool getDebugAnimParam();
-extern int getDebugAnimParamIrqId();
 
 struct AnimMap;
 // very tiny interface for motion matching implementation
 class IMotionMatchingController
 {
 public:
-  virtual bool getPose(AnimBlender::TlsContext &tls, const Tab<AnimMap> &) const = 0;
+  virtual bool blend(AnimBlender::TlsContext &tls, const Tab<AnimMap> &, dag::ConstSpan<vec4f> original_prs) const = 0;
 };
 
 } // end of namespace AnimV20

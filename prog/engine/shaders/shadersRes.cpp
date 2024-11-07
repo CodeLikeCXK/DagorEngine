@@ -1,8 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <shaders/dag_shadersRes.h>
 #include <shaders/dag_shSkinMesh.h>
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
 #include <3d/fileTexFactory.h>
 #include <ioSys/dag_genIo.h>
 #include <debug/dag_debug.h>

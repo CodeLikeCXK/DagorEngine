@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <osApiWrappers/dag_dbgStr.h>
 #include <supp/_platform.h>
 #include <string.h>

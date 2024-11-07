@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <workCycle/dag_gameScene.h>
 #include <workCycle/dag_gameSceneRenderer.h>
 #include "workCyclePriv.h"

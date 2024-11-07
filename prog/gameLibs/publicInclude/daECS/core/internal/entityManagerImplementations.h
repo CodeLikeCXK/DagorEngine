@@ -1,6 +1,8 @@
 #include <daECS/core/internal/asserts.h>
 #pragma once
 
+#include <daECS/core/internal/trackComponentAccess.h>
+
 // implementations
 namespace ecs
 {
@@ -12,22 +14,22 @@ __forceinline TemplateDB &EntityManager::getTemplateDB() { return templateDB; }
 __forceinline TemplateDB &EntityManager::getMutableTemplateDB() { return templateDB; } // thread unsafe!
 inline const Template *EntityManager::buildTemplateByName(const char *n)
 {
-  ScopedMTMutex lock(isConstrainedMTMode(), ownerThreadId, creationMutex);
+  ScopedMTMutex lock(isConstrainedMTMode(), creationMutex);
   return templateDB.buildTemplateByName(n);
 }
 inline int EntityManager::buildTemplateIdByName(const char *n)
 {
-  ScopedMTMutex lock(isConstrainedMTMode(), ownerThreadId, creationMutex);
+  ScopedMTMutex lock(isConstrainedMTMode(), creationMutex);
   return templateDB.buildTemplateIdByName(n);
 }
 inline TemplateDB::AddResult EntityManager::addTemplate(Template &&templ, dag::ConstSpan<const char *> *pnames)
 {
-  ScopedMTMutex lock(isConstrainedMTMode(), ownerThreadId, creationMutex);
+  ScopedMTMutex lock(isConstrainedMTMode(), creationMutex);
   return templateDB.addTemplate(eastl::move(templ), pnames);
 }
 inline void EntityManager::addTemplates(TemplateRefs &trefs, uint32_t tag)
 {
-  ScopedMTMutex lock(isConstrainedMTMode(), ownerThreadId, creationMutex);
+  ScopedMTMutex lock(isConstrainedMTMode(), creationMutex);
   templateDB.addTemplates(trefs, tag);
 }
 
@@ -126,7 +128,7 @@ inline EntityComponentRef EntityManager::getEntityComponentRef(EntityId eid, uin
     return EntityComponentRef();
 
   const component_index_t cIndex = archetypes.getComponentUnsafe(archetype, cid);
-  trackComponentIndex(cIndex, TrackComponentOp::READ, "getRef", TrackAccessStack::Yes, eid);
+  ecsdebug::track_ecs_component_by_index_with_stack(cIndex, ecsdebug::TRACK_READ, "getRef", eid);
   DataComponent dataComponentInfo = dataComponents.getComponentById(cIndex);
   return EntityComponentRef(data, dataComponentInfo.componentTypeName, dataComponentInfo.componentType, cIndex);
 }
@@ -197,16 +199,18 @@ DAECS_RELEASE_INLINE void *__restrict EntityManager::get(EntityId eid, component
     return nullptr;
   archetype = entDesc.archetype;
   DAECS_VALIDATE_ARCHETYPE(archetype);
-  if (DAGOR_UNLIKELY(archetype == INVALID_ARCHETYPE))
+  if (EASTL_UNLIKELY(archetype == INVALID_ARCHETYPE))
     return nullptr;
   archetype_component_id componentInArchetypeIndex = archetypes.getArchetypeComponentIdUnsafe(archetype, index);
   if (componentInArchetypeIndex == INVALID_ARCHETYPE_COMPONENT_ID)
     return nullptr;
-  DAECS_EXT_ASSERT(archetypes.getComponent(entDesc.archetype, componentInArchetypeIndex) == index);
 #if DAECS_EXTENSIVE_CHECKS
-  trackComponentIndex(index, for_write ? TrackComponentOp::WRITE : TrackComponentOp::READ, for_write ? "getRW/set" : "get",
-    TrackAccessStack::Yes, eid);
-  if (DAGOR_UNLIKELY(
+  G_ASSERT(archetypes.getComponent(entDesc.archetype, componentInArchetypeIndex) == index);
+  ecsdebug::track_ecs_component_by_index_with_stack(index, for_write ? ecsdebug::TRACK_WRITE : ecsdebug::TRACK_READ,
+    for_write ? "getRW/set" : "get", eid);
+#endif
+#if DAECS_EXTENSIVE_CHECKS
+  if (EASTL_UNLIKELY(
         for_write && creatingEntityTop.eid == eid && creatingEntityTop.createdCindex < index &&
         (componentTypes.getTypeInfo(dataComponents.getComponentById(index).componentType).flags & COMPONENT_TYPE_NON_TRIVIAL_CREATE)))
     logerr("attempt to write to component <%s> of type <%s> during creation of <%s>.\n"
@@ -248,7 +252,7 @@ DAECS_RELEASE_INLINE T &__restrict EntityManager::getRW(EntityId eid, const Hash
   uint32_t archetype;
   void *__restrict val =
     get(eid, name, ComponentTypeInfo<T>::type, ComponentTypeInfo<T>::size, cidx, archetype DAECS_EXTENSIVE_CHECK_FOR_WRITE);
-  if (DAGOR_LIKELY(val != nullptr))
+  if (EASTL_LIKELY(val != nullptr))
   {
     if (ComponentTypeInfo<T>::can_be_tracked)
       scheduleTrackChangedCheck(eid, archetype, cidx);
@@ -265,7 +269,7 @@ DAECS_RELEASE_INLINE U EntityManager::get(EntityId eid, const HashedConstString 
   uint32_t archetype;
   const void *__restrict val =
     get(eid, name, ComponentTypeInfo<T>::type, ComponentTypeInfo<T>::size, cidx, archetype DAECS_EXTENSIVE_CHECK_FOR_READ);
-  if (DAGOR_LIKELY(val != nullptr))
+  if (EASTL_LIKELY(val != nullptr))
     return PtrComponentType<T>::cref(val);
   accessError(eid, name);
   return getScratchValue<T>();
@@ -299,7 +303,7 @@ DAECS_RELEASE_INLINE U EntityManager::getFast(EntityId eid, const component_inde
 {
   uint32_t archetype;
   const void *__restrict val = get(eid, cidx, ComponentTypeInfo<T>::size, archetype DAECS_EXTENSIVE_CHECK_FOR_READ);
-  if (DAGOR_LIKELY(val != nullptr))
+  if (EASTL_LIKELY(val != nullptr))
     return PtrComponentType<T>::cref(val);
   accessError(eid, cidx, list);
   return getScratchValue<T>();
@@ -327,7 +331,7 @@ DAECS_RELEASE_INLINE T &__restrict EntityManager::getRWFast(EntityId eid, const 
 {
   uint32_t archetype;
   void *__restrict val = get(eid, name.cidx, ComponentTypeInfo<T>::size, archetype DAECS_EXTENSIVE_CHECK_FOR_WRITE);
-  if (DAGOR_LIKELY(val != nullptr))
+  if (EASTL_LIKELY(val != nullptr))
   {
     if (ComponentTypeInfo<T>::can_be_tracked && name.canBeTracked())
       scheduleTrackChangedCheck(eid, archetype, name.cidx);
@@ -439,10 +443,10 @@ template <class EventType>
 __forceinline void EntityManager::dispatchEvent(EntityId eid, EventType &&evt) // ecs::INVALID_ENTITY_ID means broadcast
 {
   const bool isMtMode = isConstrainedMTMode();
-  DAECS_EXT_ASSERT(isMtMode || get_current_thread_id() == ownerThreadId);
+  DAECS_EXT_ASSERT(isMtMode || is_main_thread());
   DAECS_EXT_ASSERTF(bool(eid) == bool(evt.getFlags() & EVCAST_UNICAST), "event %s has %s flags but sent as %s", evt.getName(),
     (evt.getFlags() & EVCAST_UNICAST) ? "unicast" : "broadcast", bool(eid) ? "unicast" : "broadcast");
-  ScopedMTMutexT<decltype(deferredEventsMutex)> evtMutex(isMtMode, ownerThreadId, deferredEventsMutex);
+  ScopedMTMutexT<decltype(deferredEventsMutex)> evtMutex(isMtMode, deferredEventsMutex);
   validateEventRegistration(evt, eastl::remove_reference<EventType>::type::staticName());
 
   deferredEventsCount++;
@@ -454,12 +458,25 @@ __forceinline void EntityManager::emplaceUntypedEvent(Storage &storage, EntityId
 {
   const uint32_t len = evt.getLength();
   void *__restrict at = storage.allocateUntypedEvent(eid, len);
-  if (DAGOR_LIKELY(!(evt.getFlags() & EVFLG_DESTROY)))
+  if (EASTL_LIKELY(!(evt.getFlags() & EVFLG_DESTROY)))
   {
     memcpy(at, (void *)&evt, len); // we can memcpy such event
   }
   else
     eventDb.moveOut(at, eastl::move(evt)); // hash lookup
+}
+
+__forceinline void EntityManager::dispatchEvent(EntityId eid, Event &evt) // ecs::INVALID_ENTITY_ID means broadcast
+{
+  const bool isMtMode = isConstrainedMTMode();
+  DAECS_EXT_ASSERT(isMtMode || is_main_thread());
+  DAECS_EXT_ASSERTF(bool(eid) == bool(evt.getFlags() & EVCAST_UNICAST), "event %s has %s flags but sent as %s", evt.getName(),
+    (evt.getFlags() & EVCAST_UNICAST) ? "unicast" : "broadcast", bool(eid) ? "unicast" : "broadcast");
+  ScopedMTMutexT<decltype(deferredEventsMutex)> evtMutex(isMtMode, deferredEventsMutex);
+  validateEventRegistration(evt, nullptr);
+
+  deferredEventsCount++;
+  emplaceUntypedEvent(eventsStorage, eid, evt);
 }
 
 __forceinline void EntityManager::dispatchEvent(EntityId eid, Event &&evt) { dispatchEvent(eid, (Event &)evt); }
@@ -468,13 +485,13 @@ template <class EventType>
 inline void EntityManager::sendEvent(EntityId eid, EventType &&evt)
 {
   G_STATIC_ASSERT(eastl::remove_reference<EventType>::type::staticFlags() & EVCAST_UNICAST);
-  if (DAGOR_LIKELY(eid)) // attempt to send event to invalid entity is no-op
+  if (EASTL_LIKELY(eid)) // attempt to send event to invalid entity is no-op
     dispatchEvent(eid, eastl::move(evt));
 }
 
 inline void EntityManager::sendEvent(EntityId eid, Event &evt)
 {
-  if (DAGOR_LIKELY(eid)) // attempt to send event to invalid entity is no-op
+  if (EASTL_LIKELY(eid)) // attempt to send event to invalid entity is no-op
     dispatchEvent(eid, evt);
 }
 
@@ -492,7 +509,7 @@ inline void EntityManager::broadcastEvent(Event &&evt) { broadcastEvent((Event &
 
 inline bool EntityManager::destroyEntity(const EntityId &eid)
 {
-  ScopedMTMutex lock(isConstrainedMTMode(), ownerThreadId, creationMutex); // todo: we can make free threadsafety
+  ScopedMTMutex lock(isConstrainedMTMode(), creationMutex); // todo: we can make free threadsafety
   if (!doesEntityExist(eid))
     return false;
   // always postpone destruction
@@ -590,7 +607,7 @@ inline void EntityManager::setOptional(EntityId eid, const HashedConstString nam
 inline component_index_t EntityManager::createComponent(const HashedConstString name, type_index_t component_type,
   dag::Span<component_t> non_optional_deps, ComponentSerializer *io, component_flags_t flags)
 {
-  ScopedMTMutex lock(isConstrainedMTMode(), ownerThreadId, creationMutex);
+  ScopedMTMutex lock(isConstrainedMTMode(), creationMutex);
   return dataComponents.createComponent(name, component_type, non_optional_deps, io, flags, componentTypes);
 }
 
@@ -664,7 +681,7 @@ bool EntityManager::performEidQuery(ecs::EntityId eid, QueryId h, Fn &&fun, void
   if (!fillEidQueryView(eid, entDesc, h, qv))
     return false;
 
-  trackComponent(queryDescs[h.index()].getDesc(), queryDescs[h.index()].getName(), TrackAccessStack::No, eid);
+  ecsdebug::track_ecs_component(queryDescs[h.index()].getDesc(), queryDescs[h.index()].getName(), eid);
 
   const bool isConstrained = isConstrainedMTMode();
   if (!isConstrained)
@@ -679,18 +696,13 @@ template <class T>
 inline const T *EntityManager::getRequestingBase(const HashedConstString name) const
 {
   const CurrentlyRequesting &creating = *requestingTop;
-
-  if constexpr (eastl::is_same_v<T, EntityId>)
-    if (name.hash == ECS_HASH("eid").hash)
-      return &creating.eid;
-
-  // Iterate in reverse order, so later values overwrite earlier ones
-  for (auto it = creating.initializer.end() - 1, ite = creating.initializer.begin() - 1; it != ite; --it) // linear search!
-    if (it->name == name.hash)
-      return it->second.getNullable<T>();
+  // initializer
+  for (auto &init : creating.initializer) // linear search!
+    if (init.name == name.hash)
+      return init.second.getNullable<T>();
 
   // check current entity data (from archetype eventsStorage)
-  if (DAGOR_UNLIKELY(creating.oldArchetype != INVALID_ARCHETYPE))
+  if (EASTL_UNLIKELY(creating.oldArchetype != INVALID_ARCHETYPE))
   {
     const T *old = getNullable<T>(creating.eid, name);
     if (old)
@@ -727,7 +739,7 @@ template <class T>
 inline const T &EntityManager::getRequesting(const HashedConstString name) const
 {
   const T *comp = getRequestingBase<T>(name);
-  if (DAGOR_LIKELY(comp != nullptr))
+  if (EASTL_LIKELY(comp != nullptr))
     return *comp;
   accessError(requestingTop->eid, name);
   return getScratchValue<T>();
@@ -772,23 +784,5 @@ protected:
 };
 
 inline void EntityManager::setReplicationCb(replication_cb_t cb) { replicationCb = cb; }
-
-#if !DAECS_EXTENSIVE_CHECKS
-inline void EntityManager::startTrackComponent(component_t) {}
-inline void EntityManager::stopTrackComponentsAndDump() {}
-
-inline void EntityManager::trackComponent(const BaseQueryDesc &, const char *, TrackAccessStack, EntityId) const {}
-
-inline void EntityManager::trackComponent(component_t, TrackComponentOp, const char *, TrackAccessStack, EntityId) const {}
-
-inline void EntityManager::trackComponentIndex(component_index_t, TrackComponentOp, const char *, TrackAccessStack, EntityId) const {}
-#else
-inline void EntityManager::trackComponentIndex(component_index_t cidx, TrackComponentOp op, const char *details,
-  TrackAccessStack need_stack, EntityId eid) const
-{
-  if (cidx < getDataComponents().size())
-    trackComponent(getDataComponents().getComponentTpById(cidx), op, details, need_stack, eid);
-}
-#endif
 
 }; // namespace ecs

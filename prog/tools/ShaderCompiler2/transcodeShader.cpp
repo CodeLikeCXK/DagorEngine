@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <generic/dag_tab.h>
 #include <3d/parseShaders.h>
 #include <libTools/util/makeBindump.h>
@@ -73,9 +71,7 @@ dag::ConstSpan<int> transcode_stcode(dag::ConstSpan<int> stcode)
       case SHCOD_RWBUF:
       case SHCOD_BUFFER:
       case SHCOD_CONST_BUFFER:
-      case SHCOD_TLAS:
       case SHCOD_GET_GBUF:
-      case SHCOD_GET_GTLAS:
       case SHCOD_GET_GINT:
       case SHCOD_GET_GREAL:
       case SHCOD_GET_GTEX:
@@ -90,13 +86,11 @@ dag::ConstSpan<int> transcode_stcode(dag::ConstSpan<int> stcode)
       case SHCOD_DIV_VEC:
       case SHCOD_GET_CHANNEL:
       case SHCOD_GET_GINT_TOREAL:
-      case SHCOD_GET_GIVEC_TOREAL:
       case SHCOD_GET_TEX:
       case SHCOD_GET_INT:
       case SHCOD_GET_REAL:
       case SHCOD_GET_VEC:
       case SHCOD_GET_INT_TOREAL:
-      case SHCOD_GET_IVEC_TOREAL:
       case SHCOD_IMM_REAL1:
       case SHCOD_IMM_SVEC1:
       case SHCOD_COPY_REAL:
@@ -201,7 +195,6 @@ dag::ConstSpan<int> process_stblkcode(dag::ConstSpan<int> stcode, bool sh_blk)
       case SHCOD_GET_REAL:
       case SHCOD_GET_VEC:
       case SHCOD_GET_INT_TOREAL:
-      case SHCOD_GET_IVEC_TOREAL:
       case SHCOD_IMM_REAL1:
       case SHCOD_IMM_SVEC1:
       case SHCOD_COPY_REAL:
@@ -221,7 +214,6 @@ dag::ConstSpan<int> process_stblkcode(dag::ConstSpan<int> stcode, bool sh_blk)
       case SHCOD_GET_GTEX:
       case SHCOD_GET_GVEC:
       case SHCOD_GET_GINT_TOREAL:
-      case SHCOD_GET_GIVEC_TOREAL:
         if (sh_blk)
           break;
         G_ASSERT(0 && "ICE: global var access in static block code");

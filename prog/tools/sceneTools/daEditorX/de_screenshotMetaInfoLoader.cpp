@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "de_screenshotMetaInfoLoader.h"
 #include <EditorCore/ec_interface.h>
 #include <ioSys/dag_dataBlock.h>

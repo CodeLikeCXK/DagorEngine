@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "include.h"
 #include "fileCache.h"
 #include "fileStructure.h"

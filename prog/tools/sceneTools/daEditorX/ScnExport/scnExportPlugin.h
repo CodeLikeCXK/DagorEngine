@@ -1,4 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __GAIJIN_DYNAMIC_LIGHTING_PLUGIN__
+#define __GAIJIN_DYNAMIC_LIGHTING_PLUGIN__
 #pragma once
 
 #include <oldEditor/de_interface.h>
@@ -72,11 +73,11 @@ public:
   virtual IGenEventHandler *getEventHandler() { return NULL; }
 
   // IBinaryDataBuilder implemenatation
-  virtual bool validateBuild(int target, ILogWriter &rep, PropPanel::ContainerPropertyControl *params);
+  virtual bool validateBuild(int target, ILogWriter &rep, PropPanel2 *params);
   virtual bool addUsedTextures(ITextureNumerator &tn);
-  virtual bool buildAndWrite(BinDumpSaveCB &cwr, const ITextureNumerator &tn, PropPanel::ContainerPropertyControl *pp);
+  virtual bool buildAndWrite(BinDumpSaveCB &cwr, const ITextureNumerator &tn, PropPanel2 *pp);
   virtual bool useExportParameters() const { return true; }
-  virtual void fillExportPanel(PropPanel::ContainerPropertyControl &params);
+  virtual void fillExportPanel(PropPanel2 &params);
   virtual bool checkMetrics(const DataBlock &metrics_blk) { return true; }
 
   // IRenderingService interface
@@ -103,3 +104,5 @@ private:
 
 extern bool check_geom_provider(IGenEditorPlugin *p);
 extern int count_geom_provider();
+
+#endif //__GAIJIN_DYNAMIC_LIGHTING_PLUGIN__

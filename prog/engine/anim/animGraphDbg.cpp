@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <anim/dag_animBlend.h>
 #include <ioSys/dag_dataBlock.h>
 #include <math/dag_geomTree.h>
@@ -170,7 +168,7 @@ const DataBlock *AnimV20::AnimationGraph::getDebugBlenderState(AnimV20::AnimDbgC
   mem_set_0(ctx->abnWt);
   IAnimBlendNode::BlendCtx bctx(st, tlsCtx, true);
   bctx.abnWt = ctx->abnWt.data();
-  root->buildBlendingList(bctx, 1.0f);
+  root->buildBlendingList(bctx, 1.0);
 
   int ord = 0;
   ctx->abnActive->setStr("root", getBlendNodeName(root));
@@ -225,9 +223,9 @@ const DataBlock *AnimV20::AnimationGraph::getDebugBlenderState(AnimV20::AnimDbgC
     b->setInt("frame", wa_key / (TIME_TicksPerSec / 30));
     ord++;
 
-    const AnimDataChan &pos = blender.bnl[i]->anim->anim.pos;
-    const AnimDataChan &scl = blender.bnl[i]->anim->anim.scl;
-    const AnimDataChan &rot = blender.bnl[i]->anim->anim.rot;
+    const AnimDataChan<AnimChanPoint3> &pos = blender.bnl[i]->anim->anim.pos;
+    const AnimDataChan<AnimChanPoint3> &scl = blender.bnl[i]->anim->anim.scl;
+    const AnimDataChan<AnimChanQuat> &rot = blender.bnl[i]->anim->anim.rot;
 
     const AnimBlender::ChannelMap &cm = blender.bnlChan[i];
 

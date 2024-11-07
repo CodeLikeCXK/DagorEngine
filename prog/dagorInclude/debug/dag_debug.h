@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -10,7 +11,7 @@
 #include <debug/dag_log.h>
 #endif
 
-#include <supp/dag_define_KRNLIMP.h>
+#include <supp/dag_define_COREIMP.h>
 
 #ifndef __cplusplus // C only interface
 
@@ -21,16 +22,31 @@ KRNLIMP void debug_dump_stack(const char *text, int skip_frames);
 #else // C++ interface start
 
 template <typename... Args>
-inline void debug(const Args &...args) //< outputs formatted string and adds \n
+inline void debug([[maybe_unused]] const Args &...args) //< outputs formatted string and adds \n
 {
   logdbg(args...);
 }
 template <typename... Args>
-inline void debug_(const Args &...args) //< outputs only formatted string (no \n added)
+inline void debug_([[maybe_unused]] const Args &...args) //< outputs only formatted string (no \n added)
 {
   logdbg_(args...);
 }
-#define DEBUG_CTX(...) LOGDBG_CTX(__VA_ARGS__)
+template <typename... Args>
+inline void debug_ctx([[maybe_unused]] const Args &...args) //< outputs formatted string with prefix 'FILE,#line: ' and adds \n
+{
+  logdbg_ctx(args...);
+}
+template <typename... Args>
+inline void debug_ctx_([[maybe_unused]] const Args &...args) //< outputs formatted string with prefix 'FILE,#line: ' (no \n added)
+{
+  logdbg_ctx_(args...);
+}
+
+#define mt_debug(...)      debug(__VA_ARGS__)
+#define mt_debug_(...)     debug_(__VA_ARGS__)
+#define mt_debug_ctx(...)  debug_ctx(__VA_ARGS__)
+#define mt_debug_ctx_(...) debug_ctx_(__VA_ARGS__)
+#define mt_debug_cp(...)   debug_cp(__VA_ARGS__)
 
 #if DAGOR_DBGLEVEL > 0 || DAGOR_FORCE_LOGS
 
@@ -51,7 +67,7 @@ KRNLIMP void force_debug_flush(bool);
 KRNLIMP void debug_allow_level_files(bool en);
 
 //! prints checkpoint in format: cp: file,line
-#define DEBUG_CP() __debug_cp(__FILE__, __LINE__)
+#define debug_cp() __debug_cp(__FILE__, __LINE__)
 KRNLIMP void __debug_cp(const char *fn, int ln);
 
 #define DEBUG_DUMP_VAR(X) debug(#X "=%@", X)
@@ -69,7 +85,7 @@ extern "C"
 inline void debug_flush(bool) {}
 inline void force_debug_flush(bool) {}
 inline void debug_allow_level_files(bool) {}
-#define DEBUG_CP()
+inline void debug_cp() {}
 inline void __debug_cp(const char *, int) {}
 inline int tail_debug_file(char *, int) { return 0; }
 
@@ -79,4 +95,4 @@ inline int tail_debug_file(char *, int) { return 0; }
 
 #endif // end of C++
 
-#include <supp/dag_undef_KRNLIMP.h>
+#include <supp/dag_undef_COREIMP.h>

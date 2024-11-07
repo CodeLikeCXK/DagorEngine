@@ -1,6 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
-
 #include "pipeline.h"
 
 namespace drv3d_vulkan
@@ -62,8 +60,6 @@ struct FramebufferState
   RenderPassClass::FramebufferDescription frameBufferInfo = {};
   VkClearColorValue colorClearValue[Driver3dRenderTarget::MAX_SIMRT] = {};
   VkClearDepthStencilValue depthStencilClearValue = {};
-
-  static constexpr uint32_t CLEAR_LOAD = 1u << 31; // Special flag to allow loading of target's previous contents.
   uint32_t clearMode = 0;
 
   void reset()
@@ -79,3 +75,6 @@ struct FramebufferState
 class Swapchain;
 
 } // namespace drv3d_vulkan
+
+// FIXME: merge this files
+#include "graphics_state2.h"

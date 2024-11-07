@@ -1,5 +1,5 @@
 //expect:w234
 
-function foo() { //-declared-never-used
+let function foo() { //-declared-never-used
   ::print(1 / (0))
 }

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <EASTL/fixed_vector.h>
 #include "device.h"
 
@@ -54,10 +52,10 @@ bool InputLayout::fromVdecl(DecodeContext &context, const VSDTYPE &decl)
     const auto data = decl & VSDT_MASK;
 
     uint32_t locationIndex = GET_VSDREG(decl);
-    useLocation(locationIndex);
-    setLocationStreamSource(locationIndex, context.streamIndex);
-    setLocationStreamOffset(locationIndex, context.ofs);
-    setLocationFormatIndex(locationIndex, data);
+    vertexAttributeSet.useLocation(locationIndex);
+    vertexAttributeSet.setLocationStreamSource(locationIndex, context.streamIndex);
+    vertexAttributeSet.setLocationStreamOffset(locationIndex, context.ofs);
+    vertexAttributeSet.setLocationFormatIndex(locationIndex, data);
 
     uint32_t sz = 0; // size of entry
     //-V::1037
@@ -98,14 +96,14 @@ bool InputLayout::fromVdecl(DecodeContext &context, const VSDTYPE &decl)
   {
     context.streamIndex = GET_VSDSTREAM(decl);
     context.ofs = 0;
-    useStream(context.streamIndex);
+    inputStreamSet.useStream(context.streamIndex);
     if (decl & VSDS_PER_INSTANCE_DATA)
     {
-      setStreamStepRate(context.streamIndex, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA);
+      inputStreamSet.setStreamStepRate(context.streamIndex, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA);
     }
     else
     {
-      setStreamStepRate(context.streamIndex, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA);
+      inputStreamSet.setStreamStepRate(context.streamIndex, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA);
     }
   }
   else
@@ -149,7 +147,7 @@ StageShaderModule drv3d_dx12::decode_shader_binary(const void *data, uint32_t si
         shaderHeader = reinterpret_cast<decltype(shaderHeader)>(dataStart + header.offset);
         if (header.hash != dxil::HashValue::calculate(shaderHeader, 1))
         {
-          D3D_ERROR("DX12: Error while decoding shader, shader header hash does not match");
+          logerr("DX12: Error while decoding shader, shader header hash does not match");
           return result;
         }
         break;
@@ -161,7 +159,7 @@ StageShaderModule drv3d_dx12::decode_shader_binary(const void *data, uint32_t si
           shaderModuleSize = header.size;
           if (header.hash != dxil::HashValue::calculate(shaderModule, shaderModuleSize))
           {
-            D3D_ERROR("DX12: Error while decoding shader, shader module hash does not match");
+            logerr("DX12: Error while decoding shader, shader module hash does not match");
             return result;
           }
         }
@@ -179,7 +177,7 @@ StageShaderModule drv3d_dx12::decode_shader_binary(const void *data, uint32_t si
         }
         break;
       default:
-        D3D_ERROR("DX12: Error while decoding shader, unrecognized chunk header id %u", static_cast<uint32_t>(header.type));
+        logerr("DX12: Error while decoding shader, unrecognized chunk header id %u", static_cast<uint32_t>(header.type));
         return result;
         break;
     }
@@ -187,12 +185,12 @@ StageShaderModule drv3d_dx12::decode_shader_binary(const void *data, uint32_t si
 
   if (!shaderHeader)
   {
-    D3D_ERROR("DX12: Error while decoding shader, unable to locate header chunk");
+    logerr("DX12: Error while decoding shader, unable to locate header chunk");
     return result;
   }
   if (!shaderModule)
   {
-    D3D_ERROR("DX12: Error while decoding shader, unable to locate shader module chunk");
+    logerr("DX12: Error while decoding shader, unable to locate shader module chunk");
     return result;
   }
 
@@ -241,8 +239,8 @@ eastl::unique_ptr<VertexShaderModule> drv3d_dx12::decode_vertex_shader(const voi
         case dxil::ShaderStage::PIXEL:
         case dxil::ShaderStage::COMPUTE:
         default:
-          D3D_ERROR("DX12: Error while decoding vertex shader, unexpected combined shader stage type "
-                    "%u",
+          logerr("DX12: Error while decoding vertex shader, unexpected combined shader stage type "
+                 "%u",
             basicModule.header.shaderType);
           return vs;
       }
@@ -272,7 +270,7 @@ eastl::unique_ptr<VertexShaderModule> drv3d_dx12::decode_vertex_shader(const voi
     }
     else
     {
-      D3D_ERROR("DX12: Error while decoding vertex shader, unexpected shader identifier 0x%08X", fileHeader->ident);
+      logerr("DX12: Error while decoding vertex shader, unexpected shader identifier 0x%08X", fileHeader->ident);
     }
   }
 
@@ -296,11 +294,11 @@ eastl::unique_ptr<PixelShaderModule> drv3d_dx12::decode_pixel_shader(const void 
     auto basicModule = decode_shader_layout<PixelShaderModule>((const uint8_t *)data);
     if (basicModule)
     {
-      ps = eastl::make_unique<PixelShaderModule>(eastl::move(basicModule));
+      ps = eastl::make_unique<VertexShaderModule>(eastl::move(basicModule));
     }
     else
     {
-      D3D_ERROR("DX12: Error while decoding pixel shader, unexpected shader identifier 0x%08X", fileHeader->ident);
+      logerr("DX12: Error while decoding pixel shader, unexpected shader identifier 0x%08X", fileHeader->ident);
     }
   }
   return ps;
@@ -337,7 +335,7 @@ StageShaderModuleInBinaryRef drv3d_dx12::decode_shader_binary_ref(const void *da
         shaderHeader = reinterpret_cast<decltype(shaderHeader)>(dataStart + header.offset);
         if (header.hash != dxil::HashValue::calculate(shaderHeader, 1))
         {
-          D3D_ERROR("DX12: Error while decoding shader, shader header hash does not match");
+          logerr("DX12: Error while decoding shader, shader header hash does not match");
           return result;
         }
         break;
@@ -349,7 +347,7 @@ StageShaderModuleInBinaryRef drv3d_dx12::decode_shader_binary_ref(const void *da
           shaderModuleSize = header.size;
           if (header.hash != dxil::HashValue::calculate(shaderModule, shaderModuleSize))
           {
-            D3D_ERROR("DX12: Error while decoding shader, shader module hash does not match");
+            logerr("DX12: Error while decoding shader, shader module hash does not match");
             return result;
           }
         }
@@ -367,7 +365,7 @@ StageShaderModuleInBinaryRef drv3d_dx12::decode_shader_binary_ref(const void *da
         }
         break;
       default:
-        D3D_ERROR("DX12: Error while decoding shader, unrecognized chunk header id %u", static_cast<uint32_t>(header.type));
+        logerr("DX12: Error while decoding shader, unrecognized chunk header id %u", static_cast<uint32_t>(header.type));
         return result;
         break;
     }
@@ -375,12 +373,12 @@ StageShaderModuleInBinaryRef drv3d_dx12::decode_shader_binary_ref(const void *da
 
   if (!shaderHeader)
   {
-    D3D_ERROR("DX12: Error while decoding shader, unable to locate header chunk");
+    logerr("DX12: Error while decoding shader, unable to locate header chunk");
     return result;
   }
   if (!shaderModule)
   {
-    D3D_ERROR("DX12: Error while decoding shader, unable to locate shader module chunk");
+    logerr("DX12: Error while decoding shader, unable to locate shader module chunk");
     return result;
   }
 
@@ -429,8 +427,8 @@ VertexShaderModuleInBinaryRef drv3d_dx12::decode_vertex_shader_ref(const void *d
         case dxil::ShaderStage::PIXEL:
         case dxil::ShaderStage::COMPUTE:
         default:
-          D3D_ERROR("DX12: Error while decoding vertex shader, unexpected combined shader stage type "
-                    "%u",
+          logerr("DX12: Error while decoding vertex shader, unexpected combined shader stage type "
+                 "%u",
             basicModule.header.shaderType);
           return vs;
       }
@@ -446,7 +444,7 @@ VertexShaderModuleInBinaryRef drv3d_dx12::decode_vertex_shader_ref(const void *d
   }
   if (vs.byteCode.empty())
   {
-    D3D_ERROR("DX12: Error while decoding vertex shader, unexpected shader identifier 0x%08X", fileHeader->ident);
+    logerr("DX12: Error while decoding vertex shader, unexpected shader identifier 0x%08X", fileHeader->ident);
   }
 
   return vs;
@@ -466,7 +464,7 @@ PixelShaderModuleInBinaryRef drv3d_dx12::decode_pixel_shader_ref(const void *dat
   }
   if (result.byteCode.empty())
   {
-    D3D_ERROR("DX12: Error while decoding pixel shader, unexpected shader identifier 0x%08X", fileHeader->ident);
+    logerr("DX12: Error while decoding pixel shader, unexpected shader identifier 0x%08X", fileHeader->ident);
   }
   return result;
 }
@@ -820,7 +818,7 @@ ProgramID ShaderProgramDatabase::newRaytraceProgram(DeviceContext &ctx, const Sh
 }
 #endif
 
-void ShaderProgramDatabase::registerShaderBinDump(DeviceContext &ctx, ScriptedShadersBinDumpOwner *dump, const char *name)
+void ShaderProgramDatabase::registerShaderBinDump(DeviceContext &ctx, ScriptedShadersBinDumpOwner *dump)
 {
   if (!dump)
   {
@@ -831,14 +829,13 @@ void ShaderProgramDatabase::registerShaderBinDump(DeviceContext &ctx, ScriptedSh
     return;
   }
 
-  logdbg("DX12: registerShaderBinDump %p <%s>", dump, name);
   if (ShaderID::Null() == nullPixelShader)
   {
     initNullPixelShader(ctx);
   }
 
   shaderProgramGroups.setGroup(1, dump, nullPixelShader);
-  ctx.addShaderGroup(1, dump, nullPixelShader, name);
+  ctx.addShaderGroup(1, dump, nullPixelShader);
 }
 
 void ShaderProgramDatabase::getBindumpShader(DeviceContext &ctx, uint32_t index, ShaderCodeType type, void *ident)
@@ -850,23 +847,20 @@ void ShaderProgramDatabase::getBindumpShader(DeviceContext &ctx, uint32_t index,
   }
 }
 
-DynamicArray<InputLayoutIDWithHash> ShaderProgramDatabase::loadInputLayoutFromBlk(DeviceContext &ctx, const DataBlock *blk,
+DynamicArray<InputLayoutID> ShaderProgramDatabase::loadInputLayoutFromBlk(DeviceContext &ctx, const DataBlock *blk,
   const char *default_format)
 {
-  DynamicArray<InputLayoutIDWithHash> result{blk->blockCount()};
+  DynamicArray<InputLayoutID> result{blk->blockCount()};
   pipeline::DataBlockDecodeEnumarator<pipeline::InputLayoutDecoder> decoder{*blk, 0, default_format};
   for (; !decoder.completed(); decoder.next())
   {
     auto bi = decoder.index();
-    auto &target = result[bi];
-    InputLayout il;
-    if (decoder.decode(il, target.hash))
+    if (!decoder.invoke([bi, &result, this, &ctx](auto &layout) {
+          result[bi] = this->registerInputLayout(ctx, layout);
+          return true;
+        }))
     {
-      target.id = registerInputLayout(ctx, il);
-    }
-    else
-    {
-      target.id = InputLayoutID::Null();
+      result[bi] = InputLayoutID::Null();
     }
   }
   return result;

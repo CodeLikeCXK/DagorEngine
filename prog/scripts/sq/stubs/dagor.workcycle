@@ -1,8 +1,6 @@
-//let natives = require("modules").get_native_module_names()
-//if (natives.contains("dagor.workcycle")) {
-//  print("using native dagor.workcycle")
-//  return require("dagor.workcycle")
-//}
+let dw = require_optional("dagor.workcyle")
+if (dw != null)
+  return dw
 
 return {
   add_cycle_action = @(...) null

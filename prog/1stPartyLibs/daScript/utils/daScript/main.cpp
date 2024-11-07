@@ -17,7 +17,6 @@ static bool pauseAfterErrors = false;
 static bool quiet = false;
 static bool paranoid_validation = false;
 static bool jitEnabled = false;
-static bool isAotLib = false;
 
 das::Context * get_context ( int stackSize=0 );
 
@@ -117,9 +116,7 @@ bool compile ( const string & fn, const string & cppFn, bool dryRun ) {
                 tw << "#pragma warning(disable:4269)   // 'const' automatic data initialized with compiler generated default constructor produces unreliable results\n";
                 tw << "#pragma warning(disable:4555)   // result of expression not used\n";
                 tw << "#endif\n";
-                tw << "#if defined(__EDG__)\n";
-                tw << "#pragma diag_suppress 826\n";
-                tw << "#elif defined(__GNUC__) && !defined(__clang__)\n";
+                tw << "#if defined(__GNUC__) && !defined(__clang__)\n";
                 tw << "#pragma GCC diagnostic push\n";
                 tw << "#pragma GCC diagnostic ignored \"-Wunused-parameter\"\n";
                 tw << "#pragma GCC diagnostic ignored \"-Wunused-variable\"\n";
@@ -152,7 +149,7 @@ bool compile ( const string & fn, const string & cppFn, bool dryRun ) {
                 tw << "\tresolveTypeInfoAnnotations();\n";
                 tw << "};\n";
                 tw << "\n";
-                if ( !isAotLib ) tw << "AotListBase impl(registerAotFunctions);\n";
+                tw << "AotListBase impl(registerAotFunctions);\n";
                 // validation stuff
                 if ( paranoid_validation ) {
                     program->validateAotCpp(tw,*pctx);
@@ -160,14 +157,11 @@ bool compile ( const string & fn, const string & cppFn, bool dryRun ) {
                 }
                 // footer
                 tw << "}\n";
-                if ( isAotLib ) tw << "AotListBase impl_aot_" << program->thisModule->name << "(" << program->thisNamespace << "::registerAotFunctions);\n";
                 tw << "}\n";
                 tw << "#if defined(_MSC_VER)\n";
                 tw << "#pragma warning(pop)\n";
                 tw << "#endif\n";
-                tw << "#if defined(__EDG__)\n";
-                tw << "#pragma diag_default 826\n";
-                tw << "#elif defined(__GNUC__) && !defined(__clang__)\n";
+                tw << "#if defined(__GNUC__) && !defined(__clang__)\n";
                 tw << "#pragma GCC diagnostic pop\n";
                 tw << "#endif\n";
                 tw << "#if defined(__clang__)\n";
@@ -217,7 +211,7 @@ int das_aot_main ( int argc, char * argv[] ) {
     _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
     #endif
     if ( argc<=3 ) {
-        tout << "daslang -aot <in_script.das> <out_script.das.cpp> [-standalone-context <ctx_name>] [-q] [-j] [-dry-run]\n";
+        tout << "daScript -aot <in_script.das> <out_script.das.cpp> [-standalone-context <ctx_name>] [-q] [-j] [-dry-run]\n";
         return -1;
     }
     bool dryRun = false;
@@ -399,23 +393,13 @@ void replace( string& str, const string& from, const string& to ) {
 
 void print_help() {
     tout
-        << "daslang version " << DAS_VERSION_MAJOR << "." << DAS_VERSION_MINOR << "." << DAS_VERSION_PATCH << "\n"
-        << "daslang scriptName1 {scriptName2} .. {-main mainFnName} {-log} {-pause} -- {script arguments}\n"
-        << "    -jit        enable JIT\n"
+        << "daScript scriptName1 {scriptName2} .. {-main mainFnName} {-log} {-pause} -- {script arguments}\n"
         << "    -project <path.das_project> path to project file\n"
         << "    -log        output program code\n"
         << "    -pause      pause after errors and pause again before exiting program\n"
         << "    -dry-run    compile and simulate script without execution\n"
         << "    -dasroot    set path to dascript root folder (with daslib)\n"
-#if DAS_SMART_PTR_ID
-        << "    -track-smart-ptr <id> track smart pointer with id\n"
-#endif
-        << "    -das-wait-debugger wait for debugger to attach\n"
-        << "    -das-profiler enable profiler\n"
-        << "    -das-profiler-log-file <file> set profiler log file\n"
-        << "    -das-profiler-manual manual profiler control\n"
-        << "    -das-profiler-memory memory profiler\n"
-        << "daslang -aot <in_script.das> <out_script.das.cpp> {-q} {-p}\n"
+        << "daScript -aot <in_script.das> <out_script.das.cpp> {-q} {-p}\n"
         << "    -project <path.das_project> path to project file\n"
         << "    -p          paranoid validation of CPP AOT\n"
         << "    -q          suppress all output\n"
@@ -433,13 +417,7 @@ void print_help() {
 #endif
 
 int MAIN_FUNC_NAME ( int argc, char * argv[] ) {
-    bool isArgAot = false;
-    if (argc > 1) {
-        isArgAot = strcmp(argv[1],"-aot")==0;
-        isAotLib = !isArgAot && strcmp(argv[1],"-aotlib")==0;
-    }
-
-    if ( argc>2 && (isArgAot || isAotLib) ) {
+    if ( argc>2 && strcmp(argv[1],"-aot")==0 ) {
         return das_aot_main(argc, argv);
     }
     use_utf8();

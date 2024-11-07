@@ -1,4 +1,0 @@
-if $(HaveRenderer) = yes {
-  gamePulls += framework_blurred_ui_pull ;
-  UseProgLibs += daNetGameLibs/blurred_ui ;
-}

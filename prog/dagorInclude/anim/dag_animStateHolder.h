@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -152,19 +153,10 @@ private:
   friend class AnimationGraph;
 };
 
-
-inline float AnimCommonStateHolder::getParam(int id) const
-{
-  G_ASSERT((unsigned)id < val.size());
-  G_ASSERT(paramTypes[id] == PT_ScalarParam || paramTypes[id] == PT_TimeParam);
-  return val[id].scalar;
-}
-
 inline void AnimCommonStateHolder::setParam(int id, float value)
 {
   G_ASSERTF(id < val.size() && check_finite(value), "%d/%d %g", id, val.size(), value);
-  G_ASSERTF(paramTypes[id] == PT_ScalarParam || paramTypes[id] == PT_TimeParam, "Unexpected (%d) non float type on param <%s>(%d)",
-    paramTypes[id], paramNames.getName(id), id);
+  G_ASSERT(paramTypes[id] == PT_ScalarParam || paramTypes[id] == PT_TimeParam);
   if (val[id].scalar != value)
     val[id].flags |= PF_Changed;
   val[id].scalar = value;

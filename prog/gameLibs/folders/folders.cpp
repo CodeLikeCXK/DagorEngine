@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <folders/folders.h>
 #include "platform/internal.h"
 #include <EASTL/string.h>

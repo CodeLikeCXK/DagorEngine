@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <ecs/input/input.h>
 #include <startup/dag_inpDevClsDrv.h>
 #include "esHidEventRouter.h"

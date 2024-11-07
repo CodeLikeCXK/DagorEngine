@@ -59,7 +59,8 @@ namespace das
     template <typename TT>
     struct vec2 {
         TT   x, y;
-        __forceinline friend StringWriter & operator<< (StringWriter & stream, const vec2<TT> & vec) {
+        template <typename AP>
+        __forceinline friend StringWriter<AP> & operator<< (StringWriter<AP> & stream, const vec2<TT> & vec) {
             stream << vec.x << DAS_PRINT_VEC_SEPARATROR << vec.y;
             return stream;
         }
@@ -71,7 +72,6 @@ namespace das
         }
         __forceinline vec2() = default;
         __forceinline vec2(const vec2 &) = default;
-        __forceinline vec2 & operator = (const vec2 &) = default;
         __forceinline vec2(vec4f t) : x(vec_extract<TT>::x(t)), y(vec_extract<TT>::y(t)) {}
         __forceinline vec2(TT X, TT Y) : x(X), y(Y) {}
         __forceinline vec2(TT t) : x(t), y(t) {}
@@ -81,7 +81,8 @@ namespace das
     template <typename TT>
     struct vec3 {
         TT   x, y, z;
-        __forceinline friend StringWriter & operator<< (StringWriter & stream, const vec3<TT> & vec) {
+        template <typename AP>
+        __forceinline friend StringWriter<AP> & operator<< (StringWriter<AP> & stream, const vec3<TT> & vec) {
             stream << vec.x << DAS_PRINT_VEC_SEPARATROR << vec.y << DAS_PRINT_VEC_SEPARATROR << vec.z;
             return stream;
         }
@@ -93,7 +94,6 @@ namespace das
         }
         __forceinline vec3() = default;
         __forceinline vec3(const vec3 &) = default;
-        __forceinline vec3 & operator = (const vec3 &) = default;
         __forceinline vec3(vec4f t) : x(vec_extract<TT>::x(t)), y(vec_extract<TT>::y(t)), z(vec_extract<TT>::z(t)) {}
         __forceinline vec3(TT X, TT Y, TT Z) : x(X), y(Y), z(Z) {}
         __forceinline vec3(TT t) : x(t), y(t), z(t) {}
@@ -104,7 +104,8 @@ namespace das
     template <typename TT>
     struct vec4 {
         TT  x, y, z, w;
-        __forceinline friend StringWriter & operator<< (StringWriter & stream, const vec4<TT> & vec) {
+        template <typename AP>
+        __forceinline friend StringWriter<AP> & operator<< (StringWriter<AP> & stream, const vec4<TT> & vec) {
             stream << vec.x << DAS_PRINT_VEC_SEPARATROR << vec.y << DAS_PRINT_VEC_SEPARATROR << vec.z << DAS_PRINT_VEC_SEPARATROR << vec.w;
             return stream;
         }
@@ -116,7 +117,6 @@ namespace das
         }
         __forceinline vec4() = default;
         __forceinline vec4(const vec4 &) = default;
-        __forceinline vec4 & operator = (const vec4 &) = default;
         __forceinline vec4(vec4f t) : x(vec_extract<TT>::x(t)), y(vec_extract<TT>::y(t)), z(vec_extract<TT>::z(t)), w(vec_extract<TT>::w(t)) {}
         __forceinline vec4(TT X, TT Y, TT Z, TT W) : x(X), y(Y), z(Z), w(W) {}
         __forceinline vec4(TT t) : x(t), y(t), z(t), w(t) {}

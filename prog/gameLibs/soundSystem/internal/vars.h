@@ -1,4 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef _DAGOR_GAMELIB_SOUNDSYSTEM_VARSINTERNAL_H_
+#define _DAGOR_GAMELIB_SOUNDSYSTEM_VARSINTERNAL_H_
 #pragma once
 
 #include <soundSystem/handle.h>
@@ -23,3 +24,5 @@ bool set_var(EventHandle event_handle, FMOD::Studio::EventInstance *event_instan
 bool get_var_desc(FMOD::Studio::EventDescription &event_description, const char *var_name, VarDesc &);
 bool get_var_desc(FMOD::Studio::EventDescription &event_description, const VarId &var_id, VarDesc &);
 } // namespace sndsys
+
+#endif

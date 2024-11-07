@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include "rayCar.h"
@@ -94,7 +93,7 @@ public:
 
     if (!model)
     {
-      LOGERR_CTX("Wheels model '%s' was not found", model_res_name);
+      logerr_ctx("Wheels model '%s' was not found", model_res_name);
       return;
     }
 
@@ -108,12 +107,15 @@ public:
     release_game_resource((GameResource *)model);
   }
   void resetLastLodNo() override { lastLodNo = -1; }
-  bool beforeRender(const Point3 &view_pos, const VisibilityFinder &vf) override
+  bool beforeRender(const Point3 &view_pos) override
   {
     if (carPhysMode == CPM_DISABLED)
       return false;
 
-    isVisible = vf.isVisible(getBoundBox(), getBoundingSphere(), getVisibilityRange());
+    if (visibility_finder)
+      isVisible = visibility_finder->isVisible(getBoundBox(), getBoundingSphere(), getVisibilityRange());
+    else
+      isVisible = true;
 
     if (!isVisible)
     {
@@ -185,12 +187,15 @@ public:
         if (wheels[i].rendObj && wheels[i].visible)
           wheels[i].rendObj->renderTrans();
   }
-  bool getRenderWtms(TMatrix &wtm_body, TMatrix *wtm_wheels, const VisibilityFinder &vf) override
+  bool getRenderWtms(TMatrix &wtm_body, TMatrix *wtm_wheels) override
   {
     if (carPhysMode == CPM_DISABLED)
       return false;
 
-    isVisible = vf.isVisible(getBoundBox(), getBoundingSphere(), getVisibilityRange());
+    if (visibility_finder)
+      isVisible = visibility_finder->isVisible(getBoundBox(), getBoundingSphere(), getVisibilityRange());
+    else
+      isVisible = true;
 
     if (!isVisible)
       return false;

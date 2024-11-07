@@ -1,20 +1,16 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
-#include "call_stack.h"
-#include <EASTL/algorithm.h>
-#include <EASTL/string.h>
-#include <EASTL/string_view.h>
 #include <EASTL/vector.h>
+#include "call_stack.h"
 
 
 namespace drv3d_dx12::debug::break_point
 {
 namespace core
 {
-class Controller : public call_stack::ExecutionContextDataStore, public call_stack::Reporter
+class Controller : public call_stack::ExecutionContextDataStore, public debug::call_stack::Reporter
 {
-  dag::Vector<eastl::string> breakPoints;
+  eastl::vector<eastl::string> breakPoints;
 
   using BaseType = call_stack::ExecutionContextDataStore;
   bool isBreakPoint(const call_stack::CommandData &call_stack_info)
@@ -56,23 +52,22 @@ public:
   }
 };
 } // namespace core
-
 namespace null
 {
-class Controller : public call_stack::ExecutionContextDataStore, public call_stack::Reporter
+class Controller : public call_stack::ExecutionContextDataStore, public debug::call_stack::Reporter
 {
   using BaseType = call_stack::ExecutionContextDataStore;
 
 public:
-  constexpr void breakNow() {}
-  constexpr void addBreakPointString(eastl::string_view) {}
-  constexpr void removeBreakPointString(eastl::string_view) {}
+  void breakNow() {}
+  void addBreakPointString(eastl::string_view) {}
+  void removeBreakPointString(eastl::string_view) {}
 };
 } // namespace null
 
 #if DAGOR_DBGLEVEL > 0
-using Controller = core::Controller;
+using Controller = ::drv3d_dx12::debug::break_point::core::Controller;
 #else
-using Controller = null::Controller;
+using Controller = ::drv3d_dx12::debug::break_point::null::Controller;
 #endif
 } // namespace drv3d_dx12::debug::break_point

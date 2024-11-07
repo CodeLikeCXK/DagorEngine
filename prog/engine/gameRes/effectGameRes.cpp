@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <gameRes/dag_gameResSystem.h>
 #include <gameRes/dag_stdGameRes.h>
 #include <fx/dag_baseFxClasses.h>
@@ -15,7 +13,7 @@
 #include <3d/dag_texMgr.h>
 #include <3d/dag_texMgrTags.h>
 #include <fx/dag_paramScriptsPool.h>
-#include <drv/3d/dag_tex3d.h>
+#include <3d/dag_tex3d.h>
 #include <gameRes/dag_dumpResRefCountImpl.h>
 #include <osApiWrappers/dag_critSec.h>
 

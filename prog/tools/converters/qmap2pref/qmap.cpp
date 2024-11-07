@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "func.h"
 
 #include <libTools/util/fileUtils.h>

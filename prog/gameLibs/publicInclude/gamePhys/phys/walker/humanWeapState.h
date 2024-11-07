@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -38,6 +39,8 @@ struct HumanWeaponParams
   float equipSpeedMult;
   float holsterSwapSpeedMult;
 
+  Point3 offsFromNode;
+  Point3 offsFromNodeCrouch;
   Point3 offsAimNode;
   Point3 offsCheckLeftNode;
   Point3 offsCheckRightNode;
@@ -57,16 +60,13 @@ enum HUWeaponSlots : uint8_t
   EWS_MELEE,
   EWS_GRENADE,
   EWS_SPECIAL,
-  EWS_UNARMED,
-  EWS_QUATERNARY,
 
   EWS_NUM
 };
 
 typedef carray<HumanWeaponParams, EWS_NUM> HumanWeaponParamsVec;
 
-static const char *humanWeaponSlotNames[] = {
-  "primary", "secondary", "tertiary", "melee", "grenade", "special", "unarmed", "quaternary"};
+static const char *humanWeaponSlotNames[] = {"primary", "secondary", "tertiary", "melee", "grenade", "special"};
 
 enum HUWeaponEquipState : uint8_t
 {

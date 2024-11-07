@@ -51,22 +51,15 @@ void init_spawn_module(SPAWN_MODULE_CONTEXT)
 DAFX_INLINE
 float4 finish_spawn_module(SPAWN_MODULE_CONTEXT)
 {
-  if (!rparams.localSpaceFlag)
-  {
-    rp.velocity = float_xyz(mul(float4(rp.velocity, 1), sparams.emitterNtm));
-    rp.velocity += sparams.fxVelocity;
-    rp.pos = float_xyz(mul(float4(rp.pos, 1), rparams.tm));
-  }
+  rp.velocity = float_xyz(mul(float4(rp.velocity, 1), sparams.emitterNtm));
+  rp.velocity += rparams.fxVelocity;
+  rp.pos = float_xyz(mul(float4(rp.pos, 1), sparams.emitterWtm));
 
-  float3 wpos = rp.pos;
-  if (rparams.localSpaceFlag)
-  {
-    float4 p4 = float4(rp.pos, 1);
-    wpos = float3(
-      dot(p4, rparams.tm[0]),
-      dot(p4, rparams.tm[1]),
-      dot(p4, rparams.tm[2]));
-  }
+  float4 p4 = float4(rp.pos, 1);
+  float3 wpos = float3(
+    dot(p4, rparams.fxTm[0]),
+    dot(p4, rparams.fxTm[1]),
+    dot(p4, rparams.fxTm[2]));
 
   return float4(
     wpos.x,
@@ -124,8 +117,7 @@ void spawn_module_noise_pos(SPAWN_MODULE_CONTEXT)
 DAFX_INLINE
 void spawn_module_width(SPAWN_MODULE_CONTEXT)
 {
-  float width_mm = LinearDistribution_gen(sparams.width, rnd_seed);
-  rp.width += width_mm * 0.001;
+  rp.width += LinearDistribution_gen(sparams.width, rnd_seed);
   UNREF_SPAWN_MODULE_CONTEXT;
 }
 #endif

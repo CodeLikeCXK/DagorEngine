@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <gameRes/dag_gameResOptionalPacks.h>
 #include <gameRes/dag_stdGameRes.h>
 #include <gameRes/dag_gameResSystem.h>
@@ -183,7 +181,7 @@ static void get_missing_packs_for_tex(TEXTUREID tid, Tab<PackId> &out_packs, boo
       out_packs.push_back(found->second);
   }
 }
-static bool get_missing_packs_for_res(dag::ConstSpan<int> res_ids, Tab<PackId> &out_packs, bool incl_model_tex, bool incl_hq)
+static bool get_missing_packs_for_res(dag::ConstSpan<int> res_ids, Tab<PackId> &out_packs, bool incl_model_tex)
 {
   unsigned initial_size = out_packs.size();
   for (int id : res_ids)
@@ -206,14 +204,13 @@ static bool get_missing_packs_for_res(dag::ConstSpan<int> res_ids, Tab<PackId> &
       if (const DataBlock *tex_b = b->getBlockByNameId(tex_nid))
         dblk::iterate_params_by_name_id_and_type(*tex_b, tex_nid, DataBlock::TYPE_STRING, [&](int param_idx) {
           if (TEXTUREID tid = get_managed_texture_id(tex_b->getStr(param_idx)))
-            get_missing_packs_for_tex(tid, out_packs, incl_hq);
+            get_missing_packs_for_tex(tid, out_packs, true);
         });
     }
   }
   return out_packs.size() > initial_size;
 }
-bool gameres_optional::get_missing_packs_for_res(dag::ConstSpan<const char *> res_names, Tab<PackId> &out_packs, bool incl_model_tex,
-  bool incl_hq)
+bool gameres_optional::get_missing_packs_for_res(dag::ConstSpan<const char *> res_names, Tab<PackId> &out_packs, bool incl_model_tex)
 {
   WinAutoLock lock(get_gameres_main_cs());
   SmallTab<int, framemem_allocator> res_ids;
@@ -224,10 +221,9 @@ bool gameres_optional::get_missing_packs_for_res(dag::ConstSpan<const char *> re
     if (id >= 0)
       res_ids.push_back(id);
   }
-  return get_missing_packs_for_res(res_ids, out_packs, incl_model_tex, incl_hq);
+  return get_missing_packs_for_res(res_ids, out_packs, incl_model_tex);
 }
-bool gameres_optional::get_missing_packs_for_res(const FastNameMap &res_names, Tab<PackId> &out_packs, bool incl_model_tex,
-  bool incl_hq)
+bool gameres_optional::get_missing_packs_for_res(const FastNameMap &res_names, Tab<PackId> &out_packs, bool incl_model_tex)
 {
   WinAutoLock lock(get_gameres_main_cs());
   SmallTab<int, framemem_allocator> res_ids;
@@ -237,7 +233,7 @@ bool gameres_optional::get_missing_packs_for_res(const FastNameMap &res_names, T
     if (id >= 0)
       res_ids.push_back(id);
   });
-  return get_missing_packs_for_res(res_ids, out_packs, incl_model_tex, incl_hq);
+  return get_missing_packs_for_res(res_ids, out_packs, incl_model_tex);
 }
 
 bool gameres_optional::get_missing_packs_for_tex(dag::ConstSpan<TEXTUREID> tid_list, Tab<PackId> &out_packs, bool incl_hq)

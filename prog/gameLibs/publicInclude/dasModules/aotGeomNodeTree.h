@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -18,7 +19,7 @@ inline void check_geomtree_out_of_bounds(const GeomNodeTree &geom_node_tree, int
   das::LineInfoArg *line_info)
 {
   const uint32_t nodeCount = geom_node_tree.nodeCount();
-  if (DAGOR_UNLIKELY(uint32_t(node_id) >= nodeCount))
+  if (EASTL_UNLIKELY(uint32_t(node_id) >= nodeCount))
     context->throw_error_at(line_info, "Node index out of range, %d of %d", node_id, nodeCount);
 }
 

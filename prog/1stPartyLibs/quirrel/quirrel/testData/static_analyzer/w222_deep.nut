@@ -2,9 +2,9 @@
 local x, y;
 
 
-function b() {}
+let function b() {}
 
-function foo(a) { //-declared-never-used
+let function foo(a) { //-declared-never-used
     local index = x < y
     b()
     ::print(a[index])

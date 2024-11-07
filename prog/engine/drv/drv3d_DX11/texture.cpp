@@ -1,12 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
-#include <mutex>
-
-#include <drv/3d/dag_rwResource.h>
-#include <drv/3d/dag_renderTarget.h>
-#include <drv/3d/dag_texture.h>
-#include <drv/3d/dag_platform_pc.h>
-#include <drv/3d/dag_resetDevice.h>
+#include <3d/dag_drv3dCmd.h>
+#include <3d/dag_drv3d_pc.h>
+#include <3d/dag_drv3dReset.h>
 #include <generic/dag_sort.h>
 #include <math/dag_TMatrix.h>
 #include <math/dag_TMatrix4.h>
@@ -31,9 +25,7 @@
 #include <generic/dag_tab.h>
 #include <workCycle/dag_workCycle.h>
 #include <util/dag_watchdog.h>
-#include <validation/texture.h>
 
-#include "resource_size_info.h"
 #include "driver.h"
 #include <supp/dag_comPtr.h>
 #include <d3d9types.h>
@@ -57,7 +49,7 @@ namespace drv3d_dx11
 #define DEBUG_SRGB_TEXTURES 0
 
 extern bool ignore_resource_leaks_on_exit;
-extern bool view_resizing_related_logging_enabled;
+extern bool dirty_render_target(bool flush = true);
 
 extern void get_shaders_mem_used(String &str);
 extern void get_states_mem_used(String &str);
@@ -182,7 +174,7 @@ void close_textures()
       if (tql::isTexStub(g_textures[i].obj))
         continue;
       numLeakedTextures++;
-      LOGERR_CTX("leaked texture '%s', ptr = 0x%p", g_textures[i].obj->getResName(), g_textures[i].obj);
+      logerr_ctx("leaked texture '%s', ptr = 0x%p", g_textures[i].obj->getResName(), g_textures[i].obj);
       g_textures[i].destroyObject();
     }
   ITERATE_OVER_OBJECT_POOL_DESTROY(g_textures)
@@ -191,48 +183,47 @@ void close_textures()
     numLeakedTextures);
 }
 
-void gather_textures_to_recreate(FramememResourceSizeInfoCollection &collection)
+void recreate_textures()
 {
-  debug("gather_textures_to_recreate: %d", g_textures.totalUsed());
+  debug("recreate_textures: %d", g_textures.totalUsed());
+  // re-create textures from thumb
+  // acquireD3dOwnership();
   ITERATE_OVER_OBJECT_POOL(g_textures, i)
     if (BaseTex *t = g_textures[i].obj)
-      collection.push_back({(uint32_t)t->ressize(), (uint32_t)i, true, t->rld != nullptr});
+    {
+      bool upd_samplers = t->releaseTex(true);
+      if (t->rld)
+      {
+        int addrU = t->addrU, addrV = t->addrV, addrW = t->addrW;
+        t->delayedCreate = true;
+        t->rld->reloadD3dRes(t);
+        t->texaddru(addrU);
+        t->texaddrv(addrV);
+        t->texaddrw(addrW);
+      }
+      else if ((t->cflg & TEXCF_SYSTEXCOPY) && data_size(t->texCopy))
+      {
+        ddsx::Header &hdr = *(ddsx::Header *)t->texCopy.data();
+        int8_t sysCopyQualityId = hdr.hqPartLevels;
+        unsigned flg = hdr.flags & ~(hdr.FLG_ADDRU_MASK | hdr.FLG_ADDRV_MASK);
+        hdr.flags = flg | (t->addrU & hdr.FLG_ADDRU_MASK) | ((t->addrV << 4) & hdr.FLG_ADDRV_MASK);
+
+        InPlaceMemLoadCB mcrd(t->texCopy.data() + sizeof(hdr), data_size(t->texCopy) - (int)sizeof(hdr));
+        t->delayedCreate = true;
+        VERBOSE_DEBUG("%s <%s> recreate %dx%dx%d (%s)", t->strLabel(), t->getResName(), hdr.w, hdr.h, hdr.depth, "TEXCF_SYSTEXCOPY");
+        d3d::load_ddsx_tex_contents(t, hdr, mcrd, sysCopyQualityId);
+      }
+      else
+        t->recreate();
+      watchdog_kick();
+    }
+    g_render_state.modified = true;
+    for (int i = 0; i < g_render_state.texFetchState.resources.size(); ++i)
+      g_render_state.texFetchState.resources[i].modifiedMask = 0xFFFFFFFF;
   ITERATE_OVER_OBJECT_POOL_RESTORE(g_textures)
+  // releaseD3dOwnership();
 }
 
-void recreate_texture(uint32_t index)
-{
-  std::lock_guard lock(g_textures);
-  if (!g_textures.isEntryUsed(index))
-    return;
-  if (BaseTex *t = g_textures[index].obj)
-  {
-    bool upd_samplers = t->releaseTex(true);
-    if (t->rld)
-    {
-      int addrU = t->addrU, addrV = t->addrV, addrW = t->addrW;
-      t->delayedCreate = true;
-      t->rld->reloadD3dRes(t);
-      t->texaddru(addrU);
-      t->texaddrv(addrV);
-      t->texaddrw(addrW);
-    }
-    else if ((t->cflg & TEXCF_SYSTEXCOPY) && data_size(t->texCopy))
-    {
-      ddsx::Header &hdr = *(ddsx::Header *)t->texCopy.data();
-      int8_t sysCopyQualityId = hdr.hqPartLevels;
-      unsigned flg = hdr.flags & ~(hdr.FLG_ADDRU_MASK | hdr.FLG_ADDRV_MASK);
-      hdr.flags = flg | (t->addrU & hdr.FLG_ADDRU_MASK) | ((t->addrV << 4) & hdr.FLG_ADDRV_MASK);
-
-      InPlaceMemLoadCB mcrd(t->texCopy.data() + sizeof(hdr), data_size(t->texCopy) - (int)sizeof(hdr));
-      t->delayedCreate = true;
-      VERBOSE_DEBUG("%s <%s> recreate %dx%dx%d (%s)", t->strLabel(), t->getResName(), hdr.w, hdr.h, hdr.depth, "TEXCF_SYSTEXCOPY");
-      d3d::load_ddsx_tex_contents(t, hdr, mcrd, sysCopyQualityId);
-    }
-    else
-      t->recreate();
-  }
-}
 
 void reserve_tex(int max_tex) { g_textures.safeReserve(max_tex); }
 
@@ -461,9 +452,9 @@ DXGI_FORMAT dxgi_format_from_flags(uint32_t cflg)
     case TEXFMT_BC6H: return DXGI_FORMAT_BC6H_UF16;
     case TEXFMT_BC7: return DXGI_FORMAT_BC7_UNORM;
     case TEXFMT_R8UI: return DXGI_FORMAT_R8_UINT;
-    case TEXFMT_R16UI: return DXGI_FORMAT_R16_UINT;
     case TEXFMT_A8R8G8B8: return DXGI_FORMAT_B8G8R8A8_UNORM; // -V1037
     case TEXFMT_R8G8B8A8: return DXGI_FORMAT_R8G8B8A8_UNORM;
+    case TEXFMT_V16U16: return DXGI_FORMAT_R16G16_SNORM;
     case TEXFMT_L16: return DXGI_FORMAT_R16_UNORM;
     case TEXFMT_A8: return DXGI_FORMAT_A8_UNORM;
     case TEXFMT_R8: return DXGI_FORMAT_R8_UNORM;
@@ -696,7 +687,7 @@ ComPtr<ID3D11Texture2D> create_clear_texture(DXGI_FORMAT format, unsigned size)
   HRESULT hr = dx_device->CreateTexture2D(&desc, &idata, &tex);
   if (FAILED(hr))
   {
-    D3D_ERROR("Failed to create clear texture for format %s", dxgi_format_to_string(format));
+    logerr("Failed to create clear texture for format %s", dxgi_format_to_string(format));
     return NULL;
   }
   return tex;
@@ -784,14 +775,6 @@ bool remove_texture_from_states(BaseTexture *tex, bool recreate, TextureFetchSta
   return found;
 }
 
-static void reset_depth()
-{
-  RenderState &rs = g_render_state;
-  rs.modified = rs.rtModified = true;
-  rs.viewModified = VIEWMOD_FULL;
-  rs.nextRtState.removeDepth();
-}
-
 bool remove_texture_from_states(BaseTexture *tex, bool recreate = false)
 {
   bool found = remove_texture_from_states(tex, recreate, g_render_state.texFetchState);
@@ -800,7 +783,7 @@ bool remove_texture_from_states(BaseTexture *tex, bool recreate = false)
   if (rs.nextRtState.isDepthUsed() && rs.nextRtState.depth.tex == tex)
   {
     found = true;
-    reset_depth();
+    d3d::set_backbuf_depth();
     G_ASSERT(!recreate);
   }
 
@@ -810,7 +793,7 @@ bool remove_texture_from_states(BaseTexture *tex, bool recreate = false)
     {
       found = true;
       d3d::set_render_target(i, NULL, 0);
-      reset_depth();
+      d3d::set_backbuf_depth();
       G_ASSERT(!recreate);
     }
 
@@ -858,8 +841,6 @@ static void fixup_tex_params(int w, int h, int32_t &flg, int &levels)
     flg &= ~TEXCF_SYSTEXCOPY;
 }
 
-static const int DX11_MIP_LEVELS_LIMIT = 16;
-
 void set_tex_params(BaseTex *tex, int w, int h, int d, uint32_t flg, int levels, const char *stat_name)
 {
   ResAutoLock resLock; // Writing to a bitfield isn't atomic, must protect getResView.
@@ -869,7 +850,6 @@ void set_tex_params(BaseTex *tex, int w, int h, int d, uint32_t flg, int levels,
   G_ASSERTF(levels > 0, "(%s).levels=%d", tex->getResName(), levels);
 
   tex->format = fmt;
-  G_ASSERTF(levels < DX11_MIP_LEVELS_LIMIT && levels > 0, "DX11: %d is invalid value for mipLevels", levels);
   tex->mipLevels = levels;
   tex->width = w;
   tex->height = h;
@@ -884,7 +864,7 @@ void set_tex_params(BaseTex *tex, int w, int h, int d, uint32_t flg, int levels,
 }
 
 bool create_tex2d(BaseTex::D3DTextures &tex, BaseTex *bt_in, uint32_t w, uint32_t h, uint32_t levels, bool cube,
-  D3D11_SUBRESOURCE_DATA *initial_data, int array_size = 1)
+  D3D11_SUBRESOURCE_DATA *initial_data, int array_size = 1, bool tmp_tex = false)
 {
   uint32_t &flg = bt_in->cflg;
   G_ASSERT(!((flg & TEXCF_SAMPLECOUNT_MASK) && initial_data != NULL));
@@ -894,7 +874,6 @@ bool create_tex2d(BaseTex::D3DTextures &tex, BaseTex *bt_in, uint32_t w, uint32_
   D3D11_TEXTURE2D_DESC desc = {0};
   desc.Width = w;
   desc.Height = h;
-  G_ASSERTF(levels < DX11_MIP_LEVELS_LIMIT && levels > 0, "DX11: %d is invalid value for realMipLevels", levels);
   desc.MipLevels = levels;
   tex.realMipLevels = levels;
   desc.ArraySize = (cube ? 6 : 1) * array_size;
@@ -949,6 +928,8 @@ bool create_tex2d(BaseTex::D3DTextures &tex, BaseTex *bt_in, uint32_t w, uint32_
   tex.texUsage = usage;
   tex.texAccess = (D3D11_CPU_ACCESS_FLAG)access;
 
+  if (!tmp_tex)
+    TEXQL_PRE_CLEAN(bt_in->ressize());
   if ((flg & TEXCF_SAMPLECOUNT_MASK))
   {
     uint32_t numQualities;
@@ -967,10 +948,9 @@ bool create_tex2d(BaseTex::D3DTextures &tex, BaseTex *bt_in, uint32_t w, uint32_
             "GetDeviceRemovedReason=0x%08X)",
         hr, tex.tex2D, bt_in->cflg, bt_in->lockFlags, (int)bt_in->delayedCreate, bt_in->getTexName(), w, h, levels, desc.ArraySize,
         dx_device->GetDeviceRemovedReason());
-      if (bt_in->getTID() != BAD_TEXTUREID)
-        tql::dump_tex_state(bt_in->getTID());
+      tql::dump_tex_state(bt_in->getTID());
       if (hr != E_OUTOFMEMORY || bt_in->getTID() == BAD_TEXTUREID)
-        D3D_ERROR("CreateTexture2D D3D_ERROR %x, %s", hr, dx11_error(hr));
+        logerr("CreateTexture2D logerr %x, %s", hr, dx11_error(hr));
       if (!device_should_reset(hr, "CreateTexture2D"))
       {
         if (bt_in->getTID() == BAD_TEXTUREID)
@@ -1002,6 +982,7 @@ bool create_tex2d(BaseTex::D3DTextures &tex, BaseTex *bt_in, uint32_t w, uint32_
     desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ | D3D11_CPU_ACCESS_WRITE;
     desc.BindFlags = 0;
 
+    TEXQL_PRE_CLEANSM(bt_in->ressize());
     {
       HRESULT hr = dx_device->CreateTexture2D(&desc, initial_data, &tex.stagingTex2D);
       RETRY_CREATE_STAGING_TEX(hr, bt_in->ressize(), dx_device->CreateTexture2D(&desc, initial_data, &tex.stagingTex2D));
@@ -1011,7 +992,7 @@ bool create_tex2d(BaseTex::D3DTextures &tex, BaseTex *bt_in, uint32_t w, uint32_
           tex.tex2D->Release();
         tex.tex2D = NULL;
 
-        D3D_ERROR("CreateTexture2D D3D_ERROR %s", dx11_error(hr));
+        logerr("CreateTexture2D logerr %s", dx11_error(hr));
         if (!device_should_reset(hr, "CreateTexture2D(stagingTex2D)"))
         {
           DXFATAL(hr, "CreateTexture2D(stagingTex2D)");
@@ -1037,7 +1018,6 @@ bool create_tex3d(BaseTex::D3DTextures &tex, BaseTex *bt_in, uint32_t w, uint32_
   desc.Width = w;
   desc.Height = h;
   desc.Depth = d;
-  G_ASSERTF(levels < DX11_MIP_LEVELS_LIMIT && levels > 0, "DX11: %d is invalid value for realMipLevels", levels);
   desc.MipLevels = levels;
   tex.realMipLevels = levels;
   desc.Format = dxgi_format_for_create(dxgi_format_from_flags(flg));
@@ -1063,6 +1043,7 @@ bool create_tex3d(BaseTex::D3DTextures &tex, BaseTex *bt_in, uint32_t w, uint32_
   tex.texUsage = usage;
   tex.texAccess = (D3D11_CPU_ACCESS_FLAG)desc.CPUAccessFlags;
 
+  TEXQL_PRE_CLEAN(bt_in->ressize());
   {
     HRESULT hr = dx_device->CreateTexture3D(&desc, initial_data, &tex.tex3D);
     // HRESULT hr = dx_device->CreateTexture3D(&desc, initial_data, &tex.tex3D);
@@ -1071,7 +1052,7 @@ bool create_tex3d(BaseTex::D3DTextures &tex, BaseTex *bt_in, uint32_t w, uint32_
       if (hr == E_OUTOFMEMORY && (flg & TEXCF_SYSMEM) && !*bt_in->getTexName())
         return false;
       if (hr != E_OUTOFMEMORY || bt_in->getTID() == BAD_TEXTUREID)
-        D3D_ERROR("CreateTexture3D D3D_ERROR %s", dx11_error(hr));
+        logerr("CreateTexture3D logerr %s", dx11_error(hr));
       debug(
         "DX11: CreateTexture3D failed "
         "(hr=0x%08X, ITex=%p, cflg=0x%08X, lockFlags=0x%08X, delayedCreate=%d, name='%s', %dx%dx%d,L%d GetDeviceRemovedReason=0x%08X)",
@@ -1224,11 +1205,11 @@ unsigned int get_texture_size(IDirect3DBaseTexture9 *texture)
 void BaseTex::destroy()
 {
 #if DAGOR_DBGLEVEL > 1
-  if (!wasUsed && view_resizing_related_logging_enabled)
+  if (!wasUsed)
     logwarn("texture %p, of size %dx%dx%d total=%dbytes, name=%s was destroyed but was never used in rendering", this, width, height,
       depth, tex.memSize, getResName());
 #elif DAGOR_DBGLEVEL > 0
-  if (!wasUsed && view_resizing_related_logging_enabled)
+  if (!wasUsed)
     debug("texture %p, of size %dx%dx%d total=%dbytes, name=%s was destroyed but was never used in rendering", this, width, height,
       depth, tex.memSize, getResName());
 #endif
@@ -1344,15 +1325,10 @@ static bool check_texformat(int cflg, int resType)
   unsigned flags = d3d::get_texformat_usage(cflg, resType);
   unsigned mask = USAGE_TEXTURE;
   if (is_depth_format_flg(cflg))
-    mask |= USAGE_DEPTH;
-  else
-  {
-    if (cflg & TEXCF_RTARGET)
-      mask |= USAGE_RTARGET;
-    if (cflg & TEXCF_UNORDERED)
-      mask |= USAGE_UNORDERED;
-  }
-  return (flags & mask) == mask ? true : false;
+    mask = USAGE_DEPTH;
+  else if (cflg & TEXCF_RTARGET)
+    mask = USAGE_RTARGET;
+  return (flags & mask) ? true : false;
 }
 } // namespace d3d
 
@@ -1375,7 +1351,11 @@ bool d3d::issame_texformat(int f1, int f2) { return dxgi_format_from_flags(f1) =
 
 bool d3d::check_cubetexformat(int f) { return check_texformat(f, RES3D_CUBETEX); }
 
+bool d3d::issame_cubetexformat(int f1, int f2) { return dxgi_format_from_flags(f1) == dxgi_format_from_flags(f2); }
+
 bool d3d::check_voltexformat(int f) { return check_texformat(f, RES3D_VOLTEX); }
+
+bool d3d::issame_voltexformat(int f1, int f2) { return dxgi_format_from_flags(f1) == dxgi_format_from_flags(f2); }
 
 
 Texture *drv3d_dx11::create_d3d_tex(ID3D11Texture2D *tex_res, const char *name, int flg)
@@ -1385,7 +1365,6 @@ Texture *drv3d_dx11::create_d3d_tex(ID3D11Texture2D *tex_res, const char *name, 
 
   BaseTex *tex = BaseTex::create_tex(flg, desc.ArraySize > 1 ? RES3D_ARRTEX : RES3D_TEX);
   tex->tex.tex2D = tex_res;
-  G_ASSERTF(desc.MipLevels < DX11_MIP_LEVELS_LIMIT && desc.MipLevels > 0, "DX11: %d is invalid value for mipLevels", desc.MipLevels);
   tex->mipLevels = desc.MipLevels;
   tex->minMipLevel = tex->mipLevels - 1;
   tex->tex.realMipLevels = desc.MipLevels;
@@ -1414,14 +1393,48 @@ Texture *drv3d_dx11::create_backbuffer_tex(int id, IDXGI_SWAP_CHAIN *swap_chain)
   return create_d3d_tex(texRes, "backbuffer", TEXFMT_DEFAULT | TEXCF_RTARGET);
 }
 
+Texture *drv3d_dx11::create_backbuffer_depth_tex(uint32_t w, uint32_t h)
+{
+  BaseTex *tex = BaseTex::create_tex(TEXFMT_DEPTH24 | TEXCF_RTARGET, RES3D_TEX);
+
+  D3D11_TEXTURE2D_DESC desc;
+  ZeroMemory(&desc, sizeof(desc));
+  desc.Width = w;
+  desc.Height = h;
+  desc.MipLevels = 1;
+  tex->tex.realMipLevels = 1;
+  desc.ArraySize = 1;
+  desc.Format = is_backbuffer_samplable_depth ? dxgi_format_for_create(DXGI_FORMAT_D24_UNORM_S8_UINT)
+                                              : DXGI_FORMAT_D24_UNORM_S8_UINT; // DXGI_FORMAT_D32_FLOAT;// d32_float is enough for
+                                                                               // everything, but no stencil
+  desc.SampleDesc.Count = 1;
+  desc.SampleDesc.Quality = 0;
+  desc.Usage = D3D11_USAGE_DEFAULT;
+  desc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+  desc.CPUAccessFlags = 0;
+  desc.MiscFlags = 0;
+  DXFATAL(dx_device->CreateTexture2D(&desc, NULL, &tex->tex.tex2D), "SCD");
+
+  tex->mipLevels = 1;
+  tex->minMipLevel = 0;
+  tex->wasUsed = 1;
+  tex->depth = 1;
+  tex->width = w;
+  tex->height = h;
+  tex->format = DXGI_FORMAT_D24_UNORM_S8_UINT; // DXGI_FORMAT_D32_FLOAT;// d32_float is enough for everything, but no stencil
+  tex->setTexName("backbuffer depth");
+  TEXQL_ON_ALLOC(tex);
+  return tex;
+}
+
+
 BaseTexture *d3d::create_tex(TexImage32 *img, int w, int h, int flg, int levels, const char *stat_name)
 {
-  check_texture_creation_args(w, h, flg, stat_name);
   G_ASSERT_RETURN(d3d::check_texformat(flg), nullptr);
 
   if ((flg & (TEXCF_RTARGET | TEXCF_DYNAMIC)) == (TEXCF_RTARGET | TEXCF_DYNAMIC))
   {
-    D3D_ERROR("create_tex: can not create dynamic render target");
+    logerr("create_tex: can not create dynamic render target");
     return NULL;
   }
   if (img)
@@ -1433,10 +1446,6 @@ BaseTexture *d3d::create_tex(TexImage32 *img, int w, int h, int flg, int levels,
   int imgH = h;
 
   DriverDesc &dd = g_device_desc;
-  // TODO: remove clamp entirely and replace logerr with assert once all projects satisfy this requirement
-  if ((w < dd.mintexw) || (w > dd.maxtexw) || (h < dd.mintexh) || (h > dd.maxtexh))
-    logerr("create_tex: texture <%s> size %d x %d is out of bounds [%d, %d] x [%d, %d]", stat_name, w, h, dd.mintexw, dd.maxtexw,
-      dd.mintexh, dd.maxtexh);
   w = clamp<int>(w, dd.mintexw, dd.maxtexw);
   h = clamp<int>(h, dd.mintexh, dd.maxtexh);
 
@@ -1454,7 +1463,7 @@ BaseTexture *d3d::create_tex(TexImage32 *img, int w, int h, int flg, int levels,
 
     if (((w ^ img->w) | (h ^ img->h)) != 0)
     {
-      D3D_ERROR("create_tex: image size differs from texture size (%dx%d != %dx%d)", img->w, img->h, w, h);
+      logerr("create_tex: image size differs from texture size (%dx%d != %dx%d)", img->w, img->h, w, h);
       img = NULL; // abort copying
     }
 
@@ -1554,14 +1563,11 @@ BaseTexture *d3d::create_cubetex(int size, int flg, int levels, const char *stat
 
   if ((flg & (TEXCF_RTARGET | TEXCF_DYNAMIC)) == (TEXCF_RTARGET | TEXCF_DYNAMIC))
   {
-    D3D_ERROR("create_cubtex: can not create dynamic render target");
+    logerr("create_cubtex: can not create dynamic render target");
     return NULL;
   }
 
   DriverDesc &dd = g_device_desc;
-  // TODO: remove clamp entirely and replace logerr with assert once all projects satisfy this requirement
-  if ((size < dd.mincubesize) || (size > dd.maxcubesize))
-    logerr("create_cubetex: texture <%s> size %d is out of bounds [%d, %d]", stat_name, size, dd.mincubesize, dd.maxcubesize);
   size = get_bigger_pow2(clamp<int>(size, dd.mincubesize, dd.maxcubesize));
 
   fixup_tex_params(size, size, flg, levels);
@@ -1594,7 +1600,7 @@ BaseTexture *d3d::create_voltex(int w, int h, int d, int flg, int levels, const 
 
   if ((flg & (TEXCF_RTARGET | TEXCF_DYNAMIC)) == (TEXCF_RTARGET | TEXCF_DYNAMIC))
   {
-    D3D_ERROR("create_voltex: can not create dynamic render target");
+    logerr("create_voltex: can not create dynamic render target");
     return NULL;
   }
 
@@ -1726,16 +1732,16 @@ BaseTexture *d3d::create_ddsx_tex(IGenLoad &crd, int flg, int quality_id, int le
       /*sysCopyQualityId*/ ((ddsx::Header *)bt->texCopy.data())->hqPartLevels = 0;
       if (!crd.readExact(bt->texCopy.data() + sizeof(hdr), data_sz))
       {
-        LOGERR_CTX("inconsistent input tex data, data_sz=%d tex=%s", data_sz, stat_name);
+        logerr_ctx("inconsistent input tex data, data_sz=%d tex=%s", data_sz, stat_name);
         del_d3dres(tex);
         return NULL;
       }
       VERBOSE_DEBUG("%s %dx%d stored DDSx (%d bytes) for TEXCF_SYSTEXCOPY", stat_name, hdr.w, hdr.h, data_size(bt->texCopy));
       InPlaceMemLoadCB mcrd(bt->texCopy.data() + sizeof(hdr), data_sz);
-      if (load_ddsx_tex_contents(tex, hdr, mcrd, quality_id) == TexLoadRes::OK)
+      if (load_ddsx_tex_contents(tex, hdr, mcrd, quality_id))
         return tex;
     }
-    else if (load_ddsx_tex_contents(tex, hdr, crd, quality_id) == TexLoadRes::OK)
+    else if (load_ddsx_tex_contents(tex, hdr, crd, quality_id))
       return tex;
     del_d3dres(tex);
   }
@@ -1809,6 +1815,12 @@ const char *d3d::pcwin32::get_texture_format_str(BaseTexture *tex)
 }
 
 void *d3d::pcwin32::get_native_surface(BaseTexture *tex) { return ((BaseTex *)tex)->tex.tex2D; }
+
+bool d3d::set_tex_usage_hint(int width, int height, int mips, const char *format, unsigned int textures_num)
+{
+  debug_ctx("n/a");
+  return true;
+}
 
 struct DX11BtSortRec
 {

@@ -58,10 +58,7 @@ public:
 		{
 			uint new_top = mTop + AlignUp(inSize, JPH_RVECTOR_ALIGNMENT);
 			if (new_top > mSize)
-			{
-				Trace("TempAllocator: Out of memory");
-				std::abort();
-			}
+				JPH_CRASH; // Out of memory
 			void *address = mBase + mTop;
 			mTop = new_top;
 			return address;
@@ -79,10 +76,7 @@ public:
 		{
 			mTop -= AlignUp(inSize, JPH_RVECTOR_ALIGNMENT);
 			if (mBase + mTop != inAddress)
-			{
-				Trace("TempAllocator: Freeing in the wrong order");
-				std::abort();
-			}
+				JPH_CRASH; // Freeing in the wrong order
 		}
 	}
 
@@ -108,14 +102,13 @@ public:
 	// See: TempAllocator
 	virtual void *					Allocate(uint inSize) override
 	{
-		return inSize > 0? AlignedAllocate(inSize, JPH_RVECTOR_ALIGNMENT) : nullptr;
+		return AlignedAllocate(inSize, JPH_RVECTOR_ALIGNMENT);
 	}
 
 	// See: TempAllocator
 	virtual void					Free(void *inAddress, [[maybe_unused]] uint inSize) override
 	{
-		if (inAddress != nullptr)
-			AlignedFree(inAddress);
+		AlignedFree(inAddress);
 	}
 };
 

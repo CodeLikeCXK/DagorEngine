@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "entityMatFileResource.h"
 
 #include <obsolete/dag_cfg.h>

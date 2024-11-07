@@ -1,7 +1,7 @@
 #allow-switch-statement
 //expect:w275
 
-function fn(x) { //-declared-never-used
+let function fn(x) { //-declared-never-used
   switch (x) {
     case 0:
     case 1:

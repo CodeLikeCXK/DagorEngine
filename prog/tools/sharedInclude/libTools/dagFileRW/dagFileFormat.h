@@ -1,4 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+
+#ifndef __DAGOR_DAGFMT_H
+#define __DAGOR_DAGFMT_H
 #pragma once
 
 #include <util/dag_stdint.h>
@@ -246,3 +248,5 @@ ANIM format:
 */
 
 #pragma pack(pop)
+
+#endif // __DAGOR_DAGFMT_H

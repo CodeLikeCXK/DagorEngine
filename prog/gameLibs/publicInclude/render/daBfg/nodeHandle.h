@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -54,9 +55,7 @@ public:
   }
 
   /// \brief Returns true if the handle is valid.
-  bool valid() const { return uid.valid; }
-  /// \brief Returns true if the handle is valid.
-  explicit operator bool() const { return this->valid(); }
+  explicit operator bool() { return uid.valid; }
 
 private:
   detail::NodeUid uid{};

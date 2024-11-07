@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <libTools/dagFileRW/dagFileNode.h>
 #include <libTools/dagFileRW/dagExporter.h>
 #include <libTools/dtx/dtx.h>

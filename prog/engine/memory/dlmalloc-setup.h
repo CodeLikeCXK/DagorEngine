@@ -1,4 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __DAGOR_DLMALLOC_SETUP_H__
+#define __DAGOR_DLMALLOC_SETUP_H__
 #pragma once
 
 #include <util/dag_stdint.h>
@@ -101,4 +102,6 @@ extern "C"
 
 #ifdef __cplusplus
 }
+#endif
+
 #endif

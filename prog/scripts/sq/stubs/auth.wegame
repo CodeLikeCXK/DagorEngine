@@ -1,3 +1,0 @@
-return {
-  login_wegame = @(_params, _id) null
-}

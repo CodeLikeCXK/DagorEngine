@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -10,10 +11,8 @@ struct ToroidalHelper
 {
   IPoint2 curOrigin, mainOrigin;
   unsigned texSize;
-  ToroidalHelper() : texSize(1), curOrigin(IPoint2::ZERO), mainOrigin(IPoint2::ZERO) { resetOrigin(); }
+  ToroidalHelper() : texSize(1), curOrigin(-1000000, 100000), mainOrigin(0, 0) {}
   ToroidalHelper(const IPoint2 &origin, const IPoint2 &main, unsigned tsz) : texSize(tsz), curOrigin(origin), mainOrigin(main) {}
-
-  void resetOrigin() { curOrigin = IPoint2(-1000000, 100000); }
 };
 
 struct ToroidalQuadRegion

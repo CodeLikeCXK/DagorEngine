@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "compositeEditorGizmoClient.h"
 #include "compositeEditorCopyDlg.h"
 #include "CompositeEditorViewport.h"

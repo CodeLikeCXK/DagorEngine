@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <osApiWrappers/dag_lockProfiler.h>
 #include <osApiWrappers/dag_ttas_spinlock.h>
 #include <osApiWrappers/dag_spinlock.h>

@@ -9,7 +9,7 @@
 
 JPH_NAMESPACE_BEGIN
 
-/// This class is responsible for creating instances of classes based on their name or hash and is mainly used for deserialization of saved data.
+/// Factory, to create RTTI objects
 class JPH_EXPORT Factory
 {
 public:

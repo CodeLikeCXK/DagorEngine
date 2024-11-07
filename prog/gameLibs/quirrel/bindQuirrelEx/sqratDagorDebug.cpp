@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <bindQuirrelEx/bindQuirrelEx.h>
 #include <sqModules/sqModules.h>
 #include <memory/dag_memStat.h>
@@ -51,19 +49,17 @@ static SQInteger script_logerr(HSQUIRRELVM vm)
 
   if (console_output)
     printf("[SQ] Error: %s\n", msg);
+  logerr("[SQ]: %s", msg);
 
   if (SQ_SUCCEEDED(sqstd_formatcallstackstring(vm)))
   {
     const char *sqcs = nullptr;
-    if (SQ_SUCCEEDED(sq_getstring(vm, -1, &sqcs)) && sqcs)
-    {
-      logerr("[SQ]: %s\n%s", msg, sqcs);
-      sq_pop(vm, 1);
-      return 0;
-    }
+    G_VERIFY(SQ_SUCCEEDED(sq_getstring(vm, -1, &sqcs)));
+    G_ASSERT(sqcs);
+    debug("%s", sqcs);
+    sq_pop(vm, 1);
   }
 
-  logerr("[SQ]: %s", msg);
   return 0;
 }
 
@@ -153,7 +149,7 @@ static SQInteger script_assert(HSQUIRRELVM v)
     {
       sq_pop(v, 3); // key + value + regtable
       G_ASSERT(sq_gettop(v) == prevTop);
-      LOGERR_CTX("Script assert intenal error, msg = %s", msg);
+      logerr_ctx("Script assert intenal error, msg = %s", msg);
     }
     else
     {
@@ -208,7 +204,7 @@ void sqrat_bind_dagor_logsys(SqModules *module_mgr, bool console_mode)
   Sqrat::Table memTraceTbl(vm);
 
   ///@module dagor.memtrace
-  memTraceTbl //
+  memTraceTbl
     .SquirrelFunc(
       "reset_cur_vm",
       [](HSQUIRRELVM vm) -> SQInteger {
@@ -216,9 +212,6 @@ void sqrat_bind_dagor_logsys(SqModules *module_mgr, bool console_mode)
         return 0;
       },
       1)
-    .SquirrelFunc("get_quirrel_object_size", sqmemtrace::get_quirrel_object_size, 2)
-    .SquirrelFunc("get_quirrel_object_size_as_string", sqmemtrace::get_quirrel_object_size_as_string, 2)
-    .SquirrelFunc("is_quirrel_object_larger_than", sqmemtrace::is_quirrel_object_larger_than, 3, "..i")
     .Func("reset_all", sqmemtrace::reset_all)
     .Func("set_huge_alloc_threshold", sqmemtrace::set_huge_alloc_threshold)
     /// @return previously allocation threshold
@@ -242,8 +235,7 @@ void sqrat_bind_dagor_logsys(SqModules *module_mgr, bool console_mode)
   Sqrat::Table nsTbl(vm);
 
   ///@module dagor.debug
-  nsTbl //
-    .Func("debug", script_debug)
+  nsTbl.Func("debug", script_debug)
     .Func("fatal", script_fatal)
     .Func("screenlog", screenlog)
     .SquirrelFunc("logerr", script_logerr, 2, ".s")
@@ -251,8 +243,7 @@ void sqrat_bind_dagor_logsys(SqModules *module_mgr, bool console_mode)
     .SquirrelFunc("debug_dump_stack", debug_dump_callstack, 1, ".")
     .SquirrelFunc("assert", script_assert, -2, "..s")
     .SquirrelFunc("assertf", script_assert, 3, "..s")
-    .Func("get_log_filename", get_log_filename)
-    /**/;
+    .Func("get_log_filename", get_log_filename);
   logerr_interceptor_bind_api(nsTbl);
 
   module_mgr->addNativeModule("dagor.debug", nsTbl);
@@ -260,10 +251,9 @@ void sqrat_bind_dagor_logsys(SqModules *module_mgr, bool console_mode)
   Sqrat::Table perfTbl(vm);
 
   ///@module dagor.perf
-  perfTbl //
+  perfTbl // comments to supress clang-format and allow qdox to generate doc
     .Func("get_avg_cpu_only_cycle_time_usec", getAvgCpuOnlyCycleTimeUsec)
-    .Func("reset_summed_cpu_only_cycle_time", []() { workcycleperf::reset_summed_cpu_only_cycle_time(); })
-    /**/;
+    .Func("reset_summed_cpu_only_cycle_time", []() { workcycleperf::reset_summed_cpu_only_cycle_time(); });
 
   logerr_interceptor_bind_api(perfTbl);
   module_mgr->addNativeModule("dagor.perf", perfTbl);

@@ -1,8 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-#pragma once
-
 // fields that related to compute part of pipeline
-
+#pragma once
 #include "util/tracked_state.h"
 #include "driver.h"
 #include "pipeline/main_pipelines.h"

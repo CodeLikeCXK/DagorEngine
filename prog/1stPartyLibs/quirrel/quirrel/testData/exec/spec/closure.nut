@@ -1,5 +1,5 @@
 
-function foo(a, b, c) {
+let function foo(a, b, c) {
   if (a) {
     local x = 10
     local z = 20

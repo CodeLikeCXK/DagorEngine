@@ -1,14 +1,11 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "av_viewportWindow.h"
 #include "assetStats.h"
 #include "av_cm.h"
 #include <EditorCore/ec_cm.h>
-#include <EditorCore/ec_ViewportWindowStatSettingsDialog.h>
 #include <gameRes/dag_collisionResource.h>
 #include <gui/dag_stdGuiRender.h>
 #include <ioSys/dag_dataBlock.h>
-#include <propPanel/control/container.h>
+#include <propPanel2/c_panel_base.h>
 #include <util/dag_string.h>
 
 struct AssetStatType
@@ -177,28 +174,33 @@ void AssetViewerViewportWindow::paint(int w, int h)
   StdGuiRender::end_render();
 }
 
-void AssetViewerViewportWindow::fillStatSettingsDialog(ViewportWindowStatSettingsDialog &dialog)
+void AssetViewerViewportWindow::fillStatSettingsDialog(PropertyContainerControlBase &tab_panel)
 {
-  ViewportWindow::fillStatSettingsDialog(dialog);
+  ViewportWindow::fillStatSettingsDialog(tab_panel);
 
-  PropPanel::TLeafHandle assetStatsGroup = dialog.addGroup(CM_STATS_SETTINGS_ASSET_STATS_GROUP, "Asset stats", showAssetStats);
+  PropertyContainerControlBase *mainTabPage = tab_panel.getContainerById(CM_STATS_SETTINGS_MAIN_PAGE);
+  G_ASSERT(mainTabPage);
+  mainTabPage->createCheckBox(CM_STATS_SETTINGS_MAIN_SHOW_ASSETS_STATS, "Show asset stats", showAssetStats);
+
+  PropertyContainerControlBase *tabPage = tab_panel.createTabPage(CM_STATS_SETTINGS_ASSET_STATS_PAGE, "Asset stats");
+
   G_STATIC_ASSERT((CM_STATS_SETTINGS_ASSET_STAT_LAST - CM_STATS_SETTINGS_ASSET_STAT_FIRST + 1) == AssetStatType::Count);
   for (int i = 0; i < AssetStatType::Count; ++i)
-    dialog.addOption(assetStatsGroup, CM_STATS_SETTINGS_ASSET_STAT_FIRST + i, asset_stat_names[i], displayed_asset_stats[i]);
+    tabPage->createCheckBox(CM_STATS_SETTINGS_ASSET_STAT_FIRST + i, asset_stat_names[i], displayed_asset_stats[i]);
 }
 
-void AssetViewerViewportWindow::handleStatSettingsDialogChange(int pcb_id, bool value)
+void AssetViewerViewportWindow::handleStatSettingsDialogChange(int pcb_id)
 {
   G_STATIC_ASSERT((CM_STATS_SETTINGS_ASSET_STAT_LAST - CM_STATS_SETTINGS_ASSET_STAT_FIRST + 1) == AssetStatType::Count);
   if (pcb_id >= CM_STATS_SETTINGS_ASSET_STAT_FIRST && pcb_id <= CM_STATS_SETTINGS_ASSET_STAT_LAST)
   {
     const int statIndex = pcb_id - CM_STATS_SETTINGS_ASSET_STAT_FIRST;
-    displayed_asset_stats[statIndex] = value;
+    displayed_asset_stats[statIndex] = !displayed_asset_stats[statIndex];
   }
-  else if (pcb_id == CM_STATS_SETTINGS_ASSET_STATS_GROUP)
-    showAssetStats = value;
+  else if (pcb_id == CM_STATS_SETTINGS_MAIN_SHOW_ASSETS_STATS)
+    showAssetStats = !showAssetStats;
   else
-    ViewportWindow::handleStatSettingsDialogChange(pcb_id, value);
+    ViewportWindow::handleStatSettingsDialogChange(pcb_id);
 }
 
 int AssetViewerViewportWindow::getAssetStatByIndex(int index)

@@ -1,5 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
+// Copyright 2023 by Gaijin Games KFT, All rights reserved.
 #include "shMacro.h"
 #include <generic/dag_tabUtils.h>
 #include "shlex.h"

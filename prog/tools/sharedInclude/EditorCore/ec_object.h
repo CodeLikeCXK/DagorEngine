@@ -1,4 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __GAIJIN_EDITORCORE_EC_OBJECT_H__
+#define __GAIJIN_EDITORCORE_EC_OBJECT_H__
 #pragma once
 
 #include <EditorCore/ec_decl.h>
@@ -95,3 +96,5 @@ T *RTTI_cast(EditableObject *source)
     return NULL;
   return (T *)source;
 }
+
+#endif

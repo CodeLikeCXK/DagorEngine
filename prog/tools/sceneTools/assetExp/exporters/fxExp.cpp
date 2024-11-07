@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <assets/daBuildExpPluginChain.h>
 #include <assets/assetPlugin.h>
 #include <assets/assetExporter.h>
@@ -27,7 +25,7 @@ public:
 
   virtual const char *__stdcall getAssetType() const { return TYPE; }
   virtual unsigned __stdcall getGameResClassId() const { return EffectGameResClassId; }
-  virtual unsigned __stdcall getGameResVersion() const { return 134; }
+  virtual unsigned __stdcall getGameResVersion() const { return 110; }
 
   virtual void __stdcall onRegister() {}
   virtual void __stdcall onUnregister() {}

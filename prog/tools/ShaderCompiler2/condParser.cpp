@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "shVarBool.h"
 #include "shsem.h"
 #include "shLog.h"

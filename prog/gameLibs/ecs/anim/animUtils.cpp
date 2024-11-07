@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <ecs/anim/anim.h>
 #include <ecs/core/entityManager.h>
 #include <memory/dag_framemem.h>
@@ -17,17 +15,13 @@ AnimIrqHandler::~AnimIrqHandler()
 }
 } // namespace ecs
 
-void anim::dump_animchar_state(AnimV20::AnimcharBaseComponent &animchar, const bool json_format)
+void anim::dump_animchar_state(AnimV20::AnimcharBaseComponent &animchar)
 {
   animchar.createDebugBlenderContext(/*dump_all_nodes*/ true);
   const DataBlock *debugBlk = animchar.getDebugBlenderState(/*dump_tm*/ true);
   DynamicMemGeneralSaveCB cwr(framemem_ptr(), 128 << 10, 4 << 10);
-  if (json_format)
-    dblk::export_to_json_text_stream(*debugBlk, cwr, true);
-  else
-    debugBlk->saveToTextStream(cwr);
+  debugBlk->saveToTextStream(cwr);
   cwr.write(ZERO_PTR<char>(), sizeof(char)); // '\0'
-  debug("--- animchar blend-state dump ---");
   debug("%s", cwr.data());
   animchar.destroyDebugBlenderContext();
 }

@@ -1,4 +1,0 @@
-if $(HaveRenderer) = yes {
-  gamePulls += daNetGameLibs_screen_night_vision_DAS_pull_AOT ;
-  UseProgLibs += daNetGameLibs/screen_night_vision ;
-}

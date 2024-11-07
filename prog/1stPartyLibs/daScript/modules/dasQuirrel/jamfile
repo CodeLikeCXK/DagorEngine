@@ -16,7 +16,7 @@ AddIncludes =
   $(Root)/prog/gameLibs/publicInclude/quirrel
 ;
 
-if $(Platform) = macOS {
+if $(Platform) = macosx {
   CPPopt += -Wno-deprecated-declarations ;
 }
 

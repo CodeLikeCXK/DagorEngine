@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <dasModules/aotDagorInput.h>
 
 struct DigitalActionAnnotation final : das::ManagedStructureAnnotation<dainput::DigitalAction, false>

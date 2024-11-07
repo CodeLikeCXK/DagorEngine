@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <dataBlockUtils/blk2sqrat/blk2sqrat.h>
 
 #include <ioSys/dag_dataBlock.h>

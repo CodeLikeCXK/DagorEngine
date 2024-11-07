@@ -42,82 +42,55 @@ class DAGOR_PT_Export(bpy.types.Panel):
     def draw(self,context):
         P = bpy.data.scenes[0].dag4blend.exporter
         l = self.layout
-        toggles = l.column(align = True)
-
-        row = toggles.row()
-        row.prop(P, 'vnorm', toggle = True,
-        icon = 'CHECKBOX_HLT' if P.vnorm else 'CHECKBOX_DEHLT')
-
-        row = toggles.row()
-        row.prop(P, 'modifiers', toggle = True,
-        icon = 'CHECKBOX_HLT' if P.modifiers else 'CHECKBOX_DEHLT')
-
-        row = toggles.row()
-        row.prop(P, 'mopt', toggle = True,
-        icon = 'CHECKBOX_HLT' if P.mopt else 'CHECKBOX_DEHLT')
-
-        row = toggles.row()
-        row.prop(P, 'cleanup_names', toggle = True,
-        icon = 'CHECKBOX_HLT' if P.cleanup_names else 'CHECKBOX_DEHLT')
-
+        l.prop(P, 'vnorm')
+        l.prop(P, 'modifiers')
+        l.prop(P, 'mopt')
+        l.prop(P, 'cleanup_names')
         l.prop(P, 'limit_by')
+        btn_text='Create directory'
         path_exists=os.path.exists(P.dirpath)
 
         l.prop(P, 'dirpath')
         if P.limit_by == 'Visible':
             l.prop(P, 'filename')
             if path_exists:
-                export_row = l.row()
-                export_row.scale_y = 2
-                export_row.operator('dt.batch_export', text = 'EXPORT ' + P.filename + '.dag', icon = 'EXPORT')
+                l.operator('dt.batch_export', text='EXPORT '+P.filename+'.dag')
                 l.operator('wm.path_open', icon = 'FILE_FOLDER', text='open export folder').filepath = P.dirpath
             else:
                 l.operator('dt.batch_export', text='Create directory',icon='ERROR')
 
         elif P.limit_by == 'Sel.Separated':
             if path_exists:
-                export_row = l.row()
-                export_row.scale_y = 2
-                export_row.operator('dt.batch_export', text='EXPORT', icon = 'EXPORT')
-                l.operator('wm.path_open', icon = 'FILE_FOLDER', text = 'open export folder').filepath = P.dirpath
+                l.operator('dt.batch_export', text='EXPORT')
+                l.operator('wm.path_open', icon = 'FILE_FOLDER', text='open export folder').filepath = P.dirpath
             else:
                 l.operator('dt.batch_export', text='Create directory',icon='ERROR')
 
         elif P.limit_by == 'Sel.Joined':
             l.prop(P, 'filename')
             if path_exists:
-                export_row = l.row()
-                export_row.scale_y = 2
-                export_row.operator('dt.batch_export', text='EXPORT ' + P.filename + '.dag', icon = 'EXPORT')
+                l.operator('dt.batch_export', text='EXPORT '+P.filename+'.dag')
                 l.operator('wm.path_open', icon = 'FILE_FOLDER', text='open export folder').filepath = P.dirpath
             else:
-                export_row.operator('dt.batch_export', text='Create directory',icon='ERROR')
+                l.operator('dt.batch_export', text='Create directory',icon='ERROR')
 
         elif P.limit_by == 'Col.Separated':
             l.prop(P, 'collection')
-            row = toggles.row()  # moved to other toggles
-            row.prop(P, 'orphans', toggle = True,
-            icon = 'CHECKBOX_HLT' if P.orphans else 'CHECKBOX_DEHLT')
-            export_row = l.row()
-            export_row.scale_y = 2
+            l.prop(P, 'orphans')
             if path_exists:
-                export_row.operator('dt.batch_export', text='EXPORT', icon = 'EXPORT')
+                l.operator('dt.batch_export', text='EXPORT')
                 l.operator('wm.path_open', icon = 'FILE_FOLDER', text='open export folder').filepath = P.dirpath
             else:
-                export_row.operator('dt.batch_export', text='Create directory',icon='ERROR')
+                l.operator('dt.batch_export', text='Create directory',icon='ERROR')
 
         elif P.limit_by == 'Col.Joined':
             l.prop(P, 'collection')
             if P.collection is None:
                 l.label(text='Choose collection!',icon='ERROR')
             elif path_exists:
-                export_row = l.row()
-                export_row.scale_y = 2
-                export_row.operator('dt.batch_export',text='EXPORT '+P.collection.name+'.dag', icon = 'EXPORT')
+                l.operator('dt.batch_export',text='EXPORT '+P.collection.name+'.dag')
             else:
-                export_row = l.row()
-                export_row.operator('dt.batch_export', text='Create directory',icon='ERROR')
-        return
+                l.operator('dt.batch_export', text='Create directory',icon='ERROR')
 
 classes = [DAGOR_PT_Export, DAGOR_OT_BatchExport]
 def register():

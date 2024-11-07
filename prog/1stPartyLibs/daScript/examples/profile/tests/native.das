@@ -2,8 +2,6 @@
 // options logCpp=true
 require testProfile
 
-include ../config.das
-
 [sideeffects]
 def testAdds()
     var count = 0
@@ -11,17 +9,11 @@ def testAdds()
         count = AddOne(count)
     return count
 
-[export,no_aot,no_jit]
-def main
+[export]
+def test()
 	var count = 0
     profile(20,"native loop") <|
         count = testAdds()
 	assert(10000000==count)
-    if is_cpp_time()
-        run_files([[TestFile
-            asFile = "native.as",
-            luaJitFile = "native.lua",
-            nutModifiedFile = "native.nut",
-            monoFile = "native.cs",
-            dotNetFile = "native.cs"
-        ]])
+    return true
+

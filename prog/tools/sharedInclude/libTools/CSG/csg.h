@@ -1,5 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-#pragma once
+#ifndef _DAGOR_CSG_H_
+#define _DAGOR_CSG_H_
 
 class StaticGeometryNode;
 
@@ -13,3 +13,5 @@ public:
 };
 
 extern ICsgManager *createCsgWrapper();
+
+#endif // _DAGOR_CSG_H_

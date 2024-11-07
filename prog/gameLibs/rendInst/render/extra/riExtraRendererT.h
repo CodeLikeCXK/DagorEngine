@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <rendInst/renderPass.h>
@@ -11,28 +10,21 @@
 
 #include <memory/dag_framemem.h>
 #include <shaders/dag_shaderResUnitedData.h>
-#include <drv/3d/dag_draw.h>
-#include <drv/3d/dag_vertexIndexBuffer.h>
-#include <drv/3d/dag_shaderConstants.h>
-#include <drv/3d/dag_buffers.h>
-#include <drv/3d/dag_decl.h>
+#include <3d/dag_drvDecl.h>
 #include <ska_hash_map/flat_hash_map2.hpp>
 #include <shaders/dag_shStateBlockBindless.h>
 #include <render/debugMesh.h>
-#include <render/pointLod/range.h>
 #include <rendInst/packedMultidrawParams.hlsli>
 
 
 // Tools don't have depth prepass for trees.
-#define USE_DEPTH_PREPASS_FOR_TREES !(_TARGET_PC_TOOLS_BUILD)
+#define USE_DEPTH_PREPASS_FOR_TREES !(_TARGET_PC && !_TARGET_STATIC_LIB)
 
 template <class>
 class DynVariantsCache;
 
 namespace rendinst::render
 {
-
-extern int ri_vertex_data_no;
 
 static constexpr uint32_t RI_RES_ORDER_COUNT_SHIFT = 14, RI_RES_ORDER_COUNT_MASK = (1 << RI_RES_ORDER_COUNT_SHIFT) - 1;
 
@@ -57,9 +49,7 @@ class RiExtraRendererT : public DynamicVariantsPolicy //-V730
     uint32_t count;
   };
   dag::Vector<PackedDrawCallsRange, Alloc, false> drawcallRanges;
-  ska::flat_hash_map<shaders::ConstStateIdx, uint16_t, eastl::hash<shaders::ConstStateIdx>, eastl::equal_to<shaders::ConstStateIdx>,
-    Alloc>
-    bindlessStatesToUpdateTexLevels;
+  ska::flat_hash_map<uint32_t, uint16_t, eastl::hash<uint32_t>, eastl::equal_to<uint32_t>, Alloc> bindlessStatesToUpdateTexLevels;
 
 public:
   RiExtraRendererT() = default;
@@ -114,23 +104,15 @@ public:
     NO_GPU_INSTANCING = false
   };
 
-  template <bool separate_lods>
-  void coalesceDrawcalls(bool allow_reordering)
+  void coalesceDrawcalls()
   {
     TIME_D3D_PROFILE(ri_extra_coalesce_drawcalls);
     if (!multidrawList.size())
       return;
 
     const auto mergeComparator = [](const RIExRenderRecord &a, const RIExRenderRecord &b) -> bool {
-      bool result = a.isTree == b.isTree && a.drawOrder_stage == b.drawOrder_stage && a.vstride == b.vstride && a.vbIdx == b.vbIdx &&
-                    a.rstate == b.rstate && get_material_id(a.cstate) == get_material_id(b.cstate) && a.prog == b.prog;
-
-#if DAGOR_DBGLEVEL > 0
-      if constexpr (separate_lods)
-        result &= a.lod == b.lod;
-#endif
-
-      return result;
+      return a.isTree == b.isTree && a.drawOrder_stage == b.drawOrder_stage && a.vstride == b.vstride && a.vbIdx == b.vbIdx &&
+             a.rstate == b.rstate && get_material_id(a.cstate) == get_material_id(b.cstate) && a.prog == b.prog;
     };
 
     drawcallRanges.push_back(PackedDrawCallsRange{0, 1});
@@ -153,14 +135,12 @@ public:
         iter->second = max(iter->second, currentRelem.texLevel);
     }
 
-    if (allow_reordering)
-      stlsort::sort(drawcallRanges.begin(), drawcallRanges.end(), [&](const auto &a, const auto &b) {
-        if (multidrawList[a.start].drawOrder_stage != multidrawList[b.start].drawOrder_stage)
-          return multidrawList[a.start].drawOrder_stage < multidrawList[b.start].drawOrder_stage;
-        else if (multidrawList[a.start].poolOrder != multidrawList[b.start].poolOrder)
-          return multidrawList[a.start].poolOrder < multidrawList[b.start].poolOrder;
-        return multidrawList[a.start].elemOrder < multidrawList[b.start].elemOrder;
-      });
+    stlsort::sort(drawcallRanges.begin(), drawcallRanges.end(), [&](const auto &a, const auto &b) {
+      if (multidrawList[a.start].drawOrder_stage != multidrawList[b.start].drawOrder_stage)
+        return multidrawList[a.start].drawOrder_stage < multidrawList[b.start].drawOrder_stage;
+      else
+        return multidrawList[a.start].poolOrder < multidrawList[b.start].poolOrder;
+    });
   }
 
   void updateDataForPackedRender() const
@@ -176,6 +156,9 @@ public:
   inline void renderSortedMeshesPacked(dag::ConstSpan<uint16_t> riResOrder) const
   {
     G_UNUSED(riResOrder);
+    if (!unitedvdata::riUnitedVdata.getResCount() || !unitedvdata::riUnitedVdata.getIB())
+      return;
+
     if (multidrawList.empty())
       return;
 
@@ -210,11 +193,10 @@ public:
 
     TIME_D3D_PROFILE(ri_extra_render_sorted_meshes_indirect);
 
-    G_FAST_ASSERT(unitedvdata::riUnitedVdata.getIB()); // Can't be 0 if list isnt empty
     d3d_err(d3d::setind(unitedvdata::riUnitedVdata.getIB()));
 
     RiShaderConstBuffers cb;
-    cb.setInstancing(0, 4, 1, 0);
+    cb.setInstancing(0, 4, 0, true);
     cb.flushPerDraw();
 
 #if USE_DEPTH_PREPASS_FOR_TREES
@@ -246,8 +228,6 @@ public:
           shaders::overrides::set(previousOverrideId);
       }
 #endif
-      debug_mesh::set_debug_value(rl.lod);
-
       rl.curShader->setReqTexLevel(rl.texLevel);
       set_states_for_variant(rl.curShader->native(), rl.cv, rl.prog, rl.state & ~rl.DISABLE_OPTIMIZATION_BIT_STATE);
 
@@ -260,8 +240,6 @@ public:
       shaders::overrides::set(previousOverrideId);
     }
 #endif
-
-    debug_mesh::reset_debug_value();
   }
 
 
@@ -269,7 +247,7 @@ public:
   void renderSortedMeshes(dag::ConstSpan<uint16_t> riResOrder, Sbuffer *indirect_buffer = nullptr) const
   {
     G_UNUSED(riResOrder);
-    if (list.empty())
+    if (!unitedvdata::riUnitedVdata.getResCount() || !unitedvdata::riUnitedVdata.getIB())
       return;
 
     TIME_D3D_PROFILE(ri_extra_render_sorted_meshes);
@@ -278,15 +256,15 @@ public:
 
 #endif
 
-    G_FAST_ASSERT(unitedvdata::riUnitedVdata.getIB()); // Can't be 0 if list isnt empty
     d3d_err(d3d::setind(unitedvdata::riUnitedVdata.getIB()));
 
     RiShaderConstBuffers cb;
-    cb.setInstancing(0, 4, 1, 0);
+    cb.setInstancing(0, 4, 0, true);
     cb.flushPerDraw();
 
     int cVbIdx = -1, cStride = 0;
-    IPoint2 curOfsAndVertexByteStart(-1, -1);
+    IPoint2 curOfsAndCnt(-1, -1);
+    shaders::RenderStateId curRstate;
 #if USE_DEPTH_PREPASS_FOR_TREES
     shaders::OverrideStateId previousOverrideId = shaders::overrides::get_current();
     bool currentDepthPrepass = false;
@@ -294,13 +272,11 @@ public:
                                shaders::overrides::get(previousOverrideId).bits == 0;
     G_UNUSED(validOverride);
 #endif
-
-    shaders::RenderStateId curRstate = shaders::RenderStateId();
-    shaders::TexStateIdx curTstate = shaders::TexStateIdx();
-    bool currentTessellationState = !list[0].isTessellated;
+    bool currentTessellationState = false;
 
     for (auto &rl : list)
     {
+      bool skipApply = false;
       if (cVbIdx != rl.vbIdx || cStride != rl.vstride)
       {
         if (rl.vbIdx == unitedvdata::BufPool::IDX_IB)
@@ -309,28 +285,21 @@ public:
             riExtraMap.getName(riResOrder[rl.poolOrder] & RI_RES_ORDER_COUNT_MASK), rl.curShader->getShaderClassName(), rl.numf);
           continue;
         }
-        Vbuffer *vb = unitedvdata::riUnitedVdata.getVB(rl.vbIdx);
-        if (rl.isSWVertexFetch && cVbIdx != rl.vbIdx)
-        {
-          G_ASSERT(ri_vertex_data_no != -1);
-          d3d::set_buffer(STAGE_VS, ri_vertex_data_no, vb);
-          d3d::set_buffer(STAGE_PS, ri_vertex_data_no, vb);
-        }
         cVbIdx = rl.vbIdx;
         cStride = rl.vstride;
+        Vbuffer *vb = unitedvdata::riUnitedVdata.getVB(cVbIdx);
         d3d_err(d3d::setvsrc(0, vb, cStride));
       }
-
-      bool skipApply = false;
-      if (optimizeDepthPass && rl.drawOrder_stage->stage == ShaderMesh::STG_opaque && curRstate == rl.rstate &&
-          !(rl.state & RIExRenderRecord::DISABLE_OPTIMIZATION_BIT_STATE) &&
-          (rl.isTessellated == currentTessellationState && (!rl.isTessellated || curTstate == rl.tstate)))
-      {
+      if (optimizeDepthPass && (rl.drawOrder_stage & rl.STAGE_MASK) == ShaderMesh::STG_opaque && curRstate == rl.rstate &&
+          !(rl.state & RIExRenderRecord::DISABLE_OPTIMIZATION_BIT_STATE))
         skipApply = true; // we only switch renderstate - zbias,culling, etc
+
+      const bool isTessellated = rl.isTessellated;
+      if (isTessellated != currentTessellationState)
+      {
+        currentTessellationState = isTessellated;
+        skipApply = false;
       }
-      curRstate = rl.rstate;
-      curTstate = rl.tstate;
-      currentTessellationState = rl.isTessellated;
 
       RiExtraPool &riPool = riExtra[riResOrder[rl.poolOrder] & RI_RES_ORDER_COUNT_MASK];
 #if USE_DEPTH_PREPASS_FOR_TREES
@@ -357,15 +326,16 @@ public:
       if (!skipApply)
         set_states_for_variant(rl.curShader->native(), rl.cv, rl.prog, rl.state & ~rl.DISABLE_OPTIMIZATION_BIT_STATE);
 
-      IPoint2 ofsAndVertexByteStart = {rl.ofsAndCnt.x, rl.bv * rl.vstride};
-      const bool setInstancing = curOfsAndVertexByteStart != ofsAndVertexByteStart;
-      if (setInstancing || gpu_instancing)
+      IPoint2 ofsAndCnt = rl.ofsAndCnt;
+      const bool setInstancing = curOfsAndCnt.x != ofsAndCnt.x;
+      if ((setInstancing || gpu_instancing) && (globalRendinstRenderTypeVarId < 0))
       {
-        d3d::set_immediate_const(STAGE_VS, (uint32_t *)&ofsAndVertexByteStart.x, 2);
-        curOfsAndVertexByteStart = ofsAndVertexByteStart;
+        d3d::set_immediate_const(STAGE_VS, (uint32_t *)&ofsAndCnt.x, 1);
+        curOfsAndCnt = ofsAndCnt;
       }
+      curRstate = rl.rstate;
       if (gpu_instancing)
-        d3d::draw_indexed_indirect(PRIM_TRILIST, indirect_buffer, sizeof(uint32_t) * DRAW_INDEXED_INDIRECT_NUM_ARGS * rl.ofsAndCnt.x);
+        d3d::draw_indexed_indirect(PRIM_TRILIST, indirect_buffer, sizeof(uint32_t) * DRAW_INDEXED_INDIRECT_NUM_ARGS * ofsAndCnt.x);
       else
       {
         bool isImpostor = rl.lod == RiExtraPool::MAX_LODS - 1;
@@ -375,13 +345,9 @@ public:
           uint32_t immediateConsts[] = {0u, tcConsts[0], tcConsts[1]};
           d3d::set_immediate_const(STAGE_PS, immediateConsts, sizeof(immediateConsts) / sizeof(immediateConsts[0]));
         }
-        if (rl.si != RELEM_NO_INDEX_BUFFER)
-          d3d::drawind_instanced(rl.primitive, rl.si, rl.numf, rl.bv, rl.ofsAndCnt.y * instanceCountMultiply,
-            // use base instance value if shaders have interval for that
-            globalRendinstRenderTypeVarId >= 0 ? rl.ofsAndCnt.x / RIEXTRA_VECS_COUNT : 0);
-        else
-          d3d::draw_instanced(rl.primitive, rl.sv, rl.numv, rl.ofsAndCnt.y * instanceCountMultiply,
-            globalRendinstRenderTypeVarId >= 0 ? rl.ofsAndCnt.x / RIEXTRA_VECS_COUNT : 0);
+        d3d::drawind_instanced(PRIM_TRILIST, rl.si, rl.numf, rl.bv, ofsAndCnt.y * instanceCountMultiply,
+          // use base instance value if shaders have interval for that
+          globalRendinstRenderTypeVarId >= 0 ? ofsAndCnt.x / RIEXTRA_VECS_COUNT : 0);
         if (riPool.isTree && !isImpostor)
         {
           d3d::set_immediate_const(STAGE_PS, nullptr, 0);
@@ -389,10 +355,7 @@ public:
       }
 
       if (rl.state & RIExRenderRecord::DISABLE_OPTIMIZATION_BIT_STATE)
-      {
         curRstate = shaders::RenderStateId();
-        curTstate = shaders::TexStateIdx();
-      }
     }
 #if USE_DEPTH_PREPASS_FOR_TREES
     if (currentDepthPrepass)
@@ -418,9 +381,7 @@ public:
       if (a.isTessellated != b.isTessellated)
         return a.isTessellated < b.isTessellated;
 
-      if (!isDepthPass || a.isTessellated || a.drawOrder_stage->stage != ShaderMesh::STG_opaque) // opaque stage
-                                                                                                 // is all of one
-                                                                                                 // shader anyway
+      if (!isDepthPass || (a.drawOrder_stage & a.STAGE_MASK) != ShaderMesh::STG_opaque) // opaque stage is all of one shader anyway
       {
         if (a.state != b.state) // maybe split state into sampler state (heavy) and const buffer (cheap)?
         {
@@ -441,9 +402,7 @@ public:
 
       if (a.poolOrder != b.poolOrder)
         return a.poolOrder < b.poolOrder;
-      if (a.ofsAndCnt.x != b.ofsAndCnt.x)
-        return a.ofsAndCnt.x < b.ofsAndCnt.x;
-      return a.elemOrder < b.elemOrder;
+      return a.ofsAndCnt.x < b.ofsAndCnt.x;
     });
 
     if (multidrawList.empty())
@@ -462,12 +421,8 @@ public:
         return a.vstride < b.vstride;
       if (a.vbIdx != b.vbIdx)
         return a.vbIdx < b.vbIdx;
-      if (a.isTessellated != b.isTessellated)
-        return a.isTessellated < b.isTessellated;
 
-      if (!isDepthPass || a.isTessellated || a.drawOrder_stage->stage != ShaderMesh::STG_opaque) // opaque stage
-                                                                                                 // is all of one
-                                                                                                 // shader anyway
+      if (!isDepthPass || (a.drawOrder_stage & a.STAGE_MASK) != ShaderMesh::STG_opaque) // opaque stage is all of one shader anyway
       {
         if (a.rstate != b.rstate)
           return a.rstate < b.rstate;
@@ -484,21 +439,15 @@ public:
 
       if (a.poolOrder != b.poolOrder)
         return a.poolOrder < b.poolOrder;
-      if (a.ofsAndCnt.x != b.ofsAndCnt.x)
-        return a.ofsAndCnt.x < b.ofsAndCnt.x;
-      return a.elemOrder < b.elemOrder;
+      return a.ofsAndCnt.x < b.ofsAndCnt.x;
     });
 
-    const bool allowReordering = !isDecalPass && !isTransparentPass;
-    if (debug_mesh::is_enabled())
-      coalesceDrawcalls<true>(allowReordering);
-    else
-      coalesceDrawcalls<false>(allowReordering);
+    coalesceDrawcalls();
   }
 
   inline void addObjectToRender(uint16_t ri_idx, int optimizationInstances, bool optimization_depth_prepass,
     bool ignore_optimization_instances_limits, IPoint2 ofsAndCnt, int lod, uint16_t pool_order, const TexStreamingContext &texCtx,
-    float dist2, float minDist2, const ShaderElement *shader_override = nullptr, bool gpu_instancing = false)
+    float dist2, const ShaderElement *shader_override = nullptr, bool gpu_instancing = false)
   {
     if (ri_idx >= riExtra.size())
     {
@@ -509,7 +458,7 @@ public:
     if (should_hide_ri_extra_object_with_id(ri_idx))
       return;
 
-    const RiExtraPool &riPool = riExtra[ri_idx];
+    RiExtraPool &riPool = riExtra[ri_idx];
     if (layer == LayerFlag::RendinstClipmapBlend && !riPool.usingClipmap) // to be removed from here!
       return;
     // rendinsts patching heightmap are rendered only with LAYER_RENDINST_HEIGHTMAP_PATCH layer
@@ -521,7 +470,7 @@ public:
     int count = ofsAndCnt.y;
     if (optimization_depth_prepass && !ignore_optimization_instances_limits && !renderBrokenTreesToDepth)
       count = min(count, optimizationInstances);
-    if (DAGOR_LIKELY(riPool.res))
+    if (riPool.res != nullptr)
     {
       if (count > 0)
         riPool.res->updateReqLod(min<int>(lod, riPool.res->lods.size() - 1));
@@ -536,18 +485,15 @@ public:
       }
     }
     else
-    {
       logerr("Empty resource for pool %d. %d pools in total", ri_idx, riExtra.size());
-      return;
-    }
     uint32_t startEIOfs = (lod * riExtra.size() + ri_idx) * ShaderMesh::STG_COUNT + startStage;
 
     // Flag shaders and
-    // Tree shaders are generally incompatible by VS with other RI shaders and with each other. // TODO: still true?
-    const bool disableOptimization = riPool.isTree;
+    // Tree shaders are generally incompatible by VS with other RI shaders and with each other.
+    const bool disableOptimization = riPool.isTree || riPool.hasDynamicDisplacement;
     const uint32_t disableOptimizationBit = disableOptimization ? RIExRenderRecord::DISABLE_OPTIMIZATION_BIT_STATE : 0;
 
-    int texLevel = texCtx.getTexLevel(riPool.res->getTexScale(lod), dist2);
+    int texLevel = texCtx.getTexLevel(riExtra[ri_idx].res->getTexScale(lod), dist2);
 
 #if USE_DEPTH_PREPASS_FOR_TREES
     uint32_t correctedEndStage = renderBrokenTreesToDepth ? ShaderMesh::STG_atest : endStage;
@@ -576,9 +522,7 @@ public:
         const auto &elem = allElems[EI];
         if (!elem.shader)
           continue;
-        uint32_t prog, state;
-        shaders::ConstStateIdx cstate;
-        shaders::TexStateIdx tstate;
+        uint32_t prog, state, cstate, tstate;
         shaders::RenderStateId rstate;
         const ShaderElement *currentShader = (shader_override) ? shader_override : elem.shader;
         int curVar = DynamicVariantsPolicy::getStates(currentShader->native(), prog, state, rstate, cstate, tstate);
@@ -595,26 +539,15 @@ public:
 
         const bool isTessellated = riPool.elemMask[lod].tessellation & (1 << (EI - startEI));
         RIExRenderRecord record = RIExRenderRecord(currentShader, curVar, prog, state | disableOptimizationBit, rstate, tstate, cstate,
-          pool_order, (uint16_t)elem.vstride, (uint8_t)elem.vbIdx, elem.drawOrder, EI - startEI, elem.primitive,
-          IPoint2(ofsAndCnt.x, count), elem.si, elem.sv, elem.numv, elem.numf, elem.baseVertex, texLevel, riPool.isTree, isTessellated
+          pool_order, (uint16_t)elem.vstride, (uint8_t)elem.vbIdx, (uint8_t)(stage | (elem.drawOrder << RIExRenderRecord::STAGE_BITS)),
+          IPoint2(ofsAndCnt.x, count), elem.si, elem.numf, elem.baseVertex, texLevel, riPool.isTree, isTessellated
 #if DAGOR_DBGLEVEL > 0
           ,
           (uint8_t)max(counter, 0)
 #endif
         );
 
-        const auto isPacked = is_packed_material(cstate);
-        G_ASSERT(!isPacked || elem.si != RELEM_NO_INDEX_BUFFER);
-
-        const bool isPlod = riPool.elemMask[lod].plod & (1 << (EI - startEI));
-        if (isPlod)
-        {
-          record.isSWVertexFetch = true;
-          if (dist2 > minDist2)
-            record.numv >>= plod::get_density_power2_scale(dist2, minDist2);
-        }
-
-        if (!isPacked)
+        if (!is_packed_material(cstate))
           list.emplace_back(eastl::move(record));
         else
           multidrawList.emplace_back(eastl::move(record));
@@ -642,9 +575,8 @@ public:
           continue;
         int optimizationInstances = (riResOrder[k] >> RI_RES_ORDER_COUNT_SHIFT);
         float distSq = v.minSqDistances[l][i];
-        float minDistSq = v.minAllowedSqDistances[l][i];
         addObjectToRender(i, optimizationInstances, optimization_depth_prepass == OptimizeDepthPrepass::Yes,
-          ignore_optimization_instances_limits == IgnoreOptimizationLimits::Yes, ofsAndCnt, l, k, texCtx, distSq, minDistSq);
+          ignore_optimization_instances_limits == IgnoreOptimizationLimits::Yes, ofsAndCnt, l, k, texCtx, distSq);
       }
     }
   }

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 static const char *dbg_name();
 #define __DEBUG_FILEPATH          dbg_name()
 #define __UNLIMITED_BASE_PATH     1
@@ -478,21 +476,21 @@ static int do_main(bool debugmode)
       }
       else if (ctx.cmd == 7)
       {
-        DEBUG_CP();
+        debug_cp();
         jobMem->changeCtxState(ctx, 2);
         AssetExportCache::reloadSharedData();
         goto prepare_packs;
       }
       else if (ctx.cmd == 9)
       {
-        DEBUG_CP();
+        debug_cp();
         jobMem->changeCtxState(ctx, 2);
       prepare_packs:
         AssetExportCache::sharedDataRemoveRebuildType(mgr.getTexAssetTypeId());
         char target_str[6];
         strcpy(target_str, mkbindump::get_target_str(ctx.targetCode));
-        preparePacks(mgr, mgr.getAssets(), expTypesMask, exp_blk, tex_pack, grp_pack, addPackages, log, jobMem->expTex, jobMem->expRes,
-          target_str, (const char *)ctx.profileName);
+        preparePacks(mgr, expTypesMask, exp_blk, tex_pack, grp_pack, addPackages, log, jobMem->expTex, jobMem->expRes, target_str,
+          (const char *)ctx.profileName);
         debug("=== prepared packs: %d (tex) and %d (res)", tex_pack.size(), grp_pack.size());
       }
       else
@@ -508,7 +506,7 @@ static int do_main(bool debugmode)
     dabuild_finish_out_blk(out_blk, mgr, build_blk, exp_blk, app_dir, lastTargetCode, lastProfile);
   clear_all_ptr_items(tex_pack);
   clear_all_ptr_items(grp_pack);
-  DEBUG_CP();
+  debug_cp();
   release_job_mem();
 
   // release dabuild

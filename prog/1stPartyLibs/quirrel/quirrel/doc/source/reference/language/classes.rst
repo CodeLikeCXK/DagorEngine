@@ -30,11 +30,11 @@ For instance: ::
     class Foo {
         //constructor
         constructor(a) {
-            this.testy = ["stuff",1,2,3,a]
+            testy = ["stuff",1,2,3,a]
         }
         //member function
         function PrintTesty() {
-            foreach(i,val in this.testy) {
+            foreach(i,val in testy) {
                 print("idx = "+i+" = "+val)
             }
         }
@@ -103,7 +103,7 @@ class declaration. The values are copied verbatim, *no cloning is performed* eve
 
 .. note:: FOR C# and Java programmers:
 
-    Quirrel doesn't clone member's default values nor executes the member declaration for each instance (as C# or java do), just like in Python.
+    Quirrel doesn't clone member's default values nor executes the member declaration for each instance(as C# or java).
 
     So consider this example: ::
 
@@ -122,8 +122,8 @@ class declaration. The values are copied verbatim, *no cloning is performed* eve
             myarray = null
             mytable = null
             constructor() {
-                this.myarray = [1,2,3]
-                this.mytable = {}
+                myarray = [1,2,3]
+                mytable = {}
             }
         }
 
@@ -140,8 +140,8 @@ Constructors, as normal functions, can have variable number of parameters (using
 
     class Rect {
         constructor(w,h) {
-            this.width = w
-            this.height = h
+            width = w
+            height = h
         }
         x = 0
         y = 0
@@ -259,7 +259,7 @@ A method of a base class can be explicitly invoked by a method of a derived clas
             println("I'm the base")
         }
         function DoIt() {
-            this.DoSomething()
+            DoSomething()
         }
     };
 
@@ -278,6 +278,18 @@ A method of a base class can be explicitly invoked by a method of a derived clas
 
     //prints "I'm the derived"
     inst.DoIt()
+
+
+An alternative way to inheret class it to use Python-style syntax. It works the same way as described above.
+
+::
+
+    class SuperFoo(Foo) {
+        function DoSomething() {
+            println("I'm doing something")
+        }
+    }
+
 
 ----------------------
 Metamethods
@@ -300,13 +312,13 @@ the following example show how to create a class that implements the metamethod 
     class Vector3 {
         constructor(...) {
             if(vargv.len() >= 3) {
-                this.x = vargv[0]
-                this.y = vargv[1]
-                this.z = vargv[2]
+                x = vargv[0]
+                y = vargv[1]
+                z = vargv[2]
             }
         }
         function _add(other) {
-            return ::Vector3(this.x+other.x, this.y+other.y, this.z+other.z)
+            return ::Vector3(x+other.x,y+other.y,z+other.z)
         }
 
         x = 0

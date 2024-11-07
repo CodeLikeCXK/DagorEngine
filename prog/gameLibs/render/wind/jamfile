@@ -18,7 +18,7 @@ Sources =
   clusterWind.cpp
   clusterWindCascade.cpp
   clusterWindRenderer.cpp
-  fxWindHelper.cpp
+  dynamicWind.cpp
 ;
 
 include $(Root)/prog/_jBuild/build.jam ;

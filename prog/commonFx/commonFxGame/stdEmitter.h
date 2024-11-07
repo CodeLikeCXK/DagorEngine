@@ -1,5 +1,8 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright 2023 by Gaijin Games KFT, All rights reserved.
+#ifndef _GAIJIN_DAGOR_FX_STDEMITTER_H
+#define _GAIJIN_DAGOR_FX_STDEMITTER_H
 #pragma once
+
 
 #include <fx/dag_baseFxClasses.h>
 
@@ -126,3 +129,6 @@ public:
     //== handle cylinder and box
   }
 };
+
+
+#endif

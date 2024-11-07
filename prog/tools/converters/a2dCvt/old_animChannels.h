@@ -1,5 +1,14 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+/*
+ * Dagor Engine 3
+ * Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+ *
+ * (for conditions of use see prog/license.txt)
+ */
+
+#ifndef _DAGOR3_PUBLIC_ANIM_DAG_ANIMCHANNELS_H_
+#define _DAGOR3_PUBLIC_ANIM_DAG_ANIMCHANNELS_H_
 #pragma once
+
 
 #include <math/dag_Quat.h>
 #include <generic/dag_DObject.h>
@@ -236,3 +245,5 @@ protected:
   void clearOldData();
 };
 } // end of namespace AnimV20
+
+#endif

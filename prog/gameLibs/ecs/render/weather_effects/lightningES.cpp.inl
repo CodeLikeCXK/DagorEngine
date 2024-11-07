@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <math/random/dag_random.h>
 #include <ecs/anim/anim.h>
 #include <daECS/core/coreEvents.h>
@@ -127,7 +125,6 @@ struct LightningFX
     defaultRotTM = rotzTM * rotyTM;
     defaultStepsPerSequence = ShaderGlobal::get_real(clouds_steps_per_sequenceVarId);
   };
-  LightningFX(LightningFX &&) = default;
 
   ~LightningFX()
   {
@@ -372,10 +369,10 @@ static void lightning_update_es(const ecs::UpdateStageInfoAct &evt, LightningFX 
       lightning.doFlickering = lightning__point_light_flickering_probability > _rnd_float(lightning.rngSeed, 0.0f, 1.0f);
       if ((doBolt || lightning__scene_illumination_enable_for_flash) && isNearSun)
       {
-        Point3 towardsLightDir = lightPos;
-        towardsLightDir.normalize();
+        Point3 lightDir = lightPos;
+        lightDir.normalize();
         ShaderGlobal::set_int(lightning_scene_illuminationVarId, 1);
-        ShaderGlobal::set_color4(lightning_scene_illumination_dirVarId, towardsLightDir);
+        ShaderGlobal::set_color4(lightning_scene_illumination_dirVarId, lightDir);
       }
       if (lightning__animchars_eids.empty())
         return;

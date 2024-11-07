@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <daECS/core/updateStage.h>
 #include <ecs/core/entityManager.h>
 #include <ecs/core/attributeEx.h>
@@ -61,7 +59,6 @@ struct SphereCamera
     initActions();
     offs = mgr.getOr(eid, CAM_ATTR(offs), default_offset);
   }
-  SphereCamera(SphereCamera &&) = default;
   ~SphereCamera() { resetActions(); }
 
   void initActions()

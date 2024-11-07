@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 extern int dll_pull_osapiwrappers_asyncRead;
@@ -49,7 +48,6 @@ extern int dll_pull_kernel_perfTimer;
 extern int dll_pull_memory_dagmem;
 extern int dll_pull_memory_mspaceAlloc;
 extern int dll_pull_memory_framemem;
-extern int dll_pull_memory_physmem;
 
 extern int dll_pull_iosys_asyncIo;
 extern int dll_pull_iosys_asyncIoCached;
@@ -100,6 +98,7 @@ extern int dll_pull_baseutil_fileMd5Validate;
 
 extern int pull_dll_sum;
 
+extern class VisibilityFinder *visibility_finder;
 extern class OcclusionMap *occlusion_map;
 extern int hdr_render_mode;
 extern unsigned hdr_render_format;

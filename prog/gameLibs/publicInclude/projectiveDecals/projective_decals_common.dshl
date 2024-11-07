@@ -137,7 +137,8 @@ macro POJECTIVE_DECALS_VS_COMMON()
   }
 endmacro
 
-macro POJECTIVE_DECALS_WITHOUT_ZN_ZFAR_PS()
+macro POJECTIVE_DECALS_PS_COMMON()
+  INIT_ZNZFAR()
   if (mobile_render == deferred) {
     USE_SUBPASS_LOADS()
     INIT_SUBPASS_LOAD_DEPTH_GBUFFER(SP_DECALS_REG_DEPTH, SP_DECALS_IA_DEPTH)
@@ -156,7 +157,8 @@ macro POJECTIVE_DECALS_WITHOUT_ZN_ZFAR_PS()
   }
 
   hlsl(ps) {
-    float3 get_decal_eye_to_point(float4 screen)
+
+    float3 get_decal_world_pos(float4 screen)
     {
       int2 tci = screen.xy;
 
@@ -165,12 +167,7 @@ macro POJECTIVE_DECALS_WITHOUT_ZN_ZFAR_PS()
       float2 scrTc = screen.xy * screen_pos_to_texcoord.zw;
 
       float3 viewVect = lerp_view_vec(scrTc.xy);
-      return sceneDepth * viewVect;
-    }
-
-    float3 get_decal_world_pos(float4 screen)
-    {
-      return world_view_pos + get_decal_eye_to_point(screen);
+      return world_view_pos + sceneDepth * viewVect;
     }
 
     float3 get_decal_tex_coord(float4 screen, float3 patch_center, float3 norm, float3 tangent)
@@ -178,9 +175,4 @@ macro POJECTIVE_DECALS_WITHOUT_ZN_ZFAR_PS()
       return get_decal_tex_coord_from_world_pos(get_decal_world_pos(screen), patch_center, norm, tangent);
     }
   }
-endmacro
-
-macro POJECTIVE_DECALS_PS_COMMON()
-  INIT_ZNZFAR()
-  POJECTIVE_DECALS_WITHOUT_ZN_ZFAR_PS()
 endmacro

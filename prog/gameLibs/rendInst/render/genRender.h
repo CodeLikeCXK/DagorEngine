@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <rendInst/rendInstGenRender.h>
@@ -8,11 +7,9 @@
 #include "render/extraRender.h"
 
 #include <generic/dag_smallTab.h>
-#include <drv/3d/dag_vertexIndexBuffer.h>
-#include <drv/3d/dag_tex3d.h>
+#include <3d/dag_tex3d.h>
 #include <math/dag_Point3.h>
 #include <shaders/dag_rendInstRes.h>
-#include <shaders/dag_overrideStates.h>
 #include <generic/dag_tab.h>
 #include <generic/dag_carray.h>
 #include <generic/dag_staticTab.h>
@@ -108,7 +105,6 @@ struct RiGenPerInstanceParameters
 };
 
 extern shaders::UniqueOverrideStateId afterDepthPrepassOverride;
-extern Tab<UniqueBuf> riGenPerDrawDataForLayer;
 extern MultidrawContext<rendinst::render::RiGenPerInstanceParameters> riGenMultidrawContext;
 
 extern bool use_ri_depth_prepass;
@@ -124,12 +120,12 @@ extern int rendinstSceneTransBlockId;
 extern int rendinstDepthSceneBlockId;
 extern int rendinstRenderPassVarId;
 extern int rendinstShadowTexVarId;
+extern Point3_vec4 dir_from_sun; // fixme it should be initialized to most glancing angle
 extern bool per_instance_visibility;
 extern bool per_instance_visibility_for_everyone;
 extern bool per_instance_front_to_back;
 extern bool use_tree_lod0_offset;
-extern bool use_lods_by_distance_update;
-extern float lods_by_distance_range_sq;
+extern bool use_cross_dissolve;
 
 extern int dynamicImpostorTypeVarId, dynamicImpostorBackViewDepVarId, dynamicImpostorBackShadowVarId;
 extern int dynamicImpostorViewXVarId, dynamicImpostorViewYVarId;
@@ -139,11 +135,8 @@ extern float rendinst_ao_mul;
 
 extern float globalDistMul;
 extern float globalCullDistMul;
-extern float globalLodCullDistMul;
-
 extern float settingsDistMul;
 extern float settingsMinCullDistMul;
-extern float settingsMinLodBasedCullDistMul;
 extern float lodsShiftDistMul;
 extern bool forceImpostors;
 extern bool use_color_padding;
@@ -164,9 +157,6 @@ extern void initClipmapShadows();
 extern void closeClipmapShadows();
 extern void endRenderInstancing();
 extern void startRenderInstancing();
-extern void ensurePerDrawBufferExists(int layer);
-bool setBlock(int block_id, const UniqueBuf &buf);
-bool setPerDrawData(const UniqueBuf &buf);
 
 enum
 {
@@ -182,7 +172,7 @@ struct DynamicImpostor
   int baseMip;
   float currentHalfWidth, currentHalfHeight;
   float impostorSphCenterY, shadowSphCenterY;
-  SizePerRotationArr shadowImpostorSizes;
+  float shadowImpostorWd, shadowImpostorHt;
   int renderMips;
   int numColorTexMips;
   float maxFacingLeavesDelta;
@@ -198,7 +188,8 @@ struct DynamicImpostor
     renderMips(1),
     numColorTexMips(1),
     baseMip(0),
-    shadowImpostorSizes{}
+    shadowImpostorWd(0.f),
+    shadowImpostorHt(0.f)
   {}
   void delImpostor()
   {
@@ -218,17 +209,16 @@ class RtPoolData
 public:
   float sphereRadius, sphCenterY, cylinderRadius;
   float clipShadowWk, clipShadowHk, clipShadowOrigX, clipShadowOrigY;
-  UniqueTex rendinstGlobalShadowTex;
-  Texture *rendinstClipmapShadowTex;
-  TEXTUREID rendinstClipmapShadowTexId;
+  Texture *rendinstClipmapShadowTex, *rendinstGlobalShadowTex;
+  TEXTUREID rendinstClipmapShadowTexId, rendinstGlobalShadowTexId;
   DynamicImpostor impostor;
   Texture *shadowImpostorTexture;
   TEXTUREID shadowImpostorTextureId;
   Color4 shadowCol0, shadowCol1, shadowCol2;
   carray<float, MAX_LOD_COUNT_WITH_ALPHA - 1> lodRange; // no range for alpha lod
   bool hadVisibleImpostor;
+  int shadowImpostorUpdatePhase;
   uint64_t impostorDataOffsetCache;
-  float plodRadius;
   enum
   {
     HAS_NORMALMAP = 0x01,
@@ -242,7 +232,6 @@ public:
   bool hasNormalMap() const { return flags & HAS_NORMALMAP; }
   bool hasTranslucency() const { return flags & HAS_TRANSLUCENCY; }
   bool hasTransitionLod() const { return flags & HAS_TRANSITION_LOD; }
-  bool hasPLOD() const { return plodRadius > 0.0f; }
 
   RtPoolData(RenderableInstanceLodsResource *res) :
     shadowImpostorTexture(nullptr), shadowImpostorTextureId(BAD_TEXTUREID), impostorDataOffsetCache(0)
@@ -251,19 +240,20 @@ public:
     sphereRadius = res->bsphRad + sqrtf(sphereCenter.x * sphereCenter.x + sphereCenter.z * sphereCenter.z);
     cylinderRadius = sphereRadius;
     sphCenterY = sphereCenter.y;
-    rendinstClipmapShadowTexId = BAD_TEXTUREID;
-    rendinstClipmapShadowTex = nullptr;
+    rendinstGlobalShadowTexId = rendinstClipmapShadowTexId = BAD_TEXTUREID;
+    rendinstClipmapShadowTex = rendinstGlobalShadowTex = nullptr;
     flags = 0;
     clipShadowWk = clipShadowHk = sphereRadius;
     clipShadowOrigX = clipShadowOrigY = 0;
     shadowCol0 = shadowCol1 = shadowCol2 = Color4(0, 0, 0, 0);
     hasUpdatedShadowImpostor = false;
     hadVisibleImpostor = true;
-    plodRadius = 0.0f;
+    shadowImpostorUpdatePhase = 0;
   }
   ~RtPoolData()
   {
     ShaderGlobal::reset_from_vars_and_release_managed_tex_verified(rendinstClipmapShadowTexId, rendinstClipmapShadowTex);
+    ShaderGlobal::reset_from_vars_and_release_managed_tex_verified(rendinstGlobalShadowTexId, rendinstGlobalShadowTex);
     ShaderGlobal::reset_from_vars_and_release_managed_tex_verified(shadowImpostorTextureId, shadowImpostorTexture);
   }
   bool hasImpostor() const { return impostor.tex.size() != 0; }
@@ -282,8 +272,7 @@ public:
 
   inline void setShadowImpostorBoundingSphere(RiShaderConstBuffers &cb) const
   {
-    setImpostorParams(cb, impostor.shadowImpostorSizes[0].x, impostor.shadowImpostorSizes[0].y);
-    cb.setShadowImpostorSizes(impostor.shadowImpostorSizes);
+    setImpostorParams(cb, impostor.shadowImpostorWd, impostor.shadowImpostorHt);
   }
 
   void setImpostor(RiShaderConstBuffers &cb, bool forShadow) const
@@ -295,7 +284,7 @@ public:
     }
     if (forShadow)
     {
-      d3d::settex(dynamic_impostor_texture_const_no + DYNAMIC_IMPOSTOR_TEX_SHADOW_OFFSET, rendinstGlobalShadowTex.getArrayTex());
+      d3d::settex(dynamic_impostor_texture_const_no + DYNAMIC_IMPOSTOR_TEX_SHADOW_OFFSET, rendinstGlobalShadowTex);
       setShadowImpostorBoundingSphere(cb);
     }
     ShaderElement::invalidate_cached_state_block();

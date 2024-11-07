@@ -1,6 +1,3 @@
-if (__name__ == "__analysis__")
-  return
-
 //expect:w257
 //-file:undefined-global
 

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "gizmofilter.h"
 
 #include <stdlib.h>
@@ -7,7 +5,7 @@
 #include <debug/dag_debug.h>
 #include <3d/dag_render.h>
 #include <math/dag_math2d.h>
-#include <drv/hid/dag_hiKeybIds.h>
+#include <humanInput/dag_hiKeybIds.h>
 #include <gui/dag_stdGuiRenderEx.h>
 
 
@@ -1045,7 +1043,7 @@ void GizmoEventFilter::drawRotateGizmo(int sel)
     StdGuiRender::end_raw_layer();
     StdGuiRender::draw_strf_to(vp.center.x - 80, vp.center.y - AXIS_LEN_PIX - 40, "[%.2f, %.2f, %.2f]", RadToDeg(movedDelta.x),
       RadToDeg(movedDelta.y), RadToDeg(movedDelta.z));
-    StdGuiRender::reset_textures();
+    StdGuiRender::set_texture(BAD_TEXTUREID);
     StdGuiRender::start_raw_layer();
   }
 
@@ -1073,7 +1071,7 @@ void GizmoEventFilter::drawGizmo()
   if (!DAEDITOR4.worldToClient(gizmo.client->getPt(), screen))
     return;
 
-  StdGuiRender::reset_textures();
+  StdGuiRender::set_texture(BAD_TEXTUREID);
   StdGuiRender::start_raw_layer();
   switch (gizmo.type)
   {

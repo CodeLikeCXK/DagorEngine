@@ -1,7 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <ecs/core/entitySystem.h>
-#include <shaders/dag_dynSceneRes.h>
 #include <daECS/core/updateStage.h>
 #include <ecs/anim/anim.h>
 #include <util/dag_convar.h>

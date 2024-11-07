@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <daScript/daScript.h>
 #include <ecs/game/actions/action.h>
 #include <dasModules/aotEcs.h>

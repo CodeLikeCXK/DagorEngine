@@ -1,7 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "device_memory_report.h"
 #include <startup/dag_globalSettings.h>
+#include "device.h"
 
 using namespace drv3d_vulkan;
 
@@ -22,7 +21,7 @@ void DeviceMemoryReport::dmr_callback(const VkDeviceMemoryReportCallbackDataEXT 
 
     case VK_DEVICE_MEMORY_REPORT_EVENT_TYPE_ALLOCATION_FAILED_EXT: dmr.reportOutOfMemory(rdata); break;
 
-    default: D3D_ERROR("vulkan: unknown device memory report type %u", data->type); break;
+    default: logerr("vulkan: unknown device memory report type %u", data->type); break;
   }
 }
 

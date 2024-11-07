@@ -1,7 +1,8 @@
+Platform ?= win64 ;
+
 Root    ?= ../../../.. ;
 Location = prog/tools/sceneTools/daEditorX ;
-KernelLinkage = dynamic ;
-BuildingTools = yes ;
+DriverLinkage = dynamic ;
 include $(Root)/prog/tools/tools_setup.jam ;
 
 TargetType  = util ;
@@ -15,8 +16,8 @@ Dependencies =
   $(Root)/$(Location)/csg/jamfile
 ;
 
-local editor_jam = $(Root)/$(Location)/jamfile-editor ;
-platform on $(editor_jam:G=JAM) = -sPlatform=$(Platform) -sPlatformArch=$(PlatformArch) ;
-BuildJams = $(editor_jam) ;
+BuildJams =
+  $(Root)/$(Location)/jamfile-editor
+;
 
 include $(Root)/prog/_jBuild/build.jam ;

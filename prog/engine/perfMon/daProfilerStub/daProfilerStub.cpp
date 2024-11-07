@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #define DA_STUB
 #undef DA_PROFILER_ENABLED
 #define DA_PROFILER_ENABLED 0

@@ -1,4 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __DAGOR_BPARSER_H
+#define __DAGOR_BPARSER_H
 #pragma once
 
 #include <util/dag_string.h>
@@ -68,3 +69,5 @@ enum
   DIAG_WARNING,
   DIAG_USER,
 };
+
+#endif // __DAGOR_BPARSER_H

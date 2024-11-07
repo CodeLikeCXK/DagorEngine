@@ -1,10 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
-#if _TARGET_PC_WIN && !defined(_M_ARM64)
-#define HAVE_BREAKPAD_BINDER 1
-#else
-#define HAVE_BREAKPAD_BINDER 0
-#endif
 #include <sys/stat.h>
 #include <startup/dag_restart.h>
 #include <startup/dag_globalSettings.h>
@@ -12,10 +5,6 @@
 #include <osApiWrappers/dag_direct.h>
 #include <osApiWrappers/dag_cpuJobs.h>
 #include <osApiWrappers/dag_critSec.h>
-#include <osApiWrappers/dag_miscApi.h>
-#if HAVE_BREAKPAD_BINDER
-#include <binder.h>
-#endif
 #include <stdio.h>
 #include <signal.h>
 #include <ioSys/dag_dataBlock.h>
@@ -32,6 +21,7 @@
 #include "loadShaders.h"
 #include "assemblyShader.h"
 #include <stdlib.h>
+#include <time.h>
 #include "nameMap.h"
 #include <debug/dag_logSys.h>
 #include <debug/dag_debug.h>
@@ -39,16 +29,8 @@
 #include <libTools/util/hash.h>
 #include <util/dag_strUtil.h>
 
-#include <perfMon/dag_cpuFreq.h>
-
 #include "DebugLevel.h"
 #include <libTools/util/atomicPrintf.h>
-
-#include "cppStcode.h"
-#include <EASTL/string.h>
-
-#include "defer.h"
-#include "processes.h"
 
 #if _TARGET_PC_WIN
 #include <windows.h>
@@ -56,7 +38,6 @@
 
 #include <unistd.h>
 #include <spawn.h>
-#include <pthread.h>
 #if _TARGET_PC_MACOSX
 #include <AvailabilityMacros.h>
 #elif _TARGET_PC_LINUX
@@ -64,6 +45,42 @@
 #endif
 extern int __argc;
 extern char **__argv;
+char **environ;
+
+typedef struct
+{
+  pid_t hProcess;
+} PROCESS_INFORMATION;
+
+#define DWORD        uint32_t
+#define STILL_ACTIVE (~0u)
+#define INFINITE     (~0u)
+#define NOT_ACTIVE   0
+
+void TerminateProcess(pid_t process, int ret_code) { kill(process, SIGINT); }
+
+void WaitForMultipleObjects(uint32_t count, pid_t *pids, bool, uint32_t)
+{
+  for (uint32_t i = 0; i < count; ++i)
+  {
+    int status = 0;
+    waitpid(pids[i], &status, 0);
+  }
+}
+
+bool GetExitCodeProcess(pid_t process, DWORD *ret_code)
+{
+  int status = 0;
+  int ret = waitpid(process, &status, WNOHANG);
+
+  *ret_code = STILL_ACTIVE;
+  if (ret >= 0 && WIFEXITED(status))
+    *ret_code = WEXITSTATUS(status);
+  if (ret == -1 && errno == ECHILD)
+    *ret_code = NOT_ACTIVE, ret = 0;
+
+  return ret >= 0;
+}
 
 void SleepEx(uint32_t ms, bool) { usleep(ms * 1000); }
 #endif
@@ -104,6 +121,9 @@ std::vector<std::string> exclude_from_generation;
 extern int getShaderCacheVersion();
 extern void reset_shaders_inc_base();
 extern void add_shaders_inc_base(const char *base);
+static Tab<PROCESS_INFORMATION> childCompilatioProcessInfo;
+static Tab<SimpleString> childCompilatioTargetObj;
+static WinCritSec *termCC = NULL;
 
 #ifdef _CROSS_TARGET_METAL
 bool use_ios_token = false;
@@ -114,13 +134,84 @@ bool use_metal_glslang = false;
 extern const char *debug_output_dir;
 #endif
 
-const char shader_compiler_version[] = "2.72";
+static void terminateChildProcesses()
+{
+  WinAutoLock lock(*termCC);
+  if (!childCompilatioProcessInfo.size())
+    return;
+
+  debug_dump_stack("terminateChildProcesses");
+  ATOMIC_PRINTF("--- Terminating child processes...\n");
+  fflush(stdout);
+  for (int j = 0; j < childCompilatioProcessInfo.size(); j++)
+  {
+    DWORD ret_code = -1;
+    if (GetExitCodeProcess(childCompilatioProcessInfo[j].hProcess, &ret_code))
+    {
+      if (ret_code != STILL_ACTIVE)
+      {
+#if _TARGET_PC_WIN
+        CloseHandle(childCompilatioProcessInfo[j].hThread);
+        CloseHandle(childCompilatioProcessInfo[j].hProcess);
+#endif
+        mem_set_0(make_span(childCompilatioProcessInfo).subspan(j, 1));
+      }
+      if (ret_code == 0)
+        childCompilatioTargetObj[j] = NULL;
+    }
+#if _TARGET_PC_WIN
+    if (childCompilatioProcessInfo[j].dwProcessId)
+      GenerateConsoleCtrlEvent(CTRL_BREAK_EVENT, childCompilatioProcessInfo[j].dwProcessId);
+#else
+    kill(childCompilatioProcessInfo[j].hProcess, SIGINT);
+#endif
+  }
+
+  for (int i = 0; i < 100; i++)
+  {
+    int wait = 0;
+    for (int j = 0; j < childCompilatioProcessInfo.size(); j++)
+    {
+      DWORD ret_code = -1;
+      if (GetExitCodeProcess(childCompilatioProcessInfo[j].hProcess, &ret_code))
+        if (ret_code == STILL_ACTIVE)
+          wait++;
+    }
+    if (!wait)
+    {
+      ATOMIC_PRINTF("--- Wait done!\n");
+      fflush(stdout);
+      break;
+    }
+    SleepEx(100, false);
+  }
+  for (int j = 0; j < childCompilatioProcessInfo.size(); j++)
+  {
+    DWORD ret_code = 0;
+    if (GetExitCodeProcess(childCompilatioProcessInfo[j].hProcess, &ret_code))
+      if (ret_code == STILL_ACTIVE)
+      {
+        ATOMIC_PRINTF("terminating child[%d]\n", j);
+        TerminateProcess(childCompilatioProcessInfo[j].hProcess, 13);
+        mem_set_0(make_span(childCompilatioProcessInfo).subspan(j, 1));
+      }
+  }
+  // childCompilatioProcessInfo.clear();
+
+  for (int j = 0; j < childCompilatioTargetObj.size(); j++)
+  {
+    const char *nm = childCompilatioTargetObj[j];
+    if (*nm && dd_file_exists(nm))
+      ATOMIC_PRINTF("%s %s\n", unlink(nm) == 0 ? "removed" : "ERR: failed to remove", nm);
+  }
+  // childCompilatioTargetObj.clear();
+}
 
 #define QUOTE(x) #x
 #define STR(x)   QUOTE(x)
 static void show_header()
 {
-  printf("Dagor Shader Compiler %s (dump format '%c%c%c%c', obj format '%c%c%c%c', shader cache ver 0x%x)\n"
+  printf("Dagor Shader Compiler 2.72 (dump format '%c%c%c%c', obj format '%c%c%c%c', shader cache ver 0x%x)\n"
 #if _CROSS_TARGET_C1
 
 #elif _CROSS_TARGET_C2
@@ -139,7 +230,7 @@ static void show_header()
 #error "DX9 support dropped"
 #endif
          "\n\nCopyright (C) Gaijin Games KFT, 2023\n",
-    shader_compiler_version, _DUMP4C(SHADER_BINDUMP_VER), _DUMP4C(SHADER_CACHE_VER), sha1_cache_version
+    _DUMP4C(SHADER_BINDUMP_VER), _DUMP4C(SHADER_CACHE_VER), sha1_cache_version
 #if _CROSS_TARGET_C1
 
 
@@ -174,13 +265,12 @@ const char *cross_compiler = "dx12";
 const char *cross_compiler = "dx11";
 #endif
 
-// @TODO: update usage (-optionalAsBranches, maybe there is something else)
 static void showUsage()
 {
   show_header();
   printf(
     "\nUsage:\n"
-    "  dsc2-dev.exe <config blk-file|single *.dshl file> <optional options>\n"
+    "  dsc2-dev.exe <config blk-file|single *.sh file> <optional options>\n"
     "\n"
     "Common options:\n"
     "  -no_sha1_cache - do not use sha1 cache\n"
@@ -188,8 +278,8 @@ static void showUsage()
     "  -purge_sha1_cache - delete sha1 cache (if no_sha1_cache is not enabled, it will be re-populated)\n"
     "  -commentPP - save PP as comments (for shader debugging)\n"
     "  -r - force rebuild all files (even if not modified)\n"
-    "  -relinkOnly - forbid compilation so build will fail if any OBJ is out-of-data. If passed with -r, reduces -r to -forceRelink\n"
-    "  -forceRelink - enforce linking even if bindump is up to date (may be useful for debugging)\n"
+    "  -relinkOnly - forbid compilation so build will fail if any OBJ is out-of-data\n"
+    "  -bones_start N - starting register for bones. If -1 (default) allocates as other named consts\n"
     "  -maxVSF N - maximum allowed VSF register no. Default 4096\n"
     "  -maxPSF N - maximum allowed PSF register no. Default 4096\n"
     "  -cjN - per-source parallel compilation using N processes (N=CpuCount by default)\n"
@@ -204,7 +294,6 @@ static void showUsage()
     "  -debug - enable debugging mode in shaders. It assumes the DEBUG = yes interval, and enables assert\n"
     "  -pdb - insert debug info during HLSL compile\n"
     "  -dfull | -debugfull - for Dx11 and Dx12, it produces unoptimized shaders with full debug info,\n"
-    "  -embed_source - for Dx11 and Dx12, it embeds hlsl source in the binary without turning off optimization,\n"
     "   including shader source, so shader debugging will have the HLSL source. It implies -pdb.\n"
     "  -daftermath - for DX12, it produces shader binaries and pdb/cso files for detailed resolve of\n"
     "   Aftermath gpu dumps by Nsight Graphics\n"
@@ -213,31 +302,21 @@ static void showUsage()
     "  -skipvalidation - do not validate the generated code against known capabilities"
     " and constraints\n"
     "  -nodisassembly - no hlsl disassembly output\n"
+    "  -sanitize_hash - sanitize hash of strings\n"
+    "  -no_sanitize_hash - not sanitize hash\n"
     "  -codeDump  - always dump hlsl/Cg source code to be compiled to shaderlog\n"
     "  -codeDumpErr - dump hlsl/Cg source code to shaderlog when error occurs\n"
     "  -validateIdenticalBytecode - dumps variants that were compiled but had identical bytecode\n"
     "  -shaderOn - default shaders are on\n"
     "  -invalidAsNull - by default invalid variants are marked NULL (just as dont_render)\n"
     "  -o <intermediate dir> - path to store obj files.\n"
-    "  -c <source.dshl>  - compile only one shader file (using all settings in BLK as usual)\n"
+    "  -c <source.sh>  - compile only one shader file (using all settings in BLK as usual)\n"
     "  -logdir <dir>   - path to logs\n"
-    "  -suppressLogs   - do not make fileLogs\n"
+    "  -supressLogs    - do not make fileLogs\n"
     "  -enablefp16     - enable using 16 bit types in shaders\n"
     "  -HLSL2021       - use the HLSL 2021 version of the language\n"
     "  -addTextureType - save static texture types to shaderdump (need for texture type validation in daBuild)\n"
-    "  -logExactTiming - enable logging of compilation times with 0.001s (1ms) precision\n"
-    "  -perFileAllLogs - enable logging of compilation times for all files with additional info\n"
-    "  -saveDumpOnCrash - save a dump for the proccess if there is a critical issue during compilation (could cause a process hung)\n"
-    "  -cppStcode       - compile cpp stcode, test feat, only works for win64 & xbox now.\n"
-    "  -useCpujobsBackend - Use old cpujobs as the mt backend. Shows worse cpu utilizaiton, kept as a fallback for now.\n"
-    "  -cppUnityBuild   - use unity build for cpp stcode.\n"
-    "  -cppStcodeArch   - Arch for stcode compilation. Default is chosen when it is not specified. Current opts: x86|x86_64|arm64.\n"
-#if _CROSS_TARGET_DX12
-    "  -localTimestamp - use filesystem timestamps for shader classes instead of git commit timestamps\n"
-    "  -autotestMode - disables some features for test speed. Currently disables phase 2 of xbox compilation\n"
-    "compilation tests\n"
-#endif
-#if _CROSS_TARGET_SPIRV || _CROSS_TARGET_METAL
+#if _CROSS_TARGET_SPIRV
     "  -enableBindless:<on|off> - enables utilizing bindless features (default: "
 #if USE_BINDLESS_FOR_STATIC_TEX
     "on)\n"
@@ -253,7 +332,7 @@ static void showUsage()
     "                                           if this is not true, the compilation is failed. This mode is used in bs\n"
     "                                 - generate - generates code and saves it in files\n"
     "\n"
-    "Options for !!SINGLE!! (not config BLK!!!) *.DSHL file rebuild:\n"
+    "Options for !!SINGLE!! (not config BLK!!!) *.SH file rebuild:\n"
     "  -gi:<on|off> - enable/disable variants for GI (<on> by default)\n"
 #if _CROSS_TARGET_SPIRV
     "  -compiler-hlslcc - always use hlslcc compiler path\n"
@@ -291,13 +370,11 @@ const char *shc::getSrcRootFolder() { return shaderSrcRoot.empty() ? NULL : shad
 wchar_t *dx12_pdb_cache_dir = nullptr;
 #endif
 static bool forceRebuild = false;
-static bool forceRelink = false;
 static bool shortMessages = false;
 static bool noSave = false;
 bool hlslSavePPAsComments = false;
 bool isDebugModeEnabled = false;
 DebugLevel hlslDebugLevel = DebugLevel::NONE;
-bool hlslEmbedSource = false;
 bool hlslSkipValidation = false;
 bool hlslNoDisassembly = false;
 bool hlslShowWarnings = false;
@@ -305,6 +382,7 @@ bool hlslWarningsAsErrors = false;
 bool hlslDumpCodeAlways = false, hlslDumpCodeOnError = false;
 bool validateIdenticalBytecode = false;
 bool hlsl2021 = false;
+bool enableFp16 = false;
 bool useCompression = true;
 bool addTextureType = false;
 #if USE_BINDLESS_FOR_STATIC_TEX
@@ -315,13 +393,13 @@ bool enableBindless = false;
 int hlslOptimizationLevel = 4;
 static const char *intermediate_dir = NULL, *compile_only_sh = NULL;
 static const char *log_dir = NULL;
-bool suppressLogs = false;
+bool supressLogs = false;
+static int compilation_job_count = -1;
+static bool wait_compilation_jobs = false;
 int hlsl_maximum_vsf_allowed = 2048;
 int hlsl_maximum_psf_allowed = 2048;
+int hlsl_bones_base_reg = -1;
 bool optionalIntervalsAsBranches = false;
-bool logExactCompilationTimes = false;
-bool logFullPerFileCompilationStats = false;
-bool autotest_mode = false;
 #if _CROSS_TARGET_SPIRV
 bool compilerHlslCc = false;
 bool compilerDXC = false;
@@ -329,75 +407,208 @@ bool compilerDXC = false;
 #if _CROSS_TARGET_DX12
 #include "dx12/asmShaderDXIL.h"
 dx12::dxil::Platform targetPlatform = dx12::dxil::Platform::PC;
-bool use_git_timestamps = true;
-#else
-bool use_git_timestamps = false;
 #endif
 
-#if _TARGET_PC_LINUX | _TARGET_PC_MACOSX
-static pthread_t sigint_handler_thread;
-#endif
-
-static bool doCompileModulesAsync(const ShVariantName &sv)
+static void doCompileModulesAsync(const ShVariantName &sv)
 {
-  eastl::string cmdname(__argv[0]);
+  Tab<PROCESS_INFORMATION> &pi = childCompilatioProcessInfo;
+  String cmdname(__argv[0]);
 #if _TARGET_PC_WIN
-  if (!dd_get_fname_ext(cmdname.c_str()))
+  Tab<HANDLE> piH;
+  STARTUPINFO si;
+  if (!dd_get_fname_ext(cmdname))
     cmdname += ".exe";
+#else
+  Tab<pid_t> piH;
 #endif
-
-  dag::Vector<eastl::string> commonArgv{cmdname};
+  String cmdline(cmdname);
   for (int i = 1; i < __argc; i++)
-    commonArgv.emplace_back(__argv[i]);
-  commonArgv.emplace_back("-r");
+    cmdline.aprintf(0, " %s", __argv[i]);
+  cmdline.aprintf(0, " -r");
+
+  if (compilation_job_count > 24) // very small benefit from 24+ processes, but noticeable memory consumption
+    compilation_job_count = 24;
+
+  childCompilatioTargetObj.resize(compilation_job_count);
+  pi.resize(compilation_job_count);
+  mem_set_0(pi);
+  piH.reserve(pi.size());
+  int compilations_in_flight = 0;
+  bool some_compilations_failed = false;
+  DWORD ret_code;
 
   if (sv.sourceFilesList.size() < 2)
-    return false;
+    return;
 
-  int timeMsec = get_time_msec();
-  int modules_cnt = 0;
+#ifdef _CROSS_TARGET_METAL
+  bool shouldTryAgain;
+  int triesCount = 0;
+
+restart:
+  shouldTryAgain = false;
+#endif
+
+  int timeSec = time(NULL), modules_compiled = 0;
   for (int i = 0; i < sv.sourceFilesList.size(); i++)
   {
+    PROCESS_INFORMATION *piNext = NULL;
     if (!shc::should_recompile_sh(sv, sv.sourceFilesList[i]) && !forceRebuild)
       continue;
 
-    auto argv = commonArgv;
-    argv.emplace_back("-c");
-    argv.emplace_back(sv.sourceFilesList[i].c_str());
+  find_slot:
+    for (int j = 0; j < pi.size(); j++)
+      if (!pi[j].hProcess)
+      {
+        piNext = &pi[j];
+        break;
+      }
 
-    // clang-format off
-    proc::enqueue(proc::ProcessTask{
-      eastl::move(argv),
-      eastl::nullopt,
-      [fname = eastl::string(shc::get_obj_file_name_from_source(sv.sourceFilesList[i], sv))] {
-        if (dd_file_exist(fname.c_str()))
-          dd_erase(fname.c_str());
-      }});
-    // clang-format on
+    if (!piNext)
+    {
+      piH.clear();
+      for (int j = 0; j < pi.size(); j++)
+        if (pi[j].hProcess)
+          piH.push_back(pi[j].hProcess);
+      WaitForMultipleObjects(piH.size(), piH.data(), false, INFINITE);
 
-    modules_cnt++;
+      for (int j = 0; j < pi.size(); j++)
+        if (GetExitCodeProcess(pi[j].hProcess, &ret_code))
+        {
+          if (ret_code == STILL_ACTIVE)
+            continue;
+#if _TARGET_PC_WIN
+          CloseHandle(pi[j].hThread);
+          CloseHandle(pi[j].hProcess);
+#endif
+          compilations_in_flight--;
+          mem_set_0(make_span(pi).subspan(j, 1));
+          if (ret_code != 0)
+          {
+#ifdef _CROSS_TARGET_METAL
+            shouldTryAgain = true;
+#else
+            if (wait_compilation_jobs)
+              some_compilations_failed = true;
+            else
+            {
+              terminateChildProcesses();
+              sh_debug(SHLOG_FATAL, "compilation failed");
+              compilation_job_count = 0;
+              return;
+            }
+#endif
+          }
+          childCompilatioTargetObj[j] = NULL;
+          if (!piNext)
+            piNext = &pi[j];
+        }
+      if (!piNext)
+      {
+        SleepEx(100, true);
+        goto find_slot;
+      }
+    }
+
+#if _TARGET_PC_WIN
+    ZeroMemory(&si, sizeof(STARTUPINFO));
+    si.cb = sizeof(STARTUPINFO);
+    si.dwFlags = STARTF_USESHOWWINDOW;
+    si.wShowWindow = SW_HIDE;
+    childCompilatioTargetObj[piNext - pi.data()] = shc::get_obj_file_name_from_source(sv.sourceFilesList[i], sv);
+
+    if (!CreateProcessA(cmdname, cmdline + String(0, " -c %s", sv.sourceFilesList[i]), NULL, NULL, TRUE, CREATE_NEW_PROCESS_GROUP,
+          NULL, NULL, &si, piNext))
+    {
+      terminateChildProcesses();
+      sh_debug(SHLOG_FATAL, "cannot start %s\nwith cmdline;: %s -c %s", cmdname, cmdline, sv.sourceFilesList[i]);
+      compilation_job_count = 0;
+      return;
+    }
+#else
+    Tab<const char *> arguments;
+    arguments.push_back(cmdname);
+    for (int arg = 1; arg < __argc; arg++)
+      arguments.push_back(__argv[arg]);
+    arguments.push_back("-r");
+    arguments.push_back("-c");
+    arguments.push_back(sv.sourceFilesList[i].c_str());
+    arguments.push_back(nullptr);
+    int res = posix_spawn(&piNext->hProcess, cmdname, nullptr, nullptr, (char *const *)arguments.data(), environ);
+    if (res)
+    {
+      terminateChildProcesses();
+      sh_debug(SHLOG_FATAL, "cannot start %s\nwith cmdline;: %s -c %s", cmdname, cmdline, sv.sourceFilesList[i]);
+      compilation_job_count = 0;
+      return;
+    }
+#endif
+    compilations_in_flight++;
+    modules_compiled++;
   }
 
-  bool compiled = proc::execute();
-  if (!compiled)
+  while (compilations_in_flight > 0)
   {
+    piH.clear();
+    for (int j = 0; j < pi.size(); j++)
+      if (pi[j].hProcess)
+        piH.push_back(pi[j].hProcess);
+    WaitForMultipleObjects(piH.size(), piH.data(), false, INFINITE);
+
+    for (int j = 0; j < pi.size(); j++)
+      if (GetExitCodeProcess(pi[j].hProcess, &ret_code))
+      {
+        if (ret_code == STILL_ACTIVE)
+          continue;
+#if _TARGET_PC_WIN
+        CloseHandle(pi[j].hThread);
+        CloseHandle(pi[j].hProcess);
+#endif
+        compilations_in_flight--;
+        mem_set_0(make_span(pi).subspan(j, 1));
+        if (ret_code != 0)
+        {
+#ifdef _CROSS_TARGET_METAL
+          shouldTryAgain = true;
+#else
+          if (wait_compilation_jobs)
+            some_compilations_failed = true;
+          else
+          {
+            terminateChildProcesses();
+            sh_debug(SHLOG_FATAL, "compilation failed");
+            compilation_job_count = 0;
+            return;
+          }
+#endif
+        }
+        childCompilatioTargetObj[j] = NULL;
+      }
+    if (compilations_in_flight)
+      SleepEx(100, true);
+  }
+
+#ifdef _CROSS_TARGET_METAL
+  if (shouldTryAgain)
+  {
+    triesCount++;
+
+    if (triesCount < 2)
+    {
+      goto restart;
+    }
+  }
+#endif
+
+  timeSec = time(NULL) - timeSec;
+  sh_debug(SHLOG_NORMAL, "[INFO] parallel compilation of %d modules using %d processes (x%d threads) done for %ds", modules_compiled,
+    compilation_job_count, shc::compileJobsCount, timeSec);
+  forceRebuild = false;
+  if (wait_compilation_jobs && some_compilations_failed)
+  {
+    terminateChildProcesses();
     sh_debug(SHLOG_FATAL, "compilation failed");
-    return false;
+    compilation_job_count = 0;
   }
-
-  float timeSec = float(get_time_msec() - timeMsec) * 1e-3;
-  if (logExactCompilationTimes)
-  {
-    sh_debug(SHLOG_NORMAL, "[INFO] parallel compilation of %d modules using %d processes (x%d threads) done for %.4gs", modules_cnt,
-      proc::max_proc_count(), shc::worker_count(), timeSec);
-  }
-  else
-  {
-    sh_debug(SHLOG_NORMAL, "[INFO] parallel compilation of %d modules using %d processes (x%d threads) done for %ds", modules_cnt,
-      proc::max_proc_count(), shc::worker_count(), int(timeSec));
-  }
-
-  return true;
 }
 
 static char sha1_cache_dir_buf[320] = {0};
@@ -426,9 +637,9 @@ static bool remove_recursive(const char *dirname)
 }
 
 static void compile(Tab<String> &source_files, const char *fn, const char *bindump_fnprefix, const ShHardwareOptions &opt,
-  const char *blk_file_name, const char *cfg_dir, const char *binminidump_fnprefix, BindumpPackingFlags packing_flags)
+  const char *blk_file_name, const char *cfg_dir, const char *binminidump_fnprefix, bool pack)
 {
-  ShVariantName sv(dd_get_fname(fn), opt);
+  ShVariantName sv(fn, opt);
   ShaderParser::AssembleShaderEvalCB::buildHwDefines(opt);
   sv.sourceFilesList = source_files;
   for (int i = 0; i < sv.sourceFilesList.size(); i++)
@@ -446,18 +657,8 @@ static void compile(Tab<String> &source_files, const char *fn, const char *bindu
     if (sv.sourceFilesList.size() != 1 || sv.sourceFilesList[0] != compile_only_sh)
     {
       sh_debug(SHLOG_ERROR, "unknown source '%s', available are:", compile_only_sh);
-
-      int linesForStdout = min<size_t>(100ul, sv.sourceFilesList.size());
-      for (int i = 0; i < linesForStdout; i++)
-        sh_debug(SHLOG_NORMAL, "    %s", sv.sourceFilesList[i]);
-      if (linesForStdout > sv.sourceFilesList.size())
-      {
-        sh_debug(SHLOG_NORMAL, "\nToo many available files, see full list in log");
-        for (int i = linesForStdout; i < sv.sourceFilesList.size(); i++)
-          debug("    %s", sv.sourceFilesList[i]);
-      }
-
-      sh_process_errors();
+      for (int i = 0; i < sv.sourceFilesList.size(); i++)
+        sh_debug(SHLOG_ERROR, "  %s", sv.sourceFilesList[i]);
       return;
     }
   }
@@ -484,14 +685,10 @@ static void compile(Tab<String> &source_files, const char *fn, const char *bindu
     additionalDirStr += "DAFTERMATH";
   if (isDebugModeEnabled)
     additionalDirStr += "-debug";
-  if (hlslEmbedSource)
-    additionalDirStr += "-embed_src";
-#if _CROSS_TARGET_SPIRV || _CROSS_TARGET_METAL
+#if _CROSS_TARGET_SPIRV
   if (enableBindless)
     additionalDirStr += "-bindless";
 #endif
-  if (autotest_mode)
-    additionalDirStr += "-autotest";
 
   sv.intermediateDir += additionalDirStr;
   dd_mkdir(sv.intermediateDir);
@@ -519,7 +716,6 @@ static void compile(Tab<String> &source_files, const char *fn, const char *bindu
     blk.removeParam("outDumpName");
     blk.removeParam("outMiniDumpName");
     blk.removeParam("packBin");
-    blk.removeParam("packShGroups");
     if (addTextureType)
       blk.addBool("addTextureType", true);
     blk.saveToTextStream(*hasher);
@@ -555,28 +751,7 @@ static void compile(Tab<String> &source_files, const char *fn, const char *bindu
   }
   if (forceRebuild && shc::relinkOnly)
   {
-    if (isBlkChanged)
-    {
-      sh_debug(SHLOG_FATAL, "need to recompile %s but compilation is denied by -relinkOnly", compile_only_sh ? compile_only_sh : "");
-      return;
-    }
-    else // caused by -r flag: -relinkOnly reduces -r to -forceRelink
-    {
-      forceRebuild = false;
-      forceRelink = true;
-      sh_debug(SHLOG_NORMAL, "[WARNING] -r flag was reduced to -forceRelink because -relinkOnly was specified");
-    }
-  }
-  if (forceRelink && compile_only_sh)
-  {
-    sh_debug(SHLOG_FATAL,
-      "trying to compile single shader %s but relinking is enforced with -forceRelink or -r and -relinkOnly combination",
-      compile_only_sh);
-    return;
-  }
-  if (forceRelink && noSave)
-  {
-    sh_debug(SHLOG_FATAL, "need to relink shaders but -nosave flag enforces no save or linkage", compile_only_sh);
+    sh_debug(SHLOG_FATAL, "need to recompile %s but compilation is denied by -relinkOnly", compile_only_sh ? compile_only_sh : "");
     return;
   }
 
@@ -584,25 +759,16 @@ static void compile(Tab<String> &source_files, const char *fn, const char *bindu
   auto verStr = d3d::as_ps_string(opt.fshVersion);
 
   char bindump_fn[260];
-  char stcode_lib_path[260];
-#if _CROSS_TARGET_SPIRV || _CROSS_TARGET_METAL
+#if _CROSS_TARGET_SPIRV
   if (enableBindless)
   {
-    _snprintf(bindump_fn, 260, "%s.bindless.%s%s.shdump.bin", bindump_fnprefix, verStr, autotest_mode ? ".autotest" : "");
-    _snprintf(stcode_lib_path, 260, "%s.bindless.%s-stcode", bindump_fnprefix, verStr);
+    _snprintf(bindump_fn, 260, "%s.bindless.%s.shdump.bin", bindump_fnprefix, verStr);
   }
   else
 #endif
   {
-    _snprintf(bindump_fn, 260, "%s.%s%s.shdump.bin", bindump_fnprefix, verStr, autotest_mode ? ".autotest" : "");
-    _snprintf(stcode_lib_path, 260, "%s.%s-stcode", bindump_fnprefix, verStr);
+    _snprintf(bindump_fn, 260, "%s.%s.shdump.bin", bindump_fnprefix, verStr);
   }
-
-  const char *stcode_lib_fn = strrchr(stcode_lib_path, '/');
-  if (!stcode_lib_fn)
-    stcode_lib_fn = stcode_lib_path;
-  else
-    ++stcode_lib_fn;
 
   {
     char destDir[260];
@@ -625,7 +791,6 @@ static void compile(Tab<String> &source_files, const char *fn, const char *bindu
 
 
 #elif _CROSS_TARGET_DX12
-    if (!noSave)
     {
       String pdb(260, "%s_pdb/", destDir[0] ? bindump_fnprefix : "./");
       dd_mkdir(pdb);
@@ -636,45 +801,18 @@ static void compile(Tab<String> &source_files, const char *fn, const char *bindu
 #endif
   }
 
-  prepare_stcode_directory(sv.intermediateDir);
-
-  CompilerAction compAction = forceRebuild ? CompilerAction::COMPILE_AND_LINK : shc::should_recompile(sv);
-  if (compile_only_sh)
-  {
-    if (compAction == CompilerAction::COMPILE_AND_LINK)
-      compAction = CompilerAction::COMPILE_ONLY;
-    else if (compAction == CompilerAction::LINK_ONLY)
-      compAction = CompilerAction::NOTHING;
-  }
-  else if (forceRelink)
-  {
-    if (compAction == CompilerAction::NOTHING)
-      compAction = CompilerAction::LINK_ONLY;
-    else if (compAction == CompilerAction::COMPILE_ONLY)
-      compAction = CompilerAction::COMPILE_AND_LINK;
-  }
-
-  if (compAction != CompilerAction::NOTHING)
+  if (forceRebuild || shc::should_recompile(sv))
   {
     if (shortMessages && !compile_only_sh)
-      ATOMIC_PRINTF_IMM("[INFO] Building '%s'...\n", (char *)sv.dest);
-    if (proc::is_multiproc())
+      ATOMIC_PRINTF("[INFO] Building '%s'...\n", (char *)sv.dest);
+    if (compilation_job_count)
     {
-      const bool compileResult = doCompileModulesAsync(sv);
+      doCompileModulesAsync(sv);
       AtomicPrintfMutex::term();
-
-      if (compileResult)
-      {
-        forceRebuild = false;
-        if (compAction == CompilerAction::COMPILE_AND_LINK)
-          compAction = CompilerAction::LINK_ONLY;
-        else if (compAction == CompilerAction::COMPILE_ONLY)
-          compAction = CompilerAction::NOTHING;
-      }
     }
-    shc::compileShader(sv, noSave, forceRebuild, compAction);
-    if (!suppressLogs)
-      ShaderCompilerStat::printReport((proc::is_multiproc() || compile_only_sh) ? NULL : (log_dir ? log_dir : cfg_dir));
+    shc::compileShader(sv, noSave, forceRebuild, compile_only_sh != NULL);
+    if (!supressLogs)
+      ShaderCompilerStat::printReport((compilation_job_count || compile_only_sh) ? NULL : (log_dir ? log_dir : cfg_dir));
   }
   else
   {
@@ -687,42 +825,19 @@ static void compile(Tab<String> &source_files, const char *fn, const char *bindu
   if (strcmp(bindump_fnprefix, "*") != 0)
   {
     dd_mkpath(bindump_fn);
-    shc::buildShaderBinDump(bindump_fn, sv.dest, forceRebuild, false, packing_flags);
+    shc::buildShaderBinDump(bindump_fn, sv.dest, forceRebuild, false, pack);
   }
 
   if (binminidump_fnprefix)
   {
-    _snprintf(bindump_fn, 260, "%s.%s%s.shdump.bin", binminidump_fnprefix, verStr, autotest_mode ? ".autotest" : "");
+    _snprintf(bindump_fn, 260, "%s.%s.shdump.bin", binminidump_fnprefix, verStr);
     dd_mkpath(bindump_fn);
-    shc::buildShaderBinDump(bindump_fn, sv.dest, dd_stricmp(binminidump_fnprefix, bindump_fnprefix) == 0, true, packing_flags);
-  }
-
-  eastl::string bindump_path;
-  const char *end = strrchr(bindump_fnprefix, '/'); // remove last part, the prefix
-  if (end)
-    bindump_path = eastl::string(bindump_fnprefix, end);
-  else
-    bindump_path = eastl::string("./");
-
-  auto stcodeCompTaskMaybe = make_stcode_compilation_task(bindump_path.c_str(), stcode_lib_fn, sv);
-  if (stcodeCompTaskMaybe)
-  {
-    proc::enqueue(eastl::move(stcodeCompTaskMaybe).value());
-    bool compiled = proc::execute();
-    if (!compiled)
-    {
-      sh_debug(SHLOG_FATAL, "Failed to compile stcode");
-      return;
-    }
-  }
-  else if (stcodeCompTaskMaybe.error() == StcodeMakeTaskError::FAILED)
-  {
-    sh_debug(SHLOG_FATAL, "Failed to create stcode task");
-    return;
+    shc::buildShaderBinDump(bindump_fn, sv.dest, dd_stricmp(binminidump_fnprefix, bindump_fnprefix) == 0, true, pack);
   }
 
   if (blk_file_name && isBlkChanged)
   {
+    ;
     if (auto blkHashFile = df_open(blkHashFilename.c_str(), DF_WRITE | DF_CREATE))
     {
       df_write(blkHashFile, blkHash.data(), blkHash.size());
@@ -896,40 +1011,10 @@ static void mergeDataBlock(DataBlock &dest, const DataBlock &src, const SCFastNa
 
 static void stderr_report_fatal_error(const char *, const char *msg, const char *call_stack)
 {
-  ATOMIC_FPRINTF_IMM(stderr, "Fatal error: %s\n%s", msg, call_stack);
+  ATOMIC_FPRINTF(stderr, "Fatal error: %s\n%s", msg, call_stack);
 }
 
-#if HAVE_BREAKPAD_BINDER
-static void enable_breakpad()
-{
-  breakpad::Product p;
-  p.name = "ShaderCompiler";
-  p.version = shader_compiler_version;
-
-  breakpad::Configuration cfg;
-  cfg.userAgent = "SC";
-  if (suppressLogs)
-    cfg.dumpPath = "ShaderCrashDumps";
-
-  breakpad::init(eastl::move(p), eastl::move(cfg));
-}
-
-static bool fatal_handler(const char *msg, const char *call_stack, const char *file, int line)
-{
-  if (!breakpad::is_enabled())
-    return true;
-
-  breakpad::CrashInfo info;
-  info.expression = msg;
-  info.callstack = call_stack;
-  info.errorCode = 0;
-  info.file = file;
-  info.line = line;
-
-  breakpad::dump(info);
-  return true;
-}
-#endif
+bool sanitize_hash_strings = false;
 
 #if _TARGET_PC_WIN
 static BOOL WINAPI ctrl_break_handler(_In_ DWORD dwCtrlType)
@@ -941,46 +1026,29 @@ void ctrl_break_handler(int)
 {
 #endif
 
-#if _TARGET_PC_LINUX | _TARGET_PC_MACOSX
-  // We only process sigints in a dedicated thread to avoid deadlocks in shutdown.
-  // (See comment below where we create sigint_handler_thread)
-  // We should not be doing shutdown logic in handlers anyway, but that requires more substantial refac.
-
-  if (!pthread_equal(sigint_handler_thread, pthread_self()))
-  {
-    signal(SIGINT, &ctrl_break_handler);
-    pthread_kill(sigint_handler_thread, SIGINT);
-    return;
-  }
-#endif
-
-  // When in process loop, shutdown is locked, so instead we signal it to cancel
-  if (proc::is_multiproc())
-    proc::cancel();
-
-  if (!shc::try_enter_shutdown())
-  {
-#if _TARGET_PC_WIN
-    return TRUE;
-#else
-    signal(SIGINT, &ctrl_break_handler);
-    return;
-#endif
-  }
-
   setvbuf(stdout, NULL, _IOLBF, 4096);
   if (compile_only_sh)
-    ATOMIC_PRINTF_IMM("Cancelling compilation (%s)...\n", compile_only_sh);
+    ATOMIC_PRINTF("Cancelling compilation (%s)...\n", compile_only_sh);
   else
-    ATOMIC_PRINTF_IMM("Cancelling compilation (%d processes)...\n", proc::max_proc_count());
+    ATOMIC_PRINTF("Cancelling compilation (%d jobs)...\n", compilation_job_count);
   debug("SIGINT received!\n");
-
-  shc::deinit_jobs();
+  if (compilation_job_count > 0)
+  {
+    terminateChildProcesses();
+    for (int attempts = 10; compilation_job_count && attempts; attempts--)
+      SleepEx(100, true);
+    if (compilation_job_count)
+      ATOMIC_PRINTF("(!) failed to wait compilation_job_count(%d) reset...\n", compilation_job_count);
+  }
+  if (cpujobs::is_inited())
+  {
+    debug("terminating jobs");
+    cpujobs::term(true, 3000);
+    debug("jobs termination done");
+  }
   fflush(stdout);
   AtomicPrintfMutex::term();
-
   quit_game(1);
-
 #if _TARGET_PC_WIN
   return TRUE;
 #endif
@@ -996,29 +1064,7 @@ int DagorWinMain(bool debugmode)
 
   startup_game(RESTART_ALL);
 
-#if _TARGET_PC_LINUX | _TARGET_PC_MACOSX
-  // On unix signal can be handled by any thread, on windows a separate thread is spun up.
-  // The unix behaviour is unacceptable in the current implementation: as we are still shutting
-  // down in the handler, it a worker catches it we deadlock in jobs deinit. If the main thread
-  // catches it while awaiting jobs, we get a deadlock. So, we spin up a thread that just
-  // listens to signals, and SIGINTS are forwarded to it (see ctrl_break_handler).
-  {
-    int res = pthread_create(
-      &sigint_handler_thread, nullptr,
-      +[](void *) -> void * {
-        for (;;)
-          pause();
-        return nullptr;
-      },
-      nullptr);
-    if (res != 0)
-    {
-      fprintf(stderr, "Failed to create sighandler thread\n");
-      return 1;
-    }
-  }
-#endif
-
+  termCC = new WinCritSec("termChildren");
 #if _TARGET_PC_WIN
   SetConsoleCtrlHandler(&ctrl_break_handler, TRUE);
 #else
@@ -1052,10 +1098,6 @@ int DagorWinMain(bool debugmode)
     singleBuild = true;
   }
   const char *outDumpNameConfig = NULL;
-  bool enableFp16 = false;
-  bool saveDumpOnCrash = false;
-  unsigned numProcesses = -1;
-  unsigned numWorkers = 0;
 
   for (int i = 2; i < __argc; i++)
   {
@@ -1078,11 +1120,9 @@ int DagorWinMain(bool debugmode)
       outDumpNameConfig = __argv[i];
     }
     else if (strnicmp(s, "-j", 2) == 0)
-      numWorkers = atoi(s + 2);
+      shc::compileJobsCount = atoi(s + 2);
     else if (stricmp(s, "-relinkOnly") == 0)
       shc::relinkOnly = true;
-    else if (stricmp(s, "-forceRelink") == 0)
-      forceRelink = true;
     else if (dd_stricmp(s, "-nosave") == 0)
       noSave = true;
     else if (dd_stricmp(s, "-debug") == 0)
@@ -1091,8 +1131,6 @@ int DagorWinMain(bool debugmode)
       hlslDebugLevel = DebugLevel::BASIC;
     else if (dd_stricmp(s, "-dfull") == 0 || dd_stricmp(s, "-debugfull") == 0)
       hlslDebugLevel = DebugLevel::FULL_DEBUG_INFO;
-    else if (dd_stricmp(s, "-embed_source") == 0)
-      hlslEmbedSource = true;
     else if (dd_stricmp(s, "-daftermath") == 0)
       hlslDebugLevel = DebugLevel::AFTERMATH;
     else if (dd_stricmp(s, "-commentPP") == 0)
@@ -1109,7 +1147,10 @@ int DagorWinMain(bool debugmode)
       sh_console_print_warnings(true);
     }
     else if (dd_stricmp(s, "-O0") == 0)
+    {
       hlslOptimizationLevel = 0;
+      sanitize_hash_strings = false;
+    }
     else if (dd_stricmp(s, "-O1") == 0)
       hlslOptimizationLevel = 1;
     else if (dd_stricmp(s, "-O2") == 0)
@@ -1117,7 +1158,21 @@ int DagorWinMain(bool debugmode)
     else if (dd_stricmp(s, "-O3") == 0)
       hlslOptimizationLevel = 3;
     else if (dd_stricmp(s, "-O4") == 0)
+    {
       hlslOptimizationLevel = 4;
+      sanitize_hash_strings = true;
+    }
+    else if (dd_stricmp(s, "-no_sanitize_hash") == 0)
+      sanitize_hash_strings = false;
+    else if (dd_stricmp(s, "-sanitize_hash") == 0)
+      sanitize_hash_strings = true;
+    else if (dd_stricmp(s, "-bones_start") == 0)
+    {
+      i++;
+      if (i >= __argc)
+        goto usage_err;
+      hlsl_bones_base_reg = atoi(__argv[i]);
+    }
     else if (dd_stricmp(s, "-maxVSF") == 0)
     {
       i++;
@@ -1135,13 +1190,14 @@ int DagorWinMain(bool debugmode)
     else if (dd_stricmp(s, "-skipvalidation") == 0)
     {
       hlslSkipValidation = true;
+      sanitize_hash_strings = false;
     }
     else if (dd_stricmp(s, "-nodisassembly") == 0)
       hlslNoDisassembly = true;
     else if (dd_stricmp(s, "-shaderOn") == 0)
       shc::setRequiredShadersDef(true);
-    else if (dd_stricmp(s, "-supressLogs") == 0 || dd_stricmp(s, "-suppressLogs") == 0)
-      suppressLogs = true;
+    else if (dd_stricmp(s, "-supressLogs") == 0)
+      supressLogs = true;
     else if (dd_stricmp(s, "-shadervar-generator-mode") == 0)
     {
       using namespace std::string_view_literals;
@@ -1178,7 +1234,7 @@ int DagorWinMain(bool debugmode)
     {
       purge_sha1 = true;
     }
-#if _CROSS_TARGET_SPIRV || _CROSS_TARGET_METAL
+#if _CROSS_TARGET_SPIRV
     else if (strnicmp(s, "-enableBindless:", 15) == 0)
     {
       if (strstr(s, "on"))
@@ -1210,10 +1266,6 @@ int DagorWinMain(bool debugmode)
     else if (0 == dd_stricmp(s, "-enablefp16"))
     {
       enableFp16 = true;
-    }
-    else if (0 == dd_stricmp(s, "-autotestMode"))
-    {
-      autotest_mode = true;
     }
 #endif
 #if _CROSS_TARGET_SPIRV
@@ -1316,8 +1368,10 @@ int DagorWinMain(bool debugmode)
         goto usage_err;
       compile_only_sh = __argv[i];
     }
+    else if (dd_stricmp(s, "-cjWait") == 0)
+      wait_compilation_jobs = true;
     else if (strnicmp(s, "-cj", 3) == 0)
-      numProcesses = strlen(s) > 3 ? atoi(s + 3) : -1;
+      compilation_job_count = strlen(s) > 3 ? atoi(s + 3) : -1;
     else if (dd_stricmp(s, "-belownormal") == 0)
     {
 #if _TARGET_PC_WIN
@@ -1335,48 +1389,8 @@ int DagorWinMain(bool debugmode)
     {
       optionalIntervalsAsBranches = true;
     }
-    else if (dd_stricmp(s, "-logExactTiming") == 0)
-    {
-      logExactCompilationTimes = true;
-    }
-    else if (dd_stricmp(s, "-perFileAllLogs") == 0)
-    {
-      logFullPerFileCompilationStats = true;
-    }
     else if (strnicmp("-addpath:", __argv[i], 9) == 0)
       ; // skip
-    else if (dd_stricmp(s, "-saveDumpOnCrash") == 0)
-    {
-      saveDumpOnCrash = true;
-    }
-    else if (strnicmp("-useCpujobsBackend", __argv[i], 18) == 0)
-    {
-      shc::use_threadpool = false;
-    }
-    else if (strnicmp("-cppStcode", __argv[i], 11) == 0)
-    {
-      compile_cpp_stcode = true;
-    }
-    else if (strnicmp("-cppUnityBuild", __argv[i], 15) == 0)
-    {
-      cpp_stcode_unity_build = true;
-    }
-    else if (strnicmp("-cppStcodeArch", s, 15) == 0)
-    {
-      ++i;
-      if (i >= __argc)
-        goto usage_err;
-      if (!set_stcode_arch_from_arg(__argv[i]))
-        goto usage_err;
-    }
-#if _CROSS_TARGET_DX12
-    else if (dd_stricmp(s, "-localTimestamp") == 0)
-    {
-      use_git_timestamps = false;
-    }
-#endif
-    else if (dd_stricmp(s, "-noHlslHardcodedRegs") == 0)
-      ShaderParser::disallow_hlsl_hardcoded_regs = true;
     else
     {
     usage_err:
@@ -1386,19 +1400,8 @@ int DagorWinMain(bool debugmode)
       return 13;
     }
   }
-
-#if HAVE_BREAKPAD_BINDER
-  if (saveDumpOnCrash)
-  {
-    dgs_fatal_handler = fatal_handler;
-    enable_breakpad();
-  }
-#endif
-
-  extern bool useSha1Cache;
-  useSha1Cache &= (hlslDebugLevel == DebugLevel::NONE) && hlslNoDisassembly;
   if (compile_only_sh)
-    numProcesses = 0;
+    compilation_job_count = 0;
   else
     printf("hlslOptimizationLevel is set to %d\n", hlslOptimizationLevel);
 
@@ -1409,17 +1412,63 @@ int DagorWinMain(bool debugmode)
   if (!shortMessages && !compile_only_sh)
     show_header();
 
-  shc::init_jobs(numWorkers);
-  DEFER(shc::deinit_jobs());
+  class LocalCpuJobs
+  {
+  public:
+    LocalCpuJobs()
+    {
+      cpujobs::init();
+      if (!shc::compileJobsCount)
+        shc::compileJobsCount = cpujobs::get_physical_core_count();
+      else if (shc::compileJobsCount > 32)
+        shc::compileJobsCount = 32;
 
-  proc::init(numProcesses);
-  DEFER(proc::deinit());
+      if (shc::compileJobsCount > 1)
+      {
+        int logicalCores = cpujobs::get_logical_core_count();
+        int physicalCores = cpujobs::get_physical_core_count();
+        int coreRatio = max(1, logicalCores / physicalCores);
 
-  if (compile_only_sh || proc::is_multiproc())
+        G_ASSERTF(shc::compileJobsCount <= logicalCores, "There is not enough logic cores (%u) to run %u jobs", logicalCores,
+          shc::compileJobsCount);
+
+        if (coreRatio > 1)
+        {
+          // occupy cores properly, start with physical, then use logical HT ones
+          // use virtual job manager, otherwise job indexing will be broken
+          shc::compileJobsMgrBase = logicalCores;
+          for (int i = 0; i < shc::compileJobsCount; i++)
+          {
+            uint64_t affinity = 1ull << ((i * coreRatio) % logicalCores + i / physicalCores);
+            G_VERIFY(cpujobs::create_virtual_job_manager(1 << 20, affinity) == shc::compileJobsMgrBase + i);
+          }
+        }
+        else
+        {
+          for (int i = 0; i < shc::compileJobsCount; i++)
+            G_VERIFY(cpujobs::start_job_manager(i, 1 << 20));
+        }
+        debug("inited %d job managers", shc::compileJobsCount);
+      }
+      else
+        debug("started in job-less mode");
+    }
+    ~LocalCpuJobs()
+    {
+      cpujobs::term(true, 1000);
+      debug("terminated cpujobs");
+    }
+  };
+  LocalCpuJobs lcj;
+  if (compilation_job_count < 0)
+    compilation_job_count = cpujobs::get_physical_core_count();
+  if (compilation_job_count < 2)
+    compilation_job_count = 0;
+  if (compile_only_sh || compilation_job_count)
     setvbuf(stdout, NULL, _IOFBF, 4096);
 
   ErrorCounter::allCompilations().reset();
-  int timeMsec = get_time_msec();
+  int timeSec = time(NULL);
 
   ShaderParser::renderStageToIdxMap.reset();
   ShaderParser::renderStageToIdxMap.addNameId("opaque");
@@ -1434,12 +1483,11 @@ int DagorWinMain(bool debugmode)
     ShaderCompilerStat::reset();
     Tab<String> sourceFiles(midmem);
     sourceFiles.push_back(String(filename));
-    compile(sourceFiles, filename, makeShBinDumpName(filename), singleOptions, NULL, getDir(filename), NULL,
-      BindumpPackingFlagsBits::NONE);
+    compile(sourceFiles, filename, makeShBinDumpName(filename), singleOptions, NULL, getDir(filename), NULL, false);
   }
   else
   {
-    if (compile_only_sh || proc::is_multiproc())
+    if (compile_only_sh || compilation_job_count > 1)
       AtomicPrintfMutex::init(dd_get_fname(__argv[0]), filename);
 
     // read data block with files
@@ -1476,29 +1524,13 @@ int DagorWinMain(bool debugmode)
     }
 
     reset_shaders_inc_base();
-
-    Tab<eastl::string> mount_points;
-    mount_points.push_back(".");
-    for (int i = 0, nid = blk.getNameId("mountPoint"); i < blk.paramCount(); i++)
-      if (blk.getParamNameId(i) == nid && blk.getParamType(i) == DataBlock::TYPE_STRING)
-        mount_points.emplace_back(blk.getStr(i));
-
     for (int i = 0, nid = blk.getNameId("incDir"); i < blk.paramCount(); i++)
       if (blk.getParamNameId(i) == nid && blk.getParamType(i) == DataBlock::TYPE_STRING)
       {
-        auto param = blk.getStr(i);
-        eastl::string folder;
-        for (const auto &mount_point : mount_points)
-        {
-          folder = mount_point + "/" + param;
-          if (dd_dir_exists(folder.c_str()))
-          {
-            add_shaders_inc_base(folder.c_str());
-            add_include_path(folder.c_str());
-            if (!compile_only_sh)
-              sh_debug(SHLOG_INFO, "Using include dir: %s", folder.c_str());
-          }
-        }
+        add_shaders_inc_base(blk.getStr(i));
+        add_include_path(blk.getStr(i));
+        if (!compile_only_sh)
+          sh_debug(SHLOG_INFO, "Using include dir: %s", blk.getStr(i));
       }
 
     if (outDumpNameConfig)
@@ -1631,6 +1663,7 @@ int DagorWinMain(bool debugmode)
         {
           if (strstr(fsh, "3.0"))
             opt.fshVersion = 3.0_sm;
+#if _CROSS_TARGET_DX11 || _CROSS_TARGET_C1 || _CROSS_TARGET_C2 || _CROSS_TARGET_SPIRV || _CROSS_TARGET_METAL || _CROSS_TARGET_EMPTY
           else if (strstr(fsh, "4.0"))
             opt.fshVersion = 4.0_sm;
           else if (strstr(fsh, "4.1"))
@@ -1641,6 +1674,7 @@ int DagorWinMain(bool debugmode)
             opt.fshVersion = 6.0_sm;
           else if (strstr(fsh, "6.6"))
             opt.fshVersion = 6.6_sm;
+#endif
 #if _CROSS_TARGET_SPIRV
           else if (strstr(fsh, "SpirV"))
             opt.fshVersion = 5.0_sm;
@@ -1655,7 +1689,7 @@ int DagorWinMain(bool debugmode)
             return 13;
           }
         }
-        opt.enableHalfProfile = comp->getBool("enableHalfProfile", true) || enableFp16;
+        opt.enableHalfProfile = comp->getBool("enableHalfProfile", true);
 
         DataBlock *blk_av = comp->getBlockByName("assume_vars");
         DataBlock *blk_rs = comp->getBlockByName("required_shaders");
@@ -1707,44 +1741,20 @@ int DagorWinMain(bool debugmode)
         shc::setRequiredShadersBlock(blk_rs);
 
         ShaderCompilerStat::reset();
-
-        BindumpPackingFlags packingFlags = 0;
-        if (useCompression)
-        {
-          if (blk.getBool("packShGroups", true)) // Pack groups by default
-            packingFlags |= BindumpPackingFlagsBits::SHADER_GROUPS;
-          if (blk.getBool("packBin", false)) // Don't further compress bindump by default
-            packingFlags |= BindumpPackingFlagsBits::WHOLE_BINARY;
-        }
+        bool pack = useCompression && blk.getBool("packBin", false);
         compile(sourceFiles, fName, comp->getStr("outDumpName", defShBindDumpPrefix), opt, filename, getDir(filename),
-          blk.getStr("outMiniDumpName", NULL), packingFlags);
+          blk.getStr("outMiniDumpName", NULL), pack);
       }
     }
   }
 
   if (compile_only_sh)
   {
-    float timeSec = float(get_time_msec() - timeMsec) * 1e-3;
-    int wholeSeconds = int(timeSec);
-    String compCountMsg("");
-    if (logFullPerFileCompilationStats)
-    {
-      int uniqueCompilationCount = ShaderCompilerStat::getUniqueCompilationCount();
-      compCountMsg.aprintf(64, " (%u compilation%s)", uniqueCompilationCount, uniqueCompilationCount == 1 ? "" : "s");
-    }
-    if (logFullPerFileCompilationStats || wholeSeconds > 5)
-    {
-      if (logExactCompilationTimes)
-        sh_debug(SHLOG_NORMAL, "[INFO]      done '%s' for %.4gs%s", compile_only_sh, timeSec, compCountMsg);
-      else
-      {
-        if (wholeSeconds > 60)
-          sh_debug(SHLOG_NORMAL, "[INFO]      done '%s' for %dm:%02ds%s", compile_only_sh, wholeSeconds / 60, wholeSeconds % 60,
-            compCountMsg);
-        else
-          sh_debug(SHLOG_NORMAL, "[INFO]      done '%s' for %ds%s", compile_only_sh, wholeSeconds, compCountMsg);
-      }
-    }
+    timeSec = time(NULL) - timeSec;
+    if (timeSec > 60)
+      sh_debug(SHLOG_NORMAL, "[INFO]      done '%s' for %dm:%02ds", compile_only_sh, timeSec / 60, timeSec % 60);
+    else if (timeSec > 5)
+      sh_debug(SHLOG_NORMAL, "[INFO]      done '%s' for %ds", compile_only_sh, timeSec);
     fflush(stdout);
 #if _CROSS_TARGET_C1 | _CROSS_TARGET_C2
 
@@ -1753,30 +1763,11 @@ int DagorWinMain(bool debugmode)
   }
 
   printf("\n");
-  float timeSec = float(get_time_msec() - timeMsec) * 1e-3;
-  int wholeSeconds = int(timeSec);
-  if (logExactCompilationTimes && wholeSeconds > 1)
-    printf("took %.4gs\n", timeSec);
-  else
-  {
-    if (wholeSeconds > 60)
-      printf("took %dm:%02ds\n", wholeSeconds / 60, wholeSeconds % 60);
-    else if (wholeSeconds > 1)
-      printf("took %ds\n", wholeSeconds);
-  }
-
-  if (!::dgs_execute_quiet && ::getenv("DAGOR_BUILD_BELL") != nullptr)
-  {
-    if (void *console = get_console_window_handle())
-      flash_window(console, true);
-
-#if _TARGET_PC_WIN
-    // Sends the BEL signal to the Windows Terminal app, which is default in latest versions of Windows.
-    // The Windows Terminal app is not reacting to FlashWindowEx() API, so we need to send the BEL signal
-    // to get the user's attention.
-    printf("\a");
-#endif
-  }
+  timeSec = time(NULL) - timeSec;
+  if (timeSec > 60)
+    printf("took %dm:%02ds\n", timeSec / 60, timeSec % 60);
+  else if (timeSec > 1)
+    printf("took %ds\n", timeSec);
 
   return 0;
 }

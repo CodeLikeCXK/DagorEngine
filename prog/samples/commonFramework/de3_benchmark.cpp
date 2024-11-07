@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "de3_benchmark.h"
 #include <ioSys/dag_dataBlock.h>
 #include <perfMon/dag_cpuFreq.h>

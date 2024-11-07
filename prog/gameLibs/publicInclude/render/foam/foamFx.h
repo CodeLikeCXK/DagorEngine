@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -8,7 +9,6 @@
 #include <3d/dag_resPtr.h>
 #include <shaders/dag_postFxRenderer.h>
 #include <shaders/dag_DynamicShaderHelper.h>
-#include <shaders/dag_overrideStates.h>
 
 struct FoamFxParams
 {

@@ -1,10 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <EASTL/string.h>
 #include <ioSys/dag_dataBlock.h>
 #include <osApiWrappers/dag_localConv.h>
 #include <osApiWrappers/dag_files.h>
-#include <vecmath/dag_vecMathDecl.h> // DAGOR_ASAN_ENABLED
 #include <soundSystem/soundSystem.h>
 #include <soundSystem/debug.h>
 #include <soundSystem/fmodApi.h>
@@ -51,7 +48,7 @@ ScoopedJavaThreadAttacher::ScoopedJavaThreadAttacher()
   int getEnvStat = g_jvm->GetEnv((void **)&env, JNI_VERSION_1_6);
   if (getEnvStat == JNI_EDETACHED)
   {
-    //      DEBUG_CTX("GetEnv: expected behavior not attached");
+    //      debug_ctx("GetEnv: expected behavior not attached");
     if (g_jvm->AttachCurrentThread(&env, NULL) != 0)
       DAG_FATAL("Failed to attach JavaThread");
     isAttach = true;
@@ -59,7 +56,7 @@ ScoopedJavaThreadAttacher::ScoopedJavaThreadAttacher()
   else if (getEnvStat == JNI_OK)
   {
     // Not expected behavior but normal
-    DEBUG_CTX("GetEnv: not expected behavior attached");
+    debug_ctx("GetEnv: not expected behavior attached");
   }
   else if (getEnvStat == JNI_EVERSION)
     DAG_FATAL("Java GetEnv: version not supported");
@@ -217,18 +214,18 @@ static bool memory_init(const DataBlock &blk)
   G_ASSERTF_RETURN(blockSizeMb > 0 && blockSizeMb < 1024, false, "Wrong memory block size(%d)", blockSizeMb);
   int blockSize = blockSizeMb << 20;
   g_memory_block_size = blockSize;
-
-#ifdef DAGOR_ASAN_ENABLED
-  g_fixed_mem_pool = blk.getBool("isFixedPool", false);
-#elif _TARGET_C1 | _TARGET_C2 // FIXME: remove this hardcode (it need to be properly configured in data)
+  g_fixed_mem_pool =
+#if _TARGET_C1 | _TARGET_C2
 
 #else
-  g_fixed_mem_pool = blk.getBool("isFixedPool", true);
+    blk.getBool("isFixedPool", true);
 #endif
+
   if (g_fixed_mem_pool)
     return memory_init_fixed_pool(blockSize);
   else
     return memory_init_custom_allocators();
+  return false;
 }
 
 static inline uint32_t major_version(uint32_t version) { return version >> 16; }
@@ -565,7 +562,7 @@ void shutdown()
   // debug fmod memory usage
   int used = 0, used_max = 0;
   FMOD::Memory_GetStats(&used, &used_max);
-  DEBUG_CTX("[SNDSYS] Shutdown, memory usage (current/max/total): %d/%d/%dK", used >> 10, used_max >> 10, g_memory_block_size >> 10);
+  debug_ctx("[SNDSYS] Shutdown, memory usage (current/max/total): %d/%d/%dK", used >> 10, used_max >> 10, g_memory_block_size >> 10);
 
   // release system
   if (g_system)

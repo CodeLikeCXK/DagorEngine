@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -10,7 +11,6 @@ class DataBlock;
 
 namespace nvlowlatency
 {
-void start_frame(uint32_t frame_id);
 bool is_available();
 // minimum_interval_ms should be 1000 / <max_frames_per_sec>
 // minimum_interval_ms = 0 means no limit

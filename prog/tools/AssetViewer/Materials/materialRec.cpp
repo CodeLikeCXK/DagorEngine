@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "materialRec.h"
 #include <assets/asset.h>
 #include <assets/assetMgr.h>

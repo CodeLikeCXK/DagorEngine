@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <dasModules/dasDagorResPtr.h>
 
 
@@ -16,11 +14,11 @@
 
 static_assert(eastl::is_trivially_copyable_v<ManagedTexView>);
 static_assert(eastl::is_trivially_destructible_v<ManagedTexView>);
-static_assert(sizeof(ManagedTexView) <= sizeof(vec4f));
+static_assert(sizeof(ManagedTexView) <= 16);
 
 static_assert(eastl::is_trivially_copyable_v<ManagedBufView>);
 static_assert(eastl::is_trivially_destructible_v<ManagedBufView>);
-static_assert(sizeof(ManagedBufView) <= sizeof(vec4f));
+static_assert(sizeof(ManagedBufView) <= 16);
 
 
 struct ManagedTexViewAnnotation final : das::ManagedValueAnnotation<ManagedTexView>

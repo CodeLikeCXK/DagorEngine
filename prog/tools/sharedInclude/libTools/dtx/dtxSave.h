@@ -1,4 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __GAIJIN_DDX_SAVE_H__
+#define __GAIJIN_DDX_SAVE_H__
 #pragma once
 
 #include <libTools/dtx/dtxHeader.h>
@@ -16,3 +17,5 @@ bool write_cb_to_cb(IGenSave &cwr, IGenLoad &crd, Header *header, int size);
 bool write_to_file(IGenLoad &crd, const char *filename, int data_size = -1);
 
 } // namespace ddstexture
+
+#endif

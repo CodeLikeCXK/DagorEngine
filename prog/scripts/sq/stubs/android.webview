@@ -1,6 +1,6 @@
 
 return {
-  show = @(_url1, _b, _url2) false
+  show = @(url, false, url) false
   hide = @() null
   isShown= @() false
 }

@@ -1,5 +1,5 @@
 local z = 0
-function foo(x, y) {
+let function foo(x, y) {
     return function() {
         let c = class {
             x = 10

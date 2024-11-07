@@ -1,6 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
-
 #include <dasModules/dasScriptsLoader.h>
 #include <ecs/scripts/dasEs.h>
 #include <daECS/core/updateStage.h>
@@ -138,7 +136,7 @@ struct ESModuleGroupData : das::ModuleGroupUserData
   DebugArgStrings &argStrings;
   ecs::TemplateRefs trefs; // contains only components
   das::vector<CreatingTemplate> templates;
-  ESModuleGroupData(DebugArgStrings &str, ecs::EntityManager *mgr) : das::ModuleGroupUserData("es"), argStrings(str), trefs(mgr) {}
+  ESModuleGroupData(DebugArgStrings &str) : das::ModuleGroupUserData("es"), argStrings(str) {}
   eastl::vector<eastl::pair<EsDescUP, eastl::string>> unresolvedEs;
   eastl::vector<QueryData> unresolvedQueries;
   das::DebugInfoHelper *helper = nullptr;

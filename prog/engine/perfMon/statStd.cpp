@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <supp/dag_math.h>
 #include <generic/dag_smallTab.h>
 #include <math/dag_mathBase.h>

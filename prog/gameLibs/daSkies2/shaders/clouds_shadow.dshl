@@ -31,16 +31,13 @@ endmacro
 macro USE_CLOUDS_SHADOW_BASE_REF(code)
   hlsl(code) {
     #define INV_WEATHER_SIZE (clouds_weather_inv_size__alt_scale.x)
-    #ifndef DISABLE_CLOUDS_SHADOW
-      #define DISABLE_CLOUDS_SHADOW MOBILE_DEVICE
-    #endif
   }
   USE_CLOUDS_SHADOWS_VOLUME(code)
   hlsl(code) {
-    half base_clouds_transmittance(float3 worldPos)
+    float base_clouds_transmittance(float3 worldPos)
     {
-      #if DISABLE_CLOUDS_SHADOW
-        return 1.0h;
+      #if MOBILE_DEVICE
+        return 1.0;
       #else
         float alt = world_pos_to_clouds_alt.x*worldPos.y + world_pos_to_clouds_alt.y;
         //#define ACCURATE_SHADOW_INTERSECTION 1//correct is not making much better quality
@@ -59,24 +56,24 @@ macro USE_CLOUDS_SHADOW_BASE_REF(code)
         #endif
         //that should be actually calculated with correct lighting attenuation and then blurred.
         //we can do that for 2d
-        return half(getCloudsShadows3d(float3(worldPos.xz*clouds_weather_inv_size__alt_scale.x + world_pos_to_clouds_alt.zw + clouds_hole_pos_var.zw, max(0, alt))).x);
+        return getCloudsShadows3d(float3(worldPos.xz*clouds_weather_inv_size__alt_scale.x + world_pos_to_clouds_alt.zw + clouds_hole_pos_var.zw, max(0, alt))).x;
       #endif
     }
-    half clouds_shadow_from_extinction(half extinction)
+    float clouds_shadow_from_extinction(float extinction)
     {
-      #if DISABLE_CLOUDS_SHADOW
-        return 1.0h;
+      #if MOBILE_DEVICE
+        return 1.0;
       #else
         //to avoid 2 pow, we use hardcoded Multiple Scattering attenuation and contribution
         extinction*=extinction;
-        half extinction3 = extinction*extinction*extinction;
-        return extinction*(0.4h + extinction3*0.6h);
+        float extinction3 = extinction*extinction*extinction;
+        return extinction*(0.4 + extinction3*0.6);
       #endif
     }
-    half clouds_shadow(float3 worldPos)
+    float clouds_shadow(float3 worldPos)
     {
-      #if DISABLE_CLOUDS_SHADOW
-        return 1.0h;
+      #if MOBILE_DEVICE
+        return 1.0;
       #else
         return clouds_shadow_from_extinction(base_clouds_transmittance(worldPos));
       #endif
@@ -95,33 +92,22 @@ macro INIT_CLOUDS_SHADOW_BASE_2D(light_dir_x, light_dir_y, light_dir_z, code)
   }
 endmacro
 
-macro INIT_CLOUDS_SHADOW_BASE_2D_TEX(light_dir_x, light_dir_y, light_dir_z, code)
-  INIT_CLOUDS_SHADOW_BASE_COMMON(light_dir_x, light_dir_y, light_dir_z, code)
-  (code) {
-    clouds_shadows_2d@tex2d = clouds_shadows_2d;
-  }
-endmacro
-
-macro USE_CLOUDS_SHADOW_BASE_2D_SMP(code, smpl)
+macro USE_CLOUDS_SHADOW_BASE_2D(code)
   hlsl(code) {
     half clouds_shadow(float3 worldPos)
     {
-      #if DISABLE_CLOUDS_SHADOW
+      #if MOBILE_DEVICE
         return 1.0;
       #else
         float alt = world_pos_to_clouds_alt.x*worldPos.y + world_pos_to_clouds_alt.y;
         worldPos.xz = clouds_weather_inv_size__alt_scale.yz*alt + worldPos.xz;
         //that should be actually calculated with correct lighting attenuation and then blurred.
         //we can do that for 2d
-        float shadow = clouds_shadows_2d.SampleLevel(smpl, worldPos.xz*clouds_weather_inv_size__alt_scale.x + world_pos_to_clouds_alt.zw + clouds_hole_pos_var.zw, 0).x;
+        float shadow = tex2Dlod(clouds_shadows_2d, float4(worldPos.xz*clouds_weather_inv_size__alt_scale.x + world_pos_to_clouds_alt.zw + clouds_hole_pos_var.zw, 0, 0)).x;
         return lerp(shadow,1, max(alt,0));
       #endif
     }
   }
-endmacro
-
-macro USE_CLOUDS_SHADOW_BASE_2D(code)
-  USE_CLOUDS_SHADOW_BASE_2D_SMP(code, clouds_shadows_2d_samplerstate)
 endmacro
 
 //this auto is for SAMPLES ONLY!!
@@ -156,13 +142,8 @@ endmacro
 //by default use volume shadows, as they don't need any flags
 float4 light_shadow_dir;
 
-macro SKIP_INIT_CLOUDS_SHADOWS()
-  DEFINE(skip_init_cloud_shadows)
-endmacro
 macro INIT_CLOUDS_SHADOW_BASE(legacy_light_dir_y, code)
-  if (!DEFINED(skip_init_cloud_shadows)){
-    INIT_CLOUDS_SHADOW_BASE_REF(light_shadow_dir.x, light_shadow_dir.y, light_shadow_dir.z, code)
-  }
+  INIT_CLOUDS_SHADOW_BASE_REF(light_shadow_dir.x, light_shadow_dir.y, light_shadow_dir.z, code)
 endmacro
 macro USE_CLOUDS_SHADOW_BASE(code)
   USE_CLOUDS_SHADOW_BASE_REF(code)

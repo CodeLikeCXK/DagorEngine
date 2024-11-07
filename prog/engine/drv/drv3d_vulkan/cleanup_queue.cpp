@@ -1,17 +1,13 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
-#include "cleanup_queue.h"
-
 #include "buffer_resource.h"
+#include "cleanup_queue.h"
 #include "image_resource.h"
 #include "driver.h"
 #if D3D_HAS_RAY_TRACING
 #include "raytrace_as_resource.h"
 #endif
+#include "device.h"
 #include <EASTL/algorithm.h>
-#include "globals.h"
-#include "backend.h"
-#include "timelines.h"
+
 
 namespace drv3d_vulkan
 {
@@ -32,6 +28,12 @@ template <>
 Tab<CleanupQueue::DelayedCleanup<Image, Image::CLEANUP_DELAYED_DESTROY>> &CleanupQueue::getQueue()
 {
   return imageDelayedDestructions;
+}
+
+template <>
+Tab<CleanupQueue::DelayedCleanup<AsyncCompletionState, AsyncCompletionState::CLEANUP_DESTROY>> &CleanupQueue::getQueue()
+{
+  return asyncCompletionStateDestructions;
 }
 
 template <>
@@ -75,11 +77,10 @@ Tab<CleanupQueue::DelayedCleanup<RenderPassResource, RenderPassResource::CLEANUP
 }
 
 template <>
-Tab<CleanupQueue::DelayedCleanup<MemoryHeapResource, MemoryHeapResource::CLEANUP_DESTROY>> &CleanupQueue::getQueue()
+Tab<CleanupQueue::DelayedCleanup<SamplerResource, SamplerResource::CLEANUP_DESTROY>> &CleanupQueue::getQueue()
 {
-  return heapDestructions;
+  return samplerDestructions;
 }
-
 
 } // namespace drv3d_vulkan
 
@@ -92,34 +93,34 @@ void CleanupQueue::checkValid()
 #endif
 }
 
-void CleanupQueue::backendAfterFrameSubmitCleanup()
+void CleanupQueue::backendAfterFrameSubmitCleanup(ContextBackend &back)
 {
 #if DAGOR_DBGLEVEL > 0
   referencedByGpuWork = true;
 #endif
 
-  visitAll([](auto &data) {
+  visitAll([&back](auto &data) {
     for (auto &i : data)
-      i.backendCleanup();
+      i.backendCleanup(back);
   });
 }
 
-void CleanupQueue::backendAfterReplayCleanup()
+void CleanupQueue::backendAfterReplayCleanup(ContextBackend &back)
 {
 #if DAGOR_DBGLEVEL > 0
   referencedByGpuWork = true;
 #endif
 
-  visitAll([&](auto &data) {
+  visitAll([&back](auto &data) {
     for (auto &i : data)
-      i.backendCleanup();
+      i.backendCleanup(back);
   });
-  Backend::gpuJob->cleanupsRefs.push_back(this);
+  back.contextState.frame->cleanupsRefs.push_back(this);
 }
 
-void CleanupQueue::backendAfterGPUCleanup()
+void CleanupQueue::backendAfterGPUCleanup(ContextBackend &)
 {
-  WinAutoLock lk(Globals::Mem::mutex);
+  SharedGuardedObjectAutoLock lock(get_device().resources);
   visitAll([](auto &data) {
     for (auto &i : data)
       i.backendFinish();

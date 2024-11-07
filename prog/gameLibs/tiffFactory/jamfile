@@ -17,4 +17,6 @@ AddIncludes +=
 ;
 
 
+CPPopt += -D__B_CORE ;
+
 include $(Root)/prog/_jBuild/build.jam ;

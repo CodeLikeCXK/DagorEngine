@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #define INSIDE_RENDERER 1 // fixme: move to jam
 
 #include <render/depthAOAboveRenderer.h>
@@ -8,15 +6,10 @@
 #include <math/dag_bounds2.h>
 #include <memory/dag_framemem.h>
 
-#include <drv/3d/dag_viewScissor.h>
-#include <drv/3d/dag_renderTarget.h>
-#include <drv/3d/dag_draw.h>
-#include <drv/3d/dag_matricesAndPerspective.h>
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
 
 #include <shaders/dag_shaderBlock.h>
 #include <shaders/dag_DynamicShaderHelper.h>
-#include <shaders/dag_overrideStates.h>
 
 #include <perfMon/dag_statDrv.h>
 #include <render/toroidal_update_regions.h>
@@ -31,18 +24,13 @@
   VAR(depth_ao_heights_extra)    \
   VAR(blurred_depth)
 
-#define GLOBAL_VARS_LIST_OPT                  \
-  VAR(depth_around_transparent)               \
-  VAR(depth_around_transparent_samplerstate)  \
-  VAR(blurred_depth_transparent)              \
-  VAR(blurred_depth_transparent_samplerstate) \
-  VAR(depth_around_samplerstate)              \
-  VAR(blurred_depth_samplerstate)             \
-  VAR(heightmap_min_max)                      \
-  VAR(depth_above_copy_layer)                 \
-  VAR(depth_ao_extra_enabled)                 \
-  VAR(depth_above_blur_layer)                 \
-  VAR(depth_ao_tex_to_blur_samplerstate)
+#define GLOBAL_VARS_LIST_OPT     \
+  VAR(depth_around_transparent)  \
+  VAR(blurred_depth_transparent) \
+  VAR(heightmap_min_max)         \
+  VAR(depth_above_copy_layer)    \
+  VAR(depth_ao_extra_enabled)    \
+  VAR(depth_above_blur_layer)
 
 #define VAR(a) static int a##VarId = -1;
 GLOBAL_VARS_LIST
@@ -71,55 +59,24 @@ DepthAOAboveRenderer::DepthAOAboveRenderer(const int tex_size, const float depth
 
   const int numCascades = use_extra_cascade ? 2 : 1;
   ShaderGlobal::set_int(depth_ao_extra_enabledVarId, use_extra_cascade ? 1 : 0);
-
-  worldAODepth.close();
   worldAODepth = dag::create_array_tex(texSize, texSize, numCascades, TEXCF_RTARGET | TEXFMT_DEPTH16, 1, "depth_around");
-  if (worldAODepth.getTexId() == BAD_TEXTUREID)
-    logerr("DepthAOAboveRenderer: Failed to create 'depth_around' texture");
-  else
-  {
-    d3d::SamplerInfo smpInfo;
-    smpInfo.filter_mode = d3d::FilterMode::Point;
-    d3d::SamplerHandle sampler = d3d::request_sampler(smpInfo);
-    ShaderGlobal::set_sampler(depth_around_samplerstateVarId, sampler);
-    ShaderGlobal::set_sampler(depth_ao_tex_to_blur_samplerstateVarId, sampler);
-    ShaderGlobal::set_sampler(depth_around_transparent_samplerstateVarId, sampler);
-    worldAODepth->disableSampler();
-  }
-
-  blurredDepth.close();
+  worldAODepth->texfilter(TEXFILTER_POINT);
   blurredDepth = dag::create_array_tex(texSize, texSize, numCascades, TEXCF_RTARGET | TEXFMT_L16, 1, "blurred_depth");
-  if (blurredDepth.getTexId() == BAD_TEXTUREID)
-    logerr("DepthAOAboveRenderer: Failed to create 'blurred_depth' texture");
-  else
-    blurredDepth->disableSampler();
 
   if (renderTransparent)
   {
     copyRegionsRenderer.init("depth_above_copy_regions");
-
-    worldAODepthWithTransparency.close();
     worldAODepthWithTransparency =
       dag::create_array_tex(texSize, texSize, numCascades, TEXCF_RTARGET | TEXFMT_DEPTH16, 1, "depth_around_transparent");
-    if (worldAODepthWithTransparency.getTexId() == BAD_TEXTUREID)
-      logerr("DepthAOAboveRenderer: Failed to create 'depth_around_transparent' texture");
-    worldAODepthWithTransparency->disableSampler();
-
-    blurredDepthWithTransparency.close();
+    worldAODepthWithTransparency->texfilter(TEXFILTER_POINT);
     blurredDepthWithTransparency =
       dag::create_array_tex(texSize, texSize, numCascades, TEXCF_RTARGET | TEXFMT_L16, 1, "blurred_depth_transparent");
-    if (blurredDepthWithTransparency.getTexId() == BAD_TEXTUREID)
-      logerr("DepthAOAboveRenderer: Failed to create 'blurred_depth_transparent' texture");
-    else
-      blurredDepthWithTransparency->disableSampler();
   }
   else
   {
     ShaderGlobal::set_texture(depth_around_transparentVarId, worldAODepth);
     ShaderGlobal::set_texture(blurred_depth_transparentVarId, blurredDepth);
   }
-  ShaderGlobal::set_sampler(blurred_depth_samplerstateVarId, d3d::request_sampler({}));
-  ShaderGlobal::set_sampler(blurred_depth_transparent_samplerstateVarId, d3d::request_sampler({}));
 
   cascadeDependantData.resize(numCascades);
   for (int i = 0; i < cascadeDependantData.size(); ++i)
@@ -229,7 +186,7 @@ void DepthAOAboveRenderer::renderAODepthQuads(dag::ConstSpan<RegionToRender> reg
 
   for (int i = 0; i < regions.size(); ++i)
   {
-    const RegionToRender &region = regions[i];
+    auto region = regions[i];
     if (region.reg.wd.x <= 0 || region.reg.wd.y <= 0)
       continue;
     const IPoint2 &lt = region.reg.lt;
@@ -263,7 +220,7 @@ void DepthAOAboveRenderer::copyDepthAboveRegions(dag::ConstSpan<RegionToRender> 
   d3d::set_depth(depthTex, cascade_no, DepthAccess::RW);
   ShaderGlobal::set_int(depth_above_copy_layerVarId, cascade_no);
 
-  for (const RegionToRender &region : regions)
+  for (auto region : regions)
   {
     if (region.reg.wd.x <= 0 || region.reg.wd.y <= 0)
       continue;
@@ -492,7 +449,7 @@ void DepthAOAboveRenderer::prepareRenderRegionsForCascade(const Point3 &origin, 
     TMatrix4 proj;
     proj = matrix_ortho_off_center_lh(region[0].x, region[1].x, region[0].y, region[1].y, scene_min_z, scene_max_z);
     d3d::settm(TM_PROJ, &proj);
-    i.cullViewProj = TMatrix4(vtm) * proj;
+    d3d::getglobtm(i.cullViewProj);
   }
 }
 
@@ -525,7 +482,6 @@ void DepthAOAboveRenderer::invalidateAO(bool force)
 
 void DepthAOAboveRenderer::invalidateAO(const BBox3 &box)
 {
-  TIME_PROFILE_DEV(DepthAOAbove_invalidateBox);
   for (auto &cascade : cascadeDependantData)
   {
     const float fullDistance = 2.f * cascade.depthAroundDistance;
@@ -547,12 +503,6 @@ void DepthAOAboveRenderer::setDistanceAround(const float distance_around)
   for (int i = 0; i < cascadeDependantData.size(); ++i)
     cascadeDependantData[i].depthAroundDistance = i == 0 ? distance_around : distance_around * extraCascadeMult;
   invalidateAO(true);
-}
-
-float DepthAOAboveRenderer::getTexelSize(int cascade_no) const
-{
-  G_ASSERT(cascade_no < cascadeDependantData.size());
-  return 2.f * cascadeDependantData[cascade_no].depthAroundDistance / texSize;
 }
 
 void DepthAOAboveRenderer::setInvalidVars()
@@ -579,12 +529,4 @@ void DepthAOAboveRenderer::setVars()
   }
   ShaderGlobal::set_real(depth_ao_texture_sizeVarId, texSize);
   ShaderGlobal::set_real(depth_ao_texture_rcp_sizeVarId, 1.0f / texSize);
-}
-
-bool DepthAOAboveRenderer::isValid() const
-{
-  bool valid = true;
-  for (const auto &cascade : cascadeDependantData)
-    valid &= cascade.regionsToRender.empty();
-  return valid;
 }

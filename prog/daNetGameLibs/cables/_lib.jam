@@ -1,4 +1,0 @@
-if $(HaveRenderer) = yes {
-  gamePulls += framework_cables_pull ;
-  UseProgLibs += daNetGameLibs/cables ;
-}

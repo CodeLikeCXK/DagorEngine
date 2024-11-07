@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <math/dag_vecMathCompatibility.h>
 #include <render/renderShadowObject.h>
 #include <render/psm.h>

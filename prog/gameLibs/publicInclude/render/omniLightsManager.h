@@ -1,12 +1,11 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
 #include "omniLight.h"
-#include <atomic>
-#include <osApiWrappers/dag_spinlock.h>
 #include <vecmath/dag_vecMathDecl.h>
 #include <generic/dag_tabFwd.h>
 #include <generic/dag_staticTab.h>
@@ -23,23 +22,6 @@
 
 struct Frustum;
 class Occlusion;
-
-/* NOTE: thread safe for OmniLightsManager
-  - OmniLightsManager doesn't allocate memory: all data arrays
-    (rawLights, lightPriority, etc) are inside instance, not heap.
-    It is intended to make some operations thread safe.
-  - addLight, destroyLight can be called concurrent
-  - destroyLight, setters and getters (setLightMask, getLightMask, etc)
-    can be called from several threads, but lightId should be not equal
-    for different threads.
-  - However, access to the same lightId is not thread safe:
-    if some thread updates or destroys some light,
-    another thread cannot access to the same lightId.
-  - prepare, drawDebugInfo, renderDebugBboxes is not thread safe:
-    it should be synchronized with previous writes from another thread.
-  - destroyAllLights, close and destructor should be synchronized
-    with previous access to OmniLightsManager from another thread.
- */
 
 class OmniLightsManager
 {
@@ -145,7 +127,8 @@ public:
     }
     rawLights[id] = l;
   }
-  int maxIndex() const DAG_TS_NO_THREAD_SAFETY_ANALYSIS { return maxLightIndex; }
+  void removeEmpty();
+  int maxIndex() const { return maxLightIndex; }
 
   IesTextureCollection::PhotometryData getPhotometryData(int texId) const;
 
@@ -171,8 +154,7 @@ private:
   // masks allows to ignore specific lights in specific cases
   // for example, we can ignore highly dynamic lights for GI
   carray<mask_type_t, MAX_LIGHTS> masks; //-V730_NOINIT
-  StaticTab<uint16_t, MAX_LIGHTS> freeLightIds DAG_TS_GUARDED_BY(lightAllocationSpinlock);
+  StaticTab<uint16_t, MAX_LIGHTS> freeLightIds;
   IesTextureCollection *photometryTextures = nullptr;
-  OSSpinlock lightAllocationSpinlock;
-  int maxLightIndex DAG_TS_GUARDED_BY(lightAllocationSpinlock) = -1;
+  int maxLightIndex;
 };

@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -62,7 +63,7 @@ protected:
 class RobjWorldBlur : public RobjBlurBase
 {
 public:
-  virtual void render(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *rdata,
+  virtual void renderCustom(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *rdata,
     const RenderState &render_state) override;
 };
 
@@ -71,7 +72,7 @@ class RobjWorldBlurPanel : public RobjBlurBase
 {
 public:
   void execBlur(const Point2 &lt, const Point2 &size) const;
-  virtual void render(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *rdata,
+  virtual void renderCustom(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *rdata,
     const RenderState &render_state) override;
 };
 
@@ -79,7 +80,7 @@ public:
 class RobjWorldBlurPanelStub : public RobjBlurBase
 {
 public:
-  virtual void render(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *rdata,
+  virtual void renderCustom(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *rdata,
     const RenderState &render_state) override;
 };
 

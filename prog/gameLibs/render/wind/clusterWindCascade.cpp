@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <render/wind/clusterWindCascade.h>
 #include <render/toroidal_update_regions.h>
 #include <memory/dag_framemem.h>

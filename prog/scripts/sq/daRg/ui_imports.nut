@@ -1,15 +1,15 @@
-from "%sqstd/frp.nut" import Watched, Computed, ComputedImmediate, FRP_INITIAL, FRP_DONT_CHECK_NESTED, set_nested_observable_debug, make_all_observables_immutable, isObservable, isComputed
+from "%sqstd/frp.nut" import Watched, Computed, FRP_INITIAL, FRP_DONT_CHECK_NESTED, set_nested_observable_debug, make_all_observables_immutable
 
 let {tostring_r} = require("%sqstd/string.nut")
 let logLib = require("%sqstd/log.nut")
 
 let log = logLib([
   {
-    compare = @(val) isObservable(val)
+    compare = @(val) val instanceof Watched
     tostring = @(val) "Watched: {0}".subst(tostring_r(val.value,{maxdeeplevel = 3, splitlines=false}))
   }
   {
-    compare = @(val) isComputed(val)
+    compare = @(val) val instanceof Computed
     tostring = @(val) "Computed: {0}".subst(tostring_r(val.value,{maxdeeplevel = 3, splitlines=false}))
   }
   {
@@ -28,24 +28,13 @@ let logs = {
   logerr = log.logerr
   wlog = log.wlog
   wdlog = @(watched, prefix = null, transform=null) log.wlog(watched, prefix, transform, log.dlog) //disable: -dlog-warn
-}
 
-let frpExtras = {
   Watched
   Computed
-  ComputedImmediate
-  isComputed
-  isObservable
   FRP_INITIAL
   FRP_DONT_CHECK_NESTED
   set_nested_observable_debug
   make_all_observables_immutable
 }
 
-return require("daRg").__merge(
-  require("darg_library.nut")
-  require("%sqstd/functools.nut")
-  logs
-  frpExtras
-  {Behaviors = require("daRg.behaviors")}
-)
+return require("daRg").__merge(require("darg_library.nut"), require("%sqstd/functools.nut"), logs)

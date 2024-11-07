@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <UnitTest++/UnitTestPP.h>
 #include "filebackend.h"
 #include <util/dag_globDef.h>

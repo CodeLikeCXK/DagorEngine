@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -141,7 +142,7 @@ bool writeToFileFast(const LayoutType &layout, const char *filename)
 namespace detail
 {
 template <enum detail::Target target>
-struct StrHolderBase : public traits::List<char, 4, target>
+struct StrHolderBase : public traits::List<char, 1, target>
 {
   bool empty() const { return this->size() == 0; }
   uint64_t length() const { return !empty() ? this->size() - 1 : 0; }
@@ -166,6 +167,7 @@ struct VecHolderBase : public traits::List<UserDataType, alignment, target>
   UserDataType *data() { return this->getDataPtr(); }
 };
 
+#pragma pack(push, 1)
 template <typename UserDataType, enum detail::Target target>
 class SpanBase : public traits::Address<UserDataType, target>
 {
@@ -190,6 +192,7 @@ public:
   UserDataType &get() = delete;
   const UserDataType &get() const = delete;
 };
+#pragma pack(pop)
 } // namespace detail
 
 template <enum detail::Target target = detail::MASTER>
@@ -214,7 +217,7 @@ struct StrHolder<detail::MASTER> : public detail::StrHolderBase<detail::MASTER>
   }
 };
 
-template <typename UserDataType, uint64_t alignment = 4, enum detail::Target target = detail::MASTER>
+template <typename UserDataType, uint64_t alignment = 1, enum detail::Target target = detail::MASTER>
 struct VecHolder : public detail::VecHolderBase<detail::traits::RetargetType<UserDataType, target>, alignment, target>
 {
   template <enum detail::Target t>
@@ -301,6 +304,7 @@ enum class BehaviorOnUncompressed
 
 namespace detail
 {
+#pragma pack(push, 1)
 template <typename DataType>
 struct Compressed
 {
@@ -374,6 +378,7 @@ struct Compressed
     }
   BINDUMP_END_LAYOUT()
 };
+#pragma pack(pop)
 } // namespace detail
 
 template <template <enum detail::Target> class LayoutClass>
@@ -382,7 +387,7 @@ template <typename UserDataType>
 using Compressed = typename detail::Compressed<UserDataType>::template Type<detail::MASTER>;
 
 #define BINDUMP_USING_EXTENSION()                                                                                  \
-  template <typename UserDataType, uint64_t alignment = 4>                                                         \
+  template <typename UserDataType, uint64_t alignment = 1>                                                         \
   using VecHolder = bindump::VecHolder<UserDataType, alignment, target>;                                           \
   template <typename UserDataType>                                                                                 \
   using Span = bindump::Span<UserDataType, target>;                                                                \

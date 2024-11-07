@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "device.h"
 #include "fsr2_wrapper.h"
 

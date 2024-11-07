@@ -9,9 +9,9 @@ macro INIT_APPLY_TREE_WIND()
   }
 endmacro
 
-macro USE_APPLY_TREE_WIND_BASE(stage)
+macro USE_APPLY_TREE_WIND()
 
-hlsl(stage) {
+hlsl(vs) {
   float4 fast_cos(float4 x)
   {
     return (1 - 0.5*x*x);
@@ -67,8 +67,4 @@ hlsl(stage) {
     return newPos * fLength;
   }
 }
-endmacro
-
-macro USE_APPLY_TREE_WIND()
-  USE_APPLY_TREE_WIND_BASE(vs)
 endmacro

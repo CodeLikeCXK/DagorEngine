@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -18,8 +19,12 @@ public:
   {
   private:
     void *pCritSec;
-    AutoLock(const AutoLock &) = delete;
-    AutoLock &operator=(const AutoLock &) = delete;
+    AutoLock(const AutoLock &refAutoLock) { pCritSec = refAutoLock.refAutoLock; }
+    AutoLock &operator=(const AutoLock &refAutoLock)
+    {
+      pCritSec = refAutoLock.refAutoLock;
+      return *this;
+    }
     friend class TabWithLock;
 
   public:

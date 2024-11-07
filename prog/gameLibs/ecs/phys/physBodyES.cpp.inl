@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <ecs/core/entityManager.h>
 #include <ecs/phys/physBody.h>
 #include <ecs/phys/collRes.h>

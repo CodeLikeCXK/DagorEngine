@@ -1,5 +1,6 @@
 Root    ?= ../../../.. ;
 Location = prog/tools/dagUtils/dagCSG ;
+DriverLinkage   = static ;
 ConsoleExe      = yes ;
 
 TargetType  = exe ;

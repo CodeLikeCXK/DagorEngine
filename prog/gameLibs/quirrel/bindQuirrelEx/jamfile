@@ -43,7 +43,6 @@ if $(ProjectUseQuirrel) in sq3r sq3r+ {
     dagorTime.cpp
     dagorWorkCycle.cpp
     dagorFS.cpp
-    dagorFolders.cpp
     dagorShell.cpp
     dagorClipboard.cpp
     localization.cpp
@@ -52,14 +51,17 @@ if $(ProjectUseQuirrel) in sq3r sq3r+ {
     helpers.cpp
   ;
 
-  if $(Platform) = macOS {
+  if $(Platform) = macosx {
     Sources +=
       dagorSystemMac.mm
     ;
   }
 }
 
-if $(Platform) in windows {
+CPPopt = -D__B_CORE ;
+Copt   = -D__B_CORE ;
+
+if $(Platform) in win32 win64 {
   CPPopt += /wd4548 ; # devtools\win.sdk.100\Include\10.0.10586.0\ucrt\malloc.h(160): warning C4548: expression before comma has no effect; expected expression with side-effect
 }
 

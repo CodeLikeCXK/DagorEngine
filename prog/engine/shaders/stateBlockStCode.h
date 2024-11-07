@@ -1,7 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
-#include <drv/3d/dag_renderStates.h>
+#include <3d/dag_renderStates.h>
 #include <util/dag_globDef.h>
 #include <memory/dag_framemem.h>
 

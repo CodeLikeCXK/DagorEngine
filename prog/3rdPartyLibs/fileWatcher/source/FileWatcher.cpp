@@ -34,8 +34,6 @@
 #	define FILEWATCHER_IMPL FileWatcherLinux
 #endif
 
-#ifdef FILEWATCHER_IMPL
-
 namespace FW
 {
 
@@ -83,18 +81,3 @@ namespace FW
 	}
 
 };//namespace FW
-
-#else // stub
-
-namespace FW
-{
-	FileWatcher::FileWatcher() {}
-	FileWatcher::~FileWatcher() {}
-	WatchID FileWatcher::addWatch(const String&, FileWatchListener*) { return 1; }
-	WatchID FileWatcher::addWatch(const String&, FileWatchListener*, bool) { return 1; }
-	void FileWatcher::removeWatch(const String&) {}
-	void FileWatcher::removeWatch(WatchID watchid) {}
-	void FileWatcher::update() {}
-};//namespace FW
-
-#endif // stub

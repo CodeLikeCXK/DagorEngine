@@ -1,9 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "hmlSnow.h"
 #include "hmlPlugin.h"
 #include <de3_interface.h>
-#include <EditorCore/ec_IEditorCore.h>
+#include <dllPluginCore/core.h>
 #include <libTools/staticGeom/staticGeometry.h>
 #include <EditorCore/ec_rect.h>
 #include <math/dag_math3d.h>
@@ -11,8 +9,6 @@
 #include <math/dag_math2d.h>
 #include <debug/dag_debug.h>
 
-using editorcore_extapi::dagGeom;
-using editorcore_extapi::dagRender;
 
 enum
 {
@@ -132,8 +128,7 @@ void SnowSourceObject::renderObject()
   dagRender->renderSphere(Point3(0, 0, 0), 0.5, dc);
 }
 
-void SnowSourceObject::fillProps(PropPanel::ContainerPropertyControl &op, DClassID for_class_id,
-  dag::ConstSpan<RenderableEditableObject *> objects)
+void SnowSourceObject::fillProps(PropPanel2 &op, DClassID for_class_id, dag::ConstSpan<RenderableEditableObject *> objects)
 {
   bool one_type = true;
 
@@ -159,8 +154,7 @@ void SnowSourceObject::fillProps(PropPanel::ContainerPropertyControl &op, DClass
   }
 }
 
-void SnowSourceObject::onPPChange(int pid, bool edit_finished, PropPanel::ContainerPropertyControl &panel,
-  dag::ConstSpan<RenderableEditableObject *> objects)
+void SnowSourceObject::onPPChange(int pid, bool edit_finished, PropPanel2 &panel, dag::ConstSpan<RenderableEditableObject *> objects)
 {
 #define CHANGE_VAL(type, pname, getfunc)                             \
   {                                                                  \

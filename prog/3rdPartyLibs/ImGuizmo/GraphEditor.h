@@ -1,5 +1,5 @@
 // https://github.com/CedricGuillemet/ImGuizmo
-// v 1.89 WIP
+// v 1.83
 //
 // The MIT License(MIT)
 //
@@ -139,8 +139,6 @@ struct Delegate
     
     virtual const size_t GetLinkCount() = 0;
     virtual const Link GetLink(LinkIndex index) = 0;
-
-    virtual ~Delegate() = default;
 };
 
 void Show(Delegate& delegate, const Options& options, ViewState& viewState, bool enabled, FitOnScreen* fit = nullptr);

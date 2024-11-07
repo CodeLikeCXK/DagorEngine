@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <de3_interface.h>
 #include <de3_objEntity.h>
 #include <de3_entityPool.h>
@@ -17,9 +15,8 @@
 #include <phys/dag_physResource.h>
 #include <gameRes/dag_gameResSystem.h>
 #include <gameRes/dag_stdGameRes.h>
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
 #include <3d/dag_render.h>
-#include <shaders/dag_dynSceneRes.h>
 #include <render/dag_cur_view.h>
 #include <math/dag_geomTree.h>
 #include <math/dag_TMatrix.h>
@@ -499,7 +496,7 @@ public:
   void onLightingSettingsChanged() override {}
 
   // IBinaryDataBuilder interface
-  virtual bool validateBuild(int target, ILogWriter &log, PropPanel::ContainerPropertyControl *params)
+  virtual bool validateBuild(int target, ILogWriter &log, PropPanel2 *params)
   {
     if (!objPool.calcEntities(IObjEntityFilter::getSubTypeMask(IObjEntityFilter::STMASK_TYPE_EXPORT)))
       log.addMessage(log.WARNING, "No physObj entities for export");
@@ -508,7 +505,7 @@ public:
 
   virtual bool addUsedTextures(ITextureNumerator &tn) { return true; }
 
-  virtual bool buildAndWrite(BinDumpSaveCB &cwr, const ITextureNumerator &tn, PropPanel::ContainerPropertyControl *)
+  virtual bool buildAndWrite(BinDumpSaveCB &cwr, const ITextureNumerator &tn, PropPanel2 *)
   {
     dag::Vector<SrcObjsToPlace> objs;
 
@@ -582,7 +579,7 @@ void init_physobj_mgr_service()
 {
   if (!IDaEditor3Engine::get().checkVersion())
   {
-    DEBUG_CTX("Incorrect version!");
+    debug_ctx("Incorrect version!");
     return;
   }
 

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <math/dag_TMatrix.h>
 #include "impBlkReader.h"
 #include <osApiWrappers/dag_files.h>

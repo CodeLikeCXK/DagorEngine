@@ -1,5 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __GAIJIN_GEOM_OBJECT__
+#define __GAIJIN_GEOM_OBJECT__
 #pragma once
+
 
 #include <3d/dag_materialData.h>
 
@@ -321,3 +323,6 @@ inline const char *GeomObject::getShaderName(int idx) const
 
   return NULL;
 }
+
+
+#endif //__GAIJIN_GEOM_OBJECT__

@@ -16,7 +16,6 @@ shader etc2_compressor
   (cs) { src_tex@smp2d = src_tex; }
 
   INIT_ETC2_COMPRESSION()
-  ENABLE_ASSERT(cs)
 
   hlsl(cs)
   {

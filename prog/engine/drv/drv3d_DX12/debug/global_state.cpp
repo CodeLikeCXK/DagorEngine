@@ -1,11 +1,8 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
-#include "global_state.h"
 #include "device.h"
 
-namespace drv3d_dx12::debug
-{
-void GlobalState::setup(const DataBlock *settings, Direct3D12Enviroment &d3d_env)
+using namespace drv3d_dx12;
+
+void debug::GlobalState::setup(const DataBlock *settings, Direct3D12Enviroment &d3d_env)
 {
   config.applyDefaults();
   config.applySettings(settings);
@@ -89,13 +86,7 @@ void GlobalState::setup(const DataBlock *settings, Direct3D12Enviroment &d3d_env
   }
 }
 
-void GlobalState::teardown()
-{
-  report();
-  gpuCapture.teardown();
-}
-
-void GlobalState::report()
+void debug::GlobalState::teardown()
 {
   if (dxgiDebug)
   {
@@ -104,12 +95,6 @@ void GlobalState::report()
     dxgiDebug->ReportLiveObjects(DXGI_DEBUG_ALL,
       DXGI_DEBUG_RLO_FLAGS(DXGI_DEBUG_RLO_SUMMARY | DXGI_DEBUG_RLO_DETAIL | DXGI_DEBUG_RLO_IGNORE_INTERNAL));
   }
+
+  gpuCapture.teardown();
 }
-
-} // namespace drv3d_dx12::debug
-
-// to prevent the clang discard types declared for debug purpose and omit from PDB
-#if DAGOR_DBGLEVEL > 0
-extern int debug_types_pull;
-int debug_types_puller = debug_types_pull;
-#endif

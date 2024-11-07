@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -9,7 +10,7 @@
 #include <math/dag_Point4.h>
 #include <osApiWrappers/dag_cpuJobs.h>
 #include "tracerConsts.hlsli"
-#include <drv/3d/dag_consts.h>
+#include <3d/dag_drv3dConsts.h>
 #include <3d/dag_resPtr.h>
 #include <EASTL/functional.h>
 #include <3d/dag_ringDynBuf.h>
@@ -41,7 +42,7 @@ public:
   Tracer() { memset(this, 0, sizeof(*this)); }
   Tracer(TracerManager *owner, uint32_t in_idx, const Point3 &start_pos, const Point3 &in_speed, int type_no, unsigned int mesh_no,
     float tail_particle_half_size_from, float tail_particle_half_size_to, float tail_deviation, const Color4 &tail_color,
-    float in_caliber, float spawn_time, float amplify_scale);
+    float in_caliber, float spawn_time);
 
   void setMinLen(float value);
   void setStartPos(const Point3 &value);
@@ -78,7 +79,6 @@ protected:
   float tailParticleHalfSizeTo;
   float tailDeviation;
   Color4 tailColor;
-  float amplifyScale;
 
   carray<TracerSegment, MAX_FX_SEGMENTS> segments;
   int segmentsNum;
@@ -110,7 +110,7 @@ public:
   void finishPreparingIfNecessary();
 
   Tracer *createTracer(const Point3 &start_pos, const Point3 &speed, int tracerType, int trailType, float caliber, bool force = false,
-    bool forceNoTrail = false, float cur_life_time = 0.0f, bool amplify = false);
+    bool forceNoTrail = false, float cur_life_time = 0.0f);
 
   int getTracerTypeNoByName(const char *name);
   int getTrailTypeNoByName(const char *name);
@@ -119,7 +119,6 @@ public:
   const Point2 &getEyeDistBlend() const;
   void setEyeDistBlend(const Point2 &value);
 
-  void readBlk(const DataBlock *blk);
   void clear();
   void reset();
 
@@ -206,7 +205,7 @@ protected:
   float tailDecayToDelete;
   ComputeShaderElement *createCmdCs;
 
-  bool computeAndBaseVertexSupported;
+  bool computeSupported;
   bool multiDrawIndirectSupported;
   bool instanceIdSupported;
   DrawBuffer tailIndirect;
@@ -251,8 +250,6 @@ public:
     float hdrK;
     float minPixelSize;
     bool beam;
-    float amplifyScale;
-    float headTaper;
   };
   Tab<TracerType> tracerTypes;
   Tab<TrailType> trailTypes;

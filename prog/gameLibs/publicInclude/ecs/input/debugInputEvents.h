@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -22,8 +23,8 @@ Step 2: Build and run the game in dev or dbg mode, in release the events are tur
 */
 
 #include <ecs/core/entityManager.h>
-#include <drv/hid/dag_hiKeybIds.h>  //For the keyboard enum
-#include <drv/hid/dag_hiMouseIds.h> //For the mouse enum
+#include <humanInput/dag_hiKeybIds.h>  //For the keyboard enum
+#include <humanInput/dag_hiMouseIds.h> //For the mouse enum
 
 #define DEBUG_INPUT_ECS_EVENTS                                \
   DEBUG_INPUT_ECS_EVENT(EventDebugKeyboardPressed, uint32_t)  \

@@ -1,11 +1,11 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
 #include <EASTL/type_traits.h>
-#include <util/dag_preprocessor.h>
 
 template <typename T>
 struct Finally
@@ -32,8 +32,10 @@ private:
   bool should_exit = true;
 };
 
-#define FINALLY(...)                       \
-  Finally DAG_CONCAT(__finally_, __LINE__) \
-  {                                        \
-    __VA_ARGS__                            \
+#define FINALLY_CONCAT_IMPL(x, y) x##y
+#define FINALLY_CONCAT(x, y)      FINALLY_CONCAT_IMPL(x, y)
+#define FINALLY(...)                           \
+  Finally FINALLY_CONCAT(__finally_, __LINE__) \
+  {                                            \
+    __VA_ARGS__                                \
   }

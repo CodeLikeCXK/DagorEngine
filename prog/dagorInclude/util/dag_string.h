@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -22,7 +23,7 @@
 
 #include <generic/dag_tab.h>
 #include <util/dag_safeArg.h>
-#include <supp/dag_define_KRNLIMP.h>
+#include <supp/dag_define_COREIMP.h>
 #include <debug/dag_assert.h>
 
 extern "C" KRNLIMP void dd_simplify_fname_c(char *fn);
@@ -380,7 +381,7 @@ inline uint32_t append_items(String &v, uint32_t n, const char *p)
   return at;
 }
 
-#include <supp/dag_undef_KRNLIMP.h>
+#include <supp/dag_undef_COREIMP.h>
 
 inline const char *simplify_fname(String &s)
 {

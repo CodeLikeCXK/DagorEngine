@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <vecmath/dag_vecMath.h>
 #include <scene/dag_tiledScene.h>
 #include <startup/dag_globalSettings.h>
@@ -90,7 +88,7 @@ void scene::TiledScene::term()
   SimpleScene::term();
   termTiledStructures();
 
-  mDeferredCommand.clear();
+  mDeferredCommand.resize(0);
   pendingNewNodesCount1 = pendingNewNodesCount2 = pendingNewNodesCount3 = 0;
 }
 
@@ -220,119 +218,112 @@ void scene::TiledScene::rearrange(int tx0, int tz0, int tx1, int tz1)
 void scene::TiledScene::setTransformNoScaleChange(node_index node, mat44f_cref transform)
 {
   std::lock_guard<std::mutex> scopedLock(mDeferredSetTransformMutex);
-  if (isInWritingThread() && mDeferredCommand.empty())
+  if (isInWritingThread() && !mDeferredCommand.size())
   {
     WriteLockRAII lock(*this);
-    if (mDeferredCommand.empty())
+    if (!mDeferredCommand.size())
       return setTransformNoScaleChangeImm(node, transform);
   }
 
-  auto prev = eastl::find_if(mDeferredCommand.begin(), mDeferredCommand.end(), [node](const DeferredCommand &c) {
-    return c.node == node && (c.command == DeferredCommand::MOVE || c.command == DeferredCommand::MOVE_FAST);
-  });
+  size_t idx = mDeferredCommand.size();
+  mDeferredCommand.resize(idx + 1);
 
-  if (prev == mDeferredCommand.end())
-    mDeferredCommand.addCmd([&](DeferredCommand &cmd) {
-      cmd.command = DeferredCommand::MOVE_FAST;
-      cmd.transformCommand = transform;
-      cmd.node = node;
-    });
-  else
-    prev->transformCommand = transform;
+  DeferredCommand &cmd = mDeferredCommand[idx];
+  cmd.command = DeferredCommand::MOVE_FAST;
+  cmd.transformCommand = transform;
+  cmd.node = node;
 }
 
 void scene::TiledScene::setTransform(node_index node, mat44f_cref transform, bool do_not_wait)
 {
   std::lock_guard<std::mutex> scopedLock(mDeferredSetTransformMutex);
-  if (isInWritingThread() && mDeferredCommand.empty())
+  if (isInWritingThread() && !mDeferredCommand.size())
   {
     WriteLockRAII lock(*this, do_not_wait);
     if (lock.locked)
       return setTransformImm(node, transform);
   }
 
-  auto prev = eastl::find_if(mDeferredCommand.begin(), mDeferredCommand.end(), [node](const DeferredCommand &c) {
-    return c.node == node && (c.command == DeferredCommand::MOVE || c.command == DeferredCommand::MOVE_FAST);
-  });
-  if (prev == mDeferredCommand.end())
-    mDeferredCommand.addCmd([&](DeferredCommand &cmd) {
-      cmd.command = DeferredCommand::MOVE;
-      cmd.transformCommand = transform;
-      cmd.node = node;
-    });
-  else
-    prev->transformCommand = transform;
+  DeferredCommand &cmd = mDeferredCommand.push_back();
+
+  cmd.command = DeferredCommand::MOVE;
+  cmd.transformCommand = transform;
+  cmd.node = node;
 }
 
 void scene::TiledScene::setFlags(node_index node, uint16_t flags)
 {
   std::lock_guard<std::mutex> scopedLock(mDeferredSetTransformMutex);
-  if (isInWritingThread() && mDeferredCommand.empty())
+  if (isInWritingThread() && !mDeferredCommand.size())
   {
     WriteLockRAII lock(*this);
     return setFlagsImm(node, flags);
   }
 
-  mDeferredCommand.addCmd([&](DeferredCommand &cmd) {
-    cmd.command = DeferredCommand::SET_FLAGS;
-    get_node_pool_flags_ref(cmd.transformCommand) = 0;
-    set_node_flags(cmd.transformCommand, flags);
-    cmd.node = node;
-  });
+  DeferredCommand &cmd = mDeferredCommand.push_back();
+
+  cmd.command = DeferredCommand::SET_FLAGS;
+  get_node_pool_flags_ref(cmd.transformCommand) = 0;
+  set_node_flags(cmd.transformCommand, flags);
+  cmd.node = node;
 }
 
 void scene::TiledScene::unsetFlags(node_index node, uint16_t flags)
 {
   std::lock_guard<std::mutex> scopedLock(mDeferredSetTransformMutex);
-  if (isInWritingThread() && mDeferredCommand.empty())
+  if (isInWritingThread() && !mDeferredCommand.size())
   {
     WriteLockRAII lock(*this);
     return unsetFlagsImm(node, flags);
   }
 
-  mDeferredCommand.addCmd([&](DeferredCommand &cmd) {
-    cmd.command = DeferredCommand::UNSET_FLAGS;
-    get_node_pool_flags_ref(cmd.transformCommand) = 0;
-    set_node_flags(cmd.transformCommand, flags);
-    cmd.node = node;
-  });
+  DeferredCommand &cmd = mDeferredCommand.push_back();
+
+  cmd.command = DeferredCommand::UNSET_FLAGS;
+  get_node_pool_flags_ref(cmd.transformCommand) = 0;
+  set_node_flags(cmd.transformCommand, flags);
+  cmd.node = node;
 }
 
 void scene::TiledScene::setPoolBBox(pool_index pool, bbox3f_cref box)
 {
   std::lock_guard<std::mutex> scopedLock(mDeferredSetTransformMutex);
-  if (isInWritingThread() && mDeferredCommand.empty())
+  if (isInWritingThread() && !mDeferredCommand.size())
   {
     WriteLockRAII lock(*this);
-    if (mDeferredCommand.empty())
+    if (!mDeferredCommand.size())
       return SimpleScene::setPoolBBox(pool, box, false);
   }
 
-  mDeferredCommand.addCmd([&](DeferredCommand &cmd) {
-    cmd.command = DeferredCommand::SET_POOL_BBOX;
-    cmd.transformCommand.col0 = box.bmin;
-    cmd.transformCommand.col1 = box.bmax;
-    encodeCommandPoolFlags(cmd.transformCommand, pool);
-    cmd.node = INVALID_NODE;
-  });
+  size_t idx = mDeferredCommand.size();
+  mDeferredCommand.resize(idx + 1);
+
+  DeferredCommand &cmd = mDeferredCommand[idx];
+  cmd.command = DeferredCommand::SET_POOL_BBOX;
+  cmd.transformCommand.col0 = box.bmin;
+  cmd.transformCommand.col1 = box.bmax;
+  encodeCommandPoolFlags(cmd.transformCommand, pool);
+  cmd.node = INVALID_NODE;
 }
 
 void scene::TiledScene::setPoolDistanceSqScale(pool_index pool, float dist_scale_sq)
 {
   std::lock_guard<std::mutex> scopedLock(mDeferredSetTransformMutex);
-  if (isInWritingThread() && mDeferredCommand.empty())
+  if (isInWritingThread() && !mDeferredCommand.size())
   {
     WriteLockRAII lock(*this);
-    if (mDeferredCommand.empty())
+    if (!mDeferredCommand.size())
       return SimpleScene::setPoolDistanceSqScale(pool, dist_scale_sq);
   }
 
-  mDeferredCommand.addCmd([&](DeferredCommand &cmd) {
-    cmd.command = DeferredCommand::SET_POOL_DIST;
-    *(float *)(char *)&cmd.transformCommand.col0 = dist_scale_sq;
-    encodeCommandPoolFlags(cmd.transformCommand, pool);
-    cmd.node = INVALID_NODE;
-  });
+  size_t idx = mDeferredCommand.size();
+  mDeferredCommand.resize(idx + 1);
+
+  DeferredCommand &cmd = mDeferredCommand[idx];
+  cmd.command = DeferredCommand::SET_POOL_DIST;
+  *(float *)&cmd.transformCommand.col0 = dist_scale_sq;
+  encodeCommandPoolFlags(cmd.transformCommand, pool);
+  cmd.node = INVALID_NODE;
 }
 
 scene::node_index scene::TiledScene::reserveOne()
@@ -385,57 +376,60 @@ void scene::TiledScene::applyReserves()
 void scene::TiledScene::destroy(node_index node)
 {
   std::lock_guard<std::mutex> scopedLock(mDeferredSetTransformMutex);
-  if (isInWritingThread() && mDeferredCommand.empty())
+  if (isInWritingThread() && !mDeferredCommand.size())
   {
     WriteLockRAII lock(*this);
-    if (mDeferredCommand.empty())
+    if (!mDeferredCommand.size())
       return destroyImm(node);
   }
 
-  mDeferredCommand.addCmd([&](DeferredCommand &cmd) {
-    cmd.command = DeferredCommand::DESTROY;
-    cmd.node = node;
-  });
+  size_t idx = mDeferredCommand.size();
+  mDeferredCommand.resize(idx + 1);
+
+  DeferredCommand &cmd = mDeferredCommand[idx];
+  cmd.command = DeferredCommand::DESTROY;
+  cmd.node = node;
 }
 
 void scene::TiledScene::reallocate(node_index node, const mat44f &transform, pool_index pool, uint16_t flags)
 {
   std::lock_guard<std::mutex> scopedLock(mDeferredSetTransformMutex);
-  if (isInWritingThread() && mDeferredCommand.empty())
+  if (isInWritingThread() && !mDeferredCommand.size())
   {
     WriteLockRAII lock(*this);
-    if (mDeferredCommand.empty())
+    if (!mDeferredCommand.size())
       return reallocateImm(node, transform, pool, flags);
   }
 
-  mDeferredCommand.addCmd([&](DeferredCommand &cmd) {
-    cmd.command = DeferredCommand::REALLOC;
-    cmd.node = node;
-    cmd.transformCommand = transform;
-    encodeCommandPoolFlags(cmd.transformCommand, (flags << 16) | pool);
-  });
+  size_t idx = mDeferredCommand.size();
+  mDeferredCommand.resize(idx + 1);
+
+  DeferredCommand &cmd = mDeferredCommand[idx];
+  cmd.command = DeferredCommand::REALLOC;
+  cmd.node = node;
+  cmd.transformCommand = transform;
+  encodeCommandPoolFlags(cmd.transformCommand, (flags << 16) | pool);
 }
 
 scene::node_index scene::TiledScene::allocate(const mat44f &transform, pool_index pool, uint16_t flags)
 {
   std::lock_guard<std::mutex> scopedLock(mDeferredSetTransformMutex);
-  if (isInWritingThread() && mDeferredCommand.empty())
+  if (isInWritingThread() && !mDeferredCommand.size())
   {
     WriteLockRAII lock(*this);
-    if (mDeferredCommand.empty())
+    if (!mDeferredCommand.size())
       return allocateImm(allocateOne(), transform, pool, flags);
   }
 
-  auto node = reserveOne();
+  size_t idx = mDeferredCommand.size();
+  mDeferredCommand.resize(idx + 1);
 
-  mDeferredCommand.addCmd([&](DeferredCommand &cmd) {
-    cmd.command = DeferredCommand::ADD;
-    cmd.node = node;
-    cmd.transformCommand = transform;
-    encodeCommandPoolFlags(cmd.transformCommand, (flags << 16) | pool);
-  });
-
-  return node;
+  DeferredCommand &cmd = mDeferredCommand[idx];
+  cmd.command = DeferredCommand::ADD;
+  cmd.node = reserveOne();
+  cmd.transformCommand = transform;
+  encodeCommandPoolFlags(cmd.transformCommand, (flags << 16) | pool);
+  return cmd.node;
 }
 
 static inline void updateMaxExt(float *tile_bbox, float &objMaxExt, int tx, int tz, float tileSize)
@@ -457,15 +451,15 @@ __forceinline uint32_t scene::TiledScene::selectTileIndex(uint32_t n_index, bool
   posToTile(nodes.data()[n_index].col3, tx, tz);
   if (tx < getTileX0() || tz < getTileZ0() || tx >= getTileX1() || tz >= getTileZ1())
   {
-    G_ASSERTF(allow_add, "pos=%f %f %f %f-> tile=%d,%d is outside grid (%d,%d)-(%d,%d) (node=%08X)", V4D(nodes.data()[n_index].col3),
-      tx, tz, getTileX0(), getTileZ0(), getTileX1(), getTileZ1(), n_index);
+    G_ASSERTF_RETURN(allow_add, INVALID_INDEX, "pos=%f %f %f %f-> tile=%d,%d is outside grid (%d,%d)-(%d,%d)",
+      V4D(nodes.data()[n_index].col3), tx, tz, getTileX0(), getTileZ0(), getTileX1(), getTileZ1());
     rearrange(tx, tz);
   }
   uint32_t tidx = getTileIndex(tx, tz);
   if (tidx == INVALID_INDEX)
   {
-    G_ASSERTF(allow_add, "pos=%f %f %f %f -> tile=%d,%d references invalid tile (node=%08X)", V4D(nodes.data()[n_index].col3), tx, tz,
-      n_index);
+    G_ASSERTF_RETURN(allow_add, INVALID_INDEX, "pos=%f %f %f %f -> tile=%d,%d references invalid tile",
+      V4D(nodes.data()[n_index].col3), tx, tz);
     tidx = tileGrid[getTileGridIndex(tx, tz)] = allocTile(tx - getTileX0(), tz - getTileZ0());
   }
   return tidx;
@@ -682,7 +676,7 @@ __forceinline void scene::TiledScene::removeNode(TileData &tdata, node_index nod
   // scheduleTileMaintenance(tdata, tdata.MFLG_RECALC_BBOX|tdata.MFLG_REBUILD_KDTREE|tdata.MFLG_IVALIDATE_KDTREE);//simple, but slow
 }
 
-__forceinline void scene::TiledScene::updateTileExtents(TileData &tdata, mat44f_cref node, bbox3f &wabb)
+__forceinline void scene::TiledScene::updateTileExtents(TileData &tdata, mat44f_cref &node, bbox3f &wabb)
 {
   const int tidx = eastl::distance(tileData.begin(), &tdata);
   bbox3f &tbox = tileBox[tidx];
@@ -900,7 +894,7 @@ void scene::TiledScene::reallocateImm(node_index node, const mat44f &transform, 
 
   G_ASSERT_RETURN(isInWritingThread(), );
   uint32_t index = getNodeIndex(node);
-  if (isFreeIndex(index))
+  if (index >= nodes.size())
     return;
 
   int t_idx = selectTileIndex(index, false);
@@ -919,17 +913,19 @@ void scene::TiledScene::setTransformNoScaleChangeImm(node_index node, mat44f_cre
 
   G_ASSERT_RETURN(isInWritingThread(), );
   uint32_t index = getNodeIndex(node);
-  if (isFreeIndex(index))
+  if (index >= nodes.size())
     return;
 
 
   int t_idx = selectTileIndex(index, false);
+  G_ASSERTF_RETURN(t_idx != INVALID_INDEX, , "node=%08X pos=%f %f %f", node, V4D(nodes.data()[index].col3));
   mat44f oldTransform = nodes.data()[index];
   vec3f move = v_sub(transform.col3, oldTransform.col3);
   SimpleScene::setTransformNoScaleChange(node, transform);
   if (t_idx != OUTER_TILE_INDEX && v_test_vec_x_gt_0(v_length3_sq(move)))
   {
     int nt_idx = selectTileIndex(index, true);
+    G_ASSERT(nt_idx != INVALID_INDEX);
     if (nt_idx != t_idx)
     {
       removeNode(getTileByIndex(t_idx), node);
@@ -951,10 +947,11 @@ void scene::TiledScene::setTransformImm(node_index node, mat44f_cref transform)
 
   G_ASSERT_RETURN(isInWritingThread(), );
   uint32_t index = getNodeIndex(node);
-  if (isFreeIndex(index))
+  if (index >= nodes.size())
     return;
 
   int t_idx = selectTileIndex(index, false);
+  G_ASSERTF_RETURN(t_idx != INVALID_INDEX, , "node=%08X pos=%f %f %f", node, V4D(nodes.data()[index].col3));
   mat44f oldTransform = nodes.data()[index];
   vec3f move = v_sub(transform.col3, oldTransform.col3);
   SimpleScene::setTransform(node, transform);
@@ -962,6 +959,7 @@ void scene::TiledScene::setTransformImm(node_index node, mat44f_cref transform)
   if (t_idx != OUTER_TILE_INDEX && v_test_vec_x_gt_0(v_length3_sq(move)))
   {
     int nt_idx = selectTileIndex(index, true);
+    G_ASSERT(nt_idx != INVALID_INDEX);
     if (nt_idx != t_idx)
     {
       removeNode(getTileByIndex(t_idx), node);
@@ -976,23 +974,25 @@ void scene::TiledScene::setTransformImm(node_index node, mat44f_cref transform)
 void scene::TiledScene::setFlagsImm(node_index node, uint16_t flags)
 {
   uint32_t nodeIdx = getNodeIndexInternal(node);
-  if (isFreeIndex(nodeIdx))
+  if (nodeIdx >= nodes.size())
     return;
 
   SimpleScene::setFlags(node, flags);
   uint32_t tileIdx = selectTileIndex(nodeIdx, false);
-  scheduleTileMaintenance(getTileByIndex(tileIdx), TileData::MFLG_RECALC_FLAGS);
+  if (tileIdx != INVALID_INDEX)
+    scheduleTileMaintenance(getTileByIndex(tileIdx), TileData::MFLG_RECALC_FLAGS);
 }
 
 void scene::TiledScene::unsetFlagsImm(node_index node, uint16_t flags)
 {
   uint32_t nodeIdx = getNodeIndexInternal(node);
-  if (isFreeIndex(nodeIdx))
+  if (nodeIdx >= nodes.size())
     return;
 
   SimpleScene::unsetFlags(node, flags);
   uint32_t tileIdx = selectTileIndex(nodeIdx, false);
-  scheduleTileMaintenance(getTileByIndex(tileIdx), TileData::MFLG_RECALC_FLAGS);
+  if (tileIdx != INVALID_INDEX)
+    scheduleTileMaintenance(getTileByIndex(tileIdx), TileData::MFLG_RECALC_FLAGS);
 }
 
 void scene::TiledScene::destroyImm(node_index node)
@@ -1008,11 +1008,14 @@ void scene::TiledScene::destroyImm(node_index node)
   G_ASSERT_RETURN(!isFreeIndex(index), );
 
   int t_idx = selectTileIndex(index, false);
-  G_ASSERTF_RETURN(t_idx >= 0 && t_idx < tileData.size() && t_idx < tileBox.size() && t_idx < tileCull.size(),
-    SimpleScene::destroy(node), "node=%08X index=%08X t_idx=%d tileData.size()=%d tileBox.size()=%d tileCull.size()=%d  pos=%@ rad=%@",
-    node, index, t_idx, tileData.size(), tileBox.size(), tileCull.size(), as_point3(&nodes[index].col3),
-    get_node_bsphere_rad(nodes[index]));
-  removeNode(getTileByIndex(t_idx), node);
+  if (t_idx != INVALID_INDEX)
+  {
+    G_ASSERTF_RETURN(t_idx >= 0 && t_idx < tileData.size() && t_idx < tileBox.size() && t_idx < tileCull.size(),
+      SimpleScene::destroy(node),
+      "node=%08X index=%08X t_idx=%d tileData.size()=%d tileBox.size()=%d tileCull.size()=%d  pos=%@ rad=%@", node, index, t_idx,
+      tileData.size(), tileBox.size(), tileCull.size(), as_point3(&nodes[index].col3), get_node_bsphere_rad(nodes[index]));
+    removeNode(getTileByIndex(t_idx), node);
+  }
   SimpleScene::destroy(node);
 }
 

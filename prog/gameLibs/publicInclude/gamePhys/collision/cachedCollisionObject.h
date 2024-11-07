@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -22,13 +23,9 @@ struct CachedCollisionObjectInfo : public gamephys::CollisionObjectInfo
 
   virtual ~CachedCollisionObjectInfo() {}
 
-  virtual float onImpulse(float impulse, const Point3 & /*dir*/, const Point3 & /*pos*/, float /*point_vel*/,
-    const Point3 & /*collision_normal*/, uint32_t flags = CIF_NONE, int32_t /* user_data */ = -1,
-    gamephys::ImpulseLogFunc /*log_func*/ = nullptr) override
+  virtual float onImpulse(float /*impulse*/, const Point3 & /*dir*/, const Point3 & /*pos*/, float /*point_vel*/,
+    int32_t /* user_data */ = -1, gamephys::ImpulseLogFunc /*log_func*/ = nullptr)
   {
-    if (flags & CIF_NO_DAMAGE)
-      return impulse;
-
     timeToLive = 1.f;
     return 0.f;
   }

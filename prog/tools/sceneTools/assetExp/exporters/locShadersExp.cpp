@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #if _TARGET_PC_WIN
 #include <assets/daBuildExpPluginChain.h>
 #include <assets/assetPlugin.h>
@@ -9,7 +7,6 @@
 #include <assets/assetMgr.h>
 #include <libTools/util/makeBindump.h>
 #include <libTools/util/iLogWriter.h>
-#include <libTools/util/fileUtils.h>
 #include <gameRes/dag_stdGameRes.h>
 #include <ioSys/dag_fileIo.h>
 #include <osApiWrappers/dag_files.h>
@@ -223,17 +220,17 @@ private:
     templateNames.push_back(String("../../../render/shaders/pcg_hash.hlsl"));
     templateNames.push_back(String("../../../publicInclude/render/volumetricLights/heightFogNode.hlsli"));
     templateNames.push_back(String("../../../render/shaders/phase_functions.hlsl"));
-    templateNames.push_back(String("../../../render/volumetricLights/shaders/volfog_common_def.hlsli"));
-    templateNames.push_back(String("../../../render/volumetricLights/shaders/volfog_common.hlsl"));
+    templateNames.push_back(String("../../../render/volumetricLights/shaders/volume_lights_common_def.hlsli"));
+    templateNames.push_back(String("../../../render/volumetricLights/shaders/volume_lights_common.hlsl"));
     templateNames.push_back(String("../../../render/shaders/wind/sample_wind_common.hlsl"));
 
     templateNames.push_back(String("../../../render/shaders/static_shadow_int.hlsl"));
     templateNames.push_back(String("../../../render/shaders/static_shadow.hlsl"));
-    templateNames.push_back(String("../../../render/volumetricLights/shaders/volfog_df_common.hlsl"));
+    templateNames.push_back(String("../../../render/volumetricLights/shaders/volume_lights_distant_common.hlsl"));
     templateNames.push_back(String("raymarchFogShaderTemplateHeader.hlsl"));
     templateNames.push_back(String("fogCommon.hlsl"));
     templateNames.push_back(String("raymarchFogShaderTemplateFunctions.hlsl"));
-    templateNames.push_back(String("../../../render/volumetricLights/shaders/volfog_df_raymarch.hlsl"));
+    templateNames.push_back(String("../../../render/volumetricLights/shaders/volume_lights_raymarch.hlsl"));
     templateNames.push_back(String("raymarchFogShaderTemplateBody.hlsl"));
 
     templateNames.push_back(String("froxelFogShaderTemplateHeader.hlsl"));
@@ -281,9 +278,7 @@ public:
     const char *nonOptionalFileNamePtr = lshaderBlk->getStr("nonOptionalFile", nullptr);
     nonOptionalFileName = nonOptionalFileNamePtr ? String(0, "%sdevelop/%s", appBlkDir, nonOptionalFileNamePtr) : String();
 
-    char exePath[1024];
-    dag_get_appmodule_dir(exePath, sizeof(exePath));
-    compilerExePath.printf(0, "%s/dsc2-nodeBased-dev.exe", exePath);
+    compilerExePath.printf(0, "%s/util64/dsc2-nodeBased-dev.exe", appblk.getStr("dagorCdkDir", NULL));
     if (!permutationsFileName.empty())
       permutationsFile.load(permutationsFileName);
     if (!nonOptionalFileName.empty())

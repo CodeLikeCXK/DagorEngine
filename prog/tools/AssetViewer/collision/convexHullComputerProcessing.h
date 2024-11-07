@@ -1,9 +1,8 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include "collisionNodesSettings.h"
 #include <math/dag_convexHullComputer.h>
-#include <propPanel/control/container.h>
+#include <propPanel2/c_panel_base.h>
 class ConvexHullComputerProcessing
 {
 public:
@@ -12,7 +11,7 @@ public:
   dag::Vector<ConvexHullComputer> computers;
   bool showConvexComputed = true;
 
-  void init(CollisionResource *collision_res, PropPanel::ContainerPropertyControl *prop_panel);
+  void init(CollisionResource *collision_res, PropertyContainerControlBase *prop_panel);
   void calcSelectedComputer();
   void calcComputer(const ConvexComputerSettings &settings);
   void setSelectedNodesSettings(SelectedNodesSettings &&selected_nodes);
@@ -23,6 +22,6 @@ public:
   void fillConvexComputerPanel();
 
 private:
-  PropPanel::ContainerPropertyControl *panel = nullptr;
+  PropertyContainerControlBase *panel = nullptr;
   CollisionResource *collisionRes = nullptr;
 };

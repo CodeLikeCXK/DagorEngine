@@ -10,6 +10,8 @@ hlsl {
   #include "dagi_common_types.hlsli"
 }
 
+texture downsampled_close_depth_tex;
+
 float4 ambient_voxels_visible_start;
 float4 ambient_voxels_visible_width;
 

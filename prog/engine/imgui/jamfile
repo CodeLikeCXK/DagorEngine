@@ -11,6 +11,7 @@ Sources =
 
 AddIncludes =
   $(Root)/prog/engine/sharedInclude
+  $(Root)/prog/gameLibs/publicInclude
 ;
 
 UseProgLibs =

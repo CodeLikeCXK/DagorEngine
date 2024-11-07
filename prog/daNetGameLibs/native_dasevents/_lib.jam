@@ -1,2 +1,0 @@
-gamePulls += daNetGameLibs_native_dasevents_DAS_pull_AOT ;
-UseProgLibs += daNetGameLibs/native_dasevents ;

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <daECS/net/reliabilitySys.h>
 #include <debug/dag_assert.h>
 

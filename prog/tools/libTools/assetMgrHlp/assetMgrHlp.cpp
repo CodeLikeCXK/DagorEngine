@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <assets/assetHlp.h>
 #include <libTools/util/iLogWriter.h>
 #include <ioSys/dag_dataBlock.h>

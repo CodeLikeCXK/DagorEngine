@@ -1,3 +1,0 @@
-return {
-  login_dmm = @(_params, _id) null
-}

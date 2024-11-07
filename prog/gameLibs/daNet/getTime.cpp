@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <daNet/getTime.h>
 #include <enet/enet.h>
 

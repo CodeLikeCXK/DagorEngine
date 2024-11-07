@@ -1,5 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __GAIJIN_FX_EFFECTCLASSTOOLS_H__
+#define __GAIJIN_FX_EFFECTCLASSTOOLS_H__
 #pragma once
+
 
 namespace ScriptHelpers
 {
@@ -20,3 +22,6 @@ void register_effect_class_tools(IEffectClassTools *);
 void unregister_effect_class_tools(IEffectClassTools *);
 
 IEffectClassTools *get_effect_class_tools_interface(const char *class_name);
+
+
+#endif

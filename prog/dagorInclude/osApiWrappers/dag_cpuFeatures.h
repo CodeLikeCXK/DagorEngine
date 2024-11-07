@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -21,7 +22,7 @@ times faster in same case.
 XBox One and PS4 (AMD Jaguar family) have slow 256-bit avx.
 */
 
-#include <supp/dag_define_KRNLIMP.h>
+#include <supp/dag_define_COREIMP.h>
 
 // Values got from CPUID flags, compilation options are ignored
 KRNLIMP extern bool cpu_feature_sse41_checked;
@@ -94,4 +95,4 @@ inline bool &cpu_feature_fast_256bit_avx = cpu_feature_fast_256bit_avx_checked;
 
 #endif // __cplusplus >= 201703L
 
-#include <supp/dag_undef_KRNLIMP.h>
+#include <supp/dag_undef_COREIMP.h>

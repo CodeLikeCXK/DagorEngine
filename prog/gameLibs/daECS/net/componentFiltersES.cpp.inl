@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <daECS/net/object.h>
 #include <daECS/net/connection.h>
 #include "objectReplica.h"

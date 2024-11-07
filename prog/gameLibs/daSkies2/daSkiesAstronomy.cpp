@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <daSkies2/daSkies.h>
 #include <astronomy/astronomy.h>
 

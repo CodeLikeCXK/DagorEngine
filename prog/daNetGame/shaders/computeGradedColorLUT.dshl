@@ -1,6 +1,0 @@
-include "gradedColorLUT.dshl"
-
-shader compute_graded_color_lut
-{
-  FULL_TONEMAP_COMPUTE()
-}

@@ -1,5 +1,6 @@
 Root    ?= ../../../.. ;
 Location = prog/tools/dagUtils/texSeamsRemover ;
+DriverLinkage   = static ;
 ConsoleExe      = yes ;
 
 TargetType  = exe ;

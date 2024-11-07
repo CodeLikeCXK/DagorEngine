@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <osApiWrappers/dag_vromfs.h>
 #include <osApiWrappers/dag_localConv.h>
 #include <osApiWrappers/dag_direct.h>

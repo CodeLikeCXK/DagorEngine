@@ -52,8 +52,7 @@ shader daStars, daMoon
   }
 
   USE_SPECIAL_VISION()
-  INIT_HDR(ps)
-  USE_HDR(ps)
+  SKY_HDR()
 
   INIT_SKIES_LUT(ps)
   USE_SKIES_LUT(ps)

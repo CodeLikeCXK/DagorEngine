@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "a2d.h"
 
 #include <EditorCore/ec_interface.h>

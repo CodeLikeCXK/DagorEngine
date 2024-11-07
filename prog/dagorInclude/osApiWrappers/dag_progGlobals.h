@@ -1,10 +1,11 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
-#include <supp/dag_define_KRNLIMP.h>
+#include <supp/dag_define_COREIMP.h>
 
 KRNLIMP void *win32_get_instance();
 KRNLIMP void *win32_get_main_wnd();
@@ -30,10 +31,7 @@ extern KRNLIMP void *win32_empty_mouse_cursor; // inited as =nullptr
 //! initializes once and returns win32_empty_mouse_cursor handle
 KRNLIMP void *win32_init_empty_mouse_cursor();
 
-//! HCURSOR cursor used to override mouse pointer over app window (if not NULL will override windows cursor)
-extern KRNLIMP void *win32_current_mouse_cursor; // inited as =nullptr
-
 //! value returned by GetDpiForSystem() or 96 if system is not DPI aware
 extern KRNLIMP int win32_system_dpi; // inited as =96
 
-#include <supp/dag_undef_KRNLIMP.h>
+#include <supp/dag_undef_COREIMP.h>

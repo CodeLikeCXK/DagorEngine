@@ -1,14 +1,8 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <render/landMask.h>
 #include <math/dag_bounds2.h>
 #include <ioSys/dag_dataBlock.h>
-#include <drv/3d/dag_viewScissor.h>
-#include <drv/3d/dag_renderTarget.h>
-#include <drv/3d/dag_matricesAndPerspective.h>
-#include <drv/3d/dag_texture.h>
-#include <drv/3d/dag_lock.h>
-#include <drv/3d/dag_info.h>
+#include <3d/dag_drv3d.h>
+#include <3d/dag_drv3dCmd.h>
 #include <perfMon/dag_statDrv.h>
 #include <shaders/dag_rendInstRes.h>
 #include <shaders/dag_postFxRenderer.h>
@@ -88,7 +82,7 @@ LandMask::LandMask(const DataBlock &level_blk, int tex_align, bool needGrass) :
     "random_grass_heightmap");
 
   if (d3d::get_texformat_usage(TEXFMT_DEPTH16) & d3d::USAGE_FILTER)
-    landHeightTex.getTex2D()->texfilter(TEXFILTER_LINEAR);
+    landHeightTex.getTex2D()->texfilter(TEXFILTER_SMOOTH);
 
   if (needGrass)
   {
@@ -109,7 +103,7 @@ LandMask::LandMask(const DataBlock &level_blk, int tex_align, bool needGrass) :
 
   // clear height
 #if _TARGET_PC
-  d3d::GpuAutoLock gpuLock;
+  d3d::driver_command(DRV3D_COMMAND_ACQUIRE_OWNERSHIP, NULL, NULL, NULL);
 
   Driver3dRenderTarget prevRt;
   d3d::get_render_target(prevRt);
@@ -120,6 +114,8 @@ LandMask::LandMask(const DataBlock &level_blk, int tex_align, bool needGrass) :
   d3d::resource_barrier({landHeightTex.getBaseTex(), RB_RO_SRV | RB_STAGE_PIXEL, 0, 0});
 
   d3d::set_render_target(prevRt);
+
+  d3d::driver_command(DRV3D_COMMAND_RELEASE_OWNERSHIP, NULL, NULL, NULL);
 #endif
 }
 

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "resUpdUtil.h"
 #include "resFormats.h"
 #if !_TARGET_64BIT

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 LOADER_ITER(xrDestroyInstance);
 LOADER_ITER(xrGetInstanceProperties);
 LOADER_ITER(xrPollEvent);

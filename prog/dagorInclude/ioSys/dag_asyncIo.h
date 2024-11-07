@@ -1,13 +1,14 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
 #include <ioSys/dag_baseIo.h>
 #include <util/dag_simpleString.h>
 
-#include <supp/dag_define_KRNLIMP.h>
+#include <supp/dag_define_COREIMP.h>
 
 
 // generic load interface implemented as async reader
@@ -48,4 +49,4 @@ public:
   KRNLIMP int64_t getTargetDataSize() override { return file.size; }
 };
 
-#include <supp/dag_undef_KRNLIMP.h>
+#include <supp/dag_undef_COREIMP.h>

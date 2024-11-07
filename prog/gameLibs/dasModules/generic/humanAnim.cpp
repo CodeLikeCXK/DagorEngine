@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <dasModules/aotHumanAnim.h>
 #include <dasModules/aotHumanPhys.h>
 

@@ -6,7 +6,7 @@
 
 // [[shader_local_functions]]
 
-RWTexture3D<float4>  volfog_ff_initial_media : register(u6); // register must match volfog_ff_initial_media_const_no
+RWTexture3D<float4>  initial_media : register(u7);
 
 
 float volume_pos_to_depth(float v, float4 inv_resolution)

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <supp/_platform.h>
 
 #include <debug/dag_logSys.h>

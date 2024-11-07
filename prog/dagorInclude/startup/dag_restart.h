@@ -1,10 +1,11 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
-#include <supp/dag_define_KRNLIMP.h>
+#include <supp/dag_define_COREIMP.h>
 
 
 #define RESTART_VIDEO             (1 << 0)
@@ -62,4 +63,4 @@ KRNLIMP int is_restart_required(int flags);
 KRNLIMP void startup_game(int flags, void (*on_before_proc)(const char *) = NULL, void (*on_after_proc)(const char *) = NULL);
 KRNLIMP void shutdown_game(int flags);
 
-#include <supp/dag_undef_KRNLIMP.h>
+#include <supp/dag_undef_COREIMP.h>

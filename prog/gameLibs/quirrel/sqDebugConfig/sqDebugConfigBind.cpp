@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <quirrel/sqDebugConfig/sqDebugConfig.h>
 #include <quirrel/sqModules/sqModules.h>
 

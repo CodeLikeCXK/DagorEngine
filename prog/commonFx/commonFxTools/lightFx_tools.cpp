@@ -40,15 +40,14 @@ ScriptHelpers::TunedElement *LightFxSize::createTunedElement(const char *name)
 ScriptHelpers::TunedElement *LightFxParams::createTunedElement(const char *name)
 {
   Tab<ScriptHelpers::TunedElement *> elems(tmpmem);
-  elems.reserve(5);
+  elems.reserve(4);
 
   elems.push_back(ScriptHelpers::create_tuned_real_param("phaseTime", 1));
   elems.push_back(ScriptHelpers::create_tuned_bool_param("burstMode", false));
-  elems.push_back(ScriptHelpers::create_tuned_bool_param("cloudLight", false));
   elems.push_back(LightFxColor::createTunedElement("color"));
   elems.push_back(LightFxSize::createTunedElement("size"));
 
-  return ScriptHelpers::create_tuned_struct(name, 3, elems);
+  return ScriptHelpers::create_tuned_struct(name, 2, elems);
 }
 
 

@@ -1,12 +1,10 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
-
-#include <propPanel/c_window_event_handler.h>
-#include <propPanel/commonWindow/dialogWindow.h>
+#include <propPanel2/comWnd/dialog_window.h>
+#include <propPanel2/c_window_event_handler.h>
 #include <generic/dag_tab.h>
 #include <string>
 
-class ObjPropDialog : public PropPanel::DialogWindow
+class ObjPropDialog : public CDialogWindow
 {
 public:
   ObjPropDialog(const char *caption, hdpi::Px width, hdpi::Px height, const Tab<String> &nodes, const Tab<String> &scripts);
@@ -16,8 +14,8 @@ public:
   const Tab<String> &getScripts() const { return scripts; }
 
 protected:
-  void onClick(int pcb_id, PropPanel::ContainerPropertyControl *panel) override;
-  void onChange(int pcb_id, PropPanel::ContainerPropertyControl *panel) override;
+  void onClick(int pcb_id, PropertyContainerControlBase *panel) override;
+  void onChange(int pcb_id, PropertyContainerControlBase *panel) override;
 
   void applyChanges(const Tab<int> &sels);
 

@@ -1,7 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #if _TARGET_PC_WIN
-#include "videoEncoder/videoEncoder.h"
+#include "videoEncoder\videoEncoder.h"
 #include <debug/dag_log.h>
 #include <util/dag_console.h>
 #include <windows.h>
@@ -18,9 +16,11 @@
 #include <mfobjects.h>
 #include <mftransform.h>
 #include <mfreadwrite.h>
-#include <drv/3d/dag_texture.h>
-#include <drv/3d/dag_driver.h>
-#include <drv/3d/dag_platform_pc.h>
+#if _TARGET_D3D_MULTI
+#include <3d/dag_drv3d_multi.h>
+#else
+#include <3d/dag_drv3d_pc.h>
+#endif
 #include <stdio.h>
 #include <mmsystem.h>
 #include <mmdeviceapi.h>
@@ -335,7 +335,7 @@ bool VideoEncoder::init(void *pUnkDevice)
   device->QueryInterface<ID3D10Multithread>(&pMultithread);
   pMultithread->SetMultithreadProtected(true);
 
-  CHECK_HR(::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED));
+  CHECK_HR(::CoInitializeEx(nullptr, COINIT_MULTITHREADED));
   ::MFStartup(MF_VERSION);
   UINT resetToken;
   CHECK_HR(pMFCreateDXGIDeviceManager(&resetToken, &deviceManager));

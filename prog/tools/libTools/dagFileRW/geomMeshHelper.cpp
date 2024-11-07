@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <libTools/dagFileRW/geomMeshHelper.h>
 #include <ioSys/dag_dataBlock.h>
 #include <math/dag_mesh.h>

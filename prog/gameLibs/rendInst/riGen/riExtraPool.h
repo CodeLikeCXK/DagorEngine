@@ -1,7 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
-#include <rendInst/rendInstExtra.h>
+#include <rendInst/layerFlags.h>
 #include <vecmath/dag_vecMath.h>
 #include <math/dag_e3dColor.h>
 #include <math/dag_Point4.h>
@@ -39,12 +38,12 @@ struct RiExtraPool
   unsigned riPoolRefLayer : 4;
   unsigned useShadow : 1, posInst : 1, destroyedColl : 1, immortal : 1, hasColoredShaders : 1, isTree : 1;
   unsigned hasOccluder : 1, largeOccluder : 1, isWalls : 1, useVsm : 1, usedInLandmaskHeight : 1;
-  unsigned patchesHeightmap : 1, usingClipmap : 1;
+  unsigned wasSavedToElems : 1, patchesHeightmap : 1, hasDynamicDisplacement : 1, usingClipmap : 1;
   unsigned killsNearEffects : 1, hasTransitionLod : 1;
   uint8_t hideMask = 0;
   struct ElemMask
   {
-    uint32_t atest, cullN, tessellation, plod;
+    uint32_t atest, cullN, tessellation;
   } elemMask[MAX_LODS];
   struct ElemUniqueData
   {
@@ -106,8 +105,6 @@ struct RiExtraPool
   int destrFxType = -1;
   int destrCompositeFxId = -1;
   float destrFxScale = 0;
-  float destrTimeToLive = -1.f;
-  float destrTimeToKinematic = -1.f;
   int dmgFxType = -1;
   float dmgFxScale = 1.f;
   float damageThreshold = 0;
@@ -118,6 +115,7 @@ struct RiExtraPool
   float radiusFadeDrown = 0.f;
   float radiusFade = 0.f;
   unsigned lodLimits = defLodLimits;
+  float ttl = -1.f;
   bool isRendinstClipmap = false;
   bool isPaintFxOnHit = false;
   bool isDynamicRendinst = false;
@@ -131,8 +129,6 @@ struct RiExtraPool
 
   float hardness = 1.f;
   float rendinstHeight = 0.f; // some buildings made by putting one ri at other, so the actual height of ri not equal bbox height
-
-  float plodRadius = 0.0f;
 
   int clonedFromIdx = -1;
 
@@ -156,7 +152,9 @@ struct RiExtraPool
     isWalls(false),
     useVsm(false),
     usedInLandmaskHeight(false),
+    wasSavedToElems(true), // Note: true to ignore this instance on rebuild until setWasNotSavedToElems() called
     patchesHeightmap(false),
+    hasDynamicDisplacement(false),
     usingClipmap(false),
     killsNearEffects(false),
     hasTransitionLod(false),
@@ -166,7 +164,6 @@ struct RiExtraPool
     memset(elemMask, 0, sizeof(elemMask));
   }
   RiExtraPool(const RiExtraPool &) = delete;
-  RiExtraPool &operator=(const RiExtraPool &) = default;
   ~RiExtraPool();
 
   bool isEmpty() const { return riTm.size() == uuIdx.size(); }
@@ -175,8 +172,13 @@ struct RiExtraPool
 
   bool isPosInst() const { return posInst; }
   bool hasImpostor() const { return posInst; }
-  bool hasPLOD() const { return plodRadius > 0.0f; }
-  bool isValid(uint32_t idx) const { return idx < riTm.size() && riex_is_instance_valid(riTm.data()[idx]); }
+  bool isValid(uint32_t idx) const
+  {
+    if (idx >= riTm.size())
+      return false;
+    uint64_t *p = (uint64_t *)&riTm.data()[idx];
+    return p[0] || p[1];
+  }
   bool isInGrid(int idx) const
   {
     if (idx < 0 || idx >= riXYZR.size())

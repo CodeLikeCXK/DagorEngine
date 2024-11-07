@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <libTools/staticGeom/geomResources.h>
 #include <libTools/staticGeom/staticGeometry.h>
 #include <libTools/staticGeom/staticGeometryContainer.h>

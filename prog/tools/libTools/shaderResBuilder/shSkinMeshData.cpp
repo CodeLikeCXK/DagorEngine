@@ -1,5 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
+// Copyright 2023 by Gaijin Games KFT, All rights reserved.
 #include <libTools/shaderResBuilder/shSkinMeshData.h>
 #include <libTools/util/makeBindump.h>
 #include <shaders/dag_shaders.h>

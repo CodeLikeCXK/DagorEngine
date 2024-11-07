@@ -1,11 +1,11 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
 #include <EASTL/fixed_function.h>
-#include <3d/dag_resPtr.h>
 #include <generic/dag_tabFwd.h>
 
 
@@ -13,7 +13,6 @@ class DataBlock;
 struct Frustum;
 class Point2;
 class Point3;
-class Point4;
 class TMatrix;
 struct TMatrix4_vec4;
 class TMatrix4;
@@ -27,10 +26,7 @@ typedef eastl::fixed_function<sizeof(void *) * 4, void(int num_cascades_to_rende
 class ICascadeShadowsClient
 {
 public:
-  // The returned point is used as an origin for shadow pixel-wise alignment.
-  // If .w > 0.0, then it is treated as a sphere around which to render the cascade.
-  // If .w <= 0.0 for cascade i, then it must be <= 0 for all the subsequent cascades.
-  virtual Point4 getCascadeShadowAnchor(int cascade_no) = 0;
+  virtual void getCascadeShadowAnchorPoint(float cascade_from, Point3 &out_anchor) = 0;
   virtual void prepareRenderShadowCascades(){};
   virtual void renderCascadeShadowDepth(int cascade_no, const Point2 &znzf) = 0;
 
@@ -60,11 +56,6 @@ public:
     // Skip rendering to CSM any destructable whose bounding box radius is less than
     // (static shadow texel size) * (this multiplier)
     float destructablesMinBboxRadiusTexelMul = 0.f;
-    enum class ResourceAccessStrategy
-    {
-      Internal,
-      External
-    } resourceAccessStrategy = ResourceAccessStrategy::Internal;
   };
 
   struct ModeSettings
@@ -76,12 +67,10 @@ public:
     float shadowStart;
     int numCascades;
     float shadowCascadeZExpansion;
-    float shadowCascadeZExpansion_znearOffset;
     float shadowCascadeRotationMargin;
     float cascade0Dist; // if cascade0Dist is >0, it will be used as minimum of auto calculated cascade dist and this one. This is to
                         // artificially create high quality cascade for 'cockpit'
     float overrideZNearForCascadeDistribution;
-    bool useFixedShadowCascade;
   };
 
 
@@ -99,12 +88,10 @@ public:
   void setDepthBiasSettings(const Settings &set);
   void setCascadeWidth(int cascadeWidth);
   void renderShadowsCascades();
-  void renderShadowsCascadesCb(const csm_render_cascades_cb_t &cb, ManagedTexView external_cascades = {});
-  void renderShadowCascadeDepth(int cascadeNo, bool clearPerView, ManagedTexView external_cascades = {});
+  void renderShadowsCascadesCb(csm_render_cascades_cb_t cb);
+  void renderShadowCascadeDepth(int cascadeNo, bool clearPerView);
 
-  void setSamplingBiasToShader(float value);
   void setCascadesToShader();
-  void setNearCullingNearPlaneToShader();
   void disable();
   bool isEnabled() const;
   void invalidate(); // Reset sparse counters.
@@ -128,7 +115,6 @@ public:
   float getMaxShadowDistance() const;
   const Frustum &getWholeCoveredFrustum() const;
   BaseTexture *getShadowsCascade() const;
-  const TextureInfo &getShadowCascadeTexInfo() const;
   const Point2 &getZnZf(int cascade_no) const;
 
   const String &setShadowCascadeDistanceDbg(const Point2 &scene_z_near_far, int tex_size, int splits_w, int splits_h,

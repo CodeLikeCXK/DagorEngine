@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <scene/dag_staticFxObjs.h>
 #include <scene/dag_objsToPlace.h>
 #include <fx/dag_baseFxClasses.h>
@@ -10,8 +8,7 @@
 
 #include <math/dag_frustum.h>
 #include <scene/dag_occlusion.h>
-#include <drv/3d/dag_matricesAndPerspective.h>
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
 #include <scene/dag_occlusionMap.h>
 #include <debug/dag_log.h>
 
@@ -47,18 +44,18 @@ void StaticFxObjects::clear()
   objects.clear();
 }
 
-static __forceinline bool is_sphere_visible(BSphere3 &sp, const Frustum &frustum, const Occlusion *occlusion)
+static __forceinline bool is_sphere_visible(BSphere3 &sp, const Frustum &frustum)
 {
   vec3f center = v_ldu(&sp.c.x);
   vec3f rad = v_splat_w(center);
   if (!frustum.testSphereB(center, rad))
     return false;
-  if (occlusion && occlusion->isOccludedSphere(center, rad))
+  if (current_occlusion && current_occlusion->isOccludedSphere(center, rad))
     return false;
   return true;
 }
 
-void StaticFxObjects::render(int render_type, const TMatrix &view_itm, const Occlusion *occlusion)
+void StaticFxObjects::render(int render_type, const TMatrix &view_itm)
 {
   if (render_type == FX_RENDER_BEFORE)
   {
@@ -68,7 +65,7 @@ void StaticFxObjects::render(int render_type, const TMatrix &view_itm, const Occ
     for (int i = 0; i < objects.size(); i++)
     {
       Effect &e = objects[i];
-      e.visible = e.bindumpRenderable && is_sphere_visible(e.sph, frustum, occlusion);
+      e.visible = e.bindumpRenderable && is_sphere_visible(e.sph, frustum);
 
       if (e.visible)
         e.fx->render(FX_RENDER_BEFORE, view_itm);

@@ -11,6 +11,7 @@ Target      = engine/kernel.lib ;
 Sources =
   fatalerr.cpp
   kernelGlobalSetting.cpp
+  globalVars/visibility_finder.cpp
   globalVars/occlusion_map.cpp
   globalVars/hdrMode.cpp
   cdebug.c
@@ -21,7 +22,7 @@ Sources =
   perfTimer.cpp
 ;
 
-if $(Platform) in windows {
+if $(Platform) in win32 win64 {
   Sources +=
     cpuFreq.cpp
     dagorHwExcept.cpp
@@ -44,7 +45,7 @@ if $(Platform) in ps4 ps5 {
   ;
 }
 
-if $(Platform) = macOS {
+if $(Platform) = macosx {
   Sources +=
     debug.cpp
     macosx/macCpuFreq.cpp
@@ -68,10 +69,10 @@ if $(Platform) = tvOS {
   ;
 }
 
-if $(Platform) in linux {
+if $(Platform) in linux64 {
   Sources += debug.cpp ;
 }
-if $(Platform) in linux android {
+if $(Platform) in linux64 android {
   Sources +=
     linux/linuxCpuFreq.cpp
     dagorHwExcept.cpp
@@ -91,15 +92,13 @@ if $(Platform) in android {
     and_debug.cpp
     and_native_activity.cpp
   ;
-  AndroidSources = android/android.bundle/src/DagorLogger.java src/com/gaijinent/common/DagorLogger.java ;
-  AndroidLibProguard = android/android.bundle/and.proguard ;
 }
 
 AddIncludes = $(Root)/prog/engine/sharedInclude ;
 
-CPPopt = -D__B_KERNEL_LIB -D__B_NO_MEM_BASE_INCLUDE ;
+CPPopt = -D__B_MINICORE -D__B_NO_MEM_BASE_INCLUDE=1 ;
 
-if $(Sanitize) != disabled && $(Platform) in linux macOS { # To consider: configure this bhv via jam opt
+if $(Sanitize) != disabled && $(Platform) in linux64 macosx { # To consider: configure this bhv via jam opt
   # Sanitizer writes to stderr and we'd like to get its output
   # Note that this disables asynchronous log writes
   CPPopt += -DDAGOR_CAPTURE_STDERR=1 ;

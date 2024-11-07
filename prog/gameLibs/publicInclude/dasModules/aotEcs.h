@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -18,7 +19,7 @@
 #include <daECS/utility/createInstantiated.h>
 #include <ecs/core/utility/ecsRecreate.h>
 #include <perfMon/dag_statDrv.h>
-#include <daScript/src/builtin/module_builtin_rtti.h>
+#include <../../1stPartyLibs/daScript/src/builtin/module_builtin_rtti.h>
 
 namespace das
 {
@@ -249,21 +250,15 @@ extern das_context_log_cb global_context_log_cb;
 
 das::StackAllocator &get_shared_stack();
 
-struct EsContextBase
+struct EsContext final : das::Context
 {
   enum
   {
     MAGIC_NOMEM = 0xBADC0402,
     MAGIC_HASMEM = 0xBADC0401
   };
-  const uint32_t ctxMagic = MAGIC_NOMEM;
+  const uint32_t magic = MAGIC_NOMEM;
   void *userData = nullptr;
-
-  EsContextBase(void *user_data) : userData(user_data) {}
-};
-
-struct EsContext final : EsContextBase, das::Context
-{
   ecs::EntityManager *mgr = (bool)g_entity_mgr ? g_entity_mgr.get() : (ecs::EntityManager *)nullptr;
 #if DAGOR_DBGLEVEL > 0
   int touchedByWkId = -1;
@@ -294,14 +289,17 @@ struct EsContext final : EsContextBase, das::Context
 #endif
   void useGlobalVariablesMem()
   {
-    const_cast<uint32_t &>(ctxMagic) = MAGIC_HASMEM;
+    const_cast<uint32_t &>(magic) = MAGIC_HASMEM;
   } // this should not happen in production, but just in case..
-  EsContext(uint32_t stackSize) : EsContextBase(nullptr), das::Context(stackSize) {}
-  EsContext(const Context &ctx, uint32_t category_, bool reset_user_data, void *new_user_data = nullptr) :
-    EsContextBase(reset_user_data ? new_user_data : ((EsContext &)ctx).userData), das::Context(ctx, category_)
+  EsContext(uint32_t stackSize) : das::Context(stackSize) {}
+  EsContext(const Context &ctx, uint32_t category) : das::Context(ctx, category)
   {
     EsContext &esCtx = (EsContext &)ctx;
-    mgr = esCtx.mgr;
+    if (esCtx.magic == MAGIC_NOMEM || esCtx.magic == MAGIC_HASMEM)
+    {
+      userData = esCtx.userData;
+      mgr = esCtx.mgr;
+    }
   }
   virtual void to_out(const das::LineInfo *at, const char *message) override
   {
@@ -338,26 +336,17 @@ struct EsContext final : EsContextBase, das::Context
   }
 };
 
-
-inline EsContext *safe_cast_es_context(das::Context *ctx)
-{
-  EsContext *esCtx = static_cast<EsContext *>(ctx);
-  if (esCtx->ctxMagic == EsContext::MAGIC_NOMEM || esCtx->ctxMagic == EsContext::MAGIC_HASMEM)
-    return esCtx;
-  return nullptr;
-}
-
 inline EsContext *cast_es_context(das::Context *ctx)
 {
   EsContext *esCtx = static_cast<EsContext *>(ctx);
-  G_ASSERT(esCtx->ctxMagic == EsContext::MAGIC_NOMEM || esCtx->ctxMagic == EsContext::MAGIC_HASMEM);
+  G_ASSERT(esCtx->magic == EsContext::MAGIC_NOMEM || esCtx->magic == EsContext::MAGIC_HASMEM);
   return esCtx;
 }
 
 inline EsContext &cast_es_context(das::Context &ctx)
 {
   EsContext &esCtx = static_cast<EsContext &>(ctx);
-  G_ASSERT(esCtx.ctxMagic == EsContext::MAGIC_NOMEM || esCtx.ctxMagic == EsContext::MAGIC_HASMEM);
+  G_ASSERT(esCtx.magic == EsContext::MAGIC_NOMEM || esCtx.magic == EsContext::MAGIC_HASMEM);
   return esCtx;
 }
 
@@ -411,7 +400,7 @@ __forceinline ecs::event_type_t ecs_hash(const char *str) { return ECS_HASH_SLOW
 template <bool sync, typename TInit>
 inline ecs::EntityId do_create_entity(const char *template_name, TInit &&block_or_init, das::Context *ctx, das::LineInfoArg *at)
 {
-  if (DAGOR_UNLIKELY(!template_name))
+  if (EASTL_UNLIKELY(!template_name))
     ctx->throw_error_at(at, "attempt to create entity with empty name");
   ecs::ComponentsInitializer initTmp, *pInit = &initTmp;
   if constexpr (eastl::is_same_v<eastl::remove_cvref_t<decltype(block_or_init)>, das::TBlock<void, ecs::ComponentsInitializer>>)
@@ -468,12 +457,12 @@ inline ecs::EntityId do_entity_fn_with_init_and_lambda(ecs::EntityId eid, const 
   das::LineInfoArg *line_info, F entfn)
 {
   das::SimFunction **fnMnh = (das::SimFunction **)lambda.capture;
-  if (DAGOR_UNLIKELY(!fnMnh))
+  if (EASTL_UNLIKELY(!fnMnh))
     context->throw_error_at(line_info, "invoke null lambda");
   das::SimFunction *simFunc = *fnMnh;
-  if (DAGOR_UNLIKELY(!simFunc))
+  if (EASTL_UNLIKELY(!simFunc))
     context->throw_error_at(line_info, "invoke null function");
-  if (DAGOR_UNLIKELY(!template_name))
+  if (EASTL_UNLIKELY(!template_name))
     context->throw_error_at(line_info, "attempt to create entity with empty name");
   auto pCapture = lambda.capture;
   ContextLockGuard lockg(*context);
@@ -531,38 +520,34 @@ inline ecs::EntityId _builtin_recreate_entity_lambda(ecs::EntityId eid, const ch
     });
 }
 
-inline char *_builtin_add_sub_template_name(const ecs::EntityId eid, const char *add_name_str, das::Context *context,
-  das::LineInfoArg *at)
+inline char *_builtin_add_sub_template_name(const ecs::EntityId eid, const char *add_name_str, das::Context *context)
 {
   const char *addNameStr = add_name_str ? add_name_str : "";
   const ECS_DEFAULT_RECREATE_STR_T &str = add_sub_template_name(eid, addNameStr);
-  return context->allocateString(str.c_str(), uint32_t(str.length()), at);
+  return context->stringHeap->allocateString(str.c_str(), uint32_t(str.length()));
 }
 
-inline char *_builtin_remove_sub_template_name(const ecs::EntityId eid, const char *remove_name_str, das::Context *context,
-  das::LineInfoArg *at)
+inline char *_builtin_remove_sub_template_name(const ecs::EntityId eid, const char *remove_name_str, das::Context *context)
 {
   const char *removeNameStr = remove_name_str ? remove_name_str : "";
   const ECS_DEFAULT_RECREATE_STR_T &str = remove_sub_template_name(eid, removeNameStr);
-  return context->allocateString(str.c_str(), uint32_t(str.length()), at);
+  return context->stringHeap->allocateString(str.c_str(), uint32_t(str.length()));
 }
 
-inline char *_builtin_add_sub_template_name_str(const char *from_templ_name, const char *add_name_str, das::Context *context,
-  das::LineInfoArg *at)
+inline char *_builtin_add_sub_template_name_str(const char *from_templ_name, const char *add_name_str, das::Context *context)
 {
   const char *fromTemplName = from_templ_name ? from_templ_name : "";
   const char *addNameStr = add_name_str ? add_name_str : "";
   const ECS_DEFAULT_RECREATE_STR_T &str = add_sub_template_name(fromTemplName, addNameStr);
-  return context->allocateString(str.c_str(), uint32_t(str.length()), at);
+  return context->stringHeap->allocateString(str.c_str(), uint32_t(str.length()));
 }
 
-inline char *_builtin_remove_sub_template_name_str(const char *from_templ_name, const char *remove_name_str, das::Context *context,
-  das::LineInfoArg *at)
+inline char *_builtin_remove_sub_template_name_str(const char *from_templ_name, const char *remove_name_str, das::Context *context)
 {
   const char *fromTemplName = from_templ_name ? from_templ_name : "";
   const char *removeNameStr = remove_name_str ? remove_name_str : "";
   const ECS_DEFAULT_RECREATE_STR_T &str = remove_sub_template_name(fromTemplName, removeNameStr);
-  return context->allocateString(str.c_str(), uint32_t(str.length()), at);
+  return context->stringHeap->allocateString(str.c_str(), uint32_t(str.length()));
 }
 
 inline ecs::EntityId _builtin_add_sub_template(ecs::EntityId eid, const char *add_name_str,

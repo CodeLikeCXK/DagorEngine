@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <libTools/util/strUtil.h>
 #include <libTools/util/filePathname.h>
 #include <libTools/util/de_TextureName.h>

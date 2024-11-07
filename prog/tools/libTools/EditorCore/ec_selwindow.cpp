@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <EditorCore/ec_selwindow.h>
 #include <EditorCore/ec_interface.h>
 #include <EditorCore/ec_interface_ex.h>
@@ -10,10 +8,8 @@
 #include <libTools/util/strUtil.h>
 #include <ioSys/dag_fileIo.h>
 
-#include <propPanel/control/container.h>
 #include <sepGui/wndGlobal.h>
-#include <drv/3d/dag_renderTarget.h>
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
 
 using hdpi::_pxActual;
 using hdpi::_pxScaled;
@@ -55,7 +51,7 @@ SelWindow::SelWindow(void *phandle, IObjectsList *obj, const char *obj_list_owne
   objects(obj),
   objListName(obj_list_owner_name),
   typeNames(tmpmem),
-  DialogWindow(phandle, _pxActual(max(scr_width() / 3, hdpi::_pxS(600))), _pxScaled(426), "Select objects")
+  CDialogWindow(phandle, _pxActual(max(scr_width() / 3, hdpi::_pxS(600))), _pxScaled(426), "Select objects")
 {
   ctorInit();
 }
@@ -68,7 +64,7 @@ SelWindow::SelWindow(void *phandle, const EcRect &rect, IObjectsList *obj, const
   objects(obj),
   objListName(obj_list_owner_name),
   typeNames(tmpmem),
-  DialogWindow(phandle, _pxActual(rect.r - rect.l), _pxActual(rect.b - rect.t), "Select objects")
+  CDialogWindow(phandle, _pxActual(rect.r - rect.l), _pxActual(rect.b - rect.t), "Select objects")
 {
   ctorInit();
 }
@@ -86,7 +82,7 @@ void SelWindow::ctorInit()
     delete crd;
   }
 
-  PropPanel::ContainerPropertyControl *_panel = getPanel();
+  PropertyContainerControlBase *_panel = getPanel();
   G_ASSERT(_panel && "SelWindow::ctorInit(): NO PANEL FOUND!!!");
 
   Tab<String> vals(tmpmem);
@@ -151,7 +147,7 @@ SelWindow::~SelWindow()
     else
       objed_blk = typesBlk->addNewBlock(objListName);
 
-    PropPanel::ContainerPropertyControl *_panel = getPanel();
+    PropertyContainerControlBase *_panel = getPanel();
     G_ASSERT(_panel && "SelWindow::~SelWindow: NO PANEL FOUND!!!");
 
     for (int i = 0; i < typeNames.size(); ++i)
@@ -170,12 +166,12 @@ SelWindow::~SelWindow()
 
 //==============================================================================
 
-int SelWindow::showDialog()
+void SelWindow::show()
 {
   autoSize();
-  setInitialFocus(PropPanel::DIALOG_ID_NONE);
+  CDialogWindow::show();
+
   getPanel()->setFocusById(ID_NAME_MASK);
-  return DialogWindow::showDialog();
 }
 
 //==============================================================================
@@ -188,7 +184,7 @@ void SelWindow::fillNames()
   Tab<String> selNames(tmpmem);
   Tab<int> selection(tmpmem);
 
-  PropPanel::ContainerPropertyControl *_panel = getPanel();
+  PropertyContainerControlBase *_panel = getPanel();
   G_ASSERT(_panel && "SelWindow::fillNames: NO PANEL FOUND!!!");
 
   for (i = 0; i < typeNames.size(); ++i)
@@ -214,7 +210,7 @@ void SelWindow::fillNames()
 //==============================================================================
 void SelWindow::getSelectedNames(Tab<String> &names)
 {
-  PropPanel::ContainerPropertyControl *_panel = getPanel();
+  PropertyContainerControlBase *_panel = getPanel();
   G_ASSERT(_panel && "SelWindow::getSelectedNames: NO PANEL FOUND!!!");
 
   clear_and_shrink(names);
@@ -232,7 +228,7 @@ void SelWindow::getSelectedNames(Tab<String> &names)
 
 //==============================================================================
 
-void SelWindow::onClick(int pcb_id, PropPanel::ContainerPropertyControl *panel)
+void SelWindow::onClick(int pcb_id, PropertyContainerControlBase *panel)
 {
   if (!panel)
     return;
@@ -288,17 +284,17 @@ void SelWindow::onClick(int pcb_id, PropPanel::ContainerPropertyControl *panel)
 
 //==============================================================================
 
-void SelWindow::onDoubleClick(int pcb_id, PropPanel::ContainerPropertyControl *panel)
+void SelWindow::onDoubleClick(int pcb_id, PropertyContainerControlBase *panel)
 {
   switch (pcb_id)
   {
-    case ID_NAMES_LIST: clickDialogButton(PropPanel::DIALOG_ID_OK); break;
+    case ID_NAMES_LIST: click(DIALOG_ID_OK); break;
   }
 }
 
 //==============================================================================
 
-void SelWindow::onChange(int pcb_id, PropPanel::ContainerPropertyControl *panel)
+void SelWindow::onChange(int pcb_id, PropertyContainerControlBase *panel)
 {
   switch (pcb_id)
   {

@@ -1,8 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
+// Copyright 2023 by Gaijin Games KFT, All rights reserved.
 #include "shExprParser.h"
-#include "cppStcodeAssembly.h"
-#include "cppStcodeUtils.h"
 #include "varMap.h"
 #include "shcode.h"
 #include "semUtils.h"
@@ -45,39 +42,33 @@ ExpressionParser::~ExpressionParser() {}
 
 void ExpressionParser::setVar(LocalVar *var, bool is_integer, ComplexExpression *rootExpr, ShaderTerminal::SHTOK_ident *decl_name)
 {
-  bool isDynamic = rootExpr->isDynamic();
-  Tab<int> &code = owner->curpass->get_alt_curstcode(isDynamic);
-  StcodeRoutine &cppStcode = owner->curpass->get_alt_curcppcode(isDynamic);
+  Tab<int> &code = owner->curpass->get_alt_curstcode(rootExpr->isDynamic());
 
   Register varReg;
   if (var->valueType == shexpr::VT_REAL)
     varReg = owner->add_reg();
   else
     varReg = owner->add_vec_reg();
-
-  StcodeExpression expr;
-  if (!rootExpr->assembly(*owner, code, expr, varReg, is_integer))
+  if (!rootExpr->assembly(*owner, code, varReg, is_integer))
   {
     error(String(128, "cannot assembly local variable '%s' expression!", decl_name->text), decl_name);
   }
-  cppStcode.addLocalVar(stcode::shexpr_value_to_shadervar_type(var->valueType), decl_name->text, eastl::move(expr));
-
   var->reg = eastl::move(varReg).release();
 }
 
 // parse local variable declaration
-LocalVar *ExpressionParser::parseLocalVarDecl(local_var_decl &decl, bool ignoreColorDimensionMismatch)
+LocalVar *ExpressionParser::parseLocalVarDecl(local_var_decl &decl)
 {
   G_ASSERT(owner);
   shexpr::ValueType valueType;
-  bool isInteger = false;
+  bool is_integer = false;
   switch (decl.type->type->number())
   {
     case SHADER_TOKENS::SHTOK_float: valueType = shexpr::VT_REAL; break;
     case SHADER_TOKENS::SHTOK_float4: valueType = shexpr::VT_COLOR4; break;
     case SHADER_TOKENS::SHTOK_int4:
       valueType = shexpr::VT_COLOR4;
-      isInteger = true;
+      is_integer = true;
       break;
     default: G_ASSERT(0);
   }
@@ -103,37 +94,20 @@ LocalVar *ExpressionParser::parseLocalVarDecl(local_var_decl &decl, bool ignoreC
     return nullptr;
   }
 
-  // register new variable
-  int varId = owner->code.locVars.addVariable(LocalVar(varNameId, valueType, isInteger));
+  // registe new variable
+  int varId = owner->code.locVars.addVariable(LocalVar(varNameId, valueType));
   LocalVar *var = owner->code.locVars.getVariableById(varId);
   G_ASSERT(var);
 
   // initialize variable
-  ComplexExpression rootExpr(decl.expr, valueType);
-
-  if (!parseExpression(*decl.expr, &rootExpr, Context{valueType, isInteger, decl.name}))
+  ComplexExpression rootExpr(valueType);
+  if (!parseExpression(*decl.expr, &rootExpr))
     return nullptr;
-
-  if (!ignoreColorDimensionMismatch && valueType == shexpr::VT_COLOR4 && rootExpr.getChannels() != 1 && rootExpr.getChannels() != 4)
-  {
-    error(String(128, "Invalid number of channels (%d) for float4 local variable with name '%s' (must be 1 or 4)",
-            rootExpr.getChannels(), decl.name->text),
-      decl.name);
-    return nullptr;
-  }
-  if (valueType == shexpr::VT_REAL && rootExpr.getChannels() != 1)
-  {
-    error(String(128, "Invalid number of channels (%d) for float local variable with name '%s' (must be 1)", rootExpr.getChannels(),
-            decl.name->text),
-      decl.name);
-    return nullptr;
-  }
 
   if (!rootExpr.collapseNumbers())
     return nullptr;
 
   var->isDynamic = rootExpr.isDynamic();
-  var->dependsOnDynVarsAndMaterialParams = rootExpr.hasDynamicAndMaterialTermsAt() != nullptr;
 
   // try to get constant value
   Color4 v;
@@ -161,25 +135,19 @@ LocalVar *ExpressionParser::parseLocalVarDecl(local_var_decl &decl, bool ignoreC
   }
 
   // add value of this variable as dynamic value
-  setVar(var, isInteger, &rootExpr, decl.name);
+  setVar(var, is_integer, &rootExpr, decl.name);
   return var;
 }
 
 // parse expression - * and / operators or single expression
-bool ExpressionParser::parseSubExpression(ShaderTerminal::arithmetic_expr_md &s, ComplexExpression *e, const Context &ctx)
+bool ExpressionParser::parseSubExpression(ShaderTerminal::arithmetic_expr_md &s, ComplexExpression *e)
 {
   G_ASSERT(e);
 
   // parse left operand
   G_ASSERT(s.lhs);
-  if (!parseOperand(*s.lhs, shexpr::OPER_LEFT, e, ctx))
+  if (!parseOperand(*s.lhs, shexpr::OPER_LEFT, e))
     return false;
-
-  if (!s.rhs.empty() && ctx.destIsInteger) // @TODO: remove when int arithmetic is implemented
-  {
-    error("Integer arithmetic is not supported (in expressions for local int# vars and @i# constants)", ctx.destTerm);
-    return false;
-  }
 
   // parse right operands
   for (int i = 0; i < s.rhs.size(); i++)
@@ -198,34 +166,23 @@ bool ExpressionParser::parseSubExpression(ShaderTerminal::arithmetic_expr_md &s,
 
     // parse right operand
     G_ASSERT(s.rhs[i]);
-    if (!parseOperand(*s.rhs[i], shexpr::OPER_USER, e, ctx))
+    if (!parseOperand(*s.rhs[i], shexpr::OPER_USER, e))
       return false;
   }
 
-  return e->validate();
+  return true;
 }
 
 
 // parse expression
-bool ExpressionParser::parseExpression(ShaderTerminal::arithmetic_expr &s, ComplexExpression *e, const Context &ctx)
+bool ExpressionParser::parseExpression(ShaderTerminal::arithmetic_expr &s, ComplexExpression *e)
 {
   G_ASSERT(e);
   // parse left operand
   G_ASSERT(s.lhs);
-
-  // If this expression just holds one subexpr, ignore this one and don't create unneeded nested ComplexExpressions
-  if (s.rhs.empty())
-    return parseSubExpression(*s.lhs, e, ctx);
-  // Otherwise, validate
-  else if (ctx.destIsInteger) // @TODO: remove when int arithmetic is implemented
-  {
-    error("Integer arithmetic is not supported (in expressions for local int# vars and @i# constants)", ctx.destTerm);
-    return false;
-  }
-
-  ComplexExpression *newExpr = new ComplexExpression(s.lhs, e->getValueType(), e->getCurrentChannel());
+  ComplexExpression *newExpr = new ComplexExpression(e->getValueType(), e->getCurrentChannel());
   e->setOperand(shexpr::OPER_LEFT, newExpr);
-  if (!parseSubExpression(*s.lhs, newExpr, ctx))
+  if (!parseSubExpression(*s.lhs, newExpr))
     return false;
 
   // parse right operands
@@ -243,55 +200,28 @@ bool ExpressionParser::parseExpression(ShaderTerminal::arithmetic_expr &s, Compl
 
     // parse right operand
     G_ASSERT(s.rhs[i]);
-    newExpr = new ComplexExpression(s.rhs[i], e->getValueType(), e->getCurrentChannel());
+    newExpr = new ComplexExpression(e->getValueType(), e->getCurrentChannel());
     e->addOperand(newExpr, opType);
-    if (!parseSubExpression(*s.rhs[i], newExpr, ctx))
+    if (!parseSubExpression(*s.rhs[i], newExpr))
       return false;
   }
 
-  return e->validate();
+  return true;
 }
 
 
-bool ExpressionParser::parseConstExpression(ShaderTerminal::arithmetic_expr &s, Color4 &ret_value, const Context &ctx)
+bool ExpressionParser::parseConstExpression(ShaderTerminal::arithmetic_expr &s, Color4 &ret_value)
 {
-  if (ctx.destValueType == shexpr::VT_BUFFER || ctx.destValueType == shexpr::VT_TEXTURE)
-  {
-    error(String(128, "Internal error: trying to parse arithmetic expression for buffer/texture expected type"), ctx.destTerm);
+  ComplexExpression real_expr(shexpr::VT_REAL);
+  if (!parseExpression(s, &real_expr))
     return false;
-  }
+  if (real_expr.getValueType() == shexpr::VT_REAL && real_expr.evaluate(ret_value.r))
+    return true;
 
-  // dest_type is either color4, real or undefined (which means both are ok)
-
-  // if we allow the expression to be of real type, try to parse it as such
-  if (ctx.destValueType != shexpr::VT_COLOR4)
-  {
-    ComplexExpression real_expr(&s, shexpr::VT_REAL);
-    if (!parseExpression(s, &real_expr, ctx))
-      return false;
-    if (real_expr.getValueType() == shexpr::VT_REAL && real_expr.evaluate(ret_value.r))
-      return true;
-    else if (ctx.destValueType == shexpr::VT_REAL)
-      return false;
-  }
-
-  // if we expect the expression to be color4, or don't expect it to be of a given type
-  // and failed to parse it as real, try to parse as color4
-  if (ctx.destValueType != shexpr::VT_REAL)
-  {
-    ComplexExpression color_expr(&s, shexpr::VT_COLOR4);
-    if (!parseExpression(s, &color_expr, ctx))
-      return false;
-    if (color_expr.getChannels() != 1 && color_expr.getChannels() != 4)
-    {
-      error(String(128, "Invalid number of channels (%d) for float4 const expression (must be 1 or 4)", color_expr.getChannels()),
-        ctx.destTerm);
-      return false;
-    }
-    return color_expr.evaluate(ret_value);
-  }
-
-  return false;
+  ComplexExpression color_expr(shexpr::VT_COLOR4);
+  if (!parseExpression(s, &color_expr))
+    return false;
+  return color_expr.evaluate(ret_value);
 }
 
 // parse color mask
@@ -310,8 +240,7 @@ shexpr::ColorChannel ExpressionParser::parseColorMask(char channel) const
 
 
 // parse operand
-bool ExpressionParser::parseOperand(ShaderTerminal::arithmetic_operand &s, shexpr::OperandType op_type, ComplexExpression *e,
-  const Context &ctx)
+bool ExpressionParser::parseOperand(ShaderTerminal::arithmetic_operand &s, shexpr::OperandType op_type, ComplexExpression *e)
 {
   if (!e)
     return false;
@@ -328,15 +257,8 @@ bool ExpressionParser::parseOperand(ShaderTerminal::arithmetic_operand &s, shexp
     }
   }
 
-  if (opType == shexpr::UOP_NEGATIVE && ctx.destIsInteger) // @TODO: remove when int arithmetic is implemented
-  {
-    error("Integer arithmetic is not supported (in expressions for local int# vars and @i# constants)", ctx.destTerm);
-    return false;
-  }
-
   // detect color channel mask
   eastl::unique_ptr<ColorChannelExpression> colorChExpr;
-  int minRequiredChannels = 1;
   if (s.cmask)
   {
     int channels = strlen(s.cmask->channel->text);
@@ -347,44 +269,24 @@ bool ExpressionParser::parseOperand(ShaderTerminal::arithmetic_operand &s, shexp
       return false;
     }
 
-    // Check min channels required for the mask to retrieve valid data
-    for (int i = 0; i < channels; i++)
-    {
-      shexpr::ColorChannel colorChannel = parseColorMask(s.cmask->channel->text[i]);
-      if (colorChannel == shexpr::_CC_UNDEFINED)
-      {
-        error("r,g,b,a or x,y,z,w expected!", s.cmask->channel);
-        return false;
-      }
-      int reqChannels = colorChannel - shexpr::CC_R + 1;
-      minRequiredChannels = eastl::max(minRequiredChannels, reqChannels);
-    }
-
     int index = (e->getCurrentChannel() == -1 || channels == 1) ? 0 : e->getCurrentChannel();
     char channel = s.cmask->channel->text[index];
     shexpr::ColorChannel colorChannel = parseColorMask(channel);
+    if (colorChannel == shexpr::_CC_UNDEFINED)
+    {
+      error("r,g,b,a or x,y,z,w expected!", s.cmask->channel);
+      return false;
+    }
 
     e->setChannels(channels);
 
-    // If the current channel of expression is defined (!= -1), it means that we are
-    // inside of a ColorValue expression, and all the channels of a mask are parsed
-    // separately (see ExpressionParser::parseColor)
-    if (channels == 1 || e->getCurrentChannel() != -1)
-      colorChExpr.reset(new SingleColorChannelExpression(s.cmask->channel, colorChannel));
-    else
-    {
-      MultiColorChannelExpression::ChannelMask allChannels(channels);
-      for (int index = 0; index < channels; index++)
-        allChannels[index] = parseColorMask(s.cmask->channel->text[index]);
-      colorChExpr.reset(new MultiColorChannelExpression(s.cmask->channel, allChannels));
-    }
+    colorChExpr.reset(new ColorChannelExpression(s.cmask->channel, colorChannel));
   }
 
   if (s.expr)
   {
     // it's a complex expression
-    shexpr::ValueType valType = colorChExpr ? shexpr::VT_COLOR4 : e->getValueType();
-    ComplexExpression *newExpr = new ComplexExpression(s.expr, valType, e->getCurrentChannel());
+    ComplexExpression *newExpr = new ComplexExpression(e->getValueType(), e->getCurrentChannel());
     newExpr->setUnaryOperator(opType);
 
     if (colorChExpr)
@@ -398,16 +300,7 @@ bool ExpressionParser::parseOperand(ShaderTerminal::arithmetic_operand &s, shexp
       e->setOperand(op_type, newExpr);
     }
 
-    if (!parseExpression(*s.expr, newExpr, ctx))
-      return false;
-    if (newExpr->getChannels() < minRequiredChannels)
-    {
-      error(String(128, "Expression only has %d channels while at least %d channels are required for the '%s' mask",
-              newExpr->getChannels(), minRequiredChannels, s.cmask->channel->text),
-        s.cmask->channel);
-      return false;
-    }
-    return true;
+    return parseExpression(*s.expr, newExpr);
   }
   if (s.var_name)
   {
@@ -416,21 +309,11 @@ bool ExpressionParser::parseOperand(ShaderTerminal::arithmetic_operand &s, shexp
 
     int varId = owner->code.locVars.getVariableId(varNameId);
     LocalVar *locVar = owner->code.locVars.getVariableByName(varNameId);
-
     if (locVar)
     {
-      if (!locVar->isInteger && ctx.destIsInteger) // @TODO: remove when int arithmetic is implemented
-      {
-        error(String(0, "Floating point local var %s is used in integer expression", s.var_name->text), ctx.destTerm);
-        return false;
-      }
-
       // it's a local variable
       if (locVar->isConst)
       {
-        // Sanity check
-        G_ASSERT(locVar->valueType == shexpr::VT_REAL || locVar->valueType == shexpr::VT_COLOR4);
-
         // add this as numeric constant
         if (locVar->valueType == shexpr::VT_COLOR4)
         {
@@ -528,7 +411,6 @@ bool ExpressionParser::parseOperand(ShaderTerminal::arithmetic_operand &s, shexp
           error("variables of type TEXTURE are unsupported here!", s.var_name);
           return false;
           break;
-        // @TODO: validate all types
         default: G_ASSERT(0);
       }
     }
@@ -555,15 +437,6 @@ bool ExpressionParser::parseOperand(ShaderTerminal::arithmetic_operand &s, shexp
         case SHVT_BUFFER: varType = shexpr::VT_BUFFER; break;
         default: G_ASSERT(0);
       }
-    }
-
-    if (!isInt && ctx.destIsInteger) // @TODO: remove when int arithmetic is implemented
-    {
-      const char *varTypeText =
-        varType == shexpr::VT_TEXTURE ? "Texture" : (varType == shexpr::VT_BUFFER ? "Buffer" : "Floating point");
-      error(String(0, "%s %s var %s is used in integer expression", varTypeText, isGlobal ? "global" : "static", s.var_name->text),
-        ctx.destTerm);
-      return false;
     }
 
     if (colorChExpr && (varType != shexpr::VT_COLOR4))
@@ -620,31 +493,12 @@ bool ExpressionParser::parseOperand(ShaderTerminal::arithmetic_operand &s, shexp
     }
 
     // parse arguments
-    eastl::unique_ptr<FunctionExpression> newExpr(new FunctionExpression(s.func->func_name, func, e->getCurrentChannel()));
+    eastl::unique_ptr<FunctionExpression> newExpr(new FunctionExpression(s.func->func_name, func));
     for (int i = 0; i < args.size(); i++)
     {
-      eastl::unique_ptr<ComplexExpression> arg(new ComplexExpression(s.func->param[i], args[i].vt, e->getCurrentChannel()));
-
-      // Function arguments have to answer to the type requirements of the function, not the destination expression
-      // @TODO: support integer numeric function args
-      if (!parseExpression(*s.func->param[i], arg.get(), Context{args[i].vt, false, s.func->func_name}))
+      eastl::unique_ptr<ComplexExpression> arg(new ComplexExpression(args[i].vt, e->getCurrentChannel()));
+      if (!parseExpression(*s.func->param[i], arg.get()))
         return false;
-
-      // @HACK: this is done so as not to break these type of expressions: (v.xy, 1.0/max(1,v.xy))
-      // i.e. expressions where functions that take real args take vectors instead inside color values.
-      // max is a real (real, real) function, but due to the way color values work now this
-      // expression is treated as (v.x, v.y, 1.0/max(1,z.x), 1.0/max(1,z.y)), and it works in existing code.
-      //
-      // @TODO: however, this should be removed, because doing the same outside a color value does not work like that
-      // and this would break if we were to call some function that should act on vectors not coordinate-wise
-      bool argHasAllowedType = (e->getCurrentChannel() != -1 && args[i].vt == shexpr::VT_REAL) || arg->canConvert(args[i].vt);
-      if (!argHasAllowedType)
-      {
-        ExpressionParser::getStatic().error(String(128, "cannot convert function arg from '%s' to '%s' here",
-                                              Expression::__getName(arg->getValueType()), Expression::__getName(args[i].vt)),
-          s.func->func_name);
-        return false;
-      }
       if (!arg->collapseNumbers())
         return false;
 
@@ -682,24 +536,14 @@ bool ExpressionParser::parseOperand(ShaderTerminal::arithmetic_operand &s, shexp
     e->setOperand(op_type, newExpr);
 
     newExpr->setUnaryOperator(opType);
-
-    if (ctx.destIsInteger)
-    {
-      int val = semutils::int_number(s.real_value);
-
-      // bit cast is "safe" in integer context: validation disallows arithmetic, and it just gets passed to the destination
-      newExpr->setValue(*(float *)&val, false);
-    }
-    else
-      newExpr->setValue(semutils::real_number(s.real_value), true);
-
+    newExpr->setValue(semutils::real_number(s.real_value));
     return true;
   }
   else if (s.color_value)
   {
     // it's a color4 value
     eastl::unique_ptr<ColorValueExpression> newExpr(new ColorValueExpression(s.color_value->decl));
-    if (!parseColor(*s.color_value, newExpr.get(), ctx))
+    if (!parseColor(*s.color_value, newExpr.get()))
       return false;
 
     if (colorChExpr)
@@ -723,7 +567,7 @@ bool ExpressionParser::parseOperand(ShaderTerminal::arithmetic_operand &s, shexp
 
 
 // parse color
-bool ExpressionParser::parseColor(ShaderTerminal::arithmetic_color &s, ColorValueExpression *e, const Context &ctx)
+bool ExpressionParser::parseColor(ShaderTerminal::arithmetic_color &s, ColorValueExpression *e)
 {
   if (!e)
     return false;
@@ -739,16 +583,16 @@ bool ExpressionParser::parseColor(ShaderTerminal::arithmetic_color &s, ColorValu
       continue;
     }
 
-    eastl::unique_ptr<ComplexExpression> expr(new ComplexExpression(expr_to_parse, shexpr::VT_REAL, 0));
-    if (!parseExpression(*expr_to_parse, expr.get(), ctx))
+    eastl::unique_ptr<ComplexExpression> expr(new ComplexExpression(shexpr::VT_REAL));
+    if (!parseExpression(*expr_to_parse, expr.get()))
       return false;
     int channels = expr->getChannels();
     if (channels > 1)
     {
       for (int j = 0; j < channels; j++)
       {
-        expr.reset(new ComplexExpression(expr_to_parse, shexpr::VT_REAL, j));
-        if (!parseExpression(*expr_to_parse, expr.get(), ctx))
+        expr.reset(new ComplexExpression(shexpr::VT_REAL, j));
+        if (!parseExpression(*expr_to_parse, expr.get()))
           return false;
         e->setOperand(shexpr::OperandType(current_operand++), expr.release());
       }
@@ -756,8 +600,8 @@ bool ExpressionParser::parseColor(ShaderTerminal::arithmetic_color &s, ColorValu
     }
     if (expr->getValueType() != shexpr::VT_REAL)
     {
-      expr.reset(new ComplexExpression(expr_to_parse, shexpr::VT_COLOR4, 0));
-      if (!parseExpression(*expr_to_parse, expr.get(), ctx))
+      expr.reset(new ComplexExpression(shexpr::VT_COLOR4));
+      if (!parseExpression(*expr_to_parse, expr.get()))
         return false;
     }
     e->setOperand(shexpr::OperandType(current_operand++), expr.release());
@@ -773,7 +617,7 @@ bool ExpressionParser::parseColor(ShaderTerminal::arithmetic_color &s, ColorValu
 }
 
 // show error
-void ExpressionParser::error(const char *msg, Symbol *t)
+void ExpressionParser::error(const char *msg, Terminal *t)
 {
   if (parser)
   {
@@ -784,7 +628,6 @@ void ExpressionParser::error(const char *msg, Symbol *t)
         str.append("\nCall stack:\n");
       for (auto it = t->macro_call_stack.rbegin(); it != t->macro_call_stack.rend(); ++it)
         str.append_sprintf("  %s()\n    %s(%i)\n", it->name, parser->get_lex_parser().get_filename(it->file), it->line);
-
       parser->get_lex_parser().set_error(t->file_start, t->line_start, t->col_start, str.c_str());
     }
     else

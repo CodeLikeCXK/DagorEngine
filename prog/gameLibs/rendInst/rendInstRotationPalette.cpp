@@ -1,12 +1,9 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <rendInst/rotation_palette_consts.hlsli>
 #include "riGen/riRotationPalette.h"
 #include "riGen/landClassData.h"
 
 #include <math/dag_mathBase.h>
 #include <gameRes/dag_stdGameResId.h>
-#include <util/dag_delayedAction.h>
 
 
 uint32_t rendinst::gen::RotationPaletteManager::version = 0;
@@ -134,18 +131,16 @@ void rendinst::gen::RotationPaletteManager::createPalette(const RendintsInfo &ri
 
   if (RendInstGenData::renderResRequired)
     ShaderGlobal::set_int(ScopedDisablePaletteRotation::get_var_id(), 1);
-  deferBufferRecreationToMT();
+  recreateBuffer();
 }
 
-void rendinst::gen::RotationPaletteManager::deferBufferRecreationToMT()
+void rendinst::gen::RotationPaletteManager::recreateBuffer()
 {
   if (RendInstGenData::renderResRequired)
   {
-    run_action_on_main_thread([this]() {
-      impostorDataBuffer.close();
-      impostorDataBuffer = dag::buffers::create_persistent_sr_tbuf(impostorData.size(), TEXFMT_A32B32G32R32F, "impostor_data_buffer");
-      fillBuffer();
-    });
+    impostorDataBuffer.close();
+    impostorDataBuffer = dag::buffers::create_persistent_sr_tbuf(impostorData.size(), TEXFMT_A32B32G32R32F, "impostor_data_buffer");
+    fillBuffer();
   }
 }
 
@@ -217,7 +212,7 @@ uint32_t rendinst::gen::RotationPaletteManager::getImpostorDataBufferOffset(cons
     }
 
     uint32_t ret = addPalette(name, res->getImpostorParams(), id, paletteSize).impostor_data_offset;
-    deferBufferRecreationToMT();
+    recreateBuffer();
     return ret;
   }
   else
@@ -261,8 +256,8 @@ rendinst::gen::RotationPaletteManager::PaletteInfo &rendinst::gen::RotationPalet
   int offset = impostorData.size();
   append_items(impostorData, paramCount);
   impostorData[offset + IMPOSTOR_DATA_SCALE] = impostors_params.scale;
-  impostorData[offset + IMPOSTOR_DATA_BSP_Y__PRESHADOW__BOT_GRADIENT] =
-    Point4(impostors_params.boundingSphere.y, impostors_params.preshadowEnabled ? 1 : -1, safeinv(impostors_params.bottomGradient), 0);
+  impostorData[offset + IMPOSTOR_DATA_BSP_Y__PRESHADOW] =
+    Point4(impostors_params.boundingSphere.y, impostors_params.preshadowEnabled ? 1 : -1, 0, 0);
   for (int i = 0; i < 4; ++i)
     impostorData[offset + IMPOSTOR_DATA_VERTEX_OFFSET + i] = impostors_params.vertexOffsets[i];
   impostorData[offset + TRANSMITTANCE_CROWN_RAD1_DATA_OFFSET] = impostors_params.invCrownRad1;
@@ -436,5 +431,5 @@ void rotation_palette_after_reset(bool /*full_reset*/)
 
 } // namespace rendinst::gen
 
-#include <drv/3d/dag_resetDevice.h>
+#include <3d/dag_drv3dReset.h>
 REGISTER_D3D_AFTER_RESET_FUNC(rendinst::gen::rotation_palette_after_reset);

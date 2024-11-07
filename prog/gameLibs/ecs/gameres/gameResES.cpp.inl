@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <daECS/core/ecsGameRes.h>
 #include <daECS/core/entityManager.h>
 #include <daECS/core/entitySystem.h>
@@ -24,33 +22,24 @@ bool load_gameres_list(const gameres_list_t &reslist)
   return ret;
 }
 
-bool filter_out_loaded_gameres(gameres_list_t &reslist, unsigned spins)
+bool filter_out_loaded_gameres(gameres_list_t &reslist)
 {
   WinCritSec &gameres_main_cs = get_gameres_main_cs();
-  auto do_filter_out = [&]() {
-    reslist.erase(eastl::remove_if(reslist.begin(), reslist.end(),
-                    [](const gameres_list_t::value_type &kv) {
-                      return is_game_resource_loaded_nolock(GAMERES_HANDLE_FROM_STRING(kv.first.c_str()), kv.second);
-                    }),
-      reslist.end());
-  };
-  if (!spins)
+  for (int i = 0; i < 1000; ++i)
   {
-    WinAutoLock lock(gameres_main_cs);
-    do_filter_out();
-  }
-  else
-    for (unsigned i = 0; i < spins; ++i)
+    if (gameres_main_cs.tryLock())
     {
-      if (gameres_main_cs.tryLock())
-      {
-        do_filter_out();
-        gameres_main_cs.unlock();
-        break;
-      }
-      // tryLock failed, yield and try again
-      cpu_yield();
+      reslist.erase(eastl::remove_if(reslist.begin(), reslist.end(),
+                      [](const gameres_list_t::value_type &kv) {
+                        return is_game_resource_loaded_nolock(GAMERES_HANDLE_FROM_STRING(kv.first.c_str()), kv.second);
+                      }),
+        reslist.end());
+      gameres_main_cs.unlock();
+      break;
     }
+    // tryLock failed, yield and try again
+    cpu_yield();
+  }
   return !reslist.empty();
 }
 
@@ -84,11 +73,11 @@ void place_gameres_request(eastl::vector<ecs::EntityId> &&eids, gameres_list_t &
   job->entities = eastl::move(eids);
   job->reslist = eastl::move(requests);
   int loadingJobMgrId = get_common_loading_job_mgr();
-  if (DAGOR_UNLIKELY(loadingJobMgrId == cpujobs::COREID_IMMEDIATE))
-    // Assume that's okay for dedicated (which lacks "render" tag) to load game resources synchronously
-    if (g_entity_mgr->getTemplateDB().info().filterTags.count(ECS_HASH("render").hash))
-      logerr("ECS common loading job mgr id isn't set - resources will be loaded synchronously.\n"
-             "ecs::set_common_loading_job_mgr() wasn't called?");
+#if DAECS_EXTENSIVE_CHECKS
+  if (loadingJobMgrId == cpujobs::COREID_IMMEDIATE)
+    logerr("ECS common loading job mgr id isn't set - resources will be loaded synchronously.\n"
+           "ecs::set_common_loading_job_mgr() wasn't called?");
+#endif
   G_VERIFY(cpujobs::add_job(loadingJobMgrId, job));
 }
 

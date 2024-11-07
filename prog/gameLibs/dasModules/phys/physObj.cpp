@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <dasModules/aotPhysObj.h>
 #include <dasModules/dasManagedTab.h>
 
@@ -92,7 +90,7 @@ struct PhysObjAnnotation : das::ManagedStructureAnnotation<PhysObj, false>
     addField<DAS_BIND_MANAGED_FIELD(unapprovedCT)>("unapprovedCT");
     addField<DAS_BIND_MANAGED_FIELD(previousState)>("previousState");
     addField<DAS_BIND_MANAGED_FIELD(currentState)>("currentState");
-    addProperty<DAS_BIND_MANAGED_PROP(getAuthorityApprovedState)>("authorityApprovedState", "getAuthorityApprovedState");
+    addField<DAS_BIND_MANAGED_FIELD(authorityApprovedState)>("authorityApprovedState");
     addField<DAS_BIND_MANAGED_FIELD(authorityApprovedPartialState)>("authorityApprovedPartialState");
     addField<DAS_BIND_MANAGED_FIELD(visualLocation)>("visualLocation");
     addField<DAS_BIND_MANAGED_FIELD(timeStep)>("timeStep");

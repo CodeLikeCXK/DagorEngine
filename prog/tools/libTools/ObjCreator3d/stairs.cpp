@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <libTools/ObjCreator3d/objCreator3d.h>
 #include <util/dag_string.h>
 #include <3d/dag_materialData.h>

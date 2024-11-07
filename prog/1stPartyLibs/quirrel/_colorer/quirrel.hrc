@@ -142,6 +142,7 @@
       <word name="else"/>
       <word name="else"/>
       <word name="enum"/>
+      <word name="extends"/>
       <word name="for"/>
       <word name="foreach"/>
       <word name="function"/>

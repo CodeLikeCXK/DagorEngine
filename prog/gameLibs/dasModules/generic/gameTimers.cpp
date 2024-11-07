@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <daGame/timers.h>
 #include <daScript/daScript.h>
 #include <dasModules/dasModulesCommon.h>

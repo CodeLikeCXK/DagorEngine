@@ -62,15 +62,12 @@ struct SQFile : public SQStream {
         , _handle(nullptr)
         , _owns(false)
     {}
-
     SQFile(SQAllocContext alloc_ctx, SQFILE file, bool owns)
         : _alloc_ctx(alloc_ctx)
         , _handle(file)
         , _owns(owns)
     {}
-
     virtual ~SQFile() { Close(); }
-
     bool Open(const SQChar *filename ,const SQChar *mode) {
         Close();
         if( (_handle = sqstd_fopen(filename,mode)) ) {
@@ -79,7 +76,6 @@ struct SQFile : public SQStream {
         }
         return false;
     }
-
     void Close() {
         if(_handle && _owns) {
             sqstd_fclose(_handle);
@@ -87,37 +83,30 @@ struct SQFile : public SQStream {
             _owns = false;
         }
     }
-
-    SQInteger Read(void *buffer,SQInteger size) override {
+    SQInteger Read(void *buffer,SQInteger size) {
         return sqstd_fread(buffer,1,size,_handle);
     }
-
-    SQInteger Write(const void *buffer,SQInteger size) override {
-        return sqstd_fwrite(const_cast<void*>(buffer), 1, size, _handle);
+    SQInteger Write(void *buffer,SQInteger size) {
+        return sqstd_fwrite(buffer,1,size,_handle);
     }
-
-    SQInteger Flush() override {
+    SQInteger Flush() {
         return sqstd_fflush(_handle);
     }
-
-    SQInteger Tell() override {
+    SQInteger Tell() {
         return sqstd_ftell(_handle);
     }
-
-    SQInteger Len() override {
+    SQInteger Len() {
         SQInteger prevpos=Tell();
         Seek(0,SQ_SEEK_END);
         SQInteger size=Tell();
         Seek(prevpos,SQ_SEEK_SET);
         return size;
     }
-
-    SQInteger Seek(SQInteger offset, SQInteger origin) override {
+    SQInteger Seek(SQInteger offset, SQInteger origin)  {
         return sqstd_fseek(_handle,offset,origin);
     }
-
-    bool IsValid() override { return _handle?true:false; }
-    bool EOS() override { return Tell()==Len()?true:false;}
+    bool IsValid() { return _handle?true:false; }
+    bool EOS() { return Tell()==Len()?true:false;}
     SQFILE GetHandle() {return _handle;}
 
 public:

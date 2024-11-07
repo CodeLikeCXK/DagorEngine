@@ -1,6 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
-
 #include "common.h"
 #include "binds.h"
 #include "buffers.h"
@@ -43,14 +41,13 @@ struct DataTransfer
 constexpr int queue_instance_sid = 0xffffffff;
 constexpr int dummy_instance_sid = 0xfffffff0;
 
-enum : int
+enum
 {
   INST_RID,
   INST_FLAGS,
   INST_REF_FLAGS,
   INST_SYNCED_FLAGS,
   INST_DEPTH,
-  INST_LOD,
 
   INST_PARENT_SID,
   INST_SUBINSTANCES,
@@ -118,15 +115,7 @@ enum : int
   INST_CULLING_ID,
   INST_LAST_VALID_BBOX_FRAME,
 
-#if DAFX_STAT
   INST_RENDERABLE_TRIS,
-#else
-  INST_RENDERABLE_TRIS = -1,
-#endif
-
-#if DAGOR_DBGLEVEL > 0
-  INST_GAMERES_ID,
-#endif
 };
 
 using InstanceStream = eastl::tuple_vector<InstanceId, // INST_RID
@@ -134,7 +123,6 @@ using InstanceStream = eastl::tuple_vector<InstanceId, // INST_RID
   uint32_t,                                            // INST_REF_FLAGS
   uint32_t,                                            // INST_SYNCED_FLAGS
   int,                                                 // INST_DEPTH
-  uint8_t,                                             // INST_LOD
 
   int,                // INST_PARENT_SID
   eastl::vector<int>, // INST_SUBINSTANCES
@@ -191,26 +179,17 @@ using InstanceStream = eastl::tuple_vector<InstanceId, // INST_RID
   uint32_t,                      // INST_RENDER_TAGS
   eastl::vector<RenderShaderId>, // INST_RENDER_SHADERS
 
-  eastl::vector<TextureDesc>, // INST_LOCAL_RES_CS
-  eastl::vector<TextureDesc>, // INST_LOCAL_RES_VS
-  eastl::vector<TextureDesc>, // INST_LOCAL_RES_PS
+  eastl::vector<TEXTUREID>, // INST_LOCAL_RES_CS
+  eastl::vector<TEXTUREID>, // INST_LOCAL_RES_VS
+  eastl::vector<TEXTUREID>, // INST_LOCAL_RES_PS
 
-  bbox3f,      // INST_BBOX (this should be fine, since eastl::tuple_vector have alignment-friendly allocator)
-  Point4,      // INST_POSITION
-  float,       // INST_VIEW_DIST
-  int,         // INST_RENDER_SORT_DEPTH
-  int,         // INST_CULLING_ID
-  unsigned int // INST_LAST_VALID_BBOX_FRAME
-
-#if DAFX_STAT
-  ,
-  unsigned int // INST_RENDERABLE_TRIS
-#endif
-
-#if DAGOR_DBGLEVEL > 0
-  ,
-  int // INST_GAMERES_ID
-#endif
+  bbox3f,       // INST_BBOX (this should be fine, since eastl::tuple_vector have alignment-friendly allocator)
+  Point4,       // INST_POSITION
+  float,        // INST_VIEW_DIST
+  int,          // INST_RENDER_SORT_DEPTH
+  int,          // INST_CULLING_ID
+  unsigned int, // INST_LAST_VALID_BBOX_FRAME
+  unsigned int  // INST_RENDERABLE_TRIS
   >;
 
 struct InstanceGroups
@@ -268,18 +247,6 @@ struct InstanceGroups
     return const_cast<typename eastl::tuple_element<I, InstanceStream::value_tuple>::type &>(cget<I>(idx));
   }
 
-  template <int I, typename T>
-  constexpr eastl::enable_if_t<(I < 0), T *> getOpt(int, T *def = nullptr)
-  {
-    return def;
-  }
-
-  template <int I, typename T>
-  eastl::enable_if_t<(I >= 0), T *> getOpt(int idx, T * = nullptr)
-  {
-    return &get<I>(idx);
-  }
-
   void shrink_to_size(int c)
   {
     // shrink whole groups, and not individual instances, we dont care about exact precision
@@ -316,4 +283,3 @@ void set_instance_visibility_from_queue(Context &ctx);
 void set_instance_emission_rate_from_queue(Context &ctx);
 void set_instance_value_from_queue(Context &ctx);
 } // namespace dafx
-DAG_DECLARE_RELOCATABLE(dafx::InstanceStream);

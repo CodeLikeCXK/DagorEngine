@@ -1,5 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-#pragma once
+#ifndef PLANE_H
+#define PLANE_H
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -273,3 +273,5 @@ public:
 };
 
 typedef std::vector<Plane> PlaneVector;
+
+#endif

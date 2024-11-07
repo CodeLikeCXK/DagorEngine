@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "drv_returnAddrStore.h"
 #include <EASTL/vector_set.h>
 

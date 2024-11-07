@@ -1,5 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __GAIJIN_DAG_PATHMAP__
+#define __GAIJIN_DAG_PATHMAP__
 #pragma once
+
 
 #include <libTools/containers/dag_DynMap.h>
 #include <libTools/util/fileUtils.h>
@@ -21,3 +23,6 @@ public:
   PathMap(IMemAlloc *mem) : DynMap<String, TVal, PathCompare>(mem) {}
   PathMap(const PathMap &from) : DynMap<String, TVal, PathCompare>(from) {}
 };
+
+
+#endif //__GAIJIN_DAG_PATHMAP__

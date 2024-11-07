@@ -1,8 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "pipeline.h"
+#include "device.h"
 #include "dynamic_graphics_state.h"
-#include "graphics_state2.h"
 
 namespace drv3d_vulkan
 {

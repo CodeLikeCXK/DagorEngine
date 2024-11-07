@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "../clipping_builder.h"
 #include <phys/dag_physics.h>
 #include <debug/dag_log.h>
@@ -582,7 +580,7 @@ public:
   {
     if (!dagor_target_code_valid(target_code))
     {
-      DEBUG_CTX("unsupported target: %c%c%c%c", _DUMP4C(target_code));
+      debug_ctx("unsupported target: %c%c%c%c", _DUMP4C(target_code));
       return false;
     }
 

@@ -1,6 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
-
 #include <util/dag_stdint.h>
 struct DrawStatSingle;
 namespace gpu_profiler
@@ -62,7 +60,7 @@ struct FuncTable
 };
 } // namespace gpu_profiler
 
-#include <supp/dag_define_KRNLIMP.h>
+#include <supp/dag_define_COREIMP.h>
 KRNLIMP void install_gpu_profile_func_table(const gpu_profiler::FuncTable &tbl);
 inline void install_gpu_profile_func_table()
 {
@@ -70,4 +68,4 @@ inline void install_gpu_profile_func_table()
   tbl.fill();
   install_gpu_profile_func_table(tbl);
 }
-#include <supp/dag_undef_KRNLIMP.h>
+#include <supp/dag_undef_COREIMP.h>

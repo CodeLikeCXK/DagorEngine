@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <fftWater/fftWater.h>
 #include <ioSys/dag_dataBlock.h>
 #include <util/dag_string.h>

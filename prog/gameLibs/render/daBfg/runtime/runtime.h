@@ -1,23 +1,20 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <EASTL/array.h>
 
 #include <math/integer/dag_IPoint2.h>
 #include <dag/dag_vector.h>
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
 #include <generic/dag_initOnDemand.h>
 
 #include <frontend/internalRegistry.h>
 #include <frontend/nameResolver.h>
 #include <frontend/dependencyDataCalculator.h>
 #include <frontend/nodeTracker.h>
-#include <frontend/registryValidator.h>
 #include <frontend/irGraphBuilder.h>
 
 #include <backend/nodeScheduler.h>
 #include <backend/resourceScheduling/resourceScheduler.h>
-#include <backend/passColoring.h>
 #include <backend/intermediateRepresentation.h>
 
 #include <runtime/nodeExecutor.h>
@@ -60,13 +57,7 @@ public:
       currentStage = stage;
   }
 
-  void invalidateHistory();
-
   void requestCompleteResourceRescheduling();
-
-  // Should be called for emergency wiping of blobs when some outer
-  // system is destroyed and we might have dangling references.
-  void wipeBlobsBetweenFrames(eastl::span<ResNameId> resources);
 
   // TODO: remove
   void dumpGraph(const eastl::string &filename) const;
@@ -74,7 +65,6 @@ public:
 private:
   CompilationStage currentStage = CompilationStage::UP_TO_DATE;
   multiplexing::Extents currentMultiplexingExtents;
-  multiplexing::Extents multiplexingExtentsOnPreviousCompilation;
 
   // === Components of FG backend ===
 
@@ -93,13 +83,9 @@ private:
 
   NodeTracker nodeTracker{registry, dependencyDataCalculator.depData};
 
-  RegistryValidator registryValidator{registry, dependencyDataCalculator.depData, nameResolver};
+  IrGraphBuilder irGraphBuilder{registry, dependencyDataCalculator.depData, nameResolver};
 
-  IrGraphBuilder irGraphBuilder{registry, dependencyDataCalculator.depData, registryValidator.validityInfo, nameResolver};
-
-  NodeScheduler cullingScheduler;
-
-  BarrierScheduler barrierScheduler;
+  NodeScheduler cullingScheduler{nodeTracker};
 
   eastl::unique_ptr<ResourceScheduler> resourceScheduler;
 
@@ -108,10 +94,8 @@ private:
 
   intermediate::Graph intermediateGraph;
   intermediate::Mapping irMapping;
-
-  PassColoring passColoring;
   sd::NodeStateDeltas perNodeStateDeltas;
-  BarrierScheduler::EventsCollectionRef allResourceEvents;
+  ResourceScheduler::EventsCollectionRef allResourceEvents;
 
   // Deferred init
   eastl::optional<NodeExecutor> nodeExec;
@@ -122,16 +106,11 @@ private:
   Runtime();
   ~Runtime();
 
-  void updateDynamicResolution(int curr_frame);
-
   void updateNodeDeclarations();
   void resolveNames();
   void calculateDependencyData();
-  void validateRegistry();
   void buildIrGraph();
-  void colorPasses();
   void scheduleNodes();
-  void scheduleBarriers();
   void recalculateStateDeltas();
   void scheduleResources();
   void initializeHistoryOfNewResources();

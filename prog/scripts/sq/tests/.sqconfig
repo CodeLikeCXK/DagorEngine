@@ -1,3 +1,0 @@
-mount = %sqstd=../std/
-
-use_libs_by_default = yes

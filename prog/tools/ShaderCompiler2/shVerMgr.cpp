@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <shaders/dag_shaders.h>
 #include <shaders/shUtils.h>
 #include "shLog.h"

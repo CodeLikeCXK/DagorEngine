@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <render/cables.h>
 
 Cables *get_cables_mgr() { return nullptr; }

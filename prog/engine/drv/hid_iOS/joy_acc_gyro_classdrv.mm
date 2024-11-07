@@ -1,12 +1,9 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #import <Foundation/Foundation.h>
 #import <GameController/GameController.h>
 
 #include <EASTL/unique_ptr.h>
-#include <ioSys/dag_dataBlock.h>
-#include <drv/hid/dag_hiXInputMappings.h>
-#include <startup/dag_globalSettings.h>
+
+#include <humanInput/dag_hiXInputMappings.h>
 #include "joy_acc_gyro_classdrv.h"
 
 @implementation iOSInputDevices
@@ -14,41 +11,6 @@ HumanInput::IGenJoystickClient *joy_client = nullptr;
 bool shouldChangeList = false;
 bool changed = false;
 
-static bool gamepad_exist_in_block(const DataBlock *blk, const char * productName, const char *blockName)
-{
-  if (const DataBlock *layoutBlk = blk->getBlockByName(blockName))
-  {
-    for (int blockNo = 0; blockNo < layoutBlk->blockCount(); blockNo++)
-    {
-      const DataBlock *configBlk = layoutBlk->getBlock(blockNo);
-      const char * pname = configBlk->getStr("name", NULL);
-      if (pname && strcasecmp(pname, productName) == 0)
-        return true;
-    }
-  }
-  return false;
-}
-
-static int get_gamepad_layout(const char * productName)
-{
-  const DataBlock *modelsBlk = dgs_get_settings()->getBlockByNameEx("gamepad_layout");
-  if (modelsBlk->isEmpty())
-  {
-    logdbg("gamepad vendors list are not found");
-    return HumanInput::GAMEPAD_VENDOR_UNKNOWN;
-  }
-  logdbg("gamepad: searching in blk gamepad layouts for device: %s", productName);
-
-  const int res = gamepad_exist_in_block(modelsBlk, productName, "nintendo") ? HumanInput::GAMEPAD_VENDOR_NINTENDO
-                : gamepad_exist_in_block(modelsBlk, productName, "sony") ? HumanInput::GAMEPAD_VENDOR_SONY
-                : gamepad_exist_in_block(modelsBlk, productName, "xbox") ? HumanInput::GAMEPAD_VENDOR_MICROSOFT
-                : HumanInput::GAMEPAD_VENDOR_UNKNOWN;
-
-  if (res != HumanInput::GAMEPAD_VENDOR_UNKNOWN)
-    logdbg("gamepad: found layout vendorid - %d", res);
-
-  return res;
-}
 
 - (id)init
 {
@@ -108,27 +70,19 @@ static int get_gamepad_layout(const char * productName)
 int vendorId = HumanInput::GAMEPAD_VENDOR_UNKNOWN;
 - (int)readVendor:(NSString *)category
 {
-  if ([category caseInsensitiveCompare:GCProductCategoryXboxOne] == NSOrderedSame
-    || [category rangeOfString:@"xbox" options:NSCaseInsensitiveSearch].location != NSNotFound)
+  if ([category rangeOfString:@"xbox" options:NSCaseInsensitiveSearch].location != NSNotFound)
   {
     return HumanInput::GAMEPAD_VENDOR_MICROSOFT;
   }
-
-  if ([category caseInsensitiveCompare:GCProductCategoryDualSense] == NSOrderedSame
-    || [category caseInsensitiveCompare:GCProductCategoryDualShock4] == NSOrderedSame
-    || [category rangeOfString:@"dualshock" options:NSCaseInsensitiveSearch].location != NSNotFound
-    || [category rangeOfString:@"dualsense" options:NSCaseInsensitiveSearch].location != NSNotFound)
+  if ([category rangeOfString:@"dualshock" options:NSCaseInsensitiveSearch].location != NSNotFound)
   {
     return HumanInput::GAMEPAD_VENDOR_SONY;
   }
-  if ([category rangeOfString:@"switch" options:NSCaseInsensitiveSearch].location != NSNotFound
-    || [category rangeOfString:@"pro" options:NSCaseInsensitiveSearch].location != NSNotFound
-    || [category rangeOfString:@"joycon" options:NSCaseInsensitiveSearch].location != NSNotFound
-    || [category rangeOfString:@"joy-con" options:NSCaseInsensitiveSearch].location != NSNotFound)
+  if ([category rangeOfString:@"dualsense" options:NSCaseInsensitiveSearch].location != NSNotFound)
   {
-    return HumanInput::GAMEPAD_VENDOR_NINTENDO;
+    return HumanInput::GAMEPAD_VENDOR_SONY;
   }
-  return get_gamepad_layout([category UTF8String]);
+  return HumanInput::GAMEPAD_VENDOR_UNKNOWN;
 }
 
 - (int)getVendorId
@@ -151,7 +105,6 @@ int vendorId = HumanInput::GAMEPAD_VENDOR_UNKNOWN;
     if (appleController.extendedGamepad != nil)
     {
       if (!inserted)
-        logdbg("gamepad: found device, vendor: %s, category: %s", [appleController.vendorName UTF8String], [appleController.productCategory UTF8String]);
         vendorId = [self readVendor:appleController.productCategory];
 
       inserted = true;

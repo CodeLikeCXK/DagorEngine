@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <daECS/net/netEvent.h>
 #include <daECS/net/object.h>
 #include <daECS/core/entityManager.h>
@@ -65,6 +63,10 @@ static void update_esd_event_set(dag::ConstSpan<net::MessageRouting> tx_routings
     }
   });
 }
+namespace ecs
+{
+extern void reset_es_order();
+};
 namespace net
 {
 /*static*/ EventRegRecord *EventRegRecord::netEventsRegList = nullptr;
@@ -101,8 +103,7 @@ void init_server()
   MessageRouting srvr = ROUTING_SERVER_TO_CLIENT;
   do_init_indexes(make_span_const(&srvr, 1));
   update_esd_event_set(make_span_const(&srvr, 1));
-  if (g_entity_mgr)
-    g_entity_mgr->resetEsOrder();
+  ecs::reset_es_order();
 }
 
 void init_client()
@@ -110,8 +111,7 @@ void init_client()
   MessageRouting clr[] = {ROUTING_CLIENT_TO_SERVER, ROUTING_CLIENT_CONTROLLED_ENTITY_TO_SERVER};
   do_init_indexes(make_span_const(clr));
   update_esd_event_set(make_span_const(clr));
-  if (g_entity_mgr)
-    g_entity_mgr->resetEsOrder();
+  ecs::reset_es_order();
 }
 
 void shutdown()

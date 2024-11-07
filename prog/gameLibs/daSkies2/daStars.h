@@ -1,9 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
-
 #include <shaders/dag_shaders.h>
 #include <shaders/dag_shaderMesh.h>
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
 #include <3d/dag_resPtr.h>
 
 class DataBlock;

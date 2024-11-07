@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -8,7 +9,7 @@
 #include "gpuReadbackQuery/gpuReadbackResult.h"
 #include <math/dag_hlsl_floatx.h>
 #include "landMesh/biome_query_result.hlsli"
-#include <drv/3d/dag_resId.h>
+#include <3d/dag_resId.h>
 
 class Point3;
 struct BiomeQueryResult;

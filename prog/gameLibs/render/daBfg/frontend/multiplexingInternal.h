@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <render/daBfg/multiplexing.h>
@@ -27,9 +26,7 @@ bool index_inside_extents(Index idx, Extents extents);
 Index next_index(Index idx, Extents extents);
 Extents extents_for_node(Mode mode, Extents total_extents);
 Index clamp(Index idx, Extents extents);
-// Wrap around sub/supersample and clamp viewport, this produces more reasonable history indices when up-multiplexing
-Index clamp_and_wrap(Index idx, Extents extents);
-bool less_multiplexed(Mode fst, Mode snd, Extents extents);
+bool less_multiplexed(Mode fst, Mode snd);
 
 } // namespace multiplexing
 

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #ifndef __GNUC__
 #include <malloc.h>
 #endif
@@ -24,11 +22,9 @@ public:
 #define _STD_RTL_MEMORY 1
 #endif
 
-#include <supp/dag_define_KRNLIMP.h>
+#include <supp/dag_define_COREIMP.h>
 extern "C" KRNLIMP void *memalloc_default(size_t sz);
 extern "C" KRNLIMP void memfree_default(void *);
-extern "C" KRNLIMP void *memalloc_aligned_default(size_t sz, size_t alignment);
-extern "C" KRNLIMP void memfree_aligned_default(void *p);
 extern "C" KRNLIMP int memresizeinplace_default(void *p, size_t sz);
 extern "C" KRNLIMP void *memrealloc_default(void *, size_t sz);
 extern "C" KRNLIMP void *memcalloc_default(size_t, size_t);
@@ -37,7 +33,7 @@ extern "C" KRNLIMP void memfree_anywhere(void *p);
 #if !_TARGET_STATIC_LIB
 extern KRNLIMP IMemAlloc *defaultmem;
 #endif
-#include <supp/dag_undef_KRNLIMP.h>
+#include <supp/dag_undef_COREIMP.h>
 
 #if !_TARGET_STATIC_LIB
 #include "../dlmalloc-setup.h"

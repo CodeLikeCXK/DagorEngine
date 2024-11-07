@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -11,7 +12,6 @@
 #include <daWeapons/gunProps.h>
 #include <daWeapons/shellStartProps.h>
 #include <daWeapons/projectileSpread.h>
-#include <daWeapons/projectileTracerProps.h>
 #include <daWeapons/meleeProps.h>
 #include <daWeapons/shellSpawnProps.h>
 #include <ecs/game/weapons/gunES.h>
@@ -23,7 +23,6 @@
 MAKE_TYPE_FACTORY(ShellPropIds, daweap::ShellPropIds);
 MAKE_TYPE_FACTORY(ShellStartProps, daweap::ShellStartProps);
 MAKE_TYPE_FACTORY(ProjectileSpreadProps, ProjectileSpreadProps);
-MAKE_TYPE_FACTORY(ProjectileTracerProps, daweap::ProjectileTracerProps);
 MAKE_TYPE_FACTORY(ShellEntityTypeProps, daweap::ShellEntityTypeProps);
 MAKE_TYPE_FACTORY(MeleeProps, daweap::MeleeProps);
 MAKE_TYPE_FACTORY(VolumeProps, daweap::VolumeProps);

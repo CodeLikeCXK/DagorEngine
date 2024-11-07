@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "de3_ICamera.h"
 #include "de3_freeCam.h"
 #include <math/dag_TMatrix.h>

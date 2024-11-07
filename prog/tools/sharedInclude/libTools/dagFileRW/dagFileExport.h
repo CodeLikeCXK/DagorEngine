@@ -1,5 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-#pragma once
+#ifndef __DAGEXP_H_
+#define __DAGEXP_H_
 
 #include <libTools/dagFileRW/dagFileFormat.h>
 #include <ioSys/dag_fileIo.h>
@@ -75,3 +75,6 @@ private:
   bool saveBigMesh(int vertn, const Point3 *vert, int facen, const DagBigFace *face, unsigned char numch,
     const DagBigMapChannel *texch);
 };
+
+
+#endif // __DAGEXP_H_

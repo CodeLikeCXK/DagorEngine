@@ -1,12 +1,14 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
 #include <EASTL/string.h>
 #include <generic/dag_tab.h>
-#include <daECS/core/entityId.h>
+#include <ecs/core/entityManager.h>
+#include <ecs/core/attributeEx.h>
 #include <daECS/net/message.h>
 
 namespace rcptf

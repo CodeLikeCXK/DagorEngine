@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "daBuild.h"
 #include <assets/assetMgr.h>
 #include <assets/assetExporter.h>
@@ -78,7 +76,7 @@ bool loadSingleExporterPlugin(const DataBlock &appblk, DagorAssetMgr &mgr, const
   ILogWriter &log)
 {
 #if !_TARGET_STATIC_LIB
-  void *dllHandle = os_dll_load_deep_bind(fname);
+  void *dllHandle = os_dll_load(fname);
   IDaBuildPlugin *p = NULL;
 
   if (dllHandle)
@@ -114,7 +112,7 @@ bool loadExporterPlugins(const DataBlock &appblk, DagorAssetMgr &mgr, const char
 {
 #if !_TARGET_STATIC_LIB
   alefind_t ff;
-  const String mask(260, "%s/*" DAGOR_OS_DLL_SUFFIX, dirpath);
+  const String mask(260, "%s/*" DAGOR_PC_OS_DLL_SUFFIX, dirpath);
   String fname;
 
   if (::dd_find_first(mask, DA_FILE, &ff))

@@ -1,8 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "acc_gyro_classdrv.h"
 
-#include <drv/hid/dag_hiCreate.h>
+#include <humanInput/dag_hiCreate.h>
 #include <supp/dag_math.h>
 using namespace HumanInput;
 

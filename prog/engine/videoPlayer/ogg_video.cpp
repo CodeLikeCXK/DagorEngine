@@ -1,10 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <videoPlayer/dag_videoPlayer.h>
 #include <theora/theora.h>
-#include <drv/3d/dag_driver.h>
-#include <drv/3d/dag_info.h>
-#include <drv/3d/dag_tex3d.h>
+#include <3d/dag_drv3d.h>
+#include <3d/dag_tex3d.h>
 #include <image/dag_texPixel.h>
 #include <perfMon/dag_cpuFreq.h>
 #include <generic/dag_tab.h>
@@ -19,7 +16,7 @@
 #include "data_pc.h"
 #else
 #include "data_min.h"
-#include <drv/3d/dag_platform.h>
+#include <3d/dag_drv3d_platform.h>
 #endif
 
 
@@ -70,7 +67,7 @@ class OggVideoPlayer : public IGenVideoPlayer, public VideoPlaybackData
       handle = realName ? ::dfa_open_for_read(realName, true) : NULL;
       if (!handle)
       {
-        DEBUG_CTX("cannot open %s(%s)", fname, realName ? realName : "");
+        debug_ctx("cannot open %s(%s)", fname, realName ? realName : "");
         return false;
       }
 
@@ -178,7 +175,7 @@ public:
       if (video_players[i] == this)
       {
         erase_items(video_players, i, 1);
-        DEBUG_CTX("removed ogg player, count = %d", video_players.size());
+        debug_ctx("removed ogg player, count = %d", video_players.size());
         break;
       }
     }
@@ -194,14 +191,14 @@ public:
 
     if (!initDecoder())
     {
-      DEBUG_CTX("cannot init decoder for %s", fname);
+      debug_ctx("cannot init decoder for %s", fname);
       file.close();
       theora_p = 0;
       return false;
     }
 
     video_players.push_back(this);
-    DEBUG_CTX("added ogg player for '%s', count = %d", fname, video_players.size());
+    debug_ctx("added ogg player for '%s', count = %d", fname, video_players.size());
     return true;
   }
 
@@ -214,14 +211,14 @@ public:
 
     if (!initDecoder())
     {
-      DEBUG_CTX("cannot init decoder to read OGG from mem");
+      debug_ctx("cannot init decoder to read OGG from mem");
       file.close();
       theora_p = 0;
       return false;
     }
 
     video_players.push_back(this);
-    DEBUG_CTX("added ogg player for mem %p, sz=%u; count = %d", data.data(), data_size(data), video_players.size());
+    debug_ctx("added ogg player for mem %p, sz=%u; count = %d", data.data(), data_size(data), video_players.size());
     return true;
   }
 
@@ -249,7 +246,7 @@ public:
     }
     if (!initDecoder())
     {
-      DEBUG_CTX("cannot init decoder for %s", fname);
+      debug_ctx("cannot init decoder for %s", fname);
       destroy();
       return NULL;
     }
@@ -263,7 +260,7 @@ public:
     oy.storage = data_size(data);
     if (!initDecoder())
     {
-      DEBUG_CTX("cannot init decoder to read OGG from mem");
+      debug_ctx("cannot init decoder to read OGG from mem");
       destroy();
       return NULL;
     }
@@ -357,15 +354,10 @@ public:
     getCurrentTex(idY, idU, idV);
     return true;
   }
-  virtual void onCurrentFrameDispatched() override
+  virtual void onCurrentFrameDispatched()
   {
     if (vBuf.buf[0].texIdY != BAD_TEXTUREID && lastRdPos >= 0)
-    {
-      auto &ev = vBuf.buf[lastRdPos].ev;
-      if (!ev)
-        ev = d3d::create_event_query(); // Init on demand to ensure that it's called from render (main) thread
-      d3d::issue_event_query(ev);
-    }
+      d3d::issue_event_query(vBuf.buf[lastRdPos].ev);
   }
   virtual bool renderFrame(const IPoint2 *, const IPoint2 *) { return false; }
 
@@ -497,12 +489,12 @@ private:
       {
         if (ret < 0)
         {
-          DEBUG_CTX("Error parsing Theora stream headers; corrupt stream?\n");
+          debug_ctx("Error parsing Theora stream headers; corrupt stream?\n");
           return false;
         }
         if (theora_decode_header(&ti, &tc, &op))
         {
-          DEBUG_CTX("Error parsing Theora stream headers; corrupt stream?\n");
+          debug_ctx("Error parsing Theora stream headers; corrupt stream?\n");
           return false;
         }
         theora_p++;
@@ -522,7 +514,7 @@ private:
       {
         if (buffer_data() == 0)
         { /* need more data */
-          DEBUG_CTX("End of file while searching for codec headers.\n");
+          debug_ctx("End of file while searching for codec headers.\n");
           return false;
         }
       }
@@ -535,7 +527,7 @@ private:
 
       frame_time = int(1000000 / ((double)ti.fps_numerator / ti.fps_denominator));
 
-      DEBUG_CTX("Ogg logical stream %lX is Theora %ux%u %.02f fps video (%d usec per frame)\n"
+      debug_ctx("Ogg logical stream %lX is Theora %ux%u %.02f fps video (%d usec per frame)\n"
                 "Encoded frame content is %ux%u with %ux%u offset; %d bitrate, %d quality, %d quick",
         to.serialno, ti.width, ti.height, (float)ti.fps_numerator / ti.fps_denominator, frame_time, ti.frame_width, ti.frame_height,
         ti.offset_x, ti.offset_y, ti.target_bitrate, ti.quality, ti.quick_p);
@@ -553,7 +545,7 @@ private:
     {
       if (frameW && frameH)
       {
-        DEBUG_CTX("need to recreate buffers, frame size changed %dx%d -> %ux%u", frameW, frameH, ti.frame_width, ti.frame_height);
+        debug_ctx("need to recreate buffers, frame size changed %dx%d -> %ux%u", frameW, frameH, ti.frame_width, ti.frame_height);
         termVideoBuffers();
         frameW = frameH = 0;
       }
@@ -654,21 +646,21 @@ private:
           videobuf_ready = 1;
 
           //*timing*/decode_start_time = get_time_usec_qpc(ref_t) - decode_start_time;
-          //*timing*/DEBUG_CTX("frame decode: %d usec", decode_start_time);
+          //*timing*/debug_ctx ( "frame decode: %d usec", decode_start_time );
         }
         else
           break;
 
         if (get_time_usec_qpc(ref_t) >= end_time)
         {
-          //*timing*/DEBUG_CTX("timeout: end_time=%d usec", end_time);
+          //*timing*/debug_ctx ( "timeout: end_time=%d usec", end_time );
           return;
         }
       }
 
       if (get_time_usec_qpc(ref_t) >= end_time)
       {
-        //*timing*/DEBUG_CTX("timeout: end_time=%d usec", end_time);
+        //*timing*/debug_ctx ( "timeout: end_time=%d usec", end_time );
         return;
       }
 
@@ -687,7 +679,7 @@ private:
         else if (!videobuf_ready && vBuf.used < 1)
         {
           isPlayed = false;
-          DEBUG_CTX("stop playing");
+          debug_ctx("stop playing");
           return;
         }
       }

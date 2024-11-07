@@ -1,5 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
+// Copyright 2023 by Gaijin Games KFT, All rights reserved.
 #include <ioSys/dag_fileIo.h>
 #include <osApiWrappers/dag_files.h>
 

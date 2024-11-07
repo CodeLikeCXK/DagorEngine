@@ -16,4 +16,3 @@
 
 .. |variable-json-Token_symbol| replace:: to be documented in |variable-json-Token_symbol|.rst
 
-.. |structure-json-TokenAt| replace:: to be documented in |structure-json-TokenAt|.rst

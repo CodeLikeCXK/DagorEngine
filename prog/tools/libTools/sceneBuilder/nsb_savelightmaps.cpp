@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <3d/ddsFormat.h>
 #include <string.h>
 #include <util/dag_bitArray.h>

@@ -4,18 +4,11 @@
 #include <unordered_set>
 #include <vector>
 #include <algorithm>
-#include <climits>
 #include "../sqtable.h"
-#include "../sqarray.h"
-#include "../sqclass.h"
-#include "../sqfuncproto.h"
-#include "../sqclosure.h"
-#include <sqdirect.h>
-// #include "../sqast_tree_dump.h"
 
 namespace SQCompilation {
 
-static const Expr *deparen(const Expr *e) {
+const Expr *deparen(const Expr *e) {
   if (!e) return nullptr;
 
   if (e->op() == TO_PAREN)
@@ -23,7 +16,7 @@ static const Expr *deparen(const Expr *e) {
   return e;
 }
 
-static const Expr *skipUnary(const Expr *e) {
+const Expr *skipUnary(const Expr *e) {
   if (!e) return nullptr;
 
   if (e->op() == TO_INC) {
@@ -333,7 +326,7 @@ class NodeEqualChecker {
     return check(l->receiver(), r->receiver());
   }
 
-  bool cmpGetSlot(const GetSlotExpr *l, const GetSlotExpr *r) const {
+  bool cmpGetTable(const GetTableExpr *l, const GetTableExpr *r) const {
     if (l->isNullable() != r->isNullable())
       return false;
 
@@ -482,7 +475,7 @@ public:
     case TO_CONTINUE:
     case TO_EMPTY:
     case TO_BASE:
-    case TO_ROOT_TABLE_ACCESS:
+    case TO_ROOT:
       return true;
     case TO_EXPR_STMT:
       return cmpExprStmt((const ExprStatement *)lhs, (const ExprStatement *)rhs);
@@ -515,6 +508,7 @@ public:
     case TO_ADD:
     case TO_SUB:
     case TO_NEWSLOT:
+    case TO_INEXPR_ASSIGN:
     case TO_PLUSEQ:
     case TO_MINUSEQ:
     case TO_MULEQ:
@@ -540,8 +534,8 @@ public:
       return cmpArrayExpr((const ArrayExpr *)lhs, (const ArrayExpr *)rhs);
     case TO_GETFIELD:
       return cmpGetField((const GetFieldExpr *)lhs, (const GetFieldExpr *)rhs);
-    case TO_GETSLOT:
-      return cmpGetSlot((const GetSlotExpr *)lhs, (const GetSlotExpr *)rhs);
+    case TO_GETTABLE:
+      return cmpGetTable((const GetTableExpr *)lhs, (const GetTableExpr *)rhs);
     case TO_CALL:
       return cmpCallExpr((const CallExpr *)lhs, (const CallExpr *)rhs);
     case TO_TERNARY:
@@ -567,7 +561,7 @@ public:
     case TO_TABLE:
       return cmpTable((const TableDecl *)lhs, (const TableDecl *)rhs);
     case TO_SETFIELD:
-    case TO_SETSLOT:
+    case TO_SETTABLE:
     default:
       assert(0);
       return false;
@@ -621,9 +615,9 @@ public:
     Visitor::visitGetFieldExpr(f);
   }
 
-  void visitGetSlotExpr(GetSlotExpr *t) {
+  void visitGetTableExpr(GetTableExpr *t) {
     complexity += 2;
-    Visitor::visitGetSlotExpr(t);
+    Visitor::visitGetTableExpr(t);
   }
 
   void visitCallExpr(CallExpr *call) {
@@ -1127,7 +1121,7 @@ class NodeDiffComputer {
     return receiverDiff;
   }
 
-  int32_t diffGetSlot(const GetSlotExpr *lhs, const GetSlotExpr *rhs) {
+  int32_t diffGetTable(const GetTableExpr *lhs, const GetTableExpr *rhs) {
     int32_t receiverDiff = diffNodes(lhs->receiver(), rhs->receiver());
 
     if (receiverDiff > limit)
@@ -1404,7 +1398,7 @@ class NodeDiffComputer {
     case TO_CONTINUE:
     case TO_EMPTY:
     case TO_BASE:
-    case TO_ROOT_TABLE_ACCESS:
+    case TO_ROOT:
       return 0;
     case TO_EXPR_STMT:
       return diffExprStmt((const ExprStatement *)lhs, (const ExprStatement *)rhs);
@@ -1437,6 +1431,7 @@ class NodeDiffComputer {
     case TO_ADD:
     case TO_SUB:
     case TO_NEWSLOT:
+    case TO_INEXPR_ASSIGN:
     case TO_PLUSEQ:
     case TO_MINUSEQ:
     case TO_MULEQ:
@@ -1462,8 +1457,8 @@ class NodeDiffComputer {
       return diffArrayExpr((const ArrayExpr *)lhs, (const ArrayExpr *)rhs);
     case TO_GETFIELD:
       return diffGetField((const GetFieldExpr *)lhs, (const GetFieldExpr *)rhs);
-    case TO_GETSLOT:
-      return diffGetSlot((const GetSlotExpr *)lhs, (const GetSlotExpr *)rhs);
+    case TO_GETTABLE:
+      return diffGetTable((const GetTableExpr *)lhs, (const GetTableExpr *)rhs);
     case TO_CALL:
       return diffCallExpr((const CallExpr *)lhs, (const CallExpr *)rhs);
     case TO_TERNARY:
@@ -1489,7 +1484,7 @@ class NodeDiffComputer {
     case TO_TABLE:
       return diffTable((const TableDecl *)lhs, (const TableDecl *)rhs);
     case TO_SETFIELD:
-    case TO_SETSLOT:
+    case TO_SETTABLE:
     default:
       assert(0);
       return -1;
@@ -1671,11 +1666,12 @@ void FunctionReturnTypeEvaluator::checkExpr(const Expr *expr) {
   case TO_GETFIELD:
       checkGetField(expr->asGetField());
       // Fall Through
-  case TO_GETSLOT:
+  case TO_GETTABLE:
       if (expr->asAccessExpr()->isNullable())
         flags |= RT_NULL;
       break;
   case TO_ASSIGN:
+  case TO_INEXPR_ASSIGN:
       flags |= RT_NOTHING;
       break;
   default:
@@ -1844,7 +1840,7 @@ protected:
   bool doCheck(const Node *checkee, Node *n) const {
     enum TreeOp op = n->op();
 
-    if (op == TO_ASSIGN || (TO_PLUSEQ <= op && op <= TO_MODEQ)) {
+    if (op == TO_ASSIGN || op == TO_INEXPR_ASSIGN || (TO_PLUSEQ <= op && op <= TO_MODEQ)) {
       BinExpr *bin = static_cast<BinExpr *>(n);
       return equalChecker.check(checkee, bin->lhs());
     }
@@ -1883,6 +1879,7 @@ public:
     {
     case TO_INC:
     case TO_ASSIGN:
+    case TO_INEXPR_ASSIGN:
     case TO_PLUSEQ:
     case TO_MINUSEQ:
     case TO_MULEQ:
@@ -1908,7 +1905,7 @@ static bool isBinaryArith(const Expr *expr) {
 }
 
 static bool isAssignOp(const TreeOp op) {
-  return op == TO_ASSIGN || (TO_PLUSEQ <= op && op <= TO_MODEQ);
+  return op == TO_ASSIGN || op == TO_INEXPR_ASSIGN || (TO_PLUSEQ <= op && op <= TO_MODEQ);
 }
 
 static bool isAssignExpr(const Expr *expr) {
@@ -2117,39 +2114,39 @@ static bool isDivOperator(enum TreeOp op) {
   return op == TO_DIV || op == TO_MOD || op == TO_DIVEQ || op == TO_MODEQ;
 }
 
-static bool isPureArithOperator(enum TreeOp op) {
+bool isPureArithOperator(enum TreeOp op) {
   return (TO_USHR <= op && op <= TO_SUB) || (TO_PLUSEQ <= op && op <= TO_MODEQ);
 }
 
-static bool isRelationOperator(enum TreeOp op) {
+bool isRelationOperator(enum TreeOp op) {
   return TO_3CMP <= op && op <= TO_LT;
 }
 
-static bool isBoolRelationOperator(enum TreeOp op) {
+bool isBoolRelationOperator(enum TreeOp op) {
   return TO_GE <= op && op <= TO_LT;
 }
 
-static bool isBitwiseOperator(enum TreeOp op) {
+bool isBitwiseOperator(enum TreeOp op) {
   return op == TO_OR || op == TO_AND || op == TO_XOR;
 }
 
-static bool isBoolCompareOperator(enum TreeOp op) {
+bool isBoolCompareOperator(enum TreeOp op) {
   return op == TO_NE || op == TO_EQ || isBoolRelationOperator(op);
 }
 
-static bool isCompareOperator(enum TreeOp op) {
+bool isCompareOperator(enum TreeOp op) {
   return TO_NE <= op && op <= TO_LT;
 }
 
-static bool isShiftOperator(enum TreeOp op) {
+bool isShiftOperator(enum TreeOp op) {
   return op == TO_SHL || op == TO_SHR || op == TO_USHR;
 }
 
-static bool isHigherShiftPriority(enum TreeOp op) {
+bool isHigherShiftPriority(enum TreeOp op) {
   return TO_MUL <= op && op <= TO_SUB;
 }
 
-static bool looksLikeBooleanExpr(const Expr *e) {
+bool looksLikeBooleanExpr(const Expr *e) {
   enum TreeOp op = e->op(); // -V522
   if (isBooleanResultOperator(op))
     return true;
@@ -2300,9 +2297,9 @@ static bool nameLooksLikeFunctionTakeBooleanLambda(const SQChar *n) {
   return hasAnyEqual(n, SQCompilationContext::function_takes_boolean_lambda);
 }
 
-static const char double_colon_str[] = "::";
-static const char base_str[] = "base";
-static const char this_str[] = "this";
+static const SQChar rootName[] = "::";
+static const SQChar baseName[] = "base";
+static const SQChar thisName[] = "this";
 
 enum ValueRefState {
   VRS_UNDEFINED,
@@ -2428,7 +2425,6 @@ struct SymbolInfo {
     const EnumDecl *e;
     const ConstDecl *c;
     const EnumConst *ec;
-    const ExternalValueExpr *ev;
   } declarator;
 
   enum SymbolKind kind;
@@ -2472,8 +2468,6 @@ struct SymbolInfo {
       return declarator.ec->val;
     case SK_PARAM:
       return declarator.p;
-    case SK_EXTERNAL_BINDING:
-      return declarator.ev;
     default:
       assert(0);
       return nullptr;
@@ -2860,6 +2854,7 @@ class CheckerVisitor : public Visitor {
   void checkUselessNullC(const BinExpr *);
   void checkCannotBeNull(const BinExpr *);
   void checkCanBeSimplified(const BinExpr *expr);
+  void checkInExprAssignPriority(const BinExpr *expr);
   void checkRangeCheck(const BinExpr *expr);
   void checkAlwaysTrueOrFalse(const TerExpr *expr);
   void checkTernaryPriority(const TerExpr *expr);
@@ -2878,13 +2873,10 @@ class CheckerVisitor : public Visitor {
   void checkUnwantedModification(const CallExpr *expr);
   void checkCannotBeNull(const CallExpr *expr);
   void checkBooleanLambda(const CallExpr *expr);
-  void checkBoolIndex(const GetSlotExpr *expr);
-  void checkNullableIndex(const GetSlotExpr *expr);
+  void checkBoolIndex(const GetTableExpr *expr);
+  void checkNullableIndex(const GetTableExpr *expr);
   void checkGlobalAccess(const GetFieldExpr *expr);
   void checkAccessFromStatic(const GetFieldExpr *expr);
-  void checkExternalField(const GetFieldExpr *expr);
-
-  bool hasDynamicContent(const SQObject &container);
 
   bool findIfWithTheSameCondition(const Expr * condition, const IfStatement * elseNode, const Expr *&duplicated) {
     if (_equalChecker.check(condition, elseNode->condition())) {
@@ -2992,9 +2984,6 @@ class CheckerVisitor : public Visitor {
   std::unordered_set<const SQChar *, StringHasher, StringEqualer> requiredModules;
   std::unordered_set<const SQChar *, StringHasher, StringEqualer> persistedKeys;
 
-  std::unordered_map<const Node *, ValueRef *> astValues;
-  std::vector<ExternalValueExpr *> externalValues;
-
   Arena *arena;
 
   FunctionInfo *currentInfo;
@@ -3017,14 +3006,13 @@ class CheckerVisitor : public Visitor {
   void applyKnownInvocationToScope(const ValueRef *ref);
   void applyUnknownInvocationToScope();
 
-  const ExternalValueExpr *findExternalValue(const Expr *e);
   const FunctionInfo *findFunctionInfo(const Expr *e, bool &isCtor);
 
   void setValueFlags(const Expr *lvalue, unsigned pf, unsigned nf);
   const ValueRef *findValueForExpr(const Expr *e);
-  const Expr *maybeEval(const Expr *e, int32_t &evalId, std::unordered_set<const Expr *> &visited, bool allow_external = false);
-  const Expr *maybeEval(const Expr *e, int32_t &evalId, bool allow_external = false);
-  const Expr *maybeEval(const Expr *e, bool allow_external = false);
+  const Expr *maybeEval(const Expr *e, int32_t &evalId, std::unordered_set<const Expr *> &visited);
+  const Expr *maybeEval(const Expr *e, int32_t &evalId);
+  const Expr *maybeEval(const Expr *e);
 
   const SQChar *findFieldName(const Expr *e);
 
@@ -3076,7 +3064,7 @@ public:
   void visitIncExpr(IncExpr *expr);
   void visitCallExpr(CallExpr *expr);
   void visitGetFieldExpr(GetFieldExpr *expr);
-  void visitGetSlotExpr(GetSlotExpr *expr);
+  void visitGetTableExpr(GetTableExpr *expr);
 
   void visitExprStatement(ExprStatement *stmt);
 
@@ -3105,10 +3093,7 @@ public:
   void visitEnumDecl(EnumDecl *enm);
   void visitDestructuringDecl(DestructuringDecl *decl);
 
-  ValueRef* addExternalValue(const SQObject &val, const Node *location);
-  void checkDestructuredVarDefault(VarDecl *var);
-
-  void analyze(RootBlock *root, const HSQOBJECT *bindings);
+  void analyze(RootBlock *root);
 };
 
 void VarScope::checkUnusedSymbols(CheckerVisitor *checker) {
@@ -3117,7 +3102,7 @@ void VarScope::checkUnusedSymbols(CheckerVisitor *checker) {
     const SQChar *n = s.first;
     const ValueRef *v = s.second;
 
-    if (strcmp(n, this_str) == 0) // skip 'this'
+    if (strcmp(n, thisName) == 0) // skip 'this'
       continue;
 
 
@@ -3269,8 +3254,6 @@ CheckerVisitor::~CheckerVisitor() {
     if (p.second)
       p.second->~FunctionInfo();
   }
-  for (auto ev : externalValues)
-    ev->~ExternalValueExpr();
 }
 
 void CheckerVisitor::visitNode(Node *n) {
@@ -3400,7 +3383,7 @@ void CheckerVisitor::checkIdUsed(const Id *id, const Node *p, ValueRef *v) {
     const BinExpr *bin = static_cast<const BinExpr *>(e);
     const Expr *lhs = bin->lhs();
     Expr *rhs = bin->rhs();
-    bool simpleAsgn = e->op() == TO_ASSIGN;
+    bool simpleAsgn = e->op() == TO_ASSIGN || e->op() == TO_INEXPR_ASSIGN;
     if (id == lhs) {
       bool used = v->info->usedAfterAssign || existsInTree(id, rhs);
       //if (!used && assigned && simpleAsgn) {
@@ -3437,7 +3420,7 @@ void CheckerVisitor::checkAccessFromStatic(const GetFieldExpr *acc) {
 
   const Expr *r = acc->receiver();
 
-  if (r->op() != TO_ID || strcmp(r->asId()->id(), this_str) != 0)
+  if (r->op() != TO_ID || strcmp(r->asId()->id(), thisName) != 0)
     return;
 
   const TableMember *m = nullptr;
@@ -3476,43 +3459,6 @@ void CheckerVisitor::checkAccessFromStatic(const GetFieldExpr *acc) {
   report(acc, DiagnosticsId::DI_USED_FROM_STATIC, memberName, "static member");
 }
 
-bool CheckerVisitor::hasDynamicContent(const SQObject &container) {
-  if (!sq_istable(container))
-    return false;
-  SQObjectPtr key(_ctx.getVm(), "__dynamic_content__");
-  SQObjectPtr val;
-  return _table(container)->Get(key, val);
-}
-
-void CheckerVisitor::checkExternalField(const GetFieldExpr *acc) {
-  if (effectsOnly)
-    return;
-
-  const Expr *r = acc->receiver();
-  r = maybeEval(r, true);
-  if (r->op() != TO_EXTERNAL_VALUE)
-    return;
-
-  const auto &container = r->asExternal()->value();
-  if (sq_isinstance(container))
-    return;
-
-  SQObjectPtr key(_ctx.getVm(), acc->fieldName());
-  SQObjectPtr val;
-  if (!SQ_SUCCEEDED(sq_direct_get(_ctx.getVm(), &container, &key, &val, false))) {
-    if (!acc->isNullable() && !hasDynamicContent(container)) {
-      report(acc, DI_MISSING_FIELD, acc->fieldName(), GetTypeName(container));
-      char buf[128];
-      snprintf(buf, sizeof(buf), "source of %s", GetTypeName(container));
-      report(r, DI_SEE_OTHER, buf);
-    }
-    return;
-  }
-
-  __AddRef(val._type, val._unVal);
-  astValues[acc] = addExternalValue(val, acc);
-}
-
 static bool cannotBeNull(const Expr *e) {
   switch (e->op())
   {
@@ -3525,7 +3471,7 @@ static bool cannotBeNull(const Expr *e) {
   case TO_USHR: case TO_SHL: case TO_SHR:
   case TO_ADD: case TO_SUB:  case TO_MUL: case TO_DIV: /*case TO_MOD:*/
   case TO_TYPEOF: case TO_RESUME:
-  case TO_BASE: case TO_ROOT_TABLE_ACCESS:
+  case TO_BASE: case TO_ROOT:
   case TO_ARRAYEXPR: case TO_DECL_EXPR:
     return true;
   case TO_LITERAL:
@@ -3967,7 +3913,7 @@ void CheckerVisitor::checkPotentiallyNullableOperands(const BinExpr *bin) {
 
   bool isRelOp = isBoolRelationOperator(op);
   bool isArithOp = isPureArithOperator(op);
-  bool isAssign = op == TO_ASSIGN || op == TO_NEWSLOT;
+  bool isAssign = op == TO_ASSIGN || op == TO_INEXPR_ASSIGN || op == TO_NEWSLOT;
 
   if (!isRelOp && !isArithOp && !isAssign)
     return;
@@ -4266,13 +4212,13 @@ void CheckerVisitor::checkBoolToStrangePosition(const BinExpr *bin) {
   }
 }
 
-static const SQChar *tryExtractKeyName(const Expr *e) {
+const SQChar *tryExtractKeyName(const Expr *e) {
 
   if (e->op() == TO_GETFIELD)
     return e->asGetField()->fieldName();
 
-  if (e->op() == TO_GETSLOT) {
-    e = e->asGetSlot()->key();
+  if (e->op() == TO_GETTABLE) {
+    e = e->asGetTable()->key();
   }
 
   if (e->op() == TO_LITERAL) {
@@ -4301,7 +4247,7 @@ static bool isValidId(const SQChar *id) {
 void CheckerVisitor::checkKeyNameMismatch(const Expr *key, const Expr *e) {
 
   /*
-    function bar() {}
+    let function bar() {}
     let tt = {
       "1foo" : function bar1() { .. }, // OK, not id
       "foo2" : function bar2() { .. }, // WARN
@@ -4398,7 +4344,7 @@ void CheckerVisitor::checkNewGlobalSlot(const BinExpr *bin) {
 
   const GetFieldExpr *gf = lhs->asGetField();
 
-  if (gf->receiver()->op() != TO_ROOT_TABLE_ACCESS)
+  if (gf->receiver()->op() != TO_ROOT)
     return;
 
   storeGlobalDeclaration(gf->fieldName(), bin);
@@ -4482,6 +4428,17 @@ void CheckerVisitor::checkCanBeSimplified(const BinExpr *bin) {
   }
 }
 
+void CheckerVisitor::checkInExprAssignPriority(const BinExpr *expr) {
+  if (effectsOnly)
+    return;
+
+  if (expr->op() != TO_INEXPR_ASSIGN)
+    return;
+
+  if (isBooleanBinaryOrLogicalOpeartor(expr->rhs()->op())) {
+    report(expr, DiagnosticsId::DI_INEXPR_PRIORITY);
+  }
+}
 
 static bool looksLikeElementCount(const Expr *e) {
   const SQChar *checkee = nullptr;
@@ -4491,8 +4448,8 @@ static bool looksLikeElementCount(const Expr *e) {
   else if (e->op() == TO_GETFIELD) {
     checkee = e->asGetField()->fieldName();
   }
-  else if (e->op() == TO_GETSLOT) {
-    return looksLikeElementCount(deparen(e->asGetSlot()->key()));
+  else if (e->op() == TO_GETTABLE) {
+    return looksLikeElementCount(deparen(e->asGetTable()->key()));
   }
   else if (e->op() == TO_CALL) {
     return looksLikeElementCount(deparen(e->asCallExpr()->callee()));
@@ -4573,6 +4530,9 @@ void CheckerVisitor::checkAlreadyRequired(const CallExpr *call) {
   if (effectsOnly)
     return;
 
+  if (nodeStack.size() > 2)
+    return; // do not consider require which is not on TL
+
   if (call->arguments().size() != 1)
     return;
 
@@ -4603,7 +4563,7 @@ void CheckerVisitor::checkAlreadyRequired(const CallExpr *call) {
   }
   else if (callee->op() == TO_GETFIELD) {
     const GetFieldExpr *g = callee->asGetField();
-    if (g->receiver()->op() == TO_ROOT_TABLE_ACCESS) {
+    if (g->receiver()->op() == TO_ROOT) {
       name = g->fieldName();
     }
   }
@@ -4611,43 +4571,10 @@ void CheckerVisitor::checkAlreadyRequired(const CallExpr *call) {
   if (!name)
     return;
 
-  if (strcmp(name, "require") != 0 && strcmp(name, "require_optional") != 0)
+  if (strcmp(name, "require") != 0)
     return;
 
   const SQChar *moduleName = l->s();
-
-  if (!_ctx.isRequireDisabled(call->lineStart(), call->columnStart()))
-    if (auto fv = findValueInScopes("require_optional"); fv && fv->expression && fv->expression->op() == TO_EXTERNAL_VALUE) {
-      auto vm = _ctx.getVm();
-      SQInteger top = sq_gettop(vm);
-
-      sq_pushobject(vm, fv->expression->asExternal()->value());
-      sq_pushnull(vm);
-      sq_pushstring(vm, moduleName, -1);
-
-      SQRESULT result = sq_call(vm, 2, true, false);
-      if (SQ_SUCCEEDED(result)) {
-        SQObject ret;
-        if (SQ_SUCCEEDED(sq_getstackobj(vm, -1, &ret)) && !sq_isnull(ret)) {
-          astValues[call] = addExternalValue(ret, call);
-        }
-        else if (SQCompilationContext::do_report_missing_modules) {
-          report(call, DI_MISSING_MODULE, moduleName);
-          SQObjectPtr empty;
-          astValues[call] = addExternalValue(empty, call);
-        }
-      }
-      else if (SQCompilationContext::do_report_missing_modules) {
-        report(call, DI_MISSING_MODULE, moduleName);
-        SQObjectPtr empty;
-        astValues[call] = addExternalValue(empty, call);
-      }
-
-      sq_settop(vm, top);
-    }
-
-  if (nodeStack.size() > 2)
-    return; // do not consider require which is not on TL
 
   if (requiredModules.find(moduleName) != requiredModules.end()) {
     report(call, DiagnosticsId::DI_ALREADY_REQUIRED, moduleName);
@@ -4871,83 +4798,32 @@ void CheckerVisitor::checkArguments(const CallExpr *callExpr) {
 
   bool dummy;
   const FunctionInfo *info = findFunctionInfo(callExpr->callee(), dummy);
-  const SQFunctionProto *proto = nullptr;
-  const SQNativeClosure *nclosure = nullptr;
 
-  const SQChar *funcName;
-  int numParams;
-  int dpParameters;
-  bool isVararg;
+  if (!info)
+    return;
 
-  if (info) {
-    const FunctionDecl *decl = info->declaration;
-    funcName = decl->name();
-    numParams = info->parameters.size();
-    isVararg = decl->isVararg();
-
-    dpParameters = 0;
-    for (auto &p : decl->parameters()) {
-      if (p->hasDefaultValue())
-        ++dpParameters;
-    }
-  }
-  else {
-    const ExternalValueExpr *ev = findExternalValue(callExpr->callee());
-    if (!ev)
-      return;
-
-    const SQObject& v = ev->value();
-    if (sq_isclosure(v)) {
-      proto = _closure(v)->_function;
-      funcName = sq_isstring(proto->_name) ? _stringval(proto->_name) : _SC("unknown");
-      numParams = proto->_nparameters - 1; // not counting 'this'
-      isVararg = proto->_varparams;
-      dpParameters = proto->_ndefaultparams;
-    }
-    else if (sq_isfunction(v)) {
-      assert(!"Encountered function proto - internal structure, should not happen");
-      return;
-    }
-    else if (sq_isnativeclosure(v)) {
-      nclosure = _nativeclosure(v);
-      if (nclosure->_nparamscheck == 0)
-        return;
-      funcName = sq_isstring(nclosure->_name) ? _stringval(nclosure->_name) : _SC("unknown native");
-      numParams = std::abs(nclosure->_nparamscheck)-1; // not counting 'this'
-      isVararg = nclosure->_nparamscheck < 0;
-      dpParameters = 0;
-    }
-    else
-      return;
-  }
-
-  if (numParams < 0) numParams = 0;
-
-  const int effectiveParamSizeUP = std::max<int>(isVararg ? numParams - 1 : numParams, 0);
-  const int effectiveParamSizeLB = effectiveParamSizeUP - dpParameters;
-  const int maxParamSize = isVararg ? INT_MAX : effectiveParamSizeUP;
-
+  const FunctionDecl *decl = info->declaration;
+  const auto &params = decl->parameters();
+  const auto &paramsNames = info->parameters;
   const auto &args = callExpr->arguments();
 
-  if (!(effectiveParamSizeLB <= args.size() && args.size() <= maxParamSize)) {
-    report(callExpr, DiagnosticsId::DI_PARAM_COUNT_MISMATCH, funcName,
-      effectiveParamSizeLB, maxParamSize, args.size());
-    report(maybeEval(callExpr->callee(), true), DI_SEE_OTHER, "the function");
+  const size_t effectiveParamSizeUP = decl->isVararg() ? paramsNames.size() - 2 : paramsNames.size() - 1;
+  int32_t dpParameters = 0;
+
+  for (auto &p : params) {
+    if (p->hasDefaultValue())
+      ++dpParameters;
   }
 
-  for (int i = 0; i < numParams; ++i) {
-    const SQChar *paramName;
-    if (info) paramName = info->parameters[i];
-    else if (proto) {
-      if (!sq_isstring(proto->_parameters[i + 1])) continue;
-      paramName = _stringval(proto->_parameters[i + 1]);
-    }
-    else {
-      if (!nclosure)
-        assert(0);
-      continue;
-    }
+  const size_t effectiveParamSizeLB = effectiveParamSizeUP - dpParameters;
+  const size_t maxParamSize = decl->isVararg() ? SIZE_MAX : effectiveParamSizeUP;
 
+  if (!(effectiveParamSizeLB <= args.size() && args.size() <= maxParamSize)) {
+    report(callExpr, DiagnosticsId::DI_PARAM_COUNT_MISMATCH, decl->name());
+  }
+
+  for (int i = 1; i < paramsNames.size(); ++i) {
+    const SQChar *paramName = paramsNames[i];
     for (int j = 0; j < args.size(); ++j) {
       const Expr *arg = args[j];
       const SQChar *possibleArgName = nullptr;
@@ -4964,8 +4840,8 @@ void CheckerVisitor::checkArguments(const CallExpr *callExpr) {
       SQChar *buffer = (SQChar *)sq_malloc(_ctx.allocContext(), argNL + 1);
       normalizeParamName(possibleArgName, buffer);
 
-      if (i != j) {
-        if (strcmp("vargv", paramName) != 0 || (j != numParams)) {
+      if ((i - 1) != j) {
+        if (strcmp("vargv", paramName) != 0 || (j != (paramsNames.size() - 1))) {
           if (strcmp(paramName, buffer) == 0) {  // -V575
             report(arg, DiagnosticsId::DI_PARAM_POSITION_MISMATCH, paramName);
           }
@@ -5227,6 +5103,7 @@ void CheckerVisitor::visitBinExpr(BinExpr *expr) {
   checkUselessNullC(expr);
   checkCannotBeNull(expr);
   checkCanBeSimplified(expr);
+  checkInExprAssignPriority(expr);
   checkRangeCheck(expr);
 
   Expr *lhs = expr->lhs();
@@ -5252,6 +5129,7 @@ void CheckerVisitor::visitBinExpr(BinExpr *expr) {
   case TO_MODEQ:
   case TO_NEWSLOT:
   case TO_ASSIGN:
+  case TO_INEXPR_ASSIGN:
     nodeStack.push_back({ SST_NODE, expr });
     expr->rhs()->visit(this);
     expr->lhs()->visit(this);
@@ -5345,7 +5223,7 @@ void CheckerVisitor::visitCallExpr(CallExpr *expr) {
   checkArguments(expr);
 }
 
-void CheckerVisitor::checkBoolIndex(const GetSlotExpr *expr) {
+void CheckerVisitor::checkBoolIndex(const GetTableExpr *expr) {
 
   if (effectsOnly)
     return;
@@ -5357,7 +5235,7 @@ void CheckerVisitor::checkBoolIndex(const GetSlotExpr *expr) {
   }
 }
 
-void CheckerVisitor::checkNullableIndex(const GetSlotExpr *expr) {
+void CheckerVisitor::checkNullableIndex(const GetTableExpr *expr) {
 
   if (effectsOnly)
     return;
@@ -5370,7 +5248,7 @@ void CheckerVisitor::checkNullableIndex(const GetSlotExpr *expr) {
 }
 
 void CheckerVisitor::checkGlobalAccess(const GetFieldExpr *expr) {
-  if (expr->receiver()->op() != TO_ROOT_TABLE_ACCESS)
+  if (expr->receiver()->op() != TO_ROOT)
     return;
 
   const BinExpr *newslot = nullptr;
@@ -5404,16 +5282,14 @@ void CheckerVisitor::visitGetFieldExpr(GetFieldExpr *expr) {
   checkAccessFromStatic(expr);
 
   Visitor::visitGetFieldExpr(expr);
-
-  checkExternalField(expr);
 }
 
-void CheckerVisitor::visitGetSlotExpr(GetSlotExpr *expr) {
+void CheckerVisitor::visitGetTableExpr(GetTableExpr *expr) {
   checkBoolIndex(expr);
   checkNullableIndex(expr);
   checkAccessNullable(expr);
 
-  Visitor::visitGetSlotExpr(expr);
+  Visitor::visitGetTableExpr(expr);
 }
 
 void CheckerVisitor::checkDuplicateSwitchCases(SwitchStatement *swtch) {
@@ -5519,7 +5395,7 @@ void CheckerVisitor::checkDuplicateIfConditions(IfStatement *ifStmt) {
   }
 }
 
-static bool wrappedBody(const Statement *stmt) {
+bool wrappedBody(const Statement *stmt) {
   if (stmt->op() != TO_BLOCK)
     return false;
 
@@ -5694,8 +5570,8 @@ void CheckerVisitor::checkAssignedTwice(const Block *b) {
 
           if (_equalChecker.check(firstAssignee, jassgn->lhs())) {
             bool ignore = existsInTree(firstAssignee, jassgn->rhs());
-            if (!ignore && firstAssignee->op() == TO_GETSLOT) {
-              const GetSlotExpr *getT = firstAssignee->asGetSlot();
+            if (!ignore && firstAssignee->op() == TO_GETTABLE) {
+              const GetTableExpr *getT = firstAssignee->asGetTable();
               ignore = indexChangedInTree(getT->key());
               if (!ignore) {
                 for (int32_t m = i + 1; m < j; ++m) {
@@ -5778,7 +5654,7 @@ void CheckerVisitor::checkFunctionSimilarity(const Block *b) {
 }
 
 static const Expr *extractAssignedExpression(const Node *n) {
-  if (n->op() == TO_ASSIGN || n->op() == TO_NEWSLOT)
+  if (n->op() == TO_ASSIGN || n->op() == TO_NEWSLOT || n->op() == TO_INEXPR_ASSIGN)
     return static_cast<const BinExpr *>(n)->rhs();
 
   if (n->op() == TO_VAR)
@@ -6205,7 +6081,7 @@ void CheckerVisitor::visitContinueStatement(ContinueStatement *continueStmt) {
   bs->loopScope->mergeUnbalanced(trunkScope);
 }
 
-static const Id *extractReceiver(const Expr *e) {
+const Id *extractReceiver(const Expr *e) {
   const Expr *last = e;
 
   for (;;) {
@@ -6260,8 +6136,8 @@ bool CheckerVisitor::detectTypeOfPattern(const Expr *expr, const Expr *&res_chec
   const Expr *checkExpr = lit == lhs ? rhs : lhs;
 
   if (checkExpr->op() == TO_TYPEOF) { // -V522
-    const UnExpr *typeOf = static_cast<const UnExpr *>(checkExpr);
-    res_checkee = deparen(typeOf->argument()); // -V522
+    const UnExpr *typeof = static_cast<const UnExpr *>(checkExpr);
+    res_checkee = deparen(typeof->argument()); // -V522
     res_lit = lit;
     return true;
   }
@@ -6514,7 +6390,7 @@ void CheckerVisitor::speculateIfConditionHeuristics(const Expr *cond, VarScope *
     return;
   }
 
-  if (op == TO_GETSLOT || op == TO_GETFIELD) {
+  if (op == TO_GETTABLE || op == TO_GETFIELD) {
     // x?[y]
     const AccessExpr *acc = static_cast<const AccessExpr *>(cond);
     const Expr *reciever = extractReceiver(deparen(acc->receiver()));
@@ -6524,8 +6400,8 @@ void CheckerVisitor::speculateIfConditionHeuristics(const Expr *cond, VarScope *
       setValueFlags(reciever, 0, RT_NULL);
     }
 
-    if (op == TO_GETSLOT) {
-      const Expr *key = deparen(acc->asGetSlot()->key());
+    if (op == TO_GETTABLE) {
+      const Expr *key = deparen(acc->asGetTable()->key());
       if (thenScope) {
         currentScope = thenScope;
         setValueFlags(key, 0, RT_NULL);
@@ -7124,7 +7000,7 @@ ValueRef *CheckerVisitor::findValueInScopes(const SQChar *ref) {
 }
 
 void CheckerVisitor::applyAssignmentToScope(const BinExpr *bin) {
-  assert(bin->op() == TO_ASSIGN);
+  assert(bin->op() == TO_ASSIGN || bin->op() == TO_INEXPR_ASSIGN);
 
   const Expr *lhs = bin->lhs();
   const Expr *rhs = bin->rhs();
@@ -7186,6 +7062,7 @@ void CheckerVisitor::applyBinaryToScope(const BinExpr *bin) {
   switch (bin->op())
   {
   case TO_ASSIGN:
+  case TO_INEXPR_ASSIGN:
     return applyAssignmentToScope(bin);
     //return applyNewslotToScope(bin);
   case TO_PLUSEQ:
@@ -7203,10 +7080,10 @@ int32_t CheckerVisitor::computeNameLength(const Expr *e) {
   switch (e->op()) // -V522
   {
   case TO_GETFIELD: return computeNameLength(e->asGetField());
-  //case TO_GETSLOT: return computeNameLength(e->asGetSlot());
+  //case TO_GETTABLE: return computeNameLength(e->asGetTable());
   case TO_ID: return strlen(e->asId()->id());
-  case TO_ROOT_TABLE_ACCESS: return sizeof double_colon_str;
-  case TO_BASE: return sizeof base_str;
+  case TO_ROOT: return sizeof rootName;
+  case TO_BASE: return sizeof baseName;
     // TODO:
   default:
     return -1;
@@ -7217,19 +7094,19 @@ void CheckerVisitor::computeNameRef(const Expr *e, SQChar *b, int32_t &ptr, int3
   switch (e->op())
   {
   case TO_GETFIELD: return computeNameRef(e->asGetField(), b, ptr, size);
-  //case TO_GETSLOT: return computeNameRef(lhs->asGetSlot());
+  //case TO_GETTABLE: return computeNameRef(lhs->asGetTable());
   case TO_ID: {
     int32_t l = snprintf(&b[ptr], size - ptr, "%s", e->asId()->id());
     ptr += l;
     break;
   }
-  case TO_ROOT_TABLE_ACCESS:
-    snprintf(&b[ptr], size - ptr, "%s", double_colon_str);
-    ptr += sizeof double_colon_str;
+  case TO_ROOT:
+    snprintf(&b[ptr], size - ptr, "%s", rootName);
+    ptr += sizeof rootName;
     break;
   case TO_BASE:
-    snprintf(&b[ptr], size - ptr, "%s", base_str);
-    ptr += sizeof base_str;
+    snprintf(&b[ptr], size - ptr, "%s", baseName);
+    ptr += sizeof baseName;
     break;
   default:
     assert(0);
@@ -7274,10 +7151,6 @@ void CheckerVisitor::setValueFlags(const Expr *lvalue, unsigned pf, unsigned nf)
 
 const ValueRef *CheckerVisitor::findValueForExpr(const Expr *e) {
   e = deparen(e);
-  if (!e) return nullptr;
-
-  if (auto it = astValues.find(e); it != astValues.end())
-    return it->second;
 
   SQChar buffer[128] = { 0 };
 
@@ -7441,17 +7314,17 @@ bool CheckerVisitor::couldBeString(const Expr *e) {
   return false;
 }
 
-const Expr *CheckerVisitor::maybeEval(const Expr *e, bool allow_external) {
+const Expr *CheckerVisitor::maybeEval(const Expr *e) {
   int32_t dummy = -1;
-  return maybeEval(e, dummy, allow_external);
+  return maybeEval(e, dummy);
 }
 
-const Expr *CheckerVisitor::maybeEval(const Expr *e, int32_t &evalId, bool allow_external) {
+const Expr *CheckerVisitor::maybeEval(const Expr *e, int32_t &evalId) {
   std::unordered_set<const Expr *> visited;
-  return maybeEval(e, evalId, visited, allow_external);
+  return maybeEval(e, evalId, visited);
 }
 
-const Expr *CheckerVisitor::maybeEval(const Expr *e, int32_t &evalId, std::unordered_set<const Expr *> &visited, bool allow_external) {
+const Expr *CheckerVisitor::maybeEval(const Expr *e, int32_t &evalId, std::unordered_set<const Expr *> &visited) {
 
   if (visited.find(e) != visited.end())
     return e;
@@ -7467,9 +7340,7 @@ const Expr *CheckerVisitor::maybeEval(const Expr *e, int32_t &evalId, std::unord
 
   evalId = v->evalIndex;
   if (v->hasValue()) {
-    if (!allow_external && v->expression && v->expression->op() == TO_EXTERNAL_VALUE)
-      return e;
-    return maybeEval(v->expression, evalId, visited, allow_external);
+    return maybeEval(v->expression, evalId, visited);
   }
   else {
     return e;
@@ -7516,31 +7387,6 @@ void CheckerVisitor::computeNameRef(const GetFieldExpr *access, SQChar *b, int32
   int32_t l = snprintf(&b[ptr], size - ptr, "%s", access->fieldName());
   ptr += l;
 }
-
-const ExternalValueExpr *CheckerVisitor::findExternalValue(const Expr *e) {
-  const Expr *ee = maybeEval(e, true);
-
-  if (ee->op() == TO_EXTERNAL_VALUE)
-    return static_cast<const ExternalValueExpr *>(ee);
-
-  SQChar buffer[128] = { 0 };
-  const SQChar *name = computeNameRef(ee, buffer, sizeof buffer);
-  if (!name)
-    return nullptr;
-
-  const ValueRef *v = findValueInScopes(name);
-
-  if (!v || !v->hasValue())
-    return nullptr;
-
-  const Expr *expr = maybeEval(v->expression, true);
-
-  if (expr->op() == TO_EXTERNAL_VALUE)
-    return static_cast<const ExternalValueExpr *>(expr);
-
-  return nullptr;
-}
-
 
 const FunctionInfo *CheckerVisitor::findFunctionInfo(const Expr *e, bool &isCtor) {
   const Expr *ee = maybeEval(e);
@@ -7621,10 +7467,6 @@ void CheckerVisitor::applyKnownInvocationToScope(const ValueRef *value) {
         return;
       }
     }
-    else if (expr->op() == TO_EXTERNAL_VALUE) {
-      applyUnknownInvocationToScope();
-      return;
-    }
   }
 
   if (!info) {
@@ -7689,7 +7531,7 @@ void CheckerVisitor::applyCallToScope(const CallExpr *call) {
     if (value) {
       applyKnownInvocationToScope(value);
     }
-    else if (!ref || strncmp(ref, double_colon_str, sizeof double_colon_str) != 0) {
+    else if (!ref || strncmp(ref, rootName, sizeof rootName) != 0) {
       // we don't know what exactly is being called so assume the most conservative case
       applyUnknownInvocationToScope();
     }
@@ -7748,7 +7590,6 @@ void CheckerVisitor::visitVarDecl(VarDecl *decl) {
   SymbolInfo *info = makeSymbolInfo(decl->isAssignable() ? SK_VAR : SK_BINDING);
   ValueRef *v = makeValueRef(info);
   const Expr *init = decl->initializer();
-  init = maybeEval(init, true);
   if (decl->isDestructured()) {
     v->state = VRS_UNKNOWN;
     v->expression = nullptr;
@@ -7783,7 +7624,6 @@ void CheckerVisitor::visitVarDecl(VarDecl *decl) {
   info->ownedScope = currentScope;
 
   declareSymbol(decl->name(), v);
-  astValues[decl] = v;
 }
 
 void CheckerVisitor::visitConstDecl(ConstDecl *cnst) {
@@ -7836,172 +7676,15 @@ void CheckerVisitor::visitEnumDecl(EnumDecl *enm) {
   }
 }
 
-void CheckerVisitor::checkDestructuredVarDefault(VarDecl *var) {
-  const Expr *def = var->initializer();
-  def = maybeEval(def, true);
-  if (def) {
-    auto vv = astValues[var];
-    assert(vv);
-    vv->state = VRS_INITIALIZED;
-    vv->expression = def;
-  }
-  else {
-    report(var, DiagnosticsId::DI_MISSING_DESTRUCTURED_VALUE, var->name());
-  }
-}
-
 void CheckerVisitor::visitDestructuringDecl(DestructuringDecl *d) {
 
   checkAccessNullable(d);
 
   Visitor::visitDestructuringDecl(d);
-
-  if (auto v = findValueForExpr(d->initExpression()); v && v->hasValue() && v->expression) {
-    if (v->expression->op() == TO_EXTERNAL_VALUE) {
-      const auto &init = v->expression->asExternal()->value();
-      if (sq_isnull(init)) {
-        for (auto var : d->declarations()) {
-          checkDestructuredVarDefault(var);
-        }
-      }
-      else if (sq_istable(init)) {
-        if (d->type() == DT_TABLE) {
-          auto table = _table(init);
-          for (auto var : d->declarations()) {
-            SQObjectPtr val;
-            if (table->GetStr(var->name(), strlen(var->name()), val)) {
-              auto vv = astValues[var];
-              assert(vv);
-              vv->state = VRS_INITIALIZED;
-              vv->expression = addExternalValue(val, var)->expression;
-            }
-            else {
-              checkDestructuredVarDefault(var);
-            }
-          }
-        }
-        else {
-          report(d, DiagnosticsId::DI_DESTRUCTURED_TYPE_MISMATCH, "table");
-        }
-      }
-      else if (sq_isclass(init)) {
-        if (d->type() == DT_TABLE) {
-          auto klass = _class(init);
-          for (auto var : d->declarations()) {
-            SQObjectPtr key(_ctx.getVm(), var->name());
-            SQObjectPtr val;
-            if (klass->Get(key, val)) {
-              auto vv = astValues[var];
-              assert(vv);
-              vv->state = VRS_INITIALIZED;
-              vv->expression = addExternalValue(val, var)->expression;
-            }
-            else {
-              checkDestructuredVarDefault(var);
-            }
-          }
-        }
-        else {
-          report(d, DiagnosticsId::DI_DESTRUCTURED_TYPE_MISMATCH, "class");
-        }
-      }
-      else if (sq_isinstance(init)) {
-        if (d->type() == DT_TABLE) {
-          auto inst = _instance(init);
-          for (auto var : d->declarations()) {
-            SQObjectPtr key(_ctx.getVm(), var->name());
-            SQObjectPtr val;
-            if (inst->Get(key, val)) {
-              auto vv = astValues[var];
-              assert(vv);
-              vv->state = VRS_INITIALIZED;
-              vv->expression = addExternalValue(val, var)->expression;
-            }
-            else {
-              checkDestructuredVarDefault(var);
-            }
-          }
-        }
-        else {
-          report(d, DiagnosticsId::DI_DESTRUCTURED_TYPE_MISMATCH, "instance");
-        }
-      }
-      else if (sq_isarray(init)) {
-        if (d->type() == DT_ARRAY) {
-          auto array = _array(init);
-          SQInteger index = 0;
-          for (auto var : d->declarations()) {
-            SQObjectPtr val;
-            if (array->Get(index, val)) {
-              auto vv = astValues[var];
-              assert(vv);
-              vv->state = VRS_INITIALIZED;
-              vv->expression = addExternalValue(val, var)->expression;
-            }
-            else {
-              checkDestructuredVarDefault(var);
-            }
-            index++;
-          }
-        }
-        else {
-          report(d, DiagnosticsId::DI_DESTRUCTURED_TYPE_MISMATCH, "array");
-        }
-      }
-      else {
-        report(d, DiagnosticsId::DI_DESTRUCTURED_TYPE_MISMATCH, GetTypeName(init));
-      }
-    }
-    else if (v->expression->op() == TO_TABLE) {
-      // TODO: check table destructuring
-    }
-    else if (v->expression->op() == TO_ARRAYEXPR) {
-      // TODO: check array destructuring
-    }
-  }
 }
 
-ValueRef* CheckerVisitor::addExternalValue(const SQObject &val, const Node *location) {
-  SymbolInfo *info = makeSymbolInfo(SK_EXTERNAL_BINDING);
-  ValueRef *v = makeValueRef(info);
-  ExternalValueExpr *ev = new(arena) ExternalValueExpr(val);
-  if (location)
-    ev->copyLocationFrom(*location);
-  externalValues.push_back(ev);
-
-  info->declarator.ev = ev;
-  v->state = VRS_INITIALIZED;
-  v->expression = ev;
-  if (sq_isnull(val)) v->flagsPositive |= RT_NULL;
-  // TODO: could create LiteralExpr for some values
-
-  return v;
-}
-
-void CheckerVisitor::analyze(RootBlock *root, const HSQOBJECT *bindings) {
-  assert(currentScope == nullptr);
-  VarScope rootScope(nullptr, nullptr);
-  currentScope = &rootScope;
-
-  if (bindings && sq_istable(*bindings)) {
-    SQTable *table = _table(*bindings);
-
-    SQInteger idx = 0;
-    SQObjectPtr pos(idx), key, val;
-
-    while ((idx = table->Next(false, pos, key, val)) >= 0) {
-      if (sq_isstring(key)) {
-        const SQChar *name = _string(key)->_val;
-        declareSymbol(name, addExternalValue(val, root));
-      }
-      pos._unVal.nInteger = idx;
-    }
-  }
-
+void CheckerVisitor::analyze(RootBlock *root) {
   root->visit(this);
-
-  rootScope.parent = nullptr;
-  currentScope = nullptr;
 }
 
 class NameShadowingChecker : public Visitor {
@@ -8403,7 +8086,7 @@ void StaticAnalyzer::reportGlobalNamesWarnings(HSQUIRRELVM vm) {
 
       message.clear();
       SQCompilationContext::renderDiagnosticHeader(DiagnosticsId::DI_GLOBAL_NAME_REDEF, &message, name);
-      errorFunc(vm, SEV_WARNING, message.c_str(), loc.filename, loc.line, loc.column, "\n");
+      errorFunc(vm, message.c_str(), loc.filename, loc.line, loc.column, "\n");
     }
   }
 
@@ -8428,7 +8111,7 @@ void StaticAnalyzer::reportGlobalNamesWarnings(HSQUIRRELVM vm) {
 
       message.clear();
       SQCompilationContext::renderDiagnosticHeader(DiagnosticsId::DI_UNDEFINED_GLOBAL, &message, id.c_str());
-      errorFunc(vm, SEV_WARNING, message.c_str(), loc.filename, loc.line, loc.column, "\n");
+      errorFunc(vm, message.c_str(), loc.filename, loc.line, loc.column, "\n");
     }
   }
 }
@@ -8477,7 +8160,7 @@ void StaticAnalyzer::mergeKnownBindings(const HSQOBJECT *bindings) {
 void StaticAnalyzer::runAnalysis(RootBlock *root, const HSQOBJECT *bindings)
 {
   mergeKnownBindings(bindings);
-  CheckerVisitor(_ctx).analyze(root, bindings);
+  CheckerVisitor(_ctx).analyze(root);
   NameShadowingChecker(_ctx, bindings).analyze(root);
 }
 

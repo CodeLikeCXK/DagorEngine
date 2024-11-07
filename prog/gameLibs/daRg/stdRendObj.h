@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <daRg/dag_renderObject.h>
@@ -14,12 +13,14 @@ class Picture;
 
 class RenderObjectSolid : public RenderObject
 {
-  virtual void render(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *, const RenderState &render_state);
+  virtual void renderCustom(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *,
+    const RenderState &render_state);
 };
 
 class RenderObjectDebug : public RenderObject
 {
-  virtual void render(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *, const RenderState &render_state);
+  virtual void renderCustom(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *,
+    const RenderState &render_state);
 };
 
 struct GuiTextCache
@@ -83,7 +84,8 @@ public:
 
 class RenderObjectText : public RenderObject
 {
-  virtual void render(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *, const RenderState &render_state);
+  virtual void renderCustom(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *,
+    const RenderState &render_state);
 };
 
 
@@ -115,7 +117,8 @@ public:
 
 class RenderObjectInscription : public RenderObject
 {
-  virtual void render(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *, const RenderState &render_state);
+  virtual void renderCustom(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *,
+    const RenderState &render_state);
 };
 
 
@@ -142,26 +145,30 @@ public:
 
 class RenderObjectImage : public RenderObject
 {
-  virtual void render(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *, const RenderState &render_state);
+  virtual void renderCustom(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *,
+    const RenderState &render_state);
 };
 
 
 class RenderObject9rect : public RenderObject
 {
-  virtual void render(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *, const RenderState &render_state);
+  virtual void renderCustom(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *,
+    const RenderState &render_state);
 };
 
 
 class RenderObjectProgressLinear : public RenderObject
 {
-  virtual void render(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *, const RenderState &render_state);
+  virtual void renderCustom(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *,
+    const RenderState &render_state);
   void drawRect(StdGuiRender::GuiContext &ctx, const Element *elem, float val, E3DCOLOR color);
 };
 
 
 class RenderObjectProgressCircular : public RenderObject
 {
-  virtual void render(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *, const RenderState &render_state);
+  virtual void renderCustom(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *,
+    const RenderState &render_state);
   void renderProgress(StdGuiRender::GuiContext &ctx, const ElemRenderData *rdata, float val, float dir, Picture *image,
     E3DCOLOR color);
 };
@@ -169,13 +176,15 @@ class RenderObjectProgressCircular : public RenderObject
 
 class RenderObjectTextArea : public RenderObject
 {
-  virtual void render(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *, const RenderState &render_state);
+  virtual void renderCustom(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *,
+    const RenderState &render_state);
 };
 
 
 class RenderObjectFrame : public RenderObject
 {
-  virtual void render(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *, const RenderState &render_state);
+  virtual void renderCustom(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *,
+    const RenderState &render_state);
 };
 
 
@@ -197,7 +206,7 @@ public:
 class RenderObjectMovie : public RenderObject
 {
 public:
-  virtual void render(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *rdata,
+  virtual void renderCustom(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *rdata,
     const RenderState &render_state) override;
 };
 

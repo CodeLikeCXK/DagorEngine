@@ -1,11 +1,26 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
-
 #include "ecsQueryManager.h"
-#include "daECS/core/internal/chunkedVectorMT.h"
+#include "chunkedVectorMT.h"
 
 namespace ecs
 {
+
+struct QueryStackData
+{
+  ChunkedVectorSingleThreaded<QueryView::OneComponentLine *, 10> componentData;
+  ChunkedVectorSingleThreaded<uint32_t, 8> chunkEntitiesCnt;
+  void collapse()
+  {
+    componentData.collapse();
+    chunkEntitiesCnt.collapse();
+  }
+};
+#if !defined(_MSC_VER) || defined(__clang__)
+template <>
+MTLinkedList<QueryStackData>::Node *MTLinkedList<QueryStackData>::head;
+template <>
+thread_local MTLinkedList<QueryStackData>::Node *MTLinkedList<QueryStackData>::thread_data;
+#endif
 
 struct QueryContainer
 {
@@ -15,8 +30,8 @@ struct QueryContainer
   const uint32_t *entitiesCntEnd = nullptr;
   QueryView::OneComponentLine *const *__restrict componentsDataEnd = nullptr;
 
-  QueryContainer(QueryStackData &__restrict data_) :
-    data(data_),
+  QueryContainer() :
+    data(MTLinkedList<QueryStackData>::getData()),
     entitiesCnt(data.chunkEntitiesCnt.getStack()),
     entitiesCntEnd(data.chunkEntitiesCnt.getStackEnd()),
     componentsData(data.componentData.getStack()),
@@ -77,7 +92,7 @@ __forceinline uint32_t EntityManager::fillQuery(const ArchetypesQuery &__restric
   const uint32_t totalComponentsCount = archDesc.getComponentsCount();
   uint32_t totalSize = 0;
   // reserve doesn't make much sense, since we are using fixed_vector, and initial grow value will be of reasonable size anyway
-  if (DAGOR_UNLIKELY(totalComponentsCount == 0)) // this is very rare case, where we have only require/require_not in broadcast message
+  if (EASTL_UNLIKELY(totalComponentsCount == 0)) // this is very rare case, where we have only require/require_not in broadcast message
   {
     do
     {
@@ -121,7 +136,7 @@ __forceinline uint32_t EntityManager::fillQuery(const ArchetypesQuery &__restric
         *(componentDataPtr++) =
           (ofs != ArchetypesQuery::INVALID_OFFSET) ? (QueryView::OneComponentLine *__restrict)(data + (ofs << capacityBits)) : nullptr;
       } while (archetypeOffsetsPtr != archetypeOffsetsPtrEnd);
-    } while (DAGOR_UNLIKELY(++chunksPtr != chunksE));
+    } while (EASTL_UNLIKELY(++chunksPtr != chunksE));
     archetypeOffsets = archetypeOffsetsPtrEnd;
   } while (++aqi != aqEnd);
 
@@ -178,7 +193,7 @@ inline void EntityManager::performQueryES(QueryId h, ESFuncType fun, const ESPay
   auto &__restrict archDesc = archetypeQueries[index];
   if (!archDesc.getQueriesCount())
     return;
-  QueryContainer ctx(queryStack.getData());
+  QueryContainer ctx;
   uint32_t querySize;
   if ((querySize = fillQuery(archDesc, ctx)) == 0)
   {
@@ -187,7 +202,7 @@ inline void EntityManager::performQueryES(QueryId h, ESFuncType fun, const ESPay
     return;
   }
   auto query = commitQuery(h, ctx, archDesc, querySize);
-  trackComponent(queryDescs[index].getDesc(), queryDescs[index].getName());
+  ecsdebug::track_ecs_component(queryDescs[index].getDesc(), queryDescs[index].getName());
   EntityManager::ScopedQueryingArchetypesCheck scopedCheck(index, *this);
   RaiiOptionalCounter nested(!isConstrainedMTMode(), nestedQuery);
   if (DAGOR_UNLIKELY(min_quant && maxNumJobs && querySize > min_quant * 2)) // doesn't make sense to run multithreading if there is

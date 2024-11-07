@@ -1,11 +1,12 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __GAIJIN_EDITORCORE_EC_SELWINDOW__
+#define __GAIJIN_EDITORCORE_EC_SELWINDOW__
 #pragma once
 
 #include <EditorCore/ec_decl.h>
 #include <EditorCore/ec_rect.h>
 #include <EditorCore/ec_interface_ex.h>
 
-#include <propPanel/commonWindow/dialogWindow.h>
+#include <propPanel2/comWnd/dialog_window.h>
 #include <ioSys/dag_dataBlock.h>
 #include <generic/dag_tab.h>
 
@@ -15,7 +16,7 @@
 /// @ingroup EditorCore
 /// @ingroup Misc
 /// @ingroup SelectByName
-class SelWindow : public PropPanel::DialogWindow
+class SelWindow : public CDialogWindow
 {
 public:
   /// Constructor 1.
@@ -31,8 +32,6 @@ public:
 
   /// Destructor.
   ~SelWindow();
-
-  virtual int showDialog() override;
 
   /// Get list of selected objects.
   /// @param[out] names - objects list
@@ -50,9 +49,13 @@ private:
   void ctorInit();
 
   void fillNames();
+  void show();
   // void resizeControls();
 
-  virtual void onChange(int pcb_id, PropPanel::ContainerPropertyControl *panel);
-  virtual void onClick(int pcb_id, PropPanel::ContainerPropertyControl *panel);
-  virtual void onDoubleClick(int pcb_id, PropPanel::ContainerPropertyControl *panel);
+  virtual void onChange(int pcb_id, PropertyContainerControlBase *panel);
+  virtual void onClick(int pcb_id, PropertyContainerControlBase *panel);
+  virtual void onDoubleClick(int pcb_id, PropertyContainerControlBase *panel);
 };
+
+
+#endif //__GAIJIN_EDITORCORE_EC_SELWINDOW__

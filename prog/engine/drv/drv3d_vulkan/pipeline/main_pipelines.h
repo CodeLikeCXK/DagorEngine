@@ -1,6 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
-
 #include <EASTL/array.h>
 #include <generic/dag_tab.h>
 #include <generic/dag_staticTab.h>
@@ -13,12 +11,12 @@
 #include "render_pass_resource.h"
 #include "compiler_scratch_data.h"
 #include "sampler_resource.h"
-#include "bindless_common.h"
-#include "shader/module.h"
 
 namespace drv3d_vulkan
 {
 
+struct ContextBackend;
+class Device;
 class ProgramDatabase;
 class RenderPassResource;
 
@@ -45,7 +43,8 @@ struct GraphicsPipelineShaderSet
 struct PipelineBindlessConfig
 {
   static uint32_t bindlessSetCount;
-  static BindlessSetLayouts bindlessSetLayouts;
+  static VulkanDescriptorSetLayoutHandle bindlessTextureSetLayout;
+  static VulkanDescriptorSetLayoutHandle bindlessSamplerSetLayout;
 };
 
 struct ComputePipelineShaderConfig : PipelineBindlessConfig
@@ -170,7 +169,7 @@ public:
   static constexpr int CLEANUP_DESTROY = 0;
 
   template <int Tag>
-  void onDelayedCleanupBackend()
+  void onDelayedCleanupBackend(drv3d_vulkan::ContextBackend &)
   {}
 
   template <int Tag>
@@ -259,7 +258,7 @@ struct GraphicsPipelineVariantDescription
     Hash ret = FNV1Params<64>::offset_basis;
 
     // we can't bulk hash this data as we have different paddings
-    // on different platforms, that will garbage-contribute
+    // on different platforms, that will garbadge-contribute
     // to hash value, so hash data by fields
     // and save some iterations by mixing/trimming/ignoring some of fields
 
@@ -277,7 +276,6 @@ struct GraphicsPipelineVariantDescription
         ret = fnv1a_step<64>((uint8_t)rpClass.colorFormats[i], ret);
       ret = fnv1a_step<64>((uint8_t)rpClass.depthStencilFormat, ret);
       ret = fnv1a_step<64>((uint8_t)rpClass.colorTargetMask, ret);
-      ret = fnv1a_step<64>((uint8_t)rpClass.depthSamples, ret);
       ret = fnv1a_step<64>((uint32_t)(rpClass.colorSamplesPacked >> 32), ret);        // high bits
       ret = fnv1a_step<64>((uint32_t)(rpClass.colorSamplesPacked & 0xffffffff), ret); // low bits
 
@@ -302,21 +300,22 @@ BEGIN_BITFIELD_TYPE(GraphicsPipelineDynamicStateMask, uint8_t)
   ADD_BITFIELD_MEMBER(hasStencilTest, 2, 1)
   ADD_BITFIELD_MEMBER(hasBlendConstants, 3, 1)
 
-  void from(RenderStateSystemBackend & rs_backend, const GraphicsPipelineVariantDescription &desc, RenderPassResource *native_rp);
+  void from(RenderStateSystem::Backend & rs_backend, const GraphicsPipelineVariantDescription &desc, RenderPassResource *native_rp);
 
 END_BITFIELD_TYPE()
 
 class GraphicsPipeline : public BasePipeline<GraphicsPipelineLayout, GraphicsProgram>
 {
   int32_t refs = 1;
-  bool ignore;
 
 public:
   using CreationFeedback = CreationFeedbackBase<spirv::graphics::MAX_SETS>;
 
   struct CreationInfo
   {
-    RenderStateSystemBackend &rsBackend;
+
+    RenderPassManager &pass_man;
+    RenderStateSystem::Backend &rsBackend;
     const GraphicsPipelineVariantDescription &varDsc;
     const GraphicsPipelineDynamicStateMask &dynStateMask;
     const GraphicsPipelineShaderSet<const ShaderModule *> &modules;
@@ -334,7 +333,6 @@ public:
 
   int32_t addRef() { return ++refs; }
   int32_t release() { return --refs; }
-  bool isIgnored() { return ignore; }
   void compile();
   VulkanPipelineHandle createPipelineObject(CreationFeedback &cr_feedback);
 

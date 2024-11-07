@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <math/dag_mesh.h>
 #include <shaders/dag_rendInstRes.h>
 #include <ioSys/dag_dataBlock.h>
@@ -30,7 +28,6 @@
 #include <obsolete/dag_cfg.h>
 #include <sceneRay/dag_sceneRay.h>
 #include <libTools/ambientOcclusion/ambientOcclusion.h>
-#include <supp/dag_alloca.h>
 
 // RenderableInstanceLodsResSrc //
 #include <ioSys/dag_fileIo.h>
@@ -848,17 +845,7 @@ static bool has_ao(Node &n, RenderableInstanceLodsResSrc *ri)
   return false;
 }
 
-static void remove_parameter_from_mat_script(eastl::string &script, const eastl::string &parameter_name)
-{
-  size_t start = script.find(parameter_name);
-  if (start == eastl::string::npos)
-    return;
-
-  size_t end = script.find("\n", start);
-  script.erase(start, end);
-}
-
-bool RenderableInstanceLodsResSrc::addLod(int lod_index, const char *filename, real range, LodsEqualMaterialGather &mat_gather,
+bool RenderableInstanceLodsResSrc::addLod(const char *filename, real range, LodsEqualMaterialGather &mat_gather,
   Tab<AScene *> &scene_list, const DataBlock &material_overrides, const char *add_mat_script)
 {
   struct RenderSW : public RenderSWNoInterp<512, 512>
@@ -917,7 +904,7 @@ bool RenderableInstanceLodsResSrc::addLod(int lod_index, const char *filename, r
         }
         // debug ("%d,%d  dir(%d,%d) cnt=%d", x, y, dx, dy, cnt);
       }
-      LOGERR_CTX("pixel not found");
+      logerr_ctx("pixel not found");
       out_x0 = out_y0 = 0;
       out_x1 = out_y1 = -1;
       return false;
@@ -962,28 +949,28 @@ bool RenderableInstanceLodsResSrc::addLod(int lod_index, const char *filename, r
         {
           x0--;
           y0--;
-          // DEBUG_CTX("%d,%d - %d,%d", x0, y0, x1, y1);
+          // debug_ctx("%d,%d - %d,%d", x0, y0, x1, y1);
           continue;
         }
         if (ln_r && ln_t && checkPixel(x1, y0 - 1) && checkPixel(x1 + 1, y0 - 1) && checkPixel(x1 + 1, y0))
         {
           x1++;
           y0--;
-          // DEBUG_CTX("%d,%d - %d,%d", x0, y0, x1, y1);
+          // debug_ctx("%d,%d - %d,%d", x0, y0, x1, y1);
           continue;
         }
         if (ln_r && ln_b && checkPixel(x1 + 1, y1) && checkPixel(x1 + 1, y1 + 1) && checkPixel(x1, y1 + 1))
         {
           x1++;
           y1++;
-          // DEBUG_CTX("%d,%d - %d,%d", x0, y0, x1, y1);
+          // debug_ctx("%d,%d - %d,%d", x0, y0, x1, y1);
           continue;
         }
         if (ln_l && ln_b && checkPixel(x0 - 1, y1) && checkPixel(x0 - 1, y1 + 1) && checkPixel(x0, y1 + 1))
         {
           x0--;
           y1++;
-          // DEBUG_CTX("%d,%d - %d,%d", x0, y0, x1, y1);
+          // debug_ctx("%d,%d - %d,%d", x0, y0, x1, y1);
           continue;
         }
 
@@ -991,14 +978,14 @@ bool RenderableInstanceLodsResSrc::addLod(int lod_index, const char *filename, r
         {
           x0--;
           x1++;
-          // DEBUG_CTX("%d,%d - %d,%d", x0, y0, x1, y1);
+          // debug_ctx("%d,%d - %d,%d", x0, y0, x1, y1);
           continue;
         }
         if (ln_t && ln_b && checkPixel(x0, y0 - 1) && checkPixel(x0, y1 + 1) && checkPixel(x1, y0 - 1) && checkPixel(x1, y1 + 1))
         {
           y0--;
           y1++;
-          // DEBUG_CTX("%d,%d - %d,%d", x0, y0, x1, y1);
+          // debug_ctx("%d,%d - %d,%d", x0, y0, x1, y1);
           continue;
         }
 
@@ -1009,7 +996,7 @@ bool RenderableInstanceLodsResSrc::addLod(int lod_index, const char *filename, r
           x1++;
           y1--;
           next_state = 1;
-          // DEBUG_CTX("%d,%d - %d,%d", x0, y0, x1, y1);
+          // debug_ctx("%d,%d - %d,%d", x0, y0, x1, y1);
           continue;
         }
         if (ln_t && ln_b && x1 - x0 > y1 - y0 && last_state != 1)
@@ -1019,32 +1006,32 @@ bool RenderableInstanceLodsResSrc::addLod(int lod_index, const char *filename, r
           x1--;
           y1++;
           next_state = 2;
-          // DEBUG_CTX("%d,%d - %d,%d", x0, y0, x1, y1);
+          // debug_ctx("%d,%d - %d,%d", x0, y0, x1, y1);
           continue;
         }
 
         if (ln_l && checkPixel(x0 - 1, y0) && checkPixel(x0 - 1, y1))
         {
           x0--;
-          // DEBUG_CTX("%d,%d - %d,%d", x0, y0, x1, y1);
+          // debug_ctx("%d,%d - %d,%d", x0, y0, x1, y1);
           continue;
         }
         if (ln_r && checkPixel(x1 + 1, y0) && checkPixel(x1 + 1, y1))
         {
           x1++;
-          // DEBUG_CTX("%d,%d - %d,%d", x0, y0, x1, y1);
+          // debug_ctx("%d,%d - %d,%d", x0, y0, x1, y1);
           continue;
         }
         if (ln_t && checkPixel(x0, y0 - 1) && checkPixel(x1, y0 - 1))
         {
           y0--;
-          // DEBUG_CTX("%d,%d - %d,%d", x0, y0, x1, y1);
+          // debug_ctx("%d,%d - %d,%d", x0, y0, x1, y1);
           continue;
         }
         if (ln_b && checkPixel(x0, y1 + 1) && checkPixel(x1, y1 + 1))
         {
           y1++;
-          // DEBUG_CTX("%d,%d - %d,%d", x0, y0, x1, y1);
+          // debug_ctx("%d,%d - %d,%d", x0, y0, x1, y1);
           continue;
         }
         break;
@@ -1099,16 +1086,6 @@ bool RenderableInstanceLodsResSrc::addLod(int lod_index, const char *filename, r
     }
   }
 
-  if (lod_index != 0)
-  {
-    for (auto &mat : matList)
-    {
-      eastl::string script = mat->matScript.c_str();
-      remove_parameter_from_mat_script(script, "material_pn_triangulation");
-      mat->matScript = script.c_str();
-    }
-  }
-
   BuildableStaticSceneRayTracer *rayTracer = NULL;
   sc.root->calc_wtm();
   if (log)
@@ -1139,7 +1116,12 @@ bool RenderableInstanceLodsResSrc::addLod(int lod_index, const char *filename, r
 
       for (const auto &param : delete_parameters_from_lod.parameters)
       {
-        remove_parameter_from_mat_script(script, param);
+        size_t pos = script.find(param);
+        if (pos == eastl::string::npos)
+          continue;
+
+        size_t end = script.find("\n", pos);
+        script.erase(pos, end);
       }
       mat->matScript = script.c_str();
     }
@@ -1307,7 +1289,6 @@ bool RenderableInstanceLodsResSrc::build(const DataBlock &blk)
   doNotSplitLods = blk.getBool("dont_split_lods", false);
 
   int lodNameId = blk.getNameId("lod");
-  int plodNameId = blk.getNameId("plod");
 
   LodsEqualMaterialGather matGather;
   Tab<AScene *> curScenes(tmpmem);
@@ -1321,11 +1302,10 @@ bool RenderableInstanceLodsResSrc::build(const DataBlock &blk)
       lastLodBlkIdx = blkId;
     }
 
-  int lodId = 0;
   for (int blkId = 0; blkId < numBlk; ++blkId)
   {
     const DataBlock &lodBlk = *blk.getBlock(blkId);
-    if (lodBlk.getBlockNameId() != lodNameId && lodBlk.getBlockNameId() != plodNameId)
+    if (lodBlk.getBlockNameId() != lodNameId)
       continue;
 
     const char *fileName = lodBlk.getStr("scene", NULL);
@@ -1333,12 +1313,11 @@ bool RenderableInstanceLodsResSrc::build(const DataBlock &blk)
     const DataBlock *materialOverrides = lodBlk.getBlockByNameEx("materialOverrides");
 
     buildImpostorDataNow = (blkId == beforeLastLodBlkIdx);
-    if (!addLod(lodId, fileName, range, matGather, curScenes, *materialOverrides))
+    if (!addLod(fileName, range, matGather, curScenes, *materialOverrides))
     {
       clear_all_ptr_items(curScenes);
       return false;
     }
-    lodId++;
   }
 
   if (hasImpostor && blk.getNameId("transition_lod") != -1)
@@ -1350,7 +1329,6 @@ bool RenderableInstanceLodsResSrc::build(const DataBlock &blk)
     String addMatScript;
 
     float transitionLodRange = 0;
-    int lodId = 0;
     for (int blkId = 0; blkId < numBlk; ++blkId)
     {
       const DataBlock &lodBlk = *blk.getBlock(blkId);
@@ -1367,13 +1345,12 @@ bool RenderableInstanceLodsResSrc::build(const DataBlock &blk)
         float crossDissolveAdd = safediv(-(transitionLodRange - transitionRange), transitionRange);
         addMatScript = String(128, "\r\nuse_cross_dissolve=1\r\ncross_dissolve_mul=%f\r\ncross_dissolve_add=%f\r\n", crossDissolveMul,
           crossDissolveAdd);
-        addLod(lodId, fileName, transitionLodRange, matGather, curScenes, *materialOverrides, addMatScript.c_str());
+        addLod(fileName, transitionLodRange, matGather, curScenes, *materialOverrides, addMatScript.c_str());
       }
       else if (blkId == lastLodBlkIdx)
       {
-        addLod(lodId, fileName, transitionLodRange, matGather, curScenes, *materialOverrides, addMatScript.c_str());
+        addLod(fileName, transitionLodRange, matGather, curScenes, *materialOverrides, addMatScript.c_str());
       }
-      lodId++;
     }
 
     int lodNum = lods.size();
@@ -1383,7 +1360,7 @@ bool RenderableInstanceLodsResSrc::build(const DataBlock &blk)
     Lod &lastMeshLod = lods[lodNum - 4];
 
     transitionLod = merge_lods(lods[lodNum - 2], lods[lodNum - 1]);
-    impostorLod = eastl::move(tmpImpostorLod);
+    impostorLod = tmpImpostorLod;
     lods.pop_back();
 
     transitionLod.range = transitionLodRange;
@@ -1579,7 +1556,7 @@ bool RenderableInstanceLodsResSrc::save(mkbindump::BinDumpSaveCB &cwr, const Lod
     debug("using bbox from lod %d: %@", bboxFromLod, bbox);
   }
 
-  DEBUG_CTX("bsph: " FMT_P3 " rad=%.3f, bbox=" FMT_P3 "-" FMT_P3 ", bs0rad=%.3f", P3D(bsph.c), bsph.r, P3D(bbox[0]), P3D(bbox[1]),
+  debug_ctx("bsph: " FMT_P3 " rad=%.3f, bbox=" FMT_P3 "-" FMT_P3 ", bs0rad=%.3f", P3D(bsph.c), bsph.r, P3D(bbox[0]), P3D(bbox[1]),
     sqrt(bs0rad2));
 
   if (hasOccl && !occlQuad)

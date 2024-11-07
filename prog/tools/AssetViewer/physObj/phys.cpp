@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "phys.h"
 #include "../av_appwnd.h"
 
@@ -11,8 +9,7 @@
 #include <shaders/dag_shaderMesh.h>
 #include <debug/dag_debug3d.h>
 #include <libTools/renderUtil/dynRenderBuf.h>
-#include <drv/3d/dag_matricesAndPerspective.h>
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
 #include <debug/dag_debug3d.h>
 #include <math/dag_capsule.h>
 #include <math/dag_rayIntersectBox.h>

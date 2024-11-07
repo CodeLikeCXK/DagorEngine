@@ -83,7 +83,7 @@ public:
     static void MarkObject(SQObjectPtr &o,SQCollectable **chain);
 #endif
     SQAllocContext _alloc_ctx;
-    SQObjectPtrVec *_metamethodnames;
+    SQObjectPtrVec *_metamethods;
     SQObjectPtr _metamethodsmap;
     SQObjectPtrVec *_systemstrings;
     SQObjectPtrVec *_types;

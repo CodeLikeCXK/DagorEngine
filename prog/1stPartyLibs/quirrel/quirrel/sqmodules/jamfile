@@ -6,6 +6,7 @@ Target = 1stPartyLibs/quirrel/quirrel/sqmodules.lib ;
 
 AddIncludes =
   $(Root)/prog/1stPartyLibs/quirrel/quirrel/include
+  $(Root)/prog/engine/sharedInclude
   $(Root)/prog/1stPartyLibs/eastl/include
 ;
 
@@ -14,7 +15,8 @@ Sources =
   path.cpp
 ;
 
-if $(Platform)-$(PlatformArch) = windows-x86_64 { CPPopt += -wd4267 ; }
+CPPopt = -D__B_CORE ;
+if $(Platform) = win64 { CPPopt += -wd4267 ; }
 
 Copt   = $(CPPopt) ;
 

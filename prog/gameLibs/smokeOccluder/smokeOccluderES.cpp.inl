@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <smokeOccluder/smokeOccluder.h>
 #include <ecs/core/entityManager.h>
 #include <math/dag_mathUtils.h>

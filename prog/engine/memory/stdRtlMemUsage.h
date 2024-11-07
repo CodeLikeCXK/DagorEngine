@@ -1,4 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+
+#ifndef __DAGOR_MEMORY_STD_RTL_MEM_USAGE_H
+#define __DAGOR_MEMORY_STD_RTL_MEM_USAGE_H
 #pragma once
 
 #if _TARGET_C1 | _TARGET_C2 | _TARGET_APPLE | _TARGET_PC_LINUX | _TARGET_ANDROID | _TARGET_C3
@@ -157,3 +159,5 @@ inline size_t dlmalloc_usable_size_aligned(void *p) { return dlmalloc_usable_siz
 #endif
 
 extern int pull_rtlOverride_stubRtl;
+
+#endif

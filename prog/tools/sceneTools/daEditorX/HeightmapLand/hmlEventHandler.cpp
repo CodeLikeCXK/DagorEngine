@@ -1,19 +1,17 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "hmlPanel.h"
 #include "hmlCm.h"
 #include "hmlHoleObject.h"
 
+#include <dllPluginCore/core.h>
+
 #include <de3_interface.h>
 #include <de3_hmapService.h>
 
-#include <propPanel/commonWindow/dialogWindow.h>
-#include <propPanel/control/panelWindow.h>
+#include <propPanel2/comWnd/dialog_window.h>
 
 #include <debug/dag_debug.h>
 #include <winGuiWrapper/wgw_dialogs.h>
 #include <winGuiWrapper/wgw_input.h>
-#include <osApiWrappers/dag_direct.h>
 
 #include <EASTL/string.h>
 
@@ -31,7 +29,7 @@ struct BrushIncrementer
 static BrushIncrementer brushIncTable[] = {{0, 1}, {10, 5}, {50, 10}, {100, 25}, {200, 50}, {300, 100}};
 
 
-class ExportLayeesDlg : public PropPanel::ControlEventHandler
+class ExportLayeesDlg : public ControlEventHandler
 {
 public:
   static const int PID_LAYER = 1;
@@ -39,7 +37,7 @@ public:
   ExportLayeesDlg(HmapLandPlugin *p_, Tab<int> &enabled_) : p(p_), enabled(enabled_)
   {
     mDialog = DAGORED2->createDialog(_pxScaled(250), _pxScaled(300), "Export landClass layers");
-    PropPanel::ContainerPropertyControl &panel = *mDialog->getPanel();
+    PropPanel2 &panel = *mDialog->getPanel();
 
     dag::ConstSpan<HmapBitLayerDesc> landClsLayer = p->hmlService->getBitLayersList(p->getLayersHandle());
     for (int i = 0; i < landClsLayer.size(); i++)
@@ -55,9 +53,9 @@ public:
   {
     int ret = mDialog->showDialog();
 
-    if (ret == PropPanel::DIALOG_ID_OK)
+    if (ret == DIALOG_ID_OK)
     {
-      PropPanel::ContainerPropertyControl &panel = *mDialog->getPanel();
+      PropPanel2 &panel = *mDialog->getPanel();
 
       dag::ConstSpan<HmapBitLayerDesc> landClsLayer = p->hmlService->getBitLayersList(p->getLayersHandle());
       for (int i = 0; i < landClsLayer.size(); i++)
@@ -75,7 +73,7 @@ public:
 private:
   HmapLandPlugin *p;
   Tab<int> &enabled;
-  PropPanel::DialogWindow *mDialog;
+  CDialogWindow *mDialog;
 };
 
 
@@ -98,35 +96,6 @@ bool HmapLandPlugin::onPluginMenuClick(unsigned id)
       EDITORCORE->managePropPanels();
       return true;
 
-    case CM_TOGGLE_PROPERTIES_AND_OBJECT_PROPERTIES:
-    {
-      const bool propertiesPanelShown = propPanel && propPanel->getPanelWindow();
-
-      if (objEd.isPanelShown() && propertiesPanelShown)
-      {
-        bothPropertiesAndObjectPropertiesWereOpenLastTime = true;
-
-        objEd.showPanel();
-        onPluginMenuClick(CM_SHOW_PANEL);
-      }
-      else if (!objEd.isPanelShown() && !propertiesPanelShown)
-      {
-        if (bothPropertiesAndObjectPropertiesWereOpenLastTime)
-          objEd.showPanel();
-
-        onPluginMenuClick(CM_SHOW_PANEL);
-      }
-      else
-      {
-        bothPropertiesAndObjectPropertiesWereOpenLastTime = false;
-
-        objEd.showPanel();
-        onPluginMenuClick(CM_SHOW_PANEL);
-      }
-
-      return true;
-    }
-
     case CM_CREATE_HEIGHTMAP: createHeightmap(); return true;
 
     case CM_IMPORT_HEIGHTMAP: importHeightmap(); break;
@@ -141,8 +110,8 @@ bool HmapLandPlugin::onPluginMenuClick(unsigned id)
     {
       applyHmModifiers(false, true, false);
 
-      PropPanel::DialogWindow *dlg = DAGORED2->createDialog(_pxScaled(300), _pxScaled(400), "Rescale heightmap");
-      PropPanel::ContainerPropertyControl &panel = *dlg->getPanel();
+      CDialogWindow *dlg = DAGORED2->createDialog(_pxScaled(300), _pxScaled(400), "Rescale heightmap");
+      PropPanel2 &panel = *dlg->getPanel();
       float mMin = 0, mMax = 0, dMin = 0, dMax = 0;
 
       mMin = mMax = heightMap.getInitialData(0, 0);
@@ -183,7 +152,7 @@ bool HmapLandPlugin::onPluginMenuClick(unsigned id)
       panel.createCheckBox(5, "Normalize main HMAP", false);
       // panel.createCheckBox(6, "Absolutize main HMAP", false);
 
-      if (dlg->showDialog() == PropPanel::DIALOG_ID_OK)
+      if (dlg->showDialog() == DIALOG_ID_OK)
       {
         float nMin = panel.getFloat(1), nMax = panel.getFloat(2);
         bool rescale_main = panel.getBool(3), rescale_det = panel.getBool(4), norm_main = panel.getBool(5);
@@ -284,8 +253,8 @@ bool HmapLandPlugin::onPluginMenuClick(unsigned id)
 
     case CM_EXPORT_LOFT_MASKS:
     {
-      PropPanel::DialogWindow *dlg = DAGORED2->createDialog(_pxScaled(350), _pxScaled(704), "Loft mask export props");
-      PropPanel::ContainerPropertyControl &panel = *dlg->getPanel();
+      CDialogWindow *dlg = DAGORED2->createDialog(_pxScaled(350), _pxScaled(704), "Loft mask export props");
+      PropPanel2 &panel = *dlg->getPanel();
       panel.createCheckBox(11, "Build main HMAP loft masks", lastExpLoftMain);
       panel.createEditInt(12, "Main HMAP masks tex size", lastExpLoftMainSz);
       panel.createCheckBox(13, "Use main HMAP area", lastExpLoftUseRect[0]);
@@ -329,7 +298,7 @@ bool HmapLandPlugin::onPluginMenuClick(unsigned id)
       panel.createFileEditBox(41, "Out dir", lastExpLoftFolder.empty() ? prj : lastExpLoftFolder);
       panel.setBool(41, true);
       panel.createCheckBox(42, "Create subfolders when areas used", lastExpLoftCreateAreaSubfolders);
-      if (dlg->showDialog() == PropPanel::DIALOG_ID_OK)
+      if (dlg->showDialog() == DIALOG_ID_OK)
       {
         lastExpLoftFolder = panel.getText(41);
         lastExpLoftCreateAreaSubfolders = panel.getBool(42);
@@ -509,12 +478,12 @@ bool HmapLandPlugin::onPluginMenuClick(unsigned id)
 
     case CM_SET_PT_VIS_DIST:
     {
-      PropPanel::DialogWindow *dlg = DAGORED2->createDialog(_pxScaled(250), _pxScaled(100), "Set visibility range for points");
-      PropPanel::ContainerPropertyControl &panel = *dlg->getPanel();
+      CDialogWindow *dlg = DAGORED2->createDialog(_pxScaled(250), _pxScaled(100), "Set visibility range for points");
+      PropPanel2 &panel = *dlg->getPanel();
       panel.createEditFloat(1, "Visibility range", objEd.maxPointVisDist);
       int ret = dlg->showDialog();
 
-      if (ret == PropPanel::DIALOG_ID_OK)
+      if (ret == DIALOG_ID_OK)
       {
         objEd.maxPointVisDist = panel.getFloat(1);
         DAGORED2->invalidateViewportCache();
@@ -540,11 +509,15 @@ bool HmapLandPlugin::onPluginMenuClick(unsigned id)
       if (!brushDlg->isVisible() && _vp && _vp->isActive())
         if (currentBrushId >= 0 && currentBrushId < brushes.size())
         {
-          PropPanel::ContainerPropertyControl *_panel = brushDlg->getPanel();
+          PropertyContainerControlBase *_panel = brushDlg->getPanel();
           _panel->clear();
           brushes[currentBrushId]->fillParams(*_panel);
+          int _x = 0, _y = 0;
+          wingw::get_mouse_pos(_x, _y);
           brushDlg->autoSize();
-          brushDlg->centerWindowToMousePos();
+          int _x_offset = brushDlg->getPanel()->getWidth() / 2;
+          int _y_offset = brushDlg->getPanel()->getHeight() / 2;
+          brushDlg->moveWindow(_x - _x_offset, _y - _y_offset);
           brushDlg->show();
           return true;
         }
@@ -554,102 +527,31 @@ bool HmapLandPlugin::onPluginMenuClick(unsigned id)
     case CM_TAB_RELEASE:
     {
       if (brushDlg->isVisible())
-      {
-        // Take away the focus from the dialog so the spin edit can receive the focus lost event, and send onWcChange
-        // before the dialog hides if it was edited by keyboard.
-        // Make sure the hiding gets called at least one ImGui frame (updateImgui) later.
-        // (If we had access to ImGui::GetFrameCount we would store that here and check for inequality in
-        // HmapLandPlugin::updateImgui().)
-        brushDlgHideRequestFrameCountdown = 2;
+        brushDlg->hide();
 
-        IGenViewportWnd *_vp = DAGORED2->getCurrentViewport();
-        if (_vp)
-          _vp->activate();
-      }
+      IGenViewportWnd *_vp = DAGORED2->getCurrentViewport();
+      if (_vp)
+        _vp->activate();
     }
     break;
-
-    case CM_DECREASE_BRUSH_SIZE:
-      if (DAGORED2->isBrushPainting() && DAGORED2->getBrush())
-      {
-        int cnt = sizeof(brushIncTable) / sizeof(BrushIncrementer);
-        G_ASSERT(cnt > 0);
-
-        real radius = DAGORED2->getBrush()->getRadius(), incr = 0;
-
-        real cellSz = (real)HmapLandPlugin::self->getHeightmapCellSize() * (real)HmapLandPlugin::self->getHeightmapSizeX() /
-                      (real)HmapLandPlugin::self->getlandClassMap().getMapSizeX();
-
-        if (cellSz < 1e-3)
-          return true;
-
-        real landClsMapRadius = radius / cellSz;
-
-        for (int i = cnt - 1; i >= 0; i--)
-        {
-          if (landClsMapRadius > brushIncTable[i].lim)
-          {
-            incr = brushIncTable[i].value;
-            break;
-          }
-        }
-
-        landClsMapRadius = floor(landClsMapRadius - incr);
-
-        DAGORED2->getBrush()->setRadius(landClsMapRadius * cellSz);
-        if (propPanel->getPanelWindow())
-          DAGORED2->getBrush()->updateToPanel(*propPanel->getPanelWindow()); // refillBrush();
-        DAGORED2->invalidateViewportCache();
-      }
-      return true;
-
-    case CM_INCREASE_BRUSH_SIZE:
-      if (DAGORED2->isBrushPainting() && DAGORED2->getBrush())
-      {
-        int cnt = sizeof(brushIncTable) / sizeof(BrushIncrementer);
-        G_ASSERT(cnt > 0);
-
-        real radius = DAGORED2->getBrush()->getRadius(), incr = 0;
-
-        real cellSz = (real)HmapLandPlugin::self->getHeightmapCellSize() * (real)HmapLandPlugin::self->getHeightmapSizeX() /
-                      (real)HmapLandPlugin::self->getlandClassMap().getMapSizeX();
-
-        if (cellSz < 1e-3)
-          return true;
-
-        real landClsMapRadius = radius / cellSz;
-
-        for (int i = 0; i < cnt; i++)
-        {
-          if (landClsMapRadius >= brushIncTable[i].lim)
-            incr = brushIncTable[i].value;
-        }
-
-        landClsMapRadius = floor(landClsMapRadius + incr);
-
-        DAGORED2->getBrush()->setRadius(landClsMapRadius * cellSz);
-        if (propPanel->getPanelWindow())
-          DAGORED2->getBrush()->updateToPanel(*propPanel->getPanelWindow()); // refillBrush();
-        DAGORED2->invalidateViewportCache();
-      }
-      return true;
   }
 
   return false;
-}
-
-void HmapLandPlugin::handleViewportAcceleratorCommand(unsigned id)
-{
-  if (onPluginMenuClick(id))
-    return;
-
-  objEd.onClick(id, nullptr);
 }
 
 //==============================================================================
 
 void HmapLandPlugin::handleKeyPress(IGenViewportWnd *wnd, int vk, int modif)
 {
+  if (vk == 'P')
+  {
+    EDITORCORE->skipManagePropPanels(true);
+    objEd.handleKeyPress(wnd, vk, modif);
+    EDITORCORE->skipManagePropPanels(false);
+    onPluginMenuClick(CM_SHOW_PANEL);
+    return;
+  }
+
   objEd.handleKeyPress(wnd, vk, modif);
 
   switch (vk)
@@ -711,6 +613,71 @@ void HmapLandPlugin::handleKeyPress(IGenViewportWnd *wnd, int vk, int modif)
     case '6':
       if (!wingw::is_special_pressed())
         onPluginMenuClick(CM_SCRIPT);
+      return;
+
+    case wingw::V_BRACKET_O:
+      if (DAGORED2->isBrushPainting() && DAGORED2->getBrush())
+      {
+        int cnt = sizeof(brushIncTable) / sizeof(BrushIncrementer);
+        G_ASSERT(cnt > 0);
+
+        real radius = DAGORED2->getBrush()->getRadius(), incr = 0;
+
+        real cellSz = (real)HmapLandPlugin::self->getHeightmapCellSize() * (real)HmapLandPlugin::self->getHeightmapSizeX() /
+                      (real)HmapLandPlugin::self->getlandClassMap().getMapSizeX();
+
+        if (cellSz < 1e-3)
+          return;
+
+        real landClsMapRadius = radius / cellSz;
+
+        for (int i = cnt - 1; i >= 0; i--)
+        {
+          if (landClsMapRadius > brushIncTable[i].lim)
+          {
+            incr = brushIncTable[i].value;
+            break;
+          }
+        }
+
+        landClsMapRadius = floor(landClsMapRadius - incr);
+
+        DAGORED2->getBrush()->setRadius(landClsMapRadius * cellSz);
+        if (propPanel->getPanelWindow())
+          DAGORED2->getBrush()->updateToPanel(*propPanel->getPanelWindow()); // refillBrush();
+        DAGORED2->invalidateViewportCache();
+      }
+      return;
+
+    case wingw::V_BRACKET_C:
+      if (DAGORED2->isBrushPainting() && DAGORED2->getBrush())
+      {
+        int cnt = sizeof(brushIncTable) / sizeof(BrushIncrementer);
+        G_ASSERT(cnt > 0);
+
+        real radius = DAGORED2->getBrush()->getRadius(), incr = 0;
+
+        real cellSz = (real)HmapLandPlugin::self->getHeightmapCellSize() * (real)HmapLandPlugin::self->getHeightmapSizeX() /
+                      (real)HmapLandPlugin::self->getlandClassMap().getMapSizeX();
+
+        if (cellSz < 1e-3)
+          return;
+
+        real landClsMapRadius = radius / cellSz;
+
+        for (int i = 0; i < cnt; i++)
+        {
+          if (landClsMapRadius >= brushIncTable[i].lim)
+            incr = brushIncTable[i].value;
+        }
+
+        landClsMapRadius = floor(landClsMapRadius + incr);
+
+        DAGORED2->getBrush()->setRadius(landClsMapRadius * cellSz);
+        if (propPanel->getPanelWindow())
+          DAGORED2->getBrush()->updateToPanel(*propPanel->getPanelWindow()); // refillBrush();
+        DAGORED2->invalidateViewportCache();
+      }
       return;
   }
 }

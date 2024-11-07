@@ -1,6 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
-#include "gpu_capture.h"
 #include "device.h"
 
 #if USE_PIX
@@ -17,6 +14,8 @@
 
 #include <RenderDoc/renderdoc_app.h>
 
+using namespace drv3d_dx12;
+
 #if !defined(PIX_EVENT_UNICODE_VERSION)
 #define PIX_EVENT_UNICODE_VERSION 0
 #endif
@@ -29,9 +28,7 @@
 #define PIX_EVENT_PIX3BLOB_VERSION 2
 #endif
 
-namespace drv3d_dx12::debug::gpu_capture
-{
-RENDERDOC_API_1_5_0 *RenderDoc::try_connect_interface()
+RENDERDOC_API_1_5_0 *debug::gpu_capture::RenderDoc::try_connect_interface()
 {
   auto module = GetModuleHandleW(L"renderdoc.dll");
   if (!module)
@@ -51,29 +48,29 @@ RENDERDOC_API_1_5_0 *RenderDoc::try_connect_interface()
   return api;
 }
 
-void RenderDoc::configure() { api->UnloadCrashHandler(); }
+void debug::gpu_capture::RenderDoc::configure() { api->UnloadCrashHandler(); }
 
-void RenderDoc::beginCapture(const wchar_t *) { api->StartFrameCapture(nullptr, nullptr); }
+void debug::gpu_capture::RenderDoc::beginCapture() { api->StartFrameCapture(nullptr, nullptr); }
 
-void RenderDoc::endCapture() { api->EndFrameCapture(nullptr, nullptr); }
+void debug::gpu_capture::RenderDoc::endCapture() { api->EndFrameCapture(nullptr, nullptr); }
 
-void RenderDoc::onPresent() {}
+void debug::gpu_capture::RenderDoc::onPresent() {}
 
-void RenderDoc::captureFrames(const wchar_t *, int count) { api->TriggerMultiFrameCapture(count); }
+void debug::gpu_capture::RenderDoc::captureFrames(const wchar_t *, int count) { api->TriggerMultiFrameCapture(count); }
 
-void RenderDoc::beginEvent(ID3D12GraphicsCommandList *cmd, eastl::span<const char> text)
+void debug::gpu_capture::RenderDoc::beginEvent(ID3D12GraphicsCommandList *cmd, eastl::span<const char> text)
 {
   cmd->BeginEvent(PIX_EVENT_ANSI_VERSION, text.data(), text.size());
 }
 
-void RenderDoc::endEvent(ID3D12GraphicsCommandList *cmd) { cmd->EndEvent(); }
+void debug::gpu_capture::RenderDoc::endEvent(ID3D12GraphicsCommandList *cmd) { cmd->EndEvent(); }
 
-void RenderDoc::marker(ID3D12GraphicsCommandList *cmd, eastl::span<const char> text)
+void debug::gpu_capture::RenderDoc::marker(ID3D12GraphicsCommandList *cmd, eastl::span<const char> text)
 {
   cmd->SetMarker(PIX_EVENT_ANSI_VERSION, text.data(), text.size());
 }
 
-ComPtr<IDXGraphicsAnalysis> LegacyPIX::try_connect_interface(Direct3D12Enviroment &d3d_env)
+ComPtr<IDXGraphicsAnalysis> debug::gpu_capture::LegacyPIX::try_connect_interface(Direct3D12Enviroment &d3d_env)
 {
   logdbg("DX12: ...GPA for 'DXGIGetDebugInterface1'...");
   ComPtr<IDXGraphicsAnalysis> result;
@@ -93,21 +90,21 @@ ComPtr<IDXGraphicsAnalysis> LegacyPIX::try_connect_interface(Direct3D12Enviromen
   return result;
 }
 
-void LegacyPIX::configure() {}
+void debug::gpu_capture::LegacyPIX::configure() {}
 
-void LegacyPIX::beginCapture(const wchar_t *)
+void debug::gpu_capture::LegacyPIX::beginCapture()
 {
   api->BeginCapture();
   isCapturing = true;
 }
 
-void LegacyPIX::endCapture()
+void debug::gpu_capture::LegacyPIX::endCapture()
 {
   api->EndCapture();
   isCapturing = false;
 }
 
-void LegacyPIX::onPresent()
+void debug::gpu_capture::LegacyPIX::onPresent()
 {
   if (isCapturing && (framesToCapture == 0))
   {
@@ -119,28 +116,28 @@ void LegacyPIX::onPresent()
     --framesToCapture;
     if (!isCapturing)
     {
-      beginCapture(nullptr);
+      beginCapture();
     }
   }
 }
 
-void LegacyPIX::captureFrames(const wchar_t *, int count) { framesToCapture = count; }
+void debug::gpu_capture::LegacyPIX::captureFrames(const wchar_t *, int count) { framesToCapture = count; }
 
-void LegacyPIX::beginEvent(ID3D12GraphicsCommandList *cmd, eastl::span<const char> text)
+void debug::gpu_capture::LegacyPIX::beginEvent(ID3D12GraphicsCommandList *cmd, eastl::span<const char> text)
 {
   cmd->BeginEvent(PIX_EVENT_ANSI_VERSION, text.data(), text.size());
 }
 
-void LegacyPIX::endEvent(ID3D12GraphicsCommandList *cmd) { cmd->EndEvent(); }
+void debug::gpu_capture::LegacyPIX::endEvent(ID3D12GraphicsCommandList *cmd) { cmd->EndEvent(); }
 
-void LegacyPIX::marker(ID3D12GraphicsCommandList *cmd, eastl::span<const char> text)
+void debug::gpu_capture::LegacyPIX::marker(ID3D12GraphicsCommandList *cmd, eastl::span<const char> text)
 {
   cmd->SetMarker(PIX_EVENT_ANSI_VERSION, text.data(), text.size());
 }
 
-LibPointer PIX::try_load_runtime_interface() { return {LoadLibraryW(L"WinPixEventRuntime.dll"), {}}; }
+LibPointer debug::gpu_capture::PIX::try_load_runtime_interface() { return {LoadLibraryW(L"WinPixEventRuntime.dll"), {}}; }
 
-LibPointer PIX::try_connect_capture_interface()
+LibPointer debug::gpu_capture::PIX::try_connect_capture_interface()
 {
   HMODULE module = nullptr;
   if (GetModuleHandleExW(0, L"WinPixGpuCapturer.dll", &module))
@@ -151,22 +148,17 @@ LibPointer PIX::try_connect_capture_interface()
 }
 
 #if USE_PIX
-LibPointer PIX::try_load_capture_interface() { return {PIXLoadLatestWinPixGpuCapturerLibrary(), {}}; }
+LibPointer debug::gpu_capture::PIX::try_load_capture_interface() { return {PIXLoadLatestWinPixGpuCapturerLibrary(), {}}; }
 
-void PIX::configure() { PIXSetHUDOptions(PIXHUDOptions::PIX_HUD_SHOW_ON_NO_WINDOWS); }
+void debug::gpu_capture::PIX::configure() { PIXSetHUDOptions(PIXHUDOptions::PIX_HUD_SHOW_ON_NO_WINDOWS); }
 
-void PIX::beginCapture(const wchar_t *name)
-{
-  PIXCaptureParameters params = {};
-  params.GpuCaptureParameters.FileName = name;
-  PIXBeginCapture2(PIX_CAPTURE_GPU, name ? &params : nullptr);
-}
+void debug::gpu_capture::PIX::beginCapture() { PIXBeginCapture2(PIX_CAPTURE_GPU, nullptr); }
 
-void PIX::endCapture() { PIXEndCapture(false); }
+void debug::gpu_capture::PIX::endCapture() { PIXEndCapture(false); }
 
-void PIX::onPresent() {}
+void debug::gpu_capture::PIX::onPresent() {}
 
-void PIX::captureFrames(const wchar_t *file_name, int count)
+void debug::gpu_capture::PIX::captureFrames(const wchar_t *file_name, int count)
 {
   wchar_t filePath[1024];
   GetCurrentDirectoryW(ARRAYSIZE(filePath), filePath);
@@ -179,7 +171,7 @@ void PIX::captureFrames(const wchar_t *file_name, int count)
   PIXGpuCaptureNextFrames(filePath, count);
 }
 
-void PIX::beginEvent(ID3D12GraphicsCommandList *cmd, eastl::span<const char> text)
+void debug::gpu_capture::PIX::beginEvent(ID3D12GraphicsCommandList *cmd, eastl::span<const char> text)
 {
   if (runtimeLib)
   {
@@ -191,7 +183,7 @@ void PIX::beginEvent(ID3D12GraphicsCommandList *cmd, eastl::span<const char> tex
   }
 }
 
-void PIX::endEvent(ID3D12GraphicsCommandList *cmd)
+void debug::gpu_capture::PIX::endEvent(ID3D12GraphicsCommandList *cmd)
 {
   if (runtimeLib)
   {
@@ -203,7 +195,7 @@ void PIX::endEvent(ID3D12GraphicsCommandList *cmd)
   }
 }
 
-void PIX::marker(ID3D12GraphicsCommandList *cmd, eastl::span<const char> text)
+void debug::gpu_capture::PIX::marker(ID3D12GraphicsCommandList *cmd, eastl::span<const char> text)
 {
   if (runtimeLib)
   {
@@ -215,18 +207,18 @@ void PIX::marker(ID3D12GraphicsCommandList *cmd, eastl::span<const char> text)
   }
 }
 #else
-LibPointer PIX::try_load_capture_interface() { return {}; }
-void PIX::configure() {}
-void PIX::beginCapture(const wchar_t *) {}
-void PIX::endCapture() {}
-void PIX::onPresent() {}
-void PIX::captureFrames(const wchar_t *, int) {}
-void PIX::beginEvent(ID3D12GraphicsCommandList *, eastl::span<const char>) {}
-void PIX::endEvent(ID3D12GraphicsCommandList *) {}
-void PIX::marker(ID3D12GraphicsCommandList *, eastl::span<const char>) {}
+LibPointer debug::gpu_capture::PIX::try_load_capture_interface() { return {}; }
+void debug::gpu_capture::PIX::configure() {}
+void debug::gpu_capture::PIX::beginCapture() {}
+void debug::gpu_capture::PIX::endCapture() {}
+void debug::gpu_capture::PIX::onPresent() {}
+void debug::gpu_capture::PIX::captureFrames(const wchar_t *, int) {}
+void debug::gpu_capture::PIX::beginEvent(ID3D12GraphicsCommandList *, eastl::span<const char>) {}
+void debug::gpu_capture::PIX::endEvent(ID3D12GraphicsCommandList *) {}
+void debug::gpu_capture::PIX::marker(ID3D12GraphicsCommandList *, eastl::span<const char>) {}
 #endif
 
-bool nvidia::NSight::try_connect_interface()
+bool debug::gpu_capture::nvidia::NSight::try_connect_interface()
 {
   logdbg("DX12: ...looking for Nomad.Injection.dll...");
   if (GetModuleHandleW(L"Nomad.Injection.dll"))
@@ -246,27 +238,20 @@ bool nvidia::NSight::try_connect_interface()
     logdbg("DX12: ...found...");
     return true;
   }
-  logdbg("DX12: ...nothing, looking for WarpViz.Injection.dll...");
-  if (GetModuleHandleW(L"WarpViz.Injection.dll"))
-  {
-    logdbg("DX12: ...found...");
-    return true;
-  }
   return false;
 }
 
-void nvidia::NSight::configure() {}
-void nvidia::NSight::beginCapture(const wchar_t *) {}
-void nvidia::NSight::endCapture() {}
-void nvidia::NSight::onPresent() {}
-void nvidia::NSight::captureFrames(const wchar_t *, int) {}
-void nvidia::NSight::beginEvent(ID3D12GraphicsCommandList *cmd, eastl::span<const char> text)
+void debug::gpu_capture::nvidia::NSight::configure() {}
+void debug::gpu_capture::nvidia::NSight::beginCapture() {}
+void debug::gpu_capture::nvidia::NSight::endCapture() {}
+void debug::gpu_capture::nvidia::NSight::onPresent() {}
+void debug::gpu_capture::nvidia::NSight::captureFrames(const wchar_t *, int) {}
+void debug::gpu_capture::nvidia::NSight::beginEvent(ID3D12GraphicsCommandList *cmd, eastl::span<const char> text)
 {
   cmd->BeginEvent(PIX_EVENT_ANSI_VERSION, text.data(), text.size());
 }
-void nvidia::NSight::endEvent(ID3D12GraphicsCommandList *cmd) { cmd->EndEvent(); }
-void nvidia::NSight::marker(ID3D12GraphicsCommandList *cmd, eastl::span<const char> text)
+void debug::gpu_capture::nvidia::NSight::endEvent(ID3D12GraphicsCommandList *cmd) { cmd->EndEvent(); }
+void debug::gpu_capture::nvidia::NSight::marker(ID3D12GraphicsCommandList *cmd, eastl::span<const char> text)
 {
   cmd->SetMarker(PIX_EVENT_ANSI_VERSION, text.data(), text.size());
 }
-} // namespace drv3d_dx12::debug::gpu_capture

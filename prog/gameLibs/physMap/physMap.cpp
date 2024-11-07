@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <physMap/physMap.h>
 
 #include <util/dag_treeBitmap.h>

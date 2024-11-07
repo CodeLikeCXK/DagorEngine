@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 
 #include "parser/bparser.h"
 #include <debug/dag_log.h>
@@ -6,8 +5,6 @@
 #include "shsem.h"
 #include "globVarSem.h"
 #include "boolVar.h"
-#include "cppStcode.h"
-#include "cppStcodeAssembly.h"
 using namespace ShaderTerminal;
 #include <debug/dag_debug.h>
 #include "shLog.h"
@@ -19,7 +16,6 @@ using namespace ShaderTerminal;
 #include "shCompiler.h"
 #include <osApiWrappers/dag_direct.h>
 #include <memory/dag_regionMemAlloc.h>
-#include "cppStcodeUtils.h"
 
 
 IMemAlloc *sh_symbolsmem = NULL;
@@ -416,9 +412,6 @@ void parse_shader_script(const char *fn, const ShHardwareOptions &opt, Tab<Simpl
 {
   RegionMemAlloc rm_alloc(4 << 20, 4 << 20);
 
-  g_cppstcode.reset();
-  g_cppstcode.shaderName = stcode::extract_shader_name_from_path(fn);
-
   {
     ParserFileInput inp;
     String inc_fpath;
@@ -457,7 +450,7 @@ void parse_shader_script(const char *fn, const ShHardwareOptions &opt, Tab<Simpl
     current_inp = NULL;
   }
 
-  DEBUG_CTX("sh_symbolsmem used %dK (of %dK allocated in %d pools)", rm_alloc.getPoolUsedSize() >> 10,
+  debug_ctx("sh_symbolsmem used %dK (of %dK allocated in %d pools)", rm_alloc.getPoolUsedSize() >> 10,
     rm_alloc.getPoolAllocatedSize() >> 10, rm_alloc.getPoolsCount());
   sh_symbolsmem = NULL;
 }

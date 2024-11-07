@@ -1,10 +1,10 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
-#include <EASTL/fixed_function.h>
 #include <shaders/dag_shaderCommon.h>
 #include <shaders/dag_shaderVar.h>
 #include <generic/dag_DObject.h>
@@ -84,8 +84,6 @@ public:
   virtual ShaderElement *make_elem(bool acquire_tex_refs, const char *info) = 0;
   inline ShaderElement *make_elem(const char *info = NULL) { return make_elem(true, info); }
 
-  virtual bool isPositionPacked() const = 0;
-
   // return true, if channels are valid for this material & specified render mode (if pi==NULL - default rm)
   virtual bool checkChannels(CompiledShaderChannelId *ch, int ch_count) const = 0;
 
@@ -136,8 +134,6 @@ public:
   virtual bool setStatesDispatch() const = 0;
   virtual void render(int minvert, int numvert, int sind, int numf, int base_vertex = 0, int prim = PRIM_TRILIST) const = 0;
 
-  virtual int getTextureCount() const = 0;
-  virtual TEXTUREID getTexture(int index) const = 0;
   virtual void gatherUsedTex(TextureIdSet &tex_id_list) const = 0;
   virtual bool replaceTexture(TEXTUREID tex_id_prev, TEXTUREID tex_id_new) = 0;
   virtual bool hasTexture(TEXTUREID tex_id) const = 0;
@@ -158,7 +154,7 @@ public:
 
   virtual int getSupportedBlock(int variant, int layer) const = 0;
 
-  virtual bool setReqTexLevel(int req_level = 15) const = 0;
+  virtual void setReqTexLevel(int req_level = 15) const = 0;
 
   //! invalidates internal cached state block (to force block re-apply and d3d program update)
   static void invalidate_cached_state_block();
@@ -199,12 +195,7 @@ void rebuild_shaders_stateblocks();
 void defrag_shaders_stateblocks(bool force); //
 
 // registers console processor for shader-related commands, such as 'reload_shader'
-using ShaderReloadCb = eastl::fixed_function<sizeof(void *), void(bool)>;
-void shaders_register_console(
-  bool allow_reload = true, const ShaderReloadCb &after_reload_cb = [](bool) {});
-
-// enable or disable shaders reloading depending on build configuration and settings
-void shaders_set_reload_flags();
+void shaders_register_console(bool allow_reload = true);
 
 // Shaders global time:
 

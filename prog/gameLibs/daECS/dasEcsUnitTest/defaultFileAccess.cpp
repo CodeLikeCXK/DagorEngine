@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <dasModules/dasFsFileAccess.h>
 #include <daScript/misc/smart_ptr.h>
 #include <daScript/misc/platform.h>

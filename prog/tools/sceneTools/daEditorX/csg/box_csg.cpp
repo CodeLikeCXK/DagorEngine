@@ -1,11 +1,9 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "box_csg.h"
 #include "plugIn.h"
 
 #include <libTools/renderUtil/dynRenderBuf.h>
-#include <EditorCore/ec_IEditorCore.h>
-#include <drv/3d/dag_driver.h>
+#include <dllPluginCore/core.h>
+#include <3d/dag_drv3d.h>
 #include <math/dag_rayIntersectBox.h>
 #include <math/dag_math2d.h>
 
@@ -13,8 +11,6 @@
 #include <vector>
 
 // #include <debug/dag_debug.h>
-
-using editorcore_extapi::dagRender;
 
 static DynRenderBuffer::Vertex boxVert[8];
 static int boxInd[36];
@@ -218,8 +214,7 @@ bool BoxCSG::getWorldBox(BBox3 &box) const
   return true;
 }
 
-void BoxCSG::fillProps(PropPanel::ContainerPropertyControl &op, DClassID for_class_id,
-  dag::ConstSpan<RenderableEditableObject *> objects)
+void BoxCSG::fillProps(PropertyContainerControlBase &op, DClassID for_class_id, dag::ConstSpan<RenderableEditableObject *> objects)
 {
   bool one_type = true;
 
@@ -243,18 +238,17 @@ void BoxCSG::fillProps(PropPanel::ContainerPropertyControl &op, DClassID for_cla
   }
 }
 
-void BoxCSG::onPPChange(int pid, bool edit_finished, PropPanel::ContainerPropertyControl &panel,
-  dag::ConstSpan<RenderableEditableObject *> objects)
+void BoxCSG::onPPChange(int pid, bool edit_finished, PropPanel2 &panel, dag::ConstSpan<RenderableEditableObject *> objects)
 {
   if (!edit_finished)
     return;
 }
 
 
-void BoxCSG::onPPBtnPressed(int pid, PropPanel::ContainerPropertyControl &panel, dag::ConstSpan<RenderableEditableObject *> objects) {}
+void BoxCSG::onPPBtnPressed(int pid, PropPanel2 &panel, dag::ConstSpan<RenderableEditableObject *> objects) {}
 
 
-// bool BoxCSG::onPPValidateParam(int pid, PropPanel::ContainerPropertyControl &panel,
+// bool BoxCSG::onPPValidateParam(int pid, PropPanel2 &panel,
 //     dag::ConstSpan<RenderableEditableObject*> objects)
 //{
 //   return true;

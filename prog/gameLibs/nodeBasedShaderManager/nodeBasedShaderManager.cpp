@@ -1,14 +1,8 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <nodeBasedShaderManager/nodeBasedShaderManager.h>
-#include <drv/3d/dag_shaderConstants.h>
-#include <drv/3d/dag_buffers.h>
-#include <drv/3d/dag_texture.h>
-#include <drv/3d/dag_driver.h>
-#include <drv/3d/dag_info.h>
+#include <3d/dag_drv3d.h>
 #include <ioSys/dag_dataBlock.h>
 #include <ioSys/dag_memIo.h>
-#include "platformUtils.h"
+#include "platformLabels.h"
 #include <EASTL/vector_set.h>
 #include <memory/dag_framemem.h>
 #if !NBSM_COMPILE_ONLY
@@ -16,8 +10,6 @@
 #include <shaders/dag_shaders.h>
 #include <gameRes/dag_gameResources.h>
 #include <gameRes/dag_stdGameResId.h>
-
-static ShaderVariableInfo global_time_phaseVarId("global_time_phase", true);
 #endif
 
 static eastl::vector_set<NodeBasedShaderManager *> node_based_shaders_with_cached_resources;
@@ -66,7 +58,7 @@ bool NodeBasedShaderManager::update(const DataBlock &shader_blk, String &out_err
 
 void NodeBasedShaderManager::getPlatformList(Tab<String> &out_platforms, PLATFORM platform_id)
 {
-  for (int i = 0; i < PLATFORM::COUNT; i++)
+  for (int i = 0; i < PLATFORM::LOAD_COUNT; i++)
   {
     if (platform_id >= 0 && platform_id != i)
       continue;
@@ -85,6 +77,22 @@ void NodeBasedShaderManager::updateBlkDataResources(const DataBlock &shader_blk)
 }
 
 #if !NBSM_COMPILE_ONLY
+static NodeBasedShaderManager::PLATFORM get_nbsm_platform()
+{
+  return d3d::get_driver_code()
+    .map(d3d::xboxOne, NodeBasedShaderManager::PLATFORM::DX12_XBOX_ONE)
+    .map(d3d::scarlett, NodeBasedShaderManager::PLATFORM::DX12_XBOX_SCARLETT)
+    .map(d3d::ps4, NodeBasedShaderManager::PLATFORM::PS4)
+    .map(d3d::ps5, NodeBasedShaderManager::PLATFORM::PS5)
+    .map(d3d::dx11, NodeBasedShaderManager::PLATFORM::DX11)
+    .map(d3d::dx12, NodeBasedShaderManager::PLATFORM::DX12)
+    .map(d3d::vulkan, d3d::get_driver_desc().caps.hasBindless ? NodeBasedShaderManager::PLATFORM::VULKAN_BINDLESS
+                                                              : NodeBasedShaderManager::PLATFORM::VULKAN)
+    .map(d3d::metal, NodeBasedShaderManager::PLATFORM::MTL)
+    .map(d3d::stub, NodeBasedShaderManager::PLATFORM::VULKAN)
+    .map(d3d::any, NodeBasedShaderManager::PLATFORM::LOAD_COUNT);
+}
+
 static eastl::string normalize_shader_res_name(const char *shader_name)
 {
   const char *lastSlashPtr = strrchr(shader_name, '/');
@@ -107,7 +115,7 @@ Header datablock
 void NodeBasedShaderManager::loadShaderFromStream(uint32_t idx, uint32_t platform_id, InPlaceMemLoadCB &load_stream,
   uint32_t variant_id)
 {
-  G_ASSERTF(platform_id < PLATFORM::COUNT && int(platform_id) >= 0, "Unknown platform id: %d", platform_id);
+  G_ASSERTF(platform_id < PLATFORM::LOAD_COUNT && int(platform_id) >= 0, "Unknown platform id: %d", platform_id);
   G_ASSERTF(variant_id < get_shader_variant_count(shader) && int(variant_id) >= 0, "Unknown variant id for shader #%d: %d",
     (int)shader, variant_id);
   resetCachedResources();
@@ -122,7 +130,7 @@ void NodeBasedShaderManager::loadShaderFromStream(uint32_t idx, uint32_t platfor
 bool NodeBasedShaderManager::loadFromResources(const String &shader_path, bool keep_permutation)
 {
   PLATFORM platform_id = get_nbsm_platform();
-  G_ASSERTF(platform_id < PLATFORM::COUNT && int(platform_id) >= 0, "Unknown platform id: %d", platform_id);
+  G_ASSERTF(platform_id < PLATFORM::LOAD_COUNT && int(platform_id) >= 0, "Unknown platform id: %d", platform_id);
   eastl::string resName = node_based_shader_get_resource_name(shader_path);
   auto data = (dag::Span<uint8_t> *)get_one_game_resource_ex(GAMERES_HANDLE_FROM_STRING(resName.c_str()), LShaderGameResClassId);
   if (!data)
@@ -176,7 +184,7 @@ const NodeBasedShaderManager::ShaderBinPermutations &NodeBasedShaderManager::get
   G_ASSERTF(variant_id < get_shader_variant_count(shader) && int(variant_id) >= 0, "Unknown variant id for shader #%d: %d",
     (int)shader, variant_id);
   PLATFORM platform_id = get_nbsm_platform();
-  G_ASSERTF(platform_id < PLATFORM::COUNT && int(platform_id) >= 0, "Unknown platform id: %d", platform_id);
+  G_ASSERTF(platform_id < PLATFORM::LOAD_COUNT && int(platform_id) >= 0, "Unknown platform id: %d", platform_id);
   return shaderBin[platform_id][variant_id];
 }
 
@@ -211,7 +219,7 @@ const DataBlock &NodeBasedShaderManager::getMetadata() const
 
 void NodeBasedShaderManager::setConstantBuffer()
 {
-  ShaderGlobal::set_real(global_time_phaseVarId, get_shader_global_time_phase(0, 0));
+  ShaderGlobal::set_real(::get_shader_variable_id("global_time_phase", true), get_shader_global_time_phase(0, 0));
 
   dag::Vector<float, framemem_allocator> parametersBuffer;
   const uint32_t REGISTERS_ALIGNMENT = 4;
@@ -264,7 +272,7 @@ void NodeBasedShaderManager::setConstantBuffer()
     d3d::set_cb0_data(STAGE_CS, reinterpret_cast<float *>(parametersBuffer.data()), parametersBuffer.size() / REGISTERS_ALIGNMENT);
 }
 
-void NodeBasedShaderManager::setTextures(dag::Vector<NodeBasedTexture> &node_based_textures, int &offset) const
+void NodeBasedShaderManager::setTextures(dag::Vector<NodeBasedTexture> &node_based_textures, int &offset, bool has_sampler) const
 {
   for (int i = 0, ie = node_based_textures.size(); i < ie; ++i, ++offset)
   {
@@ -274,15 +282,11 @@ void NodeBasedShaderManager::setTextures(dag::Vector<NodeBasedTexture> &node_bas
       TEXTUREID id = ShaderGlobal::get_tex_fast(nbTex.dynamicTextureVarId);
       G_FAST_ASSERT(get_managed_texture_refcount(id) > 0);
       mark_managed_tex_lfu(id);
-      if (nbTex.dynamicSamplerVarId != -1)
-        d3d::set_sampler(STAGE_CS, offset, ShaderGlobal::get_sampler(nbTex.dynamicSamplerVarId));
-      d3d::set_tex(STAGE_CS, offset, D3dResManagerData::getBaseTex(id), false);
+      d3d::set_tex(STAGE_CS, offset, D3dResManagerData::getBaseTex(id), has_sampler);
     }
     else
     {
-      if (nbTex.sampler != d3d::INVALID_SAMPLER_HANDLE)
-        d3d::set_sampler(STAGE_CS, offset, nbTex.sampler);
-      d3d::set_tex(STAGE_CS, offset, nbTex.usedTextureResId, false);
+      d3d::set_tex(STAGE_CS, offset, nbTex.usedTextureResId, has_sampler);
     }
   }
 }
@@ -317,7 +321,8 @@ void NodeBasedShaderManager::setConstants()
     precacheVariables();
   setConstantBuffer();
   int offset = 0;
-  setTextures(nodeBasedTextures, offset);
+  setTextures(nodeBasedTextures, offset, true);
+  setTextures(nodeBasedTexturesNoSampler, offset, false);
   setBuffers(offset);
 }
 
@@ -404,7 +409,7 @@ void NodeBasedShaderManager::precacheVariables()
 
 
 void NodeBasedShaderManager::fillTextureCache(dag::Vector<NodeBasedTexture> &node_based_textures, const DataBlock &src_block,
-  int offset, bool &has_loaded, bool has_sampler)
+  int offset, bool &has_loaded)
 {
   for (int i = 0, ei = src_block.paramCount(); i < ei; ++i)
   {
@@ -412,17 +417,8 @@ void NodeBasedShaderManager::fillTextureCache(dag::Vector<NodeBasedTexture> &nod
     NodeBasedTexture &nbTex = node_based_textures[i + offset];
     TEXTUREID resId = get_managed_texture_id(texName);
     bool isDynamic = resId == BAD_TEXTUREID;
-    nbTex.dynamicSamplerVarId = -1;
-    nbTex.sampler = d3d::INVALID_SAMPLER_HANDLE;
     nbTex.dynamicTextureVarId = isDynamic ? ::get_shader_variable_id(texName, true) : -1;
-    if (nbTex.dynamicTextureVarId != -1 && has_sampler)
-    {
-      eastl::string samplerName = eastl::string(texName) + "_samplerstate";
-      nbTex.dynamicSamplerVarId = ::get_shader_variable_id(samplerName.c_str(), true);
-    }
     nbTex.usedTextureResId = isDynamic ? nullptr : acquire_managed_tex(resId);
-    if (nbTex.usedTextureResId != nullptr)
-      nbTex.sampler = d3d::request_sampler({});
     if (!isDynamic)
     {
       resIdsToRelease.push_back(resId);
@@ -430,10 +426,7 @@ void NodeBasedShaderManager::fillTextureCache(dag::Vector<NodeBasedTexture> &nod
         has_loaded = false;
     }
     else if (ShaderGlobal::get_tex_fast(nbTex.dynamicTextureVarId) == BAD_TEXTUREID)
-    {
       nbTex.dynamicTextureVarId = -1;
-      nbTex.dynamicSamplerVarId = -1;
-    }
   }
 }
 void NodeBasedShaderManager::fillBufferCache(const DataBlock &src_block, int offset, bool &has_loaded)
@@ -465,24 +458,19 @@ bool NodeBasedShaderManager::invalidateCachedResources()
     release_managed_res(id);
   resIdsToRelease.resize(0);
 
-  nodeBasedTextures.resize(currentTextures2dBlk->paramCount() + currentTextures3dBlk->paramCount() +
-                           currentTextures2dShdArrayBlk->paramCount() + currentTextures2dNoSamplerBlk->paramCount() +
-                           currentTextures3dNoSamplerBlk->paramCount());
+  nodeBasedTextures.resize(
+    currentTextures2dBlk->paramCount() + currentTextures3dBlk->paramCount() + currentTextures2dShdArrayBlk->paramCount());
+  nodeBasedTexturesNoSampler.resize(currentTextures2dNoSamplerBlk->paramCount() + currentTextures3dNoSamplerBlk->paramCount());
   nodeBasedBuffers.resize(currentBuffersBlk->paramCount());
 
-  resIdsToRelease.reserve(nodeBasedTextures.size() + nodeBasedBuffers.size());
+  resIdsToRelease.reserve(nodeBasedTextures.size() + nodeBasedTexturesNoSampler.size() + nodeBasedBuffers.size());
 
-  fillTextureCache(nodeBasedTextures, *currentTextures2dBlk, 0, hasLoaded, true);
-  fillTextureCache(nodeBasedTextures, *currentTextures3dBlk, currentTextures2dBlk->paramCount(), hasLoaded, true);
+  fillTextureCache(nodeBasedTextures, *currentTextures2dBlk, 0, hasLoaded);
+  fillTextureCache(nodeBasedTextures, *currentTextures3dBlk, currentTextures2dBlk->paramCount(), hasLoaded);
   fillTextureCache(nodeBasedTextures, *currentTextures2dShdArrayBlk,
-    currentTextures2dBlk->paramCount() + currentTextures3dBlk->paramCount(), hasLoaded, true);
-  fillTextureCache(nodeBasedTextures, *currentTextures2dNoSamplerBlk,
-    currentTextures2dBlk->paramCount() + currentTextures3dBlk->paramCount() + currentTextures2dShdArrayBlk->paramCount(), hasLoaded,
-    false);
-  fillTextureCache(nodeBasedTextures, *currentTextures3dNoSamplerBlk,
-    currentTextures2dBlk->paramCount() + currentTextures3dBlk->paramCount() + currentTextures2dShdArrayBlk->paramCount() +
-      currentTextures2dNoSamplerBlk->paramCount(),
-    hasLoaded, false);
+    currentTextures2dBlk->paramCount() + currentTextures3dBlk->paramCount(), hasLoaded);
+  fillTextureCache(nodeBasedTexturesNoSampler, *currentTextures2dNoSamplerBlk, 0, hasLoaded);
+  fillTextureCache(nodeBasedTexturesNoSampler, *currentTextures3dNoSamplerBlk, currentTextures2dNoSamplerBlk->paramCount(), hasLoaded);
   fillBufferCache(*currentBuffersBlk, 0, hasLoaded);
 
   return hasLoaded;

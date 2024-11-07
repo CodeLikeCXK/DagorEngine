@@ -1,6 +1,0 @@
-include "fullTonemapLUT.dshl"
-
-shader compute_full_tonemap
-{
-  FULL_TONEMAP_COMPUTE()
-}

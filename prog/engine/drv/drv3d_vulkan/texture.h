@@ -1,22 +1,24 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
-
+#include "device.h"
 #include <util/dag_globDef.h>
-#include <drv/3d/dag_tex3d.h>
-#include <drv/3d/dag_driver.h>
 #include <generic/dag_smallTab.h>
+#include <3d/ddsxTex.h>
 #if _TARGET_PC_WIN
 #include <DXGIFormat.h>
 #endif
+#include "generic/dag_tabExt.h"
 #include <3d/tql.h>
 
-#include "image_resource.h"
-#include "async_completion_state.h"
-#include "globals.h"
-#include "translate_d3d_to_vk.h"
+namespace ddsx
+{
+struct Header;
+}
 
 namespace drv3d_vulkan
 {
+struct BaseTex;
+
+class ExecutionContext;
 
 struct BaseTex final : public BaseTexture
 {
@@ -28,6 +30,7 @@ struct BaseTex final : public BaseTexture
   struct D3DTextures
   {
     Image *image = nullptr;
+    Image *renderTarget3DEmul = nullptr;
     Buffer *stagingBuffer = nullptr;
     uint32_t memSize = 0;
     uint32_t realMipLevels = 0;
@@ -49,8 +52,17 @@ struct BaseTex final : public BaseTexture
   inline bool allowSrgbRead() const { return (cflg & TEXCF_SRGBREAD) != 0; }
 
   inline FormatStore getFormat() const { return tex.image ? tex.image->getFormat() : fmt; }
-  inline Image *getDeviceImage() const { return tex.image; }
-
+  inline Image *getDeviceImage(bool render_target) const
+  {
+    if (resType == RES3D_VOLTEX && tex.renderTarget3DEmul)
+    {
+      return render_target ? tex.renderTarget3DEmul : tex.image;
+    }
+    else
+    {
+      return tex.image;
+    }
+  }
   inline ImageViewState getViewInfoUAV(uint32_t mip, uint32_t layer, bool as_uint) const
   {
     ImageViewState result;
@@ -102,7 +114,6 @@ struct BaseTex final : public BaseTexture
     result.setMipBase(mip);
     result.setMipCount(1);
     result.isRenderTarget = 0;
-    result.isUAV = 1;
     return result;
   }
   inline ImageViewState getViewInfoRenderTarget(uint32_t mip, uint32_t layer) const
@@ -129,7 +140,6 @@ struct BaseTex final : public BaseTexture
     else
       result.setArrayCount(1);
     result.isRenderTarget = 1;
-    result.isUAV = 0;
     return result;
   }
   inline ImageViewState getViewInfo() const
@@ -243,7 +253,6 @@ struct BaseTex final : public BaseTexture
     imageViewCache.setArrayBase(0);
     imageViewCache.setArrayCount(getArrayCount());
     imageViewCache.isRenderTarget = 0;
-    imageViewCache.isUAV = 0;
 
     // rare changing field, keep it as cache and change on user api request
     imageViewCache.sampleStencil = false;
@@ -284,8 +293,12 @@ struct BaseTex final : public BaseTexture
     setInitialImageViewState();
   }
 
-  ~BaseTex() override { cleanupWaitEvent(); }
-  void cleanupWaitEvent();
+  ~BaseTex() override
+  {
+    Device &device = get_device();
+    if (waitEvent.isPending())
+      device.getContext().wait();
+  }
 
   /// ->>
   void setReadStencil(bool on) override
@@ -337,9 +350,11 @@ struct BaseTex final : public BaseTexture
     return 1;
   }
 
+  bool addDirtyRect(const RectInt &) override { return true; }
+
   int level_count() const override { return mipLevels; }
 
-  int texaddrImpl(int a) override
+  int texaddr(int a) override
   {
     SamplerState newSampler = samplerState;
     newSampler.setW(translate_texture_address_mode_to_vulkan(a));
@@ -349,7 +364,7 @@ struct BaseTex final : public BaseTexture
     return 1;
   }
 
-  int texaddruImpl(int a) override
+  int texaddru(int a) override
   {
     SamplerState newSampler = samplerState;
     newSampler.setU(translate_texture_address_mode_to_vulkan(a));
@@ -357,7 +372,7 @@ struct BaseTex final : public BaseTexture
     return 1;
   }
 
-  int texaddrvImpl(int a) override
+  int texaddrv(int a) override
   {
     SamplerState newSampler = samplerState;
     newSampler.setV(translate_texture_address_mode_to_vulkan(a));
@@ -365,7 +380,7 @@ struct BaseTex final : public BaseTexture
     return 1;
   }
 
-  int texaddrwImpl(int a) override
+  int texaddrw(int a) override
   {
     if (RES3D_VOLTEX == resType)
     {
@@ -377,7 +392,7 @@ struct BaseTex final : public BaseTexture
     return 0;
   }
 
-  int texbordercolorImpl(E3DCOLOR c) override
+  int texbordercolor(E3DCOLOR c) override
   {
     SamplerState newSampler = samplerState;
     newSampler.setBorder(remap_border_color(c, getFormat().isSampledAsFloat()));
@@ -385,7 +400,7 @@ struct BaseTex final : public BaseTexture
     return 1;
   }
 
-  int texfilterImpl(int m) override
+  int texfilter(int m) override
   {
     SamplerState newSampler = samplerState;
     newSampler.setFilter(translate_filter_type_to_vulkan(m));
@@ -394,7 +409,7 @@ struct BaseTex final : public BaseTexture
     return 1;
   }
 
-  int texmipmapImpl(int m) override
+  int texmipmap(int m) override
   {
     SamplerState newSampler = samplerState;
     newSampler.setMip(translate_mip_filter_type_to_vulkan(m));
@@ -402,7 +417,7 @@ struct BaseTex final : public BaseTexture
     return 1;
   }
 
-  int texlodImpl(float mipmaplod) override
+  int texlod(float mipmaplod) override
   {
     SamplerState newSampler = samplerState;
     newSampler.setBias(mipmaplod);
@@ -420,7 +435,7 @@ struct BaseTex final : public BaseTexture
     return 1;
   }
 
-  int setAnisotropyImpl(int level) override
+  int setAnisotropy(int level) override
   {
     SamplerState newSampler = samplerState;
     newSampler.setAniso(clamp<int>(level, 1, 16));
@@ -441,8 +456,6 @@ struct BaseTex final : public BaseTexture
   int update(BaseTexture *src) override;
   int updateSubRegion(BaseTexture *src, int src_subres_idx, int src_x, int src_y, int src_z, int src_w, int src_h, int src_d,
     int dest_subres_idx, int dest_x, int dest_y, int dest_z) override;
-  int updateSubRegionNoOrder(BaseTexture *src, int src_subres_idx, int src_x, int src_y, int src_z, int src_w, int src_h, int src_d,
-    int dest_subres_idx, int dest_x, int dest_y, int dest_z) override;
   int unlockimg() override;
   int lockbox(void **data, int &row_pitch, int &slice_pitch, int level, unsigned flags = TEXLOCK_DEFAULT) override;
   int unlockbox() override;
@@ -455,8 +468,8 @@ struct BaseTex final : public BaseTexture
 
   void copy(Image *dst);
   void resolve(Image *dst);
-  int updateSubRegionInternal(BaseTexture *src, int src_level, int src_x, int src_y, int src_z, int src_w, int src_h, int src_d,
-    int dest_level, int dest_x, int dest_y, int dest_z, bool unordered);
+  int updateSubRegionInternal(BaseTex *src, int src_level, int src_x, int src_y, int src_z, int src_w, int src_h, int src_d,
+    int dest_level, int dest_x, int dest_y, int dest_z);
 
   void destroyObject();
 
@@ -466,7 +479,15 @@ struct BaseTex final : public BaseTexture
     if (isStub())
       return;
     if (tex.image)
-      Globals::Dbg::naming.setTexName(tex.image, getResName());
+    {
+      get_device().setTexName(tex.image, getResName());
+    }
+    if (tex.renderTarget3DEmul)
+    {
+      String emulName(getResName());
+      emulName += "_3d_emulation_helper";
+      get_device().setTexName(tex.renderTarget3DEmul, emulName);
+    }
   }
 
   void setTexName(const char *name)
@@ -475,7 +496,7 @@ struct BaseTex final : public BaseTexture
     updateTexName();
   }
 
-  virtual void setResApiName(const char *name) const override { Globals::Dbg::naming.setTexName(tex.image, name); }
+  virtual void setResApiName(const char *name) const override { get_device().setTexName(tex.image, name); }
 
   bool allocateTex() override;
   void discardTex() override
@@ -493,9 +514,6 @@ struct BaseTex final : public BaseTexture
   void replaceTexResObject(BaseTexture *&other_tex) override;
 
   void blockingReadbackWait();
-
-  static Texture *wrapVKImage(VkImage tex_res, ResourceBarrier current_state, int width, int height, int layers, int mips,
-    const char *name, int flg);
 };
 
 static inline BaseTex *getbasetex(/*const*/ BaseTexture *t) { return t ? (BaseTex *)t : nullptr; }

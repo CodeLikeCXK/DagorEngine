@@ -1,6 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-#pragma once
-
 #include <EASTL/vector_map.h>
 
 namespace dafx_ex
@@ -19,11 +16,10 @@ enum
   RTAG_FOM = 9,
   RTAG_UNDERWATER = 10,
   RTAG_VOLFOG_INJECTION = 11,
-  RTAG_BVH = 12,
 };
 
 static const char *renderTags[] = {"lowres", "highres", "distortion", "transmittance", "thermal", "water_proj", "vol_thickness",
-  "vol_depth", "vol_wboit", "fom", "underwater", "volfog_injection", "bvh"};
+  "vol_depth", "vol_wboit", "fom", "underwater", "volfog_injection"};
 
 enum TransformType
 {
@@ -67,8 +63,6 @@ struct SystemInfo
     VAL_VELOCITY_ADD_MIN,
     VAL_VELOCITY_ADD_MAX,
     VAL_VELOCITY_ADD_VEC3,
-    VAL_GRAVITY_ZONE_TM,
-    VAL_VELOCITY_WIND_COEFF,
     VAL_LIGHT_POS,
     VAL_LIGHT_COLOR,
     VAL_LIGHT_RADIUS,

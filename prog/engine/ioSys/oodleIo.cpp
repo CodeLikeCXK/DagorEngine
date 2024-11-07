@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #if _TARGET_PC_WIN | _TARGET_SCARLETT
 #define OODLE_IMPORT_LIB 1
 #endif

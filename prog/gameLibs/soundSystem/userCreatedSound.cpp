@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <soundSystem/userCreatedSound.h>
 #include <fmod_studio.hpp>
 #include <osApiWrappers/dag_critSec.h>

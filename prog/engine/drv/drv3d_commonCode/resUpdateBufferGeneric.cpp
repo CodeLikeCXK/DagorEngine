@@ -1,9 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "resUpdateBufferGeneric.h"
-#include "drv_log_defs.h"
-#include <drv/3d/dag_texture.h>
-#include <drv/3d/dag_info.h>
+#include <3d/dag_drv3d.h>
 #include <debug/dag_debug.h>
 #include <debug/dag_assert.h>
 
@@ -64,7 +60,7 @@ rubgeneric::ResUpdateBuffer *rubgeneric::allocate_update_buffer_for_tex_region(B
     if (!ret || !dst)
     {
       if (!d3d::is_in_device_reset_now())
-        D3D_ERROR("failed to lock RUB.staging %dx%d,L%d cfg=0x%x %s", ti.w, ti.h, 1, ti.cflg, dest_base_texture->getTexName());
+        logerr("failed to lock RUB.staging %dx%d,L%d cfg=0x%x %s", ti.w, ti.h, 1, ti.cflg, dest_base_texture->getTexName());
       return nullptr;
     }
     dst += fmtInfo.bytesPerElement * offset_x / fmtInfo.elementWidth;
@@ -79,7 +75,7 @@ rubgeneric::ResUpdateBuffer *rubgeneric::allocate_update_buffer_for_tex_region(B
     {
       if (!d3d::is_in_device_reset_now())
       {
-        D3D_ERROR("failed to create RUB.staging %dx%d,L%d cfg=0x%x", ti.w, ti.h, 1, ti.cflg);
+        logerr("failed to create RUB.staging %dx%d,L%d cfg=0x%x", ti.w, ti.h, 1, ti.cflg);
       }
       return nullptr;
     }
@@ -90,7 +86,7 @@ rubgeneric::ResUpdateBuffer *rubgeneric::allocate_update_buffer_for_tex_region(B
     {
       if (!d3d::is_in_device_reset_now())
       {
-        D3D_ERROR("failed to lock RUB.staging %dx%d,L%d cfg=0x%x %s", ti.w, ti.h, 1, ti.cflg, dest_base_texture->getTexName());
+        logerr("failed to lock RUB.staging %dx%d,L%d cfg=0x%x %s", ti.w, ti.h, 1, ti.cflg, dest_base_texture->getTexName());
       }
       del_d3dres(stagingTex);
       return nullptr;
@@ -158,7 +154,7 @@ rubgeneric::ResUpdateBuffer *rubgeneric::allocate_update_buffer_for_tex(BaseText
     if (!ret || !dst)
     {
       if (!d3d::is_in_device_reset_now())
-        D3D_ERROR("failed to lock RUB.staging %dx%d,L%d cfg=0x%x %s", ti.w, ti.h, 1, ti.cflg, dest_tex->getTexName());
+        logerr("failed to lock RUB.staging %dx%d,L%d cfg=0x%x %s", ti.w, ti.h, 1, ti.cflg, dest_tex->getTexName());
       return nullptr;
     }
     if (RES3D_VOLTEX == dest_tex->restype())
@@ -173,7 +169,7 @@ rubgeneric::ResUpdateBuffer *rubgeneric::allocate_update_buffer_for_tex(BaseText
     if (!staging_tex)
     {
       if (!d3d::is_in_device_reset_now())
-        D3D_ERROR("failed to create RUB.staging %dx%d,L%d cfg=0x%x", ti.w, ti.h, 1, ti.cflg);
+        logerr("failed to create RUB.staging %dx%d,L%d cfg=0x%x", ti.w, ti.h, 1, ti.cflg);
       return nullptr;
     }
     staging_tex->allocateTex();
@@ -182,7 +178,7 @@ rubgeneric::ResUpdateBuffer *rubgeneric::allocate_update_buffer_for_tex(BaseText
         (!voltex && (!staging_tex->lockimg((void **)&dst, dst_pitch, 0, TEXLOCK_WRITE) || !dst)))
     {
       if (!d3d::is_in_device_reset_now())
-        D3D_ERROR("failed to lock RUB.staging %dx%d,L%d cfg=0x%x %s", ti.w, ti.h, 1, ti.cflg, dest_tex->getTexName());
+        logerr("failed to lock RUB.staging %dx%d,L%d cfg=0x%x %s", ti.w, ti.h, 1, ti.cflg, dest_tex->getTexName());
       del_d3dres(staging_tex);
       return nullptr;
     }
@@ -216,7 +212,7 @@ static void unlock_update_buffer(rubgeneric::ResUpdateBuffer *rub)
   bool voltex = (rub->staging->restype() == RES3D_VOLTEX);
   if ((voltex && !rub->staging->unlockbox()) || (!voltex && !rub->staging->unlockimg()))
     if (!d3d::is_in_device_reset_now())
-      D3D_ERROR("failed to unlock RUB.staging");
+      logerr("failed to unlock RUB.staging");
   rub->ptr = nullptr;
   rub->size = 0;
 }
@@ -259,7 +255,7 @@ bool rubgeneric::update_texture_and_release_update_buffer(ResUpdateBuffer *&src_
     if (!dest->updateSubRegion(/*src*/ src_rub->staging, 0, 0, 0, 0, /*size*/ src_rub->w, src_rub->h, src_rub->d,
           /*dest*/ dest->calcSubResIdx(dest_mip, dest_slice), src_rub->x, src_rub->y, src_rub->z))
       if (!d3d::is_in_device_reset_now())
-        D3D_ERROR("%s: updateSubRegion(%dx%d) -> %d:%d failed", dest->getTexName(), src_rub->w, src_rub->h, dest_mip, dest_slice);
+        logerr("%s: updateSubRegion(%dx%d) -> %d:%d failed", dest->getTexName(), src_rub->w, src_rub->h, dest_mip, dest_slice);
   }
   release_update_buffer(src_rub);
   return true;

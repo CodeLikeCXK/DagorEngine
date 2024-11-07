@@ -1,15 +1,13 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "include_dinput.h"
 #include "joy_device.h"
 #include "joy_ff_effects.h"
-#include <drv/hid/dag_hiDInput.h>
-#include <drv/hid/dag_hiGlobals.h>
+#include <humanInput/dag_hiDInput.h>
+#include <humanInput/dag_hiGlobals.h>
 #include <perfMon/dag_cpuFreq.h>
 #include <math/dag_mathBase.h>
 #include <debug/dag_debug.h>
 #include <debug/dag_log.h>
-#include <drv/hid/dag_hiXInputMappings.h>
+#include <humanInput/dag_hiXInputMappings.h>
 #include <perfmon/dag_autofuncprof.h>
 #include <stdio.h>
 
@@ -37,7 +35,7 @@ Di8JoystickDevice::Di8JoystickDevice(IDirectInputDevice8 *dev, bool must_poll, b
   memset(&state, 0, sizeof(state));
   decodeData = NULL;
   if (!quiet)
-    DEBUG_CTX("added joystick: dev=%p mustPoll=%d", device, mustPoll);
+    debug_ctx("added joystick: dev=%p mustPoll=%d", device, mustPoll);
 }
 
 static void safe_release_device(IDirectInputDevice8 *dev)
@@ -102,7 +100,7 @@ void Di8JoystickDevice::setDeviceName(const char *nm)
     else
       break;
   name.resize(strlen(name) + 1);
-  DEBUG_CTX("joy device name: <%s>", (char *)name);
+  debug_ctx("joy device name: <%s>", (char *)name);
 }
 
 
@@ -153,7 +151,7 @@ void Di8JoystickDevice::addAxis(AxisType axis_type, int di_type, const char *axi
     default: axes[l].valStorage = NULL;
   }
 
-  DEBUG_CTX("add axis: %d, <%s>", (int)axis_type, axis_name);
+  debug_ctx("add axis: %d, <%s>", (int)axis_type, axis_name);
 }
 
 
@@ -163,11 +161,11 @@ void Di8JoystickDevice::addButton(const char *button_name)
     return;
   if (buttons.size() >= MAX_BUTTONS)
   {
-    DEBUG_CTX("buttons maximum (%d) is already reached; button <%s> skipped", MAX_BUTTONS, button_name);
+    debug_ctx("buttons maximum (%d) is already reached; button <%s> skipped", MAX_BUTTONS, button_name);
     return;
   }
   buttons.push_back(String(button_name));
-  DEBUG_CTX("add button: <%s>", button_name);
+  debug_ctx("add button: <%s>", button_name);
 }
 
 
@@ -177,7 +175,7 @@ void Di8JoystickDevice::addPovHat(const char *hat_name)
     return;
   if (povHats.size() >= JoystickRawState::MAX_POV_HATS)
   {
-    LOGERR_CTX("maximum joystick pov hats count (%d) reached, hat <%s> skipped", JoystickRawState::MAX_POV_HATS, hat_name);
+    logerr_ctx("maximum joystick pov hats count (%d) reached, hat <%s> skipped", JoystickRawState::MAX_POV_HATS, hat_name);
     return;
   }
   PovHatData &phd = povHats.push_back();
@@ -218,7 +216,7 @@ bool Di8JoystickDevice::processAxes(JoyCookedCreateParams &dest, const JoyFfCrea
   int i;
   if (src.axisNum < 1 || src.axisNum > 3)
   {
-    DEBUG_CTX("invalid axis num: %d", src.axisNum);
+    debug_ctx("invalid axis num: %d", src.axisNum);
     return false;
   }
 
@@ -239,14 +237,14 @@ bool Di8JoystickDevice::processAxes(JoyCookedCreateParams &dest, const JoyFfCrea
       for (i = 0; i < src.axisNum; i++)
         dest.dir[i] = src.dir[i] * 180 / PI * DI_DEGREES;
       break;
-    default: DEBUG_CTX("invalid coord type: %d", src.coordType); return false;
+    default: debug_ctx("invalid coord type: %d", src.coordType); return false;
   }
   dest.axisNum = src.axisNum;
 
   for (i = 0; i < src.axisNum; i++)
     if (src.axisId[i] >= axes.size())
     {
-      DEBUG_CTX("invalid axisId[%d]=%d", i, src.axisId[i]);
+      debug_ctx("invalid axisId[%d]=%d", i, src.axisId[i]);
       return false;
     }
     else
@@ -339,7 +337,8 @@ void Di8JoystickDevice::acquire()
       return;
     if (FAILED(hr))
     {
-      // HumanInput::printHResult(__FILE__, __LINE__, "Acquire", hr);
+      // mt_debug_ctx_("Acquire = %X ", hr);
+      // HumanInput::printHResult ( hr );
       return;
     }
 
@@ -348,7 +347,7 @@ void Di8JoystickDevice::acquire()
     const int max_times_to_show_this_debug = 50;
 
     if ((++timesReacquired < max_times_to_show_this_debug) || !(timesReacquired % max_times_to_show_this_debug))
-      DEBUG_CTX("reacqired device %p, restoring effects", this);
+      mt_debug_ctx("reacqired device %p, restoring effects", this);
     for (int i = fxList.size() - 1; i >= 0; i--)
       if (fxList[i])
         fxList[i]->restore();
@@ -409,7 +408,7 @@ bool Di8JoystickDevice::updateState(int dt_msec, bool def)
     }
 
     // record event
-    // DEBUG_CTX("event recv");
+    // mt_debug_ctx ( "event recv" );
 
     static constexpr int DATA_SZ = 14 * sizeof(int);
     char prev_state[DATA_SZ];
@@ -532,8 +531,8 @@ bool Di8JoystickDevice::updateState(int dt_msec, bool def)
 
     if (client && changed)
       client->stateChanged(this, ordId);
-    // DEBUG_CTX("%d, %d, %d  %d, %d, %d, %d, %d",
-    //   state.x, state.y, state.z, state.rx, state.ry, state.rz, state.slider[0], state.slider[1]);
+    // mt_debug_ctx ( "%d, %d, %d  %d, %d, %d, %d, %d", state.x, state.y, state.z, state.rx, state.ry, state.rz, state.slider[0],
+    // state.slider[1] );
   }
 
   return changed && !state.buttons.cmpEq(state.buttonsPrev);
@@ -637,8 +636,8 @@ float Di8JoystickDevice::getAxisPos(int axis_id) const
   const int ac = axes.size();
   if (axis_id >= 0 && axis_id < ac)
   {
-    // DEBUG_CTX("axis %d: %d -> %.5f",
-    //   axis_id, axes[axis_id].valStorage[0], axes[axis_id].v0 + axes[axis_id].dv * axes[axis_id].valStorage[0]);
+    // debug_ctx ( "axis %d: %d -> %.5f", axis_id, axes[axis_id].valStorage[0], axes[axis_id].v0 + axes[axis_id].dv *
+    // axes[axis_id].valStorage[0] );
     return axes[axis_id].v0 + axes[axis_id].dv * axes[axis_id].valStorage[0];
   }
   if (axis_id >= ac && axis_id < ac + 2 * povHats.size())

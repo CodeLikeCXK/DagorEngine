@@ -1,7 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "linkShaders.h"
-#include "gitRunner.h"
 #include "loadShaders.h"
 
 #include "globVar.h"
@@ -30,13 +27,12 @@
 #include "shCompiler.h"
 #include "sha1_cache_version.h"
 #include "hashed_cache.h"
-#include "cppStcode.h"
 
 #include <debug/dag_debug.h>
-#include <drv/3d/dag_renderStates.h>
+#include <3d/dag_renderStates.h>
 
 #if _CROSS_TARGET_SPIRV
-#include <drv/shadersMetaData/spirv/compiled_meta_data.h>
+#include <spirv/compiled_meta_data.h>
 #endif
 
 #if _CROSS_TARGET_DX12
@@ -262,8 +258,8 @@ int add_vprog(dag::ConstSpan<unsigned> vs, dag::ConstSpan<unsigned> hs, dag::Con
 extern int hlslOptimizationLevel;
 extern bool hlslSkipValidation;
 extern bool hlsl2021;
+extern bool enableFp16;
 extern DebugLevel hlslDebugLevel;
-extern bool hlslEmbedSource;
 static bool is_hlsl_debug() { return hlslDebugLevel != DebugLevel::NONE; }
 extern char *sha1_cache_dir;
 
@@ -273,7 +269,7 @@ extern char *sha1_cache_dir;
 #define REPORT(...)
 #endif
 VertexProgramAndPixelShaderIdents add_phase_one_progs(dag::ConstSpan<unsigned> vs, dag::ConstSpan<unsigned> hs,
-  dag::ConstSpan<unsigned> ds, dag::ConstSpan<unsigned> gs, dag::ConstSpan<unsigned> ps, bool enable_fp16)
+  dag::ConstSpan<unsigned> ds, dag::ConstSpan<unsigned> gs, dag::ConstSpan<unsigned> ps)
 {
   VertexProgramAndPixelShaderIdents result{-1, -1};
   auto vShaderData = make_span(vs).subspan(vs.size() ? 1 : 0);
@@ -310,7 +306,7 @@ VertexProgramAndPixelShaderIdents add_phase_one_progs(dag::ConstSpan<unsigned> v
   compileOptions.debugInfo = is_hlsl_debug();
   compileOptions.scarlettW32 = useScarlettWave32;
   compileOptions.hlsl2021 = hlsl2021;
-  compileOptions.enableFp16 = enable_fp16;
+  compileOptions.enableFp16 = enableFp16;
   if (-1 == result.vprog)
   {
     auto packed = dx12::dxil::combinePhaseOneVertexProgram(vShaderData, hShaderData, dShaderData, gShaderData, rootSignatureDefinition,
@@ -332,7 +328,7 @@ VertexProgramAndPixelShaderIdents add_phase_one_progs(dag::ConstSpan<unsigned> v
   return result;
 }
 
-struct RecompileJobBase : shc::Job
+struct RecompileJobBase : public cpujobs::IJob
 {
   struct MappingFileLayout
   {
@@ -486,7 +482,7 @@ struct RecompileVPRogJob : RecompileJobBase
 {
   using RecompileJobBase::RecompileJobBase;
 
-  void doJobBody() override
+  void doJob() override
   {
     static const char cache_name[] = "vp";
     bool writeCache = false;
@@ -494,8 +490,8 @@ struct RecompileVPRogJob : RecompileJobBase
     if (!recompiledVProgBlob)
     {
       writeCache = true;
-      auto recompiledVProg = dx12::dxil::recompileVertexProgram(shaders_vpr[compileTarget], targetPlatform, dx12_pdb_cache_dir,
-        hlslDebugLevel, hlslEmbedSource);
+      auto recompiledVProg =
+        dx12::dxil::recompileVertexProgram(shaders_vpr[compileTarget], targetPlatform, dx12_pdb_cache_dir, hlslDebugLevel);
       if (!recompiledVProg)
       {
         DAG_FATAL("Recompilation of vprog failed");
@@ -523,14 +519,14 @@ struct RecompileVPRogJob : RecompileJobBase
       }
     }
   }
-  void releaseJobBody() {}
+  void releaseJob() override {}
 };
 
 struct RecompilePShJob : RecompileJobBase
 {
   using RecompileJobBase::RecompileJobBase;
 
-  void doJobBody() override
+  void doJob() override
   {
     static const char cache_name[] = "fs";
     bool writeCache = false;
@@ -538,8 +534,8 @@ struct RecompilePShJob : RecompileJobBase
     if (!recompiledFShBlob)
     {
       writeCache = true;
-      auto recompiledFSh = dx12::dxil::recompilePixelSader(shaders_fsh[compileTarget], targetPlatform, dx12_pdb_cache_dir,
-        hlslDebugLevel, hlslEmbedSource);
+      auto recompiledFSh =
+        dx12::dxil::recompilePixelSader(shaders_fsh[compileTarget], targetPlatform, dx12_pdb_cache_dir, hlslDebugLevel);
       if (!recompiledFSh)
       {
         DAG_FATAL("Recompilation of fsh failed");
@@ -567,7 +563,7 @@ struct RecompilePShJob : RecompileJobBase
       }
     }
   }
-  void releaseJobBody() override {}
+  void releaseJob() override {}
 };
 
 struct IndexReplacmentInfo
@@ -703,7 +699,7 @@ void dedup_shaders()
 
 void recompile_shaders()
 {
-  if (shc::is_multithreaded())
+  if (shc::compileJobsCount > 1)
   {
     eastl::vector<RecompileVPRogJob> vprogRecompileJobList;
     eastl::vector<RecompilePShJob> fshRecompileJobList;
@@ -738,25 +734,54 @@ void recompile_shaders()
       }
     }
 
+    // we submit work in batches on N per thread, we start with 6
+    int jobload_per_worker = 6;
     size_t issueCount = 0;
     while (issueCount < allJobs.size())
-      shc::add_job(allJobs[issueCount++], shc::JobMgrChoiceStrategy::LEAST_BUSY_COOPERATIVE);
+    {
+      // as less work is left to be submitted, we reduce the number of items we submit per batch
+      auto workLeft = allJobs.size();
+      if (workLeft < jobload_per_worker * 4)
+        jobload_per_worker = 2;
+      if (workLeft < jobload_per_worker * 2)
+        jobload_per_worker = 1;
 
-    shc::await_all_jobs();
+      // check all workers and if anyone is idle, give it the next batch of work
+      for (int worker = 0; worker < shc::compileJobsCount; ++worker)
+      {
+        if (!cpujobs::is_job_manager_busy(shc::compileJobsMgrBase + worker))
+        {
+          for (int job = 0; job < jobload_per_worker && issueCount < allJobs.size(); ++job)
+          {
+            cpujobs::add_job(shc::compileJobsMgrBase + worker, allJobs[issueCount++]);
+          }
+        }
+      }
+      // do one job if jobs are available, we submitted more than one job per worker or its the last job
+      if (issueCount < allJobs.size() && ((jobload_per_worker > 1) || ((allJobs.size() - issueCount) == 1)))
+      {
+        allJobs[issueCount++]->doJob();
+      }
+    }
+    // wit for everyone to finish
+    for (int i = 0; i < shc::compileJobsCount; i++)
+    {
+      while (cpujobs::is_job_manager_busy(shc::compileJobsMgrBase + i))
+      {
+        sleep_msec(10);
+      }
+    }
+    cpujobs::release_done_jobs();
   }
   else
   {
     for (size_t i = 0; i < shaders_vpr.size(); ++i)
     {
-      RecompileVPRogJob job{i};
-      job.doJob();
-      job.releaseJob();
+      RecompileVPRogJob{i}.doJob();
     }
     for (size_t i = 0; i < shaders_fsh.size(); ++i)
     {
-      RecompilePShJob job{i};
-      job.doJob();
-      job.releaseJob();
+      RecompilePShJob{i}.doJob();
     }
   }
 
@@ -764,19 +789,19 @@ void recompile_shaders()
 }
 #endif
 
-StcodeAddResult add_stcode(dag::ConstSpan<int> code)
+int add_stcode(dag::ConstSpan<int> code)
 {
   if (!code.size())
-    return StcodeAddResult{-1, false};
+    return -1;
 
   for (int i = shaders_stcode.size() - 1; i >= 0; i--)
     if (shaders_stcode[i].size() == code.size() && mem_eq(code, shaders_stcode[i].data()))
-      return StcodeAddResult{i, false};
+      return i;
 
   int i = append_items(shaders_stcode, 1);
   shaders_stcode[i].Tab<int>::operator=(code);
   shaders_stcode[i].shrink_to_fit();
-  return StcodeAddResult{i, true};
+  return i;
 }
 
 static int add_render_state(const shaders::RenderState &rs)
@@ -817,8 +842,6 @@ int add_render_state(const ShaderSemCode::Pass &state)
       rs.blendParams[i].sepablendFactors.dst = state.blend_adst[i];
       rs.blendParams[i].ablend = state.blend_src[i] >= 0 && state.blend_dst[i] >= 0 ? 1 : 0;
       rs.blendParams[i].sepablend = state.blend_asrc[i] >= 0 && state.blend_adst[i] >= 0 ? 1 : 0;
-      rs.blendParams[i].blendOp = state.blend_op[i];
-      rs.blendParams[i].sepablendOp = state.blend_aop[i];
     }
   }
   else
@@ -935,8 +958,7 @@ bool load_shaders_bindump(ShadersBindump &shaders, bindump::IReader &full_file_r
   return true;
 }
 
-bool link_scripted_shaders(const uint8_t *mapped_data, int data_size, const char *filename, const char *source_name,
-  StcodeInterface &stcode_interface)
+bool link_scripted_shaders(const uint8_t *mapped_data, int data_size, const char *filename)
 {
   ShadersBindump shaders;
   bindump::MemoryReader compressed_reader(mapped_data, data_size);
@@ -964,7 +986,7 @@ bool link_scripted_shaders(const uint8_t *mapped_data, int data_size, const char
   ShaderGlobal::link(shaders.variable_list, shaders.intervals, global_var_link_table, interval_link_table);
 
   Tab<int> smp_link_table;
-  g_sampler_table.link(shaders.static_samplers, smp_link_table);
+  Sampler::link(shaders.static_samplers, smp_link_table);
 
   // Link stcode, stblkcode.
   Tab<int> stcode_lnktbl(tmpmem);
@@ -972,10 +994,7 @@ bool link_scripted_shaders(const uint8_t *mapped_data, int data_size, const char
   for (int i = 0; i < shaderStcodeFromFile.size(); i++)
   {
     bindumphlp::patchStCode(make_span(shaderStcodeFromFile[i]), global_var_link_table, smp_link_table);
-    auto [id, isNew] = add_stcode(shaderStcodeFromFile[i]);
-    stcode_lnktbl[i] = id;
-    if (isNew)
-      stcode_interface.addRoutine(stcode_lnktbl[i], i, source_name);
+    stcode_lnktbl[i] = add_stcode(shaderStcodeFromFile[i]);
   }
 
   // Link blocks
@@ -1113,7 +1132,7 @@ void save_scripted_shaders(const char *filename, dag::ConstSpan<SimpleString> fi
     compressed.dependency_files.emplace_back(files[i].c_str());
 
   shaders.variable_list = eastl::move(ShaderGlobal::getMutableVariableList());
-  shaders.static_samplers = g_sampler_table.releaseSamplers();
+  shaders.static_samplers = eastl::move(g_samplers);
   shaders.intervals = eastl::move(ShaderGlobal::getMutableIntervalList());
   shaders.empty_block = eastl::move(ShaderStateBlock::getEmptyBlock());
   shaders.state_blocks = eastl::move(ShaderStateBlock::getBlocks());
@@ -1121,7 +1140,6 @@ void save_scripted_shaders(const char *filename, dag::ConstSpan<SimpleString> fi
   shaders.render_states = eastl::move(render_states);
   shaders.shaders_stcode = eastl::move(shaders_stcode);
 
-  g_sampler_table = SamplerTable{};
   // save FSH
   for (int i = 0; i < shaders_fsh.size(); i++)
   {
@@ -1144,12 +1162,8 @@ void save_scripted_shaders(const char *filename, dag::ConstSpan<SimpleString> fi
     compressed.compressed_shaders.resize(zstd_compress_bound(mem_writer.mData.size()));
     size_t compressed_size = zstd_compress(compressed.compressed_shaders.data(), compressed.compressed_shaders.size(),
       mem_writer.mData.data(), mem_writer.mData.size(), 9);
-
-    extern bool autotest_mode;
-    const size_t maxCompressedSize = autotest_mode ? 0x40000000 : 0x20000000;
-
-    G_ASSERTF(compressed_size <= maxCompressedSize, "zstd_compress() returns %d (0x%x), srcDataSz=%u destBufSz=%u",
-      (ptrdiff_t)compressed_size, compressed_size, mem_writer.mData.size(), compressed.compressed_shaders.size());
+    G_ASSERTF(compressed_size < 0x20000000, "zstd_compress() returns %d (0x%x), srcDataSz=%u destBufSz=%u", (ptrdiff_t)compressed_size,
+      compressed_size, mem_writer.mData.size(), compressed.compressed_shaders.size());
 
     compressed.compressed_shaders.resize(compressed_size);
     compressed.decompressed_size = mem_writer.mData.size();
@@ -1162,22 +1176,4 @@ void save_scripted_shaders(const char *filename, dag::ConstSpan<SimpleString> fi
   }
 
   bindump::writeToFileFast(compressed, filename);
-
-  save_compiled_cpp_stcode(eastl::move(g_cppstcode));
-}
-
-void update_shaders_timestamps(dag::ConstSpan<SimpleString> dependencies)
-{
-  // Shader class timestamp feature is only used for DX12
-#if _CROSS_TARGET_DX12
-  int64_t mostRecentTimestamp = 0;
-
-  if (use_git_timestamps)
-    mostRecentTimestamp = get_git_files_last_commit_timestamp(dependencies);
-#else
-  G_UNUSED(dependencies);
-  int64_t mostRecentTimestamp = 0;
-#endif
-  for (int i = 0; i < shader_class.size(); ++i)
-    shader_class[i]->timestamp = mostRecentTimestamp;
 }

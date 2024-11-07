@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "cookies.h"
 
 #include "../enableEndpoint.h"

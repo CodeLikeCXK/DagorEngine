@@ -1,14 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <render/shaderCacheWarmup/shaderCacheWarmup.h>
 
-#include <drv/3d/dag_renderTarget.h>
-#include <drv/3d/dag_shader.h>
-#include <drv/3d/dag_texture.h>
-#include <drv/3d/dag_driver.h>
-#include <drv/3d/dag_lock.h>
-#include <drv/3d/dag_commands.h>
-#include <drv/3d/dag_vertexIndexBuffer.h>
+#include <3d/dag_drv3d.h>
+#include <3d/dag_drv3dCmd.h>
 #include <3d/dag_texMgr.h>
 #include <generic/dag_tab.h>
 #include <math/dag_Point3.h>
@@ -138,23 +131,27 @@ static void restore_on_swap_cb()
 class DynamicD3DFlusher
 {
 public:
-  ~DynamicD3DFlusher() { releaseGPU(); }
+  ~DynamicD3DFlusher()
+  {
+    if (gpuLocked)
+    {
+      if (compiledPipelinesCount > 0)
+        flushCommands();
+      else
+        unlockGpu();
+    }
+  }
 
-  bool isGPUAcquired() { return gpuLocked; }
-
-  bool afterPipelineCreation()
+  void afterPipelineCreation()
   {
     G_ASSERT(gpuLocked);
 
     compiledPipelinesCount += 1;
-    size_t queued = d3d::driver_command(Drv3dCommand::GET_PIPELINE_COMPILATION_QUEUE_LENGTH);
-    perPipeFlush = compiledPipelinesCount == flushEveryNPipelines;
-    perQueueFlush = queued >= (flushEveryNPipelines * 2);
-    return perPipeFlush || perQueueFlush;
-  }
+    size_t queued = d3d::driver_command(DRV3D_COMMAND_GET_PIPELINE_COMPILATION_QUEUE_LENGTH, nullptr, nullptr, nullptr);
+    bool perPipeFlush = compiledPipelinesCount == flushEveryNPipelines;
+    bool perQueueFlush = queued >= (flushEveryNPipelines * 2);
+    bool doFlush = perPipeFlush | perQueueFlush;
 
-  void afterPipelineCreationFlush()
-  {
     int64_t timeus = 0;
 // detailed profiling
 #if 0
@@ -169,7 +166,8 @@ public:
       timeus = flushCommands();
     }
 #else
-    timeus = flushCommands();
+    if (doFlush)
+      timeus = flushCommands();
 #endif
 
     if (perPipeFlush)
@@ -180,34 +178,21 @@ public:
         flushEveryNPipelines = (flushEveryNPipelines > 2) ? flushEveryNPipelines - 2 : 1;
     }
 
-    int timems = timeus / 1000;
-    if (timems > maxFlushPeriodMs)
-      maxFlushPeriodMs = timems;
-    compiledPipelinesCount = 0;
+    if (doFlush)
+    {
+      int timems = timeus / 1000;
+      if (timems > maxFlushPeriodMs)
+        maxFlushPeriodMs = timems;
+      compiledPipelinesCount = 0;
+    }
   }
 
   bool acquireGpu()
   {
     if (!gpuLocked)
     {
-      d3d::driver_command(Drv3dCommand::ACQUIRE_OWNERSHIP);
-      d3d::driver_command(Drv3dCommand::SET_PIPELINE_COMPILATION_TIME_BUDGET);
-
+      d3d::driver_command(DRV3D_COMMAND_ACQUIRE_OWNERSHIP, NULL, NULL, NULL);
       gpuLocked = true;
-
-      return true;
-    }
-    return false;
-  }
-
-  bool releaseGPU()
-  {
-    if (gpuLocked)
-    {
-      if (compiledPipelinesCount > 0)
-        flushCommands();
-      else
-        unlockGpu();
 
       return true;
     }
@@ -223,8 +208,6 @@ private:
       int64_t timeus = profile_ref_ticks();
       interlocked_release_store(was_present, NOT_PRESENTED);
       unlockGpu();
-      if (perQueueFlush)
-        spin_wait([&] { return d3d::driver_command(Drv3dCommand::GET_PIPELINE_COMPILATION_QUEUE_LENGTH) > flushEveryNPipelines; });
       spin_wait([&] { return interlocked_relaxed_load(was_present) <= PRESENTED_ENOUGH; });
       timeus = profile_time_usec(timeus);
       return timeus;
@@ -232,7 +215,7 @@ private:
     else
     {
       int64_t timeus = profile_ref_ticks();
-      d3d::driver_command(Drv3dCommand::D3D_FLUSH, (void *)"shaders warmup");
+      d3d::driver_command(DRV3D_COMMAND_D3D_FLUSH, (void *)"shaders warmup", NULL, NULL);
       unlockGpu();
       watchdog_kick();
       timeus = profile_time_usec(timeus);
@@ -247,15 +230,12 @@ private:
     if (gpuLocked)
     {
       gpuLocked = false;
-      d3d::driver_command(Drv3dCommand::SET_PIPELINE_COMPILATION_TIME_BUDGET, (void *)-1);
-      d3d::driver_command(Drv3dCommand::RELEASE_OWNERSHIP);
+      d3d::driver_command(DRV3D_COMMAND_RELEASE_OWNERSHIP, NULL, NULL, NULL);
     }
   }
 
 private:
   bool gpuLocked = false;
-  bool perPipeFlush = false;
-  bool perQueueFlush = false;
   size_t compiledPipelinesCount = 0;
 };
 
@@ -265,21 +245,10 @@ public:
   using InvalidIntervalsSet = ska::flat_hash_map<uint16_t, uint64_t>; // [intervalId, normalizedValuesMask]
   ShadersWarmup(DynamicD3DFlusher &flusher, InvalidIntervalsSet &intervals) : d3dFlusher(flusher), invalidIntervals(intervals) {}
 
-  ~ShadersWarmup()
-  {
-    // ScriptedShaderElement cleanups state on destruction, must be done under GPU lock
-    d3d::GpuAutoLock gpuLock;
-    elements.clear();
-  }
-
   void warmupShaders(const eastl::vector<const shaderbindump::ShaderClass *> &shader_classes)
   {
     for (const auto &shaderClass : shader_classes)
       warmup(*shaderClass);
-
-    if (d3dFlusher.isGPUAcquired())
-      onGpuReleased();
-    d3dFlusher.releaseGPU();
   }
 
 private:
@@ -294,10 +263,7 @@ private:
   virtual bool isValidShader(const int vpr, const int fsh) const = 0;
   virtual void onStaticVariant(ScriptedShaderElement &el) = 0;
   virtual void onDynamicVariant(const shaderbindump::ShaderCode::Pass &variant, const size_t variant_id,
-    const ScriptedShaderElement &el) = 0;
-
-  virtual void onGpuAcquired() = 0;
-  virtual void onGpuReleased() = 0;
+    const ScriptedShaderElement &el, bool gpuWasAcquired) = 0;
 
   void enumerateVariants(const shaderbindump::VariantTable &vt, int code_num, eastl::bitvector<> &usedVariants)
   {
@@ -342,7 +308,7 @@ private:
   void warmup(const shaderbindump::ShaderClass &shaderClass)
   {
     TIME_PROFILE_NAME(warmup_iter, shaderClass.name.data());
-    debug("shaders warmup: [shader class: %s, %d static variants]", shaderClass.name.data(), shaderClass.code.size());
+    debug("shaders warmup: [graphics shader class: %s, %d static variants]", shaderClass.name.data(), shaderClass.code.size());
 
     ScriptedShaderMaterial *ssm = initMaterial(shaderClass);
     if (!ssm)
@@ -404,16 +370,9 @@ private:
   {
     if (isValidShader(variantPasses.rpass->vprId, variantPasses.rpass->fshId))
     {
-      if (d3dFlusher.acquireGpu())
-        onGpuAcquired();
-
-      onDynamicVariant(variantPasses, variantId, el);
-
-      if (d3dFlusher.afterPipelineCreation())
-      {
-        onGpuReleased();
-        d3dFlusher.afterPipelineCreationFlush();
-      }
+      bool gpuAcquired = d3dFlusher.acquireGpu();
+      onDynamicVariant(variantPasses, variantId, el, gpuAcquired);
+      d3dFlusher.afterPipelineCreation();
 
       return true;
     }
@@ -457,11 +416,21 @@ private:
 
   virtual void onStaticVariant(ScriptedShaderElement &el) override { el.preCreateStateBlocks(); }
 
-  virtual void onDynamicVariant(const shaderbindump::ShaderCode::Pass &, const size_t variant_id,
-    const ScriptedShaderElement &el) override
+  virtual void onDynamicVariant(const shaderbindump::ShaderCode::Pass &, const size_t variant_id, const ScriptedShaderElement &el,
+    bool gpuWasAcquired) override
   {
     const int variantStateIndex = el.passes[variant_id].id.v;
     const ShaderStateBlock *variantState = ShaderStateBlock::blocks.at(variantStateIndex);
+
+    if (gpuWasAcquired)
+    {
+      d3d::set_render_target();
+      if (colorTarget)
+        d3d::set_render_target(colorTarget, 0);
+      if (depthTarget)
+        d3d::set_depth(depthTarget, DepthAccess::RW);
+      d3d::clearview(CLEAR_TARGET | CLEAR_ZBUFFER | CLEAR_STENCIL, 0, 0.f, 0);
+    }
 
     d3d::set_program(el.passes[variant_id].id.pr);
     if (variantState)
@@ -469,26 +438,8 @@ private:
 
     const uintptr_t pipelineType = STAGE_PS;
     const uintptr_t topology = PRIM_TRILIST;
-    d3d::driver_command(Drv3dCommand::COMPILE_PIPELINE, (void *)pipelineType, (void *)topology);
+    d3d::driver_command(DRV3D_COMMAND_COMPILE_PIPELINE, (void *)pipelineType, (void *)topology, nullptr);
   }
-
-  virtual void onGpuAcquired() override
-  {
-    d3d_get_render_target(prevRT);
-
-    d3d::set_render_target();
-    if (colorTarget)
-      d3d::set_render_target(colorTarget, 0);
-    if (depthTarget)
-      d3d::set_depth(depthTarget, DepthAccess::RW);
-    d3d::clearview(CLEAR_TARGET | CLEAR_ZBUFFER | CLEAR_STENCIL, 0, 0.f, 0);
-
-    // clear vertex stream binds to avoid random incompatibility with pipelines
-    d3d::setvsrc(0, nullptr, 0);
-    d3d::setvsrc(1, nullptr, 0);
-  }
-
-  virtual void onGpuReleased() override { d3d_set_render_target(prevRT); }
 
   virtual bool isValidShader(const int vpr, const int fsh) const override
   {
@@ -501,7 +452,6 @@ private:
   const ScriptedShadersBinDump *sbd = nullptr;
   BaseTexture *colorTarget = nullptr;
   BaseTexture *depthTarget = nullptr;
-  Driver3dRenderTarget prevRT;
 
   TEXTUREID texBlobId = BAD_TEXTUREID;
 };
@@ -521,22 +471,13 @@ private:
 
   virtual void onStaticVariant(ScriptedShaderElement &) override {}
 
-  virtual void onDynamicVariant(const shaderbindump::ShaderCode::Pass &variant, const size_t, const ScriptedShaderElement &el)
+  virtual void onDynamicVariant(const shaderbindump::ShaderCode::Pass &variant, const size_t, const ScriptedShaderElement &el, bool)
   {
     const PROGRAM program = el.getComputeProgram(&variant.rpass.get());
 
     d3d::set_program(program);
     const uintptr_t pipelineType = STAGE_CS;
-    d3d::driver_command(Drv3dCommand::COMPILE_PIPELINE, (void *)pipelineType);
-  }
-
-  virtual void onGpuAcquired() override
-  {
-    // do nothing
-  }
-  virtual void onGpuReleased() override
-  {
-    // do nothing
+    d3d::driver_command(DRV3D_COMMAND_COMPILE_PIPELINE, (void *)pipelineType, nullptr, nullptr);
   }
 
   virtual bool isValidShader(const int vpr, const int fsh) const override
@@ -557,7 +498,7 @@ void shadercache::warmup_shaders(const Tab<const char *> &graphics_shader_names,
 
   compileTimeLimit =
     MS(::dgs_get_settings()->getBlockByNameEx("shadersWarmup")->getInt("compileTimeLimitMs", COMPILE_TIME_LIMIT_DEFAULT));
-  flushEveryNPipelines = ::dgs_get_settings()->getBlockByNameEx("shadersWarmup")->getInt("flushEveryNPipelines", 250);
+  flushEveryNPipelines = ::dgs_get_settings()->getBlockByNameEx("shadersWarmup")->getInt("flushEveryNPipelines", 1000);
 
   is_loading_thread = is_loading_thrd;
 
@@ -567,6 +508,7 @@ void shadercache::warmup_shaders(const Tab<const char *> &graphics_shader_names,
 
   {
     DynamicD3DFlusher d3dFlusher;
+    d3d::driver_command(DRV3D_COMMAND_SET_PIPELINE_COMPILATION_TIME_BUDGET, (void *)0, nullptr, nullptr);
 
     ShadersWarmup::InvalidIntervalsSet invalidIntervals;
     for (const auto &[name, val] : params.invalidVars)
@@ -591,11 +533,13 @@ void shadercache::warmup_shaders(const Tab<const char *> &graphics_shader_names,
       ComputeShadersWarmup compute(d3dFlusher, invalidIntervals);
       compute.warmupShaders(computeShaderClasses);
     }
+
+    d3d::driver_command(DRV3D_COMMAND_SET_PIPELINE_COMPILATION_TIME_BUDGET, (void *)-1, nullptr, nullptr);
   }
 
   {
     TIME_PROFILE(warmup_shaders_async_complete_wait);
-    while (d3d::driver_command(Drv3dCommand::GET_PIPELINE_COMPILATION_QUEUE_LENGTH) > 0)
+    while (d3d::driver_command(DRV3D_COMMAND_GET_PIPELINE_COMPILATION_QUEUE_LENGTH, nullptr, nullptr, nullptr) > 0)
       sleep_msec(TAIL_WAIT_TIME);
   }
 
@@ -604,7 +548,7 @@ void shadercache::warmup_shaders(const Tab<const char *> &graphics_shader_names,
 
   {
     TIME_PROFILE(warmup_shaders_save);
-    d3d::driver_command(Drv3dCommand::SAVE_PIPELINE_CACHE);
+    d3d::driver_command(DRV3D_COMMAND_SAVE_PIPELINE_CACHE, nullptr, nullptr, nullptr);
   }
 
   time = profile_time_usec(time);

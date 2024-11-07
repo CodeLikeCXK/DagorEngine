@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <quirrel/sqModules/sqModules.h>
 #include <quirrel/bindQuirrelEx/bindQuirrelEx.h>
 #include <osApiWrappers/dag_clipboard.h>
@@ -38,10 +36,10 @@ void register_dagor_clipboard(SqModules *module_mgr)
   HSQUIRRELVM vm = module_mgr->getVM();
   Sqrat::Table exports(vm);
   ///@module dagor.clipboard
-  exports //
+  exports
+    .SquirrelFunc("copy_to_clipboard", set_clipboard_text, 2, ".s") /// deprecated alias for scripts compatibility
     .SquirrelFunc("set_clipboard_text", set_clipboard_text, 2, ".s")
-    .SquirrelFunc("get_clipboard_text", get_clipboard_text, 1, ".")
-    /**/;
+    .SquirrelFunc("get_clipboard_text", get_clipboard_text, 1, ".");
   module_mgr->addNativeModule("dagor.clipboard", exports);
 }
 

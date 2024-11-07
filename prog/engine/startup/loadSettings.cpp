@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <startup/dag_loadSettings.h>
 #include <startup/dag_globalSettings.h>
 #include <ioSys/dag_dataBlock.h>
@@ -78,8 +76,6 @@ void dgs_load_settings_blk_ex(bool apply_cmd, const char *settings_blk_fn, const
         p[1] = 0;
     if (mindHalfGenConsoles && get_console_model() == ConsoleModel::PS4_PRO)
       strcat(patch_fn, "ps4Pro");
-    else if (mindHalfGenConsoles && get_console_model() == ConsoleModel::PS5_PRO)
-      strcat(patch_fn, "ps5Pro");
     else if (mindHalfGenConsoles && get_console_model() == ConsoleModel::XBOXONE_X)
       strcat(patch_fn, "xboxOneX");
     else if (mindHalfGenConsoles && get_console_model() == ConsoleModel::XBOX_ANACONDA)

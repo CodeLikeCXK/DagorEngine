@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "nodes.h"
 #include <assets/asset.h>
 #include <generic/dag_sort.h>
@@ -11,7 +9,7 @@
 #include <debug/dag_debug3d.h>
 #include <math/dag_capsule.h>
 #include <generic/dag_tab.h>
-#include <propPanel/control/container.h>
+#include <propPanel2/c_panel_base.h>
 #include <regExp/regExp.h>
 
 #include <gui/dag_stdGuiRenderEx.h>
@@ -113,7 +111,7 @@ static void renderLinks(Tab<bool> &nodes_is_enabled_array, const GeomNodeTree &t
   }
 }
 
-void NodesPlugin::applyMask(int index, PropPanel::ContainerPropertyControl *panel)
+void NodesPlugin::applyMask(int index, PropertyContainerControlBase *panel)
 {
   const DataBlock *maskBlk = nodeFilterMasksBlk.getBlock(index);
   const char *maskText = maskBlk->getStr("name", nullptr);
@@ -140,7 +138,7 @@ void NodesPlugin::applyMask(int index, PropPanel::ContainerPropertyControl *pane
     debug("bad regexp: '%s'", maskText);
 }
 
-void NodesPlugin::updateAllMaskFilters(PropPanel::ContainerPropertyControl *panel)
+void NodesPlugin::updateAllMaskFilters(PropertyContainerControlBase *panel)
 {
   const int blockCount = nodeFilterMasksBlk.blockCount();
   for (int i = 0; i < blockCount; ++i)
@@ -233,7 +231,7 @@ void NodesPlugin::renderTransObjects()
 
 bool NodesPlugin::supportAssetType(const DagorAsset &asset) const { return strcmp(asset.getTypeStr(), "skeleton") == 0; }
 
-void NodesPlugin::fillPropPanel(PropPanel::ContainerPropertyControl &panel)
+void NodesPlugin::fillPropPanel(PropertyContainerControlBase &panel)
 {
   panel.setEventHandler(this);
 
@@ -249,14 +247,13 @@ void NodesPlugin::fillPropPanel(PropPanel::ContainerPropertyControl &panel)
   panel.createEditFloat(PID_CIRCLE_RADIUS, "circle radius", radius);
   panel.createEditFloat(PID_AXIS_LEN, "axis len", axisLen);
 
-  PropPanel::ContainerPropertyControl *rg = panel.createRadioGroup(PID_DRAW_NODE_TYPE, "node presentation type:");
+  PropertyContainerControlBase *rg = panel.createRadioGroup(PID_DRAW_NODE_TYPE, "node presentation type:");
 
   rg->createRadio(FIG_TYPE_CIRCLE, "[2D] circle");
   rg->createRadio(FIG_TYPE_SPHERE, "[3D] sphere");
   panel.setInt(PID_DRAW_NODE_TYPE, presentationType);
 
-  PropPanel::ContainerPropertyControl &nodesFilterByMask =
-    *panel.createGroup(PID_MASK_NODES_GROUP, String(0, "Filter nodes by name mask"));
+  PropertyContainerControlBase &nodesFilterByMask = *panel.createGroup(PID_MASK_NODES_GROUP, String(0, "Filter nodes by name mask"));
 
   nodesFilterByMask.createButton(PID_MASK_NODES_UPDATE_BTN, String(0, "Update nodes visibility"));
   nodesFilterByMask.createButton(PID_MASK_NODES_UNCHECK_ALL, String(0, "Uncheck all"));
@@ -275,7 +272,7 @@ void NodesPlugin::fillPropPanel(PropPanel::ContainerPropertyControl &panel)
 
   const unsigned nodeCount = geomNodeTree->nodeCount();
   const unsigned maxNodeButtons = PID_SELECT_NODE_LAST - PID_SELECT_NODE0;
-  PropPanel::ContainerPropertyControl &selectNodeByName =
+  PropertyContainerControlBase &selectNodeByName =
     *panel.createGroup(PID_SELECT_NODES_GROUP, String(0, "Nodes List (%d nodes)", nodeCount));
 
   if (nodeCount > maxNodeButtons)
@@ -290,7 +287,7 @@ void NodesPlugin::fillPropPanel(PropPanel::ContainerPropertyControl &panel)
 }
 
 
-void NodesPlugin::onChange(int pid, PropPanel::ContainerPropertyControl *panel)
+void NodesPlugin::onChange(int pid, PropertyContainerControlBase *panel)
 {
   if (pid == PID_DRAW_LINKS)
   {
@@ -304,7 +301,7 @@ void NodesPlugin::onChange(int pid, PropPanel::ContainerPropertyControl *panel)
   }
   else if (pid == PID_DRAW_ROOT_LINKS)
     drawRootLinks = panel->getBool(pid);
-  else if (pid == PID_DRAW_NODE_TYPE && panel->getInt(pid) != PropPanel::RADIO_SELECT_NONE)
+  else if (pid == PID_DRAW_NODE_TYPE && panel->getInt(pid) != RADIO_SELECT_NONE)
     presentationType = (PresentationType)panel->getInt(pid);
   else if (pid == PID_CIRCLE_RADIUS)
     radius = panel->getFloat(PID_CIRCLE_RADIUS);
@@ -346,7 +343,7 @@ void NodesPlugin::selectNode(dag::Index16 node)
     geomNodeTree->getNodeTmScalar(node, nodeTm);
   }
 
-  if (PropPanel::ContainerPropertyControl *panel = getPluginPanel())
+  if (PropertyContainerControlBase *panel = getPluginPanel())
   {
     panel->setText(PID_SELECTED_NODE_NAME, nodeName);
 
@@ -485,7 +482,7 @@ bool NodesPlugin::getSelectionBox(BBox3 &box) const
   return true;
 }
 
-void NodesPlugin::onClick(int pcb_id, PropPanel::ContainerPropertyControl *panel)
+void NodesPlugin::onClick(int pcb_id, PropertyContainerControlBase *panel)
 {
   if (pcb_id == PID_MASK_NODES_UPDATE_BTN)
   {

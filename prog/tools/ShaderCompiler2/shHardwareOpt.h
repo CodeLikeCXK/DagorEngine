@@ -1,8 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <generic/dag_tab.h>
-#include <util/dag_string.h>
 
 struct ShHardwareOptions
 {
@@ -10,7 +8,7 @@ struct ShHardwareOptions
   static ShHardwareOptions Defaults;
 
   d3d::shadermodel::Version fshVersion; // max supported fsh version (hardware.fsh_*_*)
-  bool enableHalfProfile = false;
+  bool enableHalfProfile = true;
 
   // set options to their default values
   inline ShHardwareOptions(d3d::shadermodel::Version _fsh) : fshVersion(_fsh) {}

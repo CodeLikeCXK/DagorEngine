@@ -1,8 +1,19 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
+
+/*
+ * Dagor Engine 4 - Game Libraries
+ * Copyright (C) 2003-2023  Gaijin Entertainment.  All rights reserved
+ *
+ * (for conditions of use see prog/license.txt)
+ */
+
+#ifndef _DAGOR_GAMELIB_LANDMESH_LMESHHOLES_H_
+#define _DAGOR_GAMELIB_LANDMESH_LMESHHOLES_H_
 
 #include <math/dag_TMatrix.h>
 #include <math/dag_bounds2.h>
@@ -63,3 +74,5 @@ private:
   eastl::vector<LandMeshHolesCell> cells;
   const HeightmapHandler *hmapHandler;
 };
+
+#endif

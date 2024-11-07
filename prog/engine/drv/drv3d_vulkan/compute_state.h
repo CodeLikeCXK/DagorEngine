@@ -1,8 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-#pragma once
-
 // defines full dispatch ready state that can be applied to execution state
-
+#pragma once
 #include "util/tracked_state.h"
 #include "state_field_compute.h"
 #include "state_field_resource_binds.h"

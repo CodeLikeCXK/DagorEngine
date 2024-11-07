@@ -1,14 +1,15 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
 #include <util/dag_roNameMap.h>
+#include <util/dag_stdint.h>
 #include <osApiWrappers/dag_rwLock.h>
 #include <generic/dag_tabFwd.h>
-#include <supp/dag_define_KRNLIMP.h>
-#include <EASTL/utility.h>
+#include <supp/dag_define_COREIMP.h>
 
 class IMemAlloc;
 class String;
@@ -249,4 +250,4 @@ inline bool vromfs_check_file_exists(const char *fname)
 //! can be changed to 'false' in runtime for development purposes
 extern KRNLIMP bool vromfs_first_priority;
 
-#include <supp/dag_undef_KRNLIMP.h>
+#include <supp/dag_undef_COREIMP.h>

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <render/genericLUT/colorGradingLUT.h>
 
 ColorGradingLUT::ColorGradingLUT(bool)

@@ -1,4 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright 2023 by Gaijin Games KFT, All rights reserved.
 
 #include <debug/dag_debug3d.h>
 #include <debug/dag_debug.h>
@@ -182,7 +182,8 @@ bool BoxCreator::handleMouseLBRelease(IGenViewportWnd *wnd, int x, int y, bool i
   if (stateFinished)
     return false;
 
-  wnd->captureMouse();
+  EcWindow *ecw = wnd->getEcWindow();
+  ecw->captureMouse();
 
   if (stageNo == 1)
   {
@@ -193,7 +194,7 @@ bool BoxCreator::handleMouseLBRelease(IGenViewportWnd *wnd, int x, int y, bool i
   {
     if (length(clientPoint0 - Point2(x, y)) >= 4)
     {
-      wnd->releaseMouse();
+      ecw->releaseMouse();
       stateFinished = true;
       stateOk = height >= 0;
       wrapedX = 0;
@@ -712,7 +713,8 @@ bool PlaneCreator::handleMouseLBRelease(IGenViewportWnd *wnd, int x, int y, bool
     if (length(clientPoint0 - Point2(x, y)) >= 4)
       stageNo = 2;
 
-    wnd->captureMouse();
+    EcWindow *ecw = wnd->getEcWindow();
+    ecw->captureMouse();
   }
   return true;
 }

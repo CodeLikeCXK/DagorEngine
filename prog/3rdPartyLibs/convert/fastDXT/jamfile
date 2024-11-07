@@ -11,7 +11,7 @@ Sources =
   rygDXT.cpp
 ;
 
-if $(PlatformArch) in x86 x86_64 e2k {
+if $(Platform) in win32 win64 xboxOne scarlett linux64 ps4 ps5 || ( $(Platform) = macosx && $(MacOSXArch) = x86_64 ) {
   CPPopt += -DDXT_INTR=1 ;
 }
 

@@ -1,7 +1,9 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-#pragma once
+#ifndef __DAGOR_TOOLS_RENDER_VIEWPORT_H__
+#define __DAGOR_TOOLS_RENDER_VIEWPORT_H__
+
 
 #include <math/dag_math3d.h>
+
 
 class RenderViewport
 {
@@ -49,3 +51,6 @@ public:
   // sets lt, rb to cover all screen
   void setFullScreenViewRect();
 };
+
+
+#endif

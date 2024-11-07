@@ -1,8 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <3d/fileTexFactory.h>
 #include <3d/dag_createTex.h>
-#include <drv/3d/dag_tex3d.h>
+#include <3d/dag_tex3d.h>
 #include <3d/dag_texPackMgr2.h>
 #include <osApiWrappers/dag_urlLike.h>
 #include <util/fnameMap.h>

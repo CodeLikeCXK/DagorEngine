@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -52,14 +53,13 @@ class AnimIrqHandler : public AnimV20::IGenericIrq
 protected:
   ecs::EntityId eid;
   AnimIrqHandler(ecs::EntityId ent) : eid(ent) {}
-  AnimIrqHandler(AnimIrqHandler &&) = default;
   ~AnimIrqHandler();
 };
 } // namespace ecs
 
 namespace anim
 {
-void dump_animchar_state(AnimV20::AnimcharBaseComponent &animchar, const bool json_format = false);
+void dump_animchar_state(AnimV20::AnimcharBaseComponent &animchar);
 void animchar_act(float dt, float *accum_dt, const float *dt_threshold, AnimV20::AnimcharBaseComponent &animchar,
   bool animchar__turnDir, const TMatrix &transform, AnimcharNodesMat44 *animchar_node_wtm, vec4f *animchar_render__root_pos);
 }; // namespace anim

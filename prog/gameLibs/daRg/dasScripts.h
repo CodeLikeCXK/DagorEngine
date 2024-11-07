@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <daScript/daScript.h>
@@ -33,7 +32,7 @@ void set_das_loading_settings(HSQUIRRELVM vm, AotMode aot_mode, LogAotErrors nee
 class DasLogWriter : public das::TextWriter
 {
   virtual void output() override;
-  uint64_t pos = 0;
+  int pos = 0;
 };
 
 
@@ -58,7 +57,6 @@ public:
   das::smart_ptr<das::ModuleFileAccess> fAccess;
   DasLogWriter logWriter;
   das::DebugInfoHelper dbgInfoHelper;
-  das::daScriptEnvironment *dasEnv = nullptr;
 
   das::TypeInfo *typeGuiContextRef = nullptr, *typeConstElemRenderDataRef = nullptr, *typeConstRenderStateRef = nullptr,
                 *typeConstPropsRef = nullptr;

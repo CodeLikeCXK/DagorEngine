@@ -1,16 +1,10 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
-
 #include "device_resource.h"
-#include "debug_naming.h"
-#include "image_view_state.h"
 
 namespace drv3d_vulkan
 {
 
 class ExecutionContext;
-class MemoryHeapResource;
-class Buffer;
 
 struct ImageCreateInfo
 {
@@ -21,12 +15,8 @@ struct ImageCreateInfo
   uint8_t mips;
   FormatStore format;
   VkImageCreateFlags flags;
-  uint8_t residencyFlags;
+  uint32_t residencyFlags;
   VkSampleCountFlagBits samples;
-
-  void initByTexCreate(uint32_t cflag, bool cube_tex);
-  void setUsageBitsFromCflags(uint32_t cflag);
-  void setVulkanCreateFlagsFromCflags(uint32_t cflag, bool cube_tex);
 };
 
 struct ImageDescription
@@ -41,17 +31,6 @@ struct ImageDescription
     uint16_t arrayLayers;
     VkImageUsageFlags usage;
     VkSampleCountFlagBits samples;
-
-    void fillFromImageCreate(const ImageCreateInfo &ii)
-    {
-      flags = ii.flags;
-      imageType = ii.type;
-      extent = ii.size;
-      mipLevels = ii.mips;
-      arrayLayers = ii.arrays;
-      usage = ii.usage;
-      samples = ii.samples;
-    }
 
     VkImageCreateInfo toVk() const
     {
@@ -125,13 +104,9 @@ struct ImageLayoutInfo
   }
 };
 
-class Image : public ImageImplBase,
-              public ResourceExecutionSyncableExtend,
-              public ResourcePlaceableExtend,
-              public ResourceBindlessExtend
+class Image : public ImageImplBase, public ResourceExecutionSyncableExtend
 {
   bool useFallbackFormat(VkImageCreateInfo &ici);
-  void bindAssignedMemoryId();
 
 public:
   enum
@@ -147,7 +122,6 @@ public:
   MemoryRequirementInfo getMemoryReq();
   VkMemoryRequirements getSharedHandleMemoryReq();
   void bindMemory();
-  void bindMemoryFromHeap(MemoryHeapResource *in_heap, ResourceMemoryId heap_mem_id);
   void reuseHandle();
   void releaseSharedHandle();
   void evict();
@@ -156,11 +130,10 @@ public:
   bool nonResidentCreation();
   void restoreFromSysCopy(ExecutionContext &ctx);
   void makeSysCopy(ExecutionContext &ctx);
-  bool mayAlias() { return desc.memFlags & MEM_IN_PLACED_HEAP; }
   void delayedRestoreFromSysCopy(ExecutionContext &ctx, VulkanCommandBufferHandle cmdb);
 
   template <int Tag>
-  void onDelayedCleanupBackend();
+  void onDelayedCleanupBackend(ContextBackend &);
 
   template <int Tag>
   void onDelayedCleanupFrontend(){};
@@ -177,6 +150,7 @@ public:
 
 private:
   eastl::vector<ViewInfo> views;
+  eastl::vector<uint32_t> bindlessSlots;
   Buffer *hostCopy = nullptr;
   SamplerState cachedSamplerState; //-V730_NOINIT
   SamplerInfo *cachedSampler = nullptr;
@@ -187,10 +161,8 @@ public:
     MEM_NORMAL = 0x0,
     MEM_NOT_EVICTABLE = 0x1,
     MEM_LAZY_ALLOCATION = 0x2,
-    MEM_DEDICATE_ALLOC = 0x4,
-    MEM_IN_PLACED_HEAP = 0x8
+    MEM_DEDICATE_ALLOC = 0x4
   };
-  static bool lazyAllocationFromCflags(uint32_t cflag) { return cflag & (TEXCF_SAMPLECOUNT_MASK | TEXCF_TRANSIENT); }
 
   ImageLayoutInfo layout;
 
@@ -211,6 +183,7 @@ public:
   FormatStore getFormat() const { return desc.format; }
   VkImageUsageFlags getUsage() const { return desc.ici.usage; }
   VkImageCreateFlags getCreateFlags() const { return desc.ici.flags; }
+  const eastl::vector<ViewInfo> &getViews() const { return views; }
   eastl::vector<ViewInfo>::iterator addView(const ViewInfo &view) { return views.insert(views.end(), view); }
   VkImageType getType() const { return desc.ici.imageType; }
   uint16_t getArrayLayers() const { return desc.ici.arrayLayers; }
@@ -227,7 +200,6 @@ public:
   void cleanupReferences();
 
   const VkExtent3D &getBaseExtent() const { return desc.ici.extent; }
-  VkExtent2D getBaseExtent2D() const { return VkExtent2D{desc.ici.extent.width, desc.ici.extent.height}; }
 
   inline VkExtent3D getMipExtents(uint32_t level) const
   {
@@ -257,11 +229,15 @@ public:
 
   bool isSampledSRV() { return !isGPUWritable() && (getUsage() & VK_IMAGE_USAGE_SAMPLED_BIT); }
 
-  static Image *create(const ImageCreateInfo &ii);
-  static bool checkImageCreate(const VkImageCreateInfo &ici, FormatStore format);
+  void addBindlessSlot(uint32_t slot) { bindlessSlots.push_back(slot); }
 
-  bool checkImageViewFormat(FormatStore fmt, VkImageUsageFlags usage);
-  VulkanImageViewHandle getImageView(ImageViewState state);
+  void removeBindlessSlot(uint32_t slot)
+  {
+    bindlessSlots.erase(eastl::remove_if(begin(bindlessSlots), end(bindlessSlots), [slot](uint32_t r_slot) { return r_slot == slot; }),
+      end(bindlessSlots));
+  }
+
+  bool isUsedInBindless() { return bindlessSlots.size() > 0; }
 };
 
 void viewFormatListFrom(FormatStore format, VkImageUsageFlags usage, Image::ViewFormatList &viewFormats);

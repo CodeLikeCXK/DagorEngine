@@ -129,12 +129,6 @@ void ConeConstraint::SetupVelocityConstraint(float inDeltaTime)
 	CalculateRotationConstraintProperties(rotation1, rotation2);
 }
 
-void ConeConstraint::ResetWarmStart()
-{
-	mPointConstraintPart.Deactivate();
-	mAngleConstraintPart.Deactivate();
-}
-
 void ConeConstraint::WarmStartVelocityConstraint(float inWarmStartImpulseRatio)
 {
 	// Warm starting: Apply previous frame impulse

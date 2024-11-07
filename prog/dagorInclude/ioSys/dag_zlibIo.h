@@ -1,12 +1,13 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
 #include <ioSys/dag_baseIo.h>
 
-#include <supp/dag_define_KRNLIMP.h>
+#include <supp/dag_define_COREIMP.h>
 
 
 class ZLibGeneralWriter;
@@ -137,12 +138,8 @@ public:
     return 0;
   }
   virtual const char *getTargetName() { return saveCb ? saveCb->getTargetName() : NULL; }
-  KRNLIMP void syncFlush();
   virtual void flush()
-  {
-    syncFlush();
-    if (saveCb)
-      saveCb->flush();
+  { /*noop*/
   }
 
   KRNLIMP float getCompressionRatio();
@@ -207,4 +204,4 @@ protected:
 
 KRNLIMP int zlib_compress_data(IGenSave &dest, int compression_level, IGenLoad &src, int sz);
 
-#include <supp/dag_undef_KRNLIMP.h>
+#include <supp/dag_undef_COREIMP.h>

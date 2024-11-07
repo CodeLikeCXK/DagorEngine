@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "exp_skeleton_tools.h"
 
 #include <stdio.h>

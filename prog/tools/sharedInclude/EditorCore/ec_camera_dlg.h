@@ -1,8 +1,9 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __GAIJIN_EDITORCORE_EC_CAMERA_DLG_H__
+#define __GAIJIN_EDITORCORE_EC_CAMERA_DLG_H__
 #pragma once
 
 #include <util/dag_globDef.h>
-#include <propPanel/commonWindow/dialogWindow.h>
+#include <propPanel2/comWnd/dialog_window.h>
 
 class DataBlock;
 
@@ -150,11 +151,11 @@ struct TpsCameraConfig : public FpsCameraConfig
 class FreeCameraTab
 {
 public:
-  FreeCameraTab(PropPanel::ContainerPropertyControl *tab_page, CameraConfig *options);
+  FreeCameraTab(PropertyContainerControlBase *tab_page, CameraConfig *options);
   void onOk();
 
 protected:
-  PropPanel::ContainerPropertyControl *mTabPage;
+  PropertyContainerControlBase *mTabPage;
   CameraConfig *mConfig;
 };
 
@@ -162,7 +163,7 @@ protected:
 class FPSCameraTab : public FreeCameraTab
 {
 public:
-  FPSCameraTab(PropPanel::ContainerPropertyControl *tab_page, CameraConfig *options);
+  FPSCameraTab(PropertyContainerControlBase *tab_page, CameraConfig *options);
   void onOk();
 };
 
@@ -170,12 +171,12 @@ public:
 class TPSCameraTab : public FPSCameraTab
 {
 public:
-  TPSCameraTab(PropPanel::ContainerPropertyControl *tab_page, CameraConfig *options);
+  TPSCameraTab(PropertyContainerControlBase *tab_page, CameraConfig *options);
   void onOk();
 };
 
 
-class CamerasConfigDlg : public PropPanel::DialogWindow
+class CamerasConfigDlg : public CDialogWindow
 {
 public:
   CamerasConfigDlg(void *phandle, CameraConfig *max_cc, CameraConfig *free_cc, CameraConfig *fps_cc, CameraConfig *tps_cc);
@@ -188,10 +189,13 @@ public:
   virtual bool onCancel() { return true; };
 
 protected:
-  PropPanel::ContainerPropertyControl *mTabPage;
+  PropertyContainerControlBase *mTabPage;
   CameraConfig *mConfig;
 
   FreeCameraTab *mFreeCameraTab;
   FPSCameraTab *mFPSCameraTab;
   TPSCameraTab *mTPSCameraTab;
 };
+
+
+#endif

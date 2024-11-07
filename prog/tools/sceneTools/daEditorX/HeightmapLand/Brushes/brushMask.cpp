@@ -1,16 +1,12 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "brushMask.h"
 
-#include <EditorCore/ec_IEditorCore.h>
+#include <dllPluginCore/core.h>
 
 #include <supp/dag_math.h>
 #include <libTools/util/fileMask.h>
 
 #include <float.h>
 #include <intrin.h>
-
-using editorcore_extapi::dagTools;
 
 static inline unsigned get_power(int num)
 {

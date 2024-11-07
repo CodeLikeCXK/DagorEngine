@@ -1,31 +1,18 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright 2023 by Gaijin Games KFT, All rights reserved.
 
 #include <windows.h>
 #include <CommDlg.h>
 
 #include <winGuiWrapper/wgw_dialogs.h>
 #include <winGuiWrapper/wgw_busy.h>
-#include <libTools/util/daKernel.h>
 #include <libTools/util/strUtil.h>
+#include <propPanel2/comWnd/search_replace_dialog.h>
 
 #pragma comment(lib, "comdlg32.lib")
 #pragma comment(lib, "user32.lib")
 
 namespace wingw
 {
-
-static const char *NATIVE_MODAL_DIALOG_EVENTS_VAR_NAME = "wingw::dialog_events";
-
-void set_native_modal_dialog_events(INativeModalDialogEventHandler *events)
-{
-  dakernel::set_named_pointer(NATIVE_MODAL_DIALOG_EVENTS_VAR_NAME, events);
-}
-
-INativeModalDialogEventHandler *get_native_modal_dialog_events()
-{
-  return (INativeModalDialogEventHandler *)dakernel::get_named_pointer(NATIVE_MODAL_DIALOG_EVENTS_VAR_NAME);
-}
-
 //-----------------------------------------
 //        file dialog
 //-----------------------------------------
@@ -34,9 +21,6 @@ String select_file(void *hwnd, const char fn[], const char mask[], const char in
   const char title[])
 {
   bool _busy = wingw::set_busy(false);
-
-  if (INativeModalDialogEventHandler *eventHandler = get_native_modal_dialog_events())
-    eventHandler->beforeModalDialogShown();
 
   bool result = false;
   OPENFILENAME ofn;
@@ -81,9 +65,6 @@ String select_file(void *hwnd, const char fn[], const char mask[], const char in
     result = GetSaveFileName(&ofn);
   }
 
-  if (INativeModalDialogEventHandler *eventHandler = get_native_modal_dialog_events())
-    eventHandler->afterModalDialogShown();
-
   wingw::set_busy(_busy);
 
   if (result)
@@ -126,17 +107,13 @@ bool select_color(void *hwnd, E3DCOLOR &value)
   pclr.lStructSize = sizeof(CHOOSECOLOR);
   pclr.hwndOwner = (HWND)hwnd;
 
-  if (INativeModalDialogEventHandler *eventHandler = get_native_modal_dialog_events())
-    eventHandler->beforeModalDialogShown();
-
-  const bool accepted = ChooseColor(&pclr);
-  if (accepted)
+  if (ChooseColor(&pclr))
+  {
     value = E3DCOLOR(GetRValue(pclr.rgbResult), GetGValue(pclr.rgbResult), GetBValue(pclr.rgbResult));
+    return true;
+  }
 
-  if (INativeModalDialogEventHandler *eventHandler = get_native_modal_dialog_events())
-    eventHandler->afterModalDialogShown();
-
-  return accepted;
+  return false;
 }
 
 //-----------------------------------------
@@ -147,18 +124,12 @@ int message_box(int flags, const char *caption, const char *text, const DagorSaf
 {
   bool _busy = wingw::set_busy(false);
 
-  if (INativeModalDialogEventHandler *eventHandler = get_native_modal_dialog_events())
-    eventHandler->beforeModalDialogShown();
-
   int ret = 0;
 
   String msg;
   msg.vprintf(2048, text, arg, anum);
 
   ret = ::MessageBox(FindWindow("EDITOR_LAYOUT_DE_WINDOW", NULL), msg, caption, flags);
-
-  if (INativeModalDialogEventHandler *eventHandler = get_native_modal_dialog_events())
-    eventHandler->afterModalDialogShown();
 
   wingw::set_busy(_busy);
 

@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -18,12 +19,6 @@ namespace gamephys
 using ImpulseLogFunc = eastl::fixed_function<sizeof(void *) * 4, void(const char *name, float impulse, float damage, float hp)>;
 struct CollisionObjectInfo
 {
-  enum CollisionImpulseFlags : uint32_t
-  {
-    CIF_NONE = 0,
-    CIF_NO_DAMAGE = 1 << 0,
-  };
-
   float collisionHardness; // used for damage multiplier
 
   CollisionObjectInfo() : collisionHardness(1.f) {}
@@ -31,8 +26,7 @@ struct CollisionObjectInfo
   virtual ~CollisionObjectInfo() {}
 
   virtual float onImpulse(float impulse, const Point3 & /*dir*/, const Point3 & /*pos*/, float /*point_vel*/,
-    const Point3 & /*collision_normal*/, uint32_t /*flags*/ = CIF_NONE, int32_t /* user_data */ = -1,
-    ImpulseLogFunc /*log_func*/ = nullptr)
+    int32_t /* user_data */ = -1, ImpulseLogFunc /*log_func*/ = nullptr)
   {
     return impulse;
   }

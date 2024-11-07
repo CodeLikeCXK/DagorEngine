@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -9,7 +10,7 @@
 #include <EASTL/string.h>
 #include <EASTL/vector.h>
 #include <spirv/compiler.h>
-#include <drv/shadersMetaData/spirv/compiled_meta_data.h>
+#include "compiled_meta_data.h"
 #include "traits_table.h"
 
 namespace spirv
@@ -681,12 +682,15 @@ enum class AtomicResolveMode
   // PushConstantIndex,
   // DedicatedUniformBufferIndex
 };
-// this pass finds atomic buffers and complains if they are used
-void resolveAtomicBuffers(ModuleBuilder &builder, AtomicResolveMode mode, ErrorHandler &e_handler);
+// This pass does the necessary transformations to the module to represent buffers with counters
+// with the given mode. It returns a list of variables of buffers that are consumed by
+// 'compileHeader' to determine how to handle buffers.
+eastl::vector<NodePointer<NodeOpVariable>> resolveAtomicBuffers(ModuleBuilder &builder, AtomicResolveMode mode);
 
 // Generates the ShaderHeader out of the given SPIR-V module, it also compact the interface uniform
 // variable binding indices into a set without empty slots.
-ShaderHeader compileHeader(ModuleBuilder &builder, CompileFlags flags, ErrorHandler &e_handler);
+ShaderHeader compileHeader(ModuleBuilder &builder, const eastl::vector<NodePointer<NodeOpVariable>> &bufs_with_atomics,
+  CompileFlags flags, ErrorHandler &e_handler);
 
 ComputeShaderInfo resolveComputeShaderInfo(ModuleBuilder &builder);
 

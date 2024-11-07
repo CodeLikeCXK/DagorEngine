@@ -1,13 +1,17 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
+#include <ioSys/dag_dataBlock.h>
+#include <util/dag_string.h>
 #include <EASTL/string_view.h>
 
 
-class DataBlock;
-class String;
-
-namespace drv3d_dx12::debug::call_stack::null
+namespace drv3d_dx12
+{
+namespace debug
+{
+namespace call_stack
+{
+namespace null
 {
 struct CommandData
 {};
@@ -15,24 +19,27 @@ struct CommandData
 class ExecutionContextDataStore
 {
 public:
-  constexpr CommandData getCommandData() const { return {}; }
-  constexpr void setCommandData(const CommandData &, const char *) {}
-  constexpr const char *getLastCommandName() const { return ""; }
+  CommandData getCommandData() const { return {}; }
+  void setCommandData(const CommandData &, const char *) {}
+  const char *getLastCommandName() const { return ""; }
 };
 
 class Generator
 {
 public:
-  constexpr void configure(const DataBlock *) {}
-  constexpr CommandData generateCommandData() const { return {}; }
+  void configure(const DataBlock *) {}
+  CommandData generateCommandData() const { return {}; }
 };
 
 class Reporter
 {
 public:
-  constexpr void report(const CommandData &) {}
+  void report(const CommandData &) {}
 
-  constexpr void append(String &, const char *, const CommandData &) {}
-  constexpr eastl::string_view resolve(const CommandData &) { return {}; }
+  void append(String &, const char *, const CommandData &) {}
+  eastl::string_view resolve(const CommandData &) { return {}; }
 };
-} // namespace drv3d_dx12::debug::call_stack::null
+} // namespace null
+} // namespace call_stack
+} // namespace debug
+} // namespace drv3d_dx12

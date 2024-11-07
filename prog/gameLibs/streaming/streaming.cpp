@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <streaming/streaming.h>
 #include <debug/dag_debug.h>
 
@@ -10,9 +8,9 @@
 #elif _TARGET_XBOX
 namespace xbox
 {
-extern bool is_broadcasting();
+extern bool is_streaming();
 }
-#define IS_STREAMING() xbox::is_broadcasting()
+#define IS_STREAMING() xbox::is_streaming()
 #else
 #define IS_STREAMING() (false)
 #endif

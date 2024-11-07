@@ -1,4 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef _GAIJIN_ACES_STRMLEVEL_H_
+#define _GAIJIN_ACES_STRMLEVEL_H_
 #pragma once
 
 #include <streaming/dag_streamingBase.h>
@@ -82,10 +83,6 @@ public:
   bool getLandscapeVis();
   void setLandscapeVis(bool vis);
 
-  bool getLandscapeMirroring() const { return useLandMirroring; }
-  void setLandscapeMirroring(bool mirror) { useLandMirroring = mirror; }
-  void setupMirroring();
-
   bool tracerayNormalizedStaticScene(const Point3 &p, const Point3 &dir, real &t, int *out_pmid, Point3 *out_norm);
 
   bool tracerayNormalizedHeightmap(const Point3 &p0, const Point3 &dir, float &t, Point3 *norm);
@@ -115,7 +112,6 @@ protected:
   float dynamicZFar;
 
   bool hasWater;
-  bool useLandMirroring = true;
 
   TEXTUREID levelMapTexId;
 
@@ -152,7 +148,6 @@ protected:
   bool intited;
 
   UniqueTexHolder last_clip;
-  d3d::SamplerInfo last_clip_sampler;
   int lastClipTexSz;
   bool rebuildLastClip;
 
@@ -170,3 +165,5 @@ protected:
   static bool __stdcall custom_get_height(Point3 &p, Point3 *n);
   static vec3f __stdcall custom_update_pregen_pos_y(vec4f pos, int16_t *dest_packed_y, float csz_y, float oy);
 };
+
+#endif

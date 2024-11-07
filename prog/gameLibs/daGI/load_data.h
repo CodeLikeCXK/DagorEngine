@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 inline void load_data(void *bins, Sbuffer *buf, uint sz)

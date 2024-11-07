@@ -1,14 +1,11 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <CoreFoundation/CoreFoundation.h>
 #include <Foundation/Foundation.h>
 #include <IOKit/IOKitLib.h>
 #include <sys/sysctl.h>
 #include <Metal/Metal.h>
 
-#include <drv/3d/dag_driver.h>
-#include <drv/3d/dag_info.h>
-#include <drv/3d/dag_commands.h>
+#include <3d/dag_drv3d.h>
+#include <3d/dag_drv3dCmd.h>
 #include <osApiWrappers/dag_localConv.h>
 #include <util/dag_string.h>
 
@@ -74,8 +71,7 @@ static void get_graphics_info(int &out_vendor, String &out_gpu_desc, int &out_vr
   // Create an iterator
   io_iterator_t iterator;
 
-  constexpr mach_port_t defaultMasterPort = NULL;
-  if (IOServiceGetMatchingServices(defaultMasterPort,matchDict,
+  if (IOServiceGetMatchingServices(kIOMasterPortDefault,matchDict,
                                    &iterator) == kIOReturnSuccess)
   {
     // Iterator for devices found
@@ -179,8 +175,7 @@ void mac_get_vdevice_info(int& vram, int& vendor, String &gpu_desc, bool &web_dr
 
   io_iterator_t iterator;
 
-  constexpr mach_port_t defaultMasterPort = NULL;
-  if (IOServiceGetMatchingServices(defaultMasterPort, matchDict, &iterator) == kIOReturnSuccess)
+  if (IOServiceGetMatchingServices(kIOMasterPortDefault, matchDict, &iterator) == kIOReturnSuccess)
   {
     io_registry_entry_t regEntry;
 

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 //-----------------------------------------------------------------------------
 //  This is an implementation of Tom Forsyth's "Linear-Speed Vertex Cache
 //  Optimization" algorithm as described here:

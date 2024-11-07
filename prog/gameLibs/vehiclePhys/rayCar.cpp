@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "rayCar.h"
 #include "physCarData.h"
 #include <debug/dag_log.h>
@@ -390,7 +388,7 @@ void RayCar::calcWheelContactForces(int wid, float norm_force, float load_rad, c
 
   if (norm_force < 0)
   {
-    LOGERR_CTX("norm_force = %f", norm_force);
+    logerr_ctx("norm_force = %f", norm_force);
     norm_force = 0;
   }
 

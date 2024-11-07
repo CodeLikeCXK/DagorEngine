@@ -1,6 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-#pragma once
-
 /************************************************************************
   some semantic funtions
 /************************************************************************/
@@ -20,8 +17,6 @@ double real_number(const char *s);
 
 // convert from real decl to real
 double real_number(ShaderTerminal::signed_real *s);
-// convert from real decl to int (given that the literal denotes an int)
-int int_number(ShaderTerminal::signed_real *s);
 } // namespace semutils
 
 #endif //__SEMUTILS_H

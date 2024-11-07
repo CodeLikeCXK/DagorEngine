@@ -1,12 +1,10 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "hmlHillBrush.h"
 #include "../hmlPlugin.h"
 #include "../hmlCm.h"
 #include <ioSys/dag_dataBlock.h>
 
 
-void HmapHillLandBrush::fillParams(PropPanel::ContainerPropertyControl &panel)
+void HmapHillLandBrush::fillParams(PropPanel2 &panel)
 {
   panel.createEditFloat(PID_BRUSH_POWER, "Power(height):", power);
   HmapLandBrush::fillParams(panel);
@@ -15,7 +13,7 @@ void HmapHillLandBrush::fillParams(PropPanel::ContainerPropertyControl &panel)
 }
 
 
-void HmapHillLandBrush::updateToPanel(PropPanel::ContainerPropertyControl &panel)
+void HmapHillLandBrush::updateToPanel(PropPanel2 &panel)
 {
   panel.setFloat(PID_BRUSH_POWER, power);
   HmapLandBrush::updateToPanel(panel);
@@ -24,7 +22,7 @@ void HmapHillLandBrush::updateToPanel(PropPanel::ContainerPropertyControl &panel
 }
 
 
-bool HmapHillLandBrush::updateFromPanelRef(PropPanel::ContainerPropertyControl &panel, int pid)
+bool HmapHillLandBrush::updateFromPanelRef(PropPanel2 &panel, int pid)
 {
   switch (pid)
   {

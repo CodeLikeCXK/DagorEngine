@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <render/commonMeshManager.h>
 #include <shaders/dag_dynSceneRes.h>
 #include <memory/dag_mem.h>
@@ -31,7 +29,6 @@ CommonMeshManager::CommonMeshManager() : managedMeshList(midmem) {}
 void CommonMeshManager::clear()
 {
   WinAutoLock lock_(critSec);
-  debug("clear managed meshes");
   clear_and_shrink(managedMeshList);
 }
 

@@ -1,5 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __GAIJIN_GEOMMESHHELPER_H__
+#define __GAIJIN_GEOMMESHHELPER_H__
 #pragma once
+
 
 #include <generic/dag_tab.h>
 #include <math/dag_math3d.h>
@@ -72,3 +74,6 @@ struct GeomMeshHelperDagObject
 
 
 bool import_geom_mesh_helpers_dag(const char *filename, Tab<GeomMeshHelperDagObject> &objects);
+
+
+#endif

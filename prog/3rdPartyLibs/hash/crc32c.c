@@ -38,7 +38,7 @@
 
 
 
-#if _TARGET_PC_WIN && !defined(_M_ARM64)
+#if _TARGET_PC_WIN
 
 #include <intrin.h>
 #include <nmmintrin.h>

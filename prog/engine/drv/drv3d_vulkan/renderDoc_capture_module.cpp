@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "renderDoc_capture_module.h"
 
 #include <RenderDoc/renderdoc_app.h>
@@ -9,15 +7,13 @@
 
 namespace drv3d_vulkan
 {
+RenderDocCaptureModule::RenderDocCaptureModule() { loadRenderDocAPI(); };
 
-void RenderDocCaptureModule::init() { loadRenderDocAPI(); }
-
-void RenderDocCaptureModule::shutdown()
+RenderDocCaptureModule::~RenderDocCaptureModule()
 {
   if (docLib)
     os_dll_close(docLib);
-  docLib = nullptr;
-}
+};
 
 void RenderDocCaptureModule::triggerCapture(uint32_t count)
 {

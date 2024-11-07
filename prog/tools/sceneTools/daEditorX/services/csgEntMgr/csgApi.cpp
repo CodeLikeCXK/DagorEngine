@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "csgApi.h"
 #include <math/dag_mesh.h>
 #include <math/dag_Point2.h>

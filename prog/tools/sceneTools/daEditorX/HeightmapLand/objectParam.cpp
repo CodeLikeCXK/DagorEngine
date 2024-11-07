@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "objectParam.h"
 #include "hmlPlugin.h"
 #include "hmlPanel.h"
@@ -9,7 +7,7 @@
 #include <de3_interface.h>
 #include <debug/dag_debug.h>
 
-#include <propPanel/control/container.h>
+#include <propPanel2/c_panel_base.h>
 
 
 static HmapLandPlugin *&plugin = HmapLandPlugin::self;
@@ -36,9 +34,9 @@ enum ParamEnum
 };
 
 
-static void fillFxObj(PropPanel::ContainerPropertyControl &panel, dag::ConstSpan<RenderableEditableObject *> selection, bool expanded)
+static void fillFxObj(PropPanel2 &panel, dag::ConstSpan<RenderableEditableObject *> selection, bool expanded)
 {
-  PropPanel::ContainerPropertyControl &grp = *panel.createGroup(PID_OBJECT_PARAM_FX_GRP, "fx");
+  PropertyContainerControlBase &grp = *panel.createGroup(PID_OBJECT_PARAM_FX_GRP, "fx");
 
   real radius = -1.f;
   int update = -1;
@@ -69,10 +67,9 @@ static void fillFxObj(PropPanel::ContainerPropertyControl &panel, dag::ConstSpan
   panel.setBool(PID_OBJECT_PARAM_FX_GRP, !expanded);
 }
 
-static void fillPhysObj(PropPanel::ContainerPropertyControl &panel, dag::ConstSpan<RenderableEditableObject *> selection,
-  bool expanded)
+static void fillPhysObj(PropPanel2 &panel, dag::ConstSpan<RenderableEditableObject *> selection, bool expanded)
 {
-  PropPanel::ContainerPropertyControl &grp = *panel.createGroup(PID_OBJECT_PARAM_PHYS_OBJ_GRP, "physObj");
+  PropertyContainerControlBase &grp = *panel.createGroup(PID_OBJECT_PARAM_PHYS_OBJ_GRP, "physObj");
 
   String script;
   int str = -1;
@@ -107,7 +104,7 @@ static void fillPhysObj(PropPanel::ContainerPropertyControl &panel, dag::ConstSp
 }
 
 
-void ObjectParam::fillParams(PropPanel::ContainerPropertyControl &panel, dag::ConstSpan<RenderableEditableObject *> selection)
+void ObjectParam::fillParams(PropPanel2 &panel, dag::ConstSpan<RenderableEditableObject *> selection)
 {
   if (selection.size() <= 0)
     return;
@@ -130,7 +127,7 @@ void ObjectParam::fillParams(PropPanel::ContainerPropertyControl &panel, dag::Co
       break;
   }
 
-  PropPanel::ContainerPropertyControl &grp = *panel.createGroup(PID_OBJECT_PARAM_GRP, "Object Property");
+  PropertyContainerControlBase &grp = *panel.createGroup(PID_OBJECT_PARAM_GRP, "Object Property");
 
   static int fxId = IDaEditor3Engine::get().getAssetTypeId("fx");
   static int physObjId = IDaEditor3Engine::get().getAssetTypeId("physObj");
@@ -141,7 +138,7 @@ void ObjectParam::fillParams(PropPanel::ContainerPropertyControl &panel, dag::Co
   fillPhysObj(grp, selection, physobj);
 }
 
-bool ObjectParam::onPPChange(PropPanel::ContainerPropertyControl &panel, int pid, dag::ConstSpan<RenderableEditableObject *> selection)
+bool ObjectParam::onPPChange(PropPanel2 &panel, int pid, dag::ConstSpan<RenderableEditableObject *> selection)
 {
   // fx
   if (pid == ID_FX_MAX_RADIUS)

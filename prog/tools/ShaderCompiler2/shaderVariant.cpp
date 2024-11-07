@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "shaderVariant.h"
 #include <debug/dag_debug.h>
 #include "globVar.h"

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <shaders/dag_renderScene.h>
 
 // mark visible elems for basic render with (no shader lods)

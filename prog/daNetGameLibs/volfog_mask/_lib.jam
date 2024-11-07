@@ -1,4 +1,0 @@
-if $(HaveRenderer) = yes {
-  gamePulls += framework_volfog_mask_pull ;
-  UseProgLibs += daNetGameLibs/volfog_mask ;
-}

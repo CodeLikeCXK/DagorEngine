@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <distribComp2/distribComp2.h>
 #include <ioSys/dag_genIo.h>
 #include <libTools/util/progressInd.h>

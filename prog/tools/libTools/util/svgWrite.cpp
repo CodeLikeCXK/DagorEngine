@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <libTools/util/svgWrite.h>
 #include <math/dag_math3d.h>
 

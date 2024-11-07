@@ -1,11 +1,12 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
 #include <util/dag_stdint.h>
-#include <supp/dag_define_KRNLIMP.h>
+#include <supp/dag_define_COREIMP.h>
 
 #ifdef __cplusplus
 extern "C"
@@ -28,11 +29,9 @@ extern "C"
 #if _TARGET_IOS | _TARGET_TVOS
   KRNLIMP void set_debug_console_ios_file_output();
   KRNLIMP bool is_debug_console_ios_file_output();
-  KRNLIMP void enable_copy_debug_to_ios_console();
-  KRNLIMP bool is_enabled_copy_debug_to_ios_console();
 #endif
 
 #ifdef __cplusplus
 }
 #endif
-#include <supp/dag_undef_KRNLIMP.h>
+#include <supp/dag_undef_COREIMP.h>

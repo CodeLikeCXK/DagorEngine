@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <ecs/core/entityManager.h>
 #include <daECS/core/coreEvents.h>
 #include <ecs/core/attributeEx.h>
@@ -134,7 +132,6 @@ struct NodeCamera
     nodeIndex = animChar->getNodeTree().findNodeIndex(mgr.get<ecs::string>(eid, ECS_HASH("node_cam__node")).c_str());
     G_ASSERT(nodeIndex);
   }
-  NodeCamera(NodeCamera &&) = default;
   ~NodeCamera() { resetActions(); }
 
   void initActions()

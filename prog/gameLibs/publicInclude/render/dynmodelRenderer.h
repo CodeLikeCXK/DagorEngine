@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -18,15 +19,10 @@
 #include <math/dag_TMatrix4.h>
 #include <shaders/dag_overrideStateId.h>
 #include <3d/dag_texStreamingContext.h>
-#include <drv/3d/dag_resId.h>
-
-#include "dynmodel_consts.hlsli"
 
 class DynamicRenderableSceneInstance;
-class DynamicRenderableSceneResource;
 class BaseTexture;
 class GeomNodeTree;
-class ShaderElement;
 
 #ifndef INVALID_INST_NODE_ID
 #define INVALID_INST_NODE_ID 0
@@ -34,18 +30,10 @@ class ShaderElement;
 
 namespace dynrend
 {
-
-struct NodeExtraData
-{
-  float flt[2];
-};
-
 struct InitialNodes
 {
   SmallTab<mat44f> nodesModelTm;
-  SmallTab<NodeExtraData> extraData;
-
-  InitialNodes() = default;
+  InitialNodes() {}
   InitialNodes(const DynamicRenderableSceneInstance *instance, const GeomNodeTree *initial_skeleton);
   InitialNodes(const DynamicRenderableSceneInstance *instance, const TMatrix &root_tm);
 };
@@ -84,8 +72,7 @@ struct DECLSPEC_ALIGN(16) PerInstanceRenderData
   uint32_t flags = RENDER_OPAQUE | RENDER_TRANS | RENDER_DISTORTION; // For compatibility with deprecated renderer.
   Intervals intervals;
   shaders::OverrideStateId overrideStateId;
-  eastl::fixed_vector<Point4, NUM_GENERIC_PER_INSTANCE_PARAMS, true> params;
-  D3DRESID constDataBuf;
+  eastl::fixed_vector<Point4, 3, true> params;
 } ATTRIBUTE_ALIGN(16);
 
 struct InstanceContextData
@@ -105,8 +92,6 @@ struct Statistics
 void init();
 void close();
 bool is_initialized();
-
-void set_check_shader_names(bool check);
 
 
 // Should not be changed prior to the render call:
@@ -144,14 +129,6 @@ void get_prev_view_proj(TMatrix4_vec4 &prev_view, TMatrix4_vec4 &prev_proj);
 void set_local_offset_hint(const Point3 &hint);
 void enable_separate_atest_pass(bool enable);
 
-void replace_shader(ShaderElement *element);
-
-struct ReplacedShaderScope
-{
-  ReplacedShaderScope(ShaderElement *element) { replace_shader(element); }
-  ~ReplacedShaderScope() { replace_shader(nullptr); }
-};
-
 ContextId create_context(const char *name);
 void delete_context(ContextId context_id);
 
@@ -166,8 +143,6 @@ void update_reprojection_data(ContextId contextId);
 
 bool set_instance_data_buffer(unsigned stage, ContextId contextId, int baseOffsetRenderData);
 
-const Point4 *get_per_instance_render_data(ContextId contextId, int indexToPerInstanceRenderData);
-
 void render_one_instance(const DynamicRenderableSceneInstance *instance, RenderMode mode, TexStreamingContext texCtx,
   const InitialNodes *optional_initial_nodes = NULL, const dynrend::PerInstanceRenderData *optional_render_data = NULL);
 
@@ -181,8 +156,4 @@ bool render_in_tools(const DynamicRenderableSceneInstance *instance, RenderMode 
 
 Statistics &get_statistics();
 void reset_statistics();
-
-using InstanceIterator = void(ContextId, const DynamicRenderableSceneResource &, const DynamicRenderableSceneInstance &,
-  const Tab<bool> &, int, float, int, int, int, void *);
-void iterate_instances(dynrend::ContextId context_id, InstanceIterator iter, void *user_data);
 } // namespace dynrend

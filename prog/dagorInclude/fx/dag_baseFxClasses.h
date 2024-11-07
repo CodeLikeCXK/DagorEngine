@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -94,18 +95,12 @@ public:
   IF_STUB(setColor4Mult, Color4);
   IF_STUB(setWind, Point3);
   IF_STUB(setVelocityScale, float);
-  IF_STUB(setVelocityScaleMinMax, Point2);
-  IF_STUB(setWindScale, float);
 };
 
 class BaseParticleFxEmitter : public BaseEffectInterface
 {
 public:
   BaseParticleFxEmitter() : refCounter(0) {}
-  BaseParticleFxEmitter(const BaseParticleFxEmitter &) = default;
-  BaseParticleFxEmitter(BaseParticleFxEmitter &&) = default;
-  BaseParticleFxEmitter &operator=(const BaseParticleFxEmitter &) = default;
-  BaseParticleFxEmitter &operator=(BaseParticleFxEmitter &&) = default;
 
 
   void addRef() { interlocked_increment(refCounter); }

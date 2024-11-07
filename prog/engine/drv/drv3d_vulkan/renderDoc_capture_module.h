@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <cstdint>
@@ -10,13 +9,8 @@ namespace drv3d_vulkan
 class RenderDocCaptureModule
 {
 public:
-  RenderDocCaptureModule() = default;
-  RenderDocCaptureModule(RenderDocCaptureModule &&) = default;
-  RenderDocCaptureModule &operator=(RenderDocCaptureModule &&) = default;
-  ~RenderDocCaptureModule() {}
-
-  void init();
-  void shutdown();
+  RenderDocCaptureModule();
+  ~RenderDocCaptureModule();
 
   void triggerCapture(uint32_t count);
   void beginCapture();

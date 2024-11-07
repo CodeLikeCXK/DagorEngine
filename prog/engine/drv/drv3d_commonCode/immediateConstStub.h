@@ -1,6 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
-
 #ifdef IMMEDIATE_CB_NAMESPACE
 IMMEDIATE_CB_NAMESPACE
 {

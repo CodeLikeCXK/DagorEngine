@@ -1,11 +1,13 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
 #include <util/dag_simpleString.h>
 #include <math/dag_e3dColor.h>
+#include <generic/dag_span.h>
 
 class Point2;
 

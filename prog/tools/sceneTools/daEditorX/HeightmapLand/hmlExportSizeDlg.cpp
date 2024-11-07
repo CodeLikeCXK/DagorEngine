@@ -1,9 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "hmlExportSizeDlg.h"
 
 #include <oldEditor/de_interface.h>
-#include <propPanel/control/container.h>
 
 enum
 {
@@ -19,7 +16,7 @@ HmapExportSizeDlg::HmapExportSizeDlg(float &min_height, float &height_range, flo
 {
   mDialog = DAGORED2->createDialog(hdpi::_pxScaled(240), hdpi::_pxScaled(170), "HeightMap dimensions");
 
-  PropPanel::ContainerPropertyControl &panel = *mDialog->getPanel();
+  PropPanel2 &panel = *mDialog->getPanel();
   panel.setEventHandler(this);
 
   panel.createEditFloat(ID_MIN_HEIGHT, "Minimal height:", minHeight);
@@ -33,7 +30,7 @@ HmapExportSizeDlg::~HmapExportSizeDlg() { del_it(mDialog); }
 
 //==================================================================================================
 
-void HmapExportSizeDlg::onClick(int pcb_id, PropPanel::ContainerPropertyControl *panel)
+void HmapExportSizeDlg::onClick(int pcb_id, PropPanel2 *panel)
 {
   if (pcb_id == ID_GET_FROM_HEIGHTMAP)
   {
@@ -52,9 +49,9 @@ bool HmapExportSizeDlg::execute()
 {
   int ret = mDialog->showDialog();
 
-  if (ret == PropPanel::DIALOG_ID_OK)
+  if (ret == DIALOG_ID_OK)
   {
-    PropPanel::ContainerPropertyControl &panel = *mDialog->getPanel();
+    PropPanel2 &panel = *mDialog->getPanel();
     minHeight = panel.getFloat(ID_MIN_HEIGHT);
     heightRange = panel.getFloat(ID_HEIGHT_RANGE);
 

@@ -1,55 +1,64 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "compositeEditorTree.h"
 #include "../av_appwnd.h"
 #include "compositeEditorTreeData.h"
 #include <winGuiWrapper/wgw_input.h>
 
-CompositeEditorTree::CompositeEditorTree(PropPanel::ITreeViewEventHandler *event_handler, void *phandle, int x, int y, unsigned w,
-  unsigned h, const char caption[]) :
+CompositeEditorTree::CompositeEditorTree(ITreeViewEventHandler *event_handler, void *phandle, int x, int y, unsigned w, unsigned h,
+  const char caption[]) :
   TreeBaseWindow(event_handler, phandle, x, y, hdpi::_pxActual(w), hdpi::_pxActual(h), caption, true, true)
 {
-  animCharImageId = addImage("asset_animChar");
-  compositImageId = addImage("asset_composit");
-  dynModelImageId = addImage("asset_dynModel");
-  efxImageId = addImage("asset_efx");
-  folderImageId = addImage("folder");
-  fxImageId = addImage("asset_effects");
-  gameObjImageId = addImage("asset_gameObj");
-  prefabImageId = addImage("asset_prefab");
-  rendinstImageId = addImage("res_rendInst");
+  animCharImageIndex = addIconImage("asset_animchar");
+  compositImageIndex = addIconImage("asset_composit");
+  dynModelImageIndex = addIconImage("asset_dynmodel");
+  efxImageIndex = addIconImage("asset_efx");
+  folderImageIndex = addIconImage("folder");
+  fxImageIndex = addIconImage("asset_effects");
+  gameObjImageIndex = addIconImage("asset_gameobj");
+  prefabImageIndex = addIconImage("asset_prefab");
+  rendinstImageIndex = addIconImage("res_rendinst");
+
+  // The first state image is the no state image. It won't be drawn.
+  const String gameObjStateImage(256, "%s%s%s", p2util::get_icon_path(), "asset_gameobj", ".bmp");
+  addStateImage(gameObjStateImage);
+  gameObjStateImageIndex = addStateImage(gameObjStateImage);
 }
 
-TEXTUREID CompositeEditorTree::getImageId(CompositeEditorTreeDataNode &treeDataNode) const
+int CompositeEditorTree::addIconImage(const char *fileName)
+{
+  String bmp(256, "%s%s%s", p2util::get_icon_path(), fileName, ".bmp");
+  return addImage(bmp);
+}
+
+int CompositeEditorTree::getImageIndex(CompositeEditorTreeDataNode &treeDataNode) const
 {
   if (treeDataNode.hasEntBlock())
-    return gameObjImageId;
+    return gameObjImageIndex;
 
   const char *type = treeDataNode.getAssetTypeName();
   if (type == nullptr)
-    return gameObjImageId;
+    return gameObjImageIndex;
 
   if (strcmp(type, "rendInst") == 0)
-    return rendinstImageId;
+    return rendinstImageIndex;
   if (strcmp(type, "animChar") == 0)
-    return animCharImageId;
+    return animCharImageIndex;
   if (strcmp(type, "composit") == 0)
-    return compositImageId;
+    return compositImageIndex;
   if (strcmp(type, "dynModel") == 0)
-    return dynModelImageId;
+    return dynModelImageIndex;
   if (strcmp(type, "efx") == 0)
-    return efxImageId;
+    return efxImageIndex;
   if (strcmp(type, "fx") == 0)
-    return fxImageId;
+    return fxImageIndex;
   if (strcmp(type, "gameObj") == 0)
-    return gameObjImageId;
+    return gameObjImageIndex;
   if (strcmp(type, "prefab") == 0)
-    return prefabImageId;
+    return prefabImageIndex;
 
-  return gameObjImageId;
+  return gameObjImageIndex;
 }
 
-void CompositeEditorTree::fillInternal(CompositeEditorTreeDataNode &treeDataNode, PropPanel::TLeafHandle parent,
+void CompositeEditorTree::fillInternal(CompositeEditorTreeDataNode &treeDataNode, TLeafHandle parent,
   CompositeEditorTreeDataNode *treeDataNodeToSelect, eastl::hash_map<const void *, bool> &closedNodes)
 {
   for (int nodeIndex = 0; nodeIndex < treeDataNode.nodes.size(); ++nodeIndex)
@@ -57,11 +66,11 @@ void CompositeEditorTree::fillInternal(CompositeEditorTreeDataNode &treeDataNode
     CompositeEditorTreeDataNode &treeDataSubNode = *treeDataNode.nodes[nodeIndex];
 
     const char *name = treeDataSubNode.getName();
-    const TEXTUREID imageId = getImageId(treeDataSubNode);
-    PropPanel::TLeafHandle subBlockTreeNode = addItem(name, imageId, parent, &treeDataSubNode);
+    const int imageIndex = getImageIndex(treeDataSubNode);
+    TLeafHandle subBlockTreeNode = addItem(name, imageIndex, parent, &treeDataSubNode);
 
     if (treeDataSubNode.isEntBlock())
-      changeItemStateImage(subBlockTreeNode, gameObjImageId);
+      this->changeItemStateImage(subBlockTreeNode, gameObjStateImageIndex);
 
     fillInternal(treeDataSubNode, subBlockTreeNode, treeDataNodeToSelect, closedNodes);
 
@@ -85,16 +94,16 @@ void CompositeEditorTree::fill(CompositeEditorTreeData &treeData, CompositeEdito
   if (!treeData.isComposite)
     return;
 
-  PropPanel::TLeafHandle itemRootNode = addItem(treeData.assetName, compositImageId, nullptr, &treeData.rootNode);
-  fillInternal(treeData.rootNode, itemRootNode, treeDataNodeToSelect, closedNodes);
+  TLeafHandle rootNode = addItem(treeData.assetName, compositImageIndex, nullptr, &treeData.rootNode);
+  fillInternal(treeData.rootNode, rootNode, treeDataNodeToSelect, closedNodes);
 
   if (closedNodes.find(&treeData.rootNode) == closedNodes.end())
-    expand(itemRootNode);
+    expand(rootNode);
 
   if (treeDataNodeToSelect == &treeData.rootNode)
-    setSelectedItem(itemRootNode);
+    setSelectedItem(rootNode);
 
-  PropPanel::TLeafHandle selectedNode = getSelectedItem();
+  TLeafHandle selectedNode = getSelectedItem();
   if (selectedNode)
     ensureVisible(selectedNode);
 }
@@ -103,8 +112,8 @@ void CompositeEditorTree::selectByTreeDataNode(const CompositeEditorTreeDataNode
 {
   if (treeDataNodeToSelect != nullptr)
   {
-    PropPanel::TLeafHandle rootItem = getRoot();
-    PropPanel::TLeafHandle item = rootItem;
+    TLeafHandle rootItem = getRoot();
+    TLeafHandle item = rootItem;
     while (true)
     {
       if (getItemData(item) == treeDataNodeToSelect)
@@ -125,8 +134,8 @@ void CompositeEditorTree::selectByTreeDataNode(const CompositeEditorTreeDataNode
 
 void CompositeEditorTree::getClosedNodes(eastl::hash_map<const void *, bool> &closedNodes)
 {
-  PropPanel::TLeafHandle rootItem = getRoot();
-  PropPanel::TLeafHandle item = rootItem;
+  TLeafHandle rootItem = getRoot();
+  TLeafHandle item = rootItem;
   while (true)
   {
     const bool itemClosed = !isOpen(item);

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <dataBlockUtils/blk2json.h>
 
 #include <ioSys/dag_dataBlock.h>
@@ -46,7 +44,7 @@ bool blk_to_json(const DataBlock &blk, Json::Value &json, const DataBlock &schem
     }
     if (!childScheme)
       childScheme = &DataBlock::emptyBlock;
-    // DEBUG_CTX("'%s' subblock scheme = '%s'", name, childScheme->getBlockName());
+    // debug_ctx("'%s' subblock scheme = '%s'", name, childScheme->getBlockName());
 
     Json::Value child;
     if (!blk_to_json(*b, child, *childScheme))
@@ -61,7 +59,7 @@ bool blk_to_json(const DataBlock &blk, Json::Value &json, const DataBlock &schem
     }
     else if (json.isMember(name))
     {
-      LOGERR_CTX("Duplicate block %s", name);
+      logerr_ctx("Duplicate block %s", name);
       return false;
     }
     else
@@ -182,7 +180,7 @@ bool blk_to_json(const DataBlock &blk, Json::Value &json, const DataBlock &schem
     }
     else if (json.isMember(fullName))
     {
-      LOGERR_CTX("Duplicate param '%s' in block '%s'", fullName.str(), blk.getBlockName());
+      logerr_ctx("Duplicate param '%s' in block '%s'", fullName.str(), blk.getBlockName());
       // G_ASSERT(!"Child param already exists");
       return false;
     }
@@ -246,7 +244,7 @@ static bool add_blk_param_from_json(DataBlock &blk, const Json::Value &key, cons
   {
     if (value.type() != Json::stringValue)
     {
-      LOGERR_CTX("%s type = %d", strKey, value.type());
+      logerr_ctx("%s type = %d", strKey, value.type());
       G_ASSERT(!"Invalid type for string");
       return false;
     }
@@ -369,8 +367,8 @@ static bool add_blk_param_from_json(DataBlock &blk, const Json::Value &key, cons
   {
     if (value.type() != Json::arrayValue || value.size() != 4)
     {
-      DEBUG_CTX("%s", value.toStyledString().c_str());
-      DEBUG_CTX("key = %s, type = %d, size = %d", strKey, value.type(), value.size());
+      debug_ctx("%s", value.toStyledString().c_str());
+      debug_ctx("key = %s, type = %d, size = %d", strKey, value.type(), value.size());
       G_ASSERT(!"Invalid type for TMatrix");
       return false;
     }
@@ -380,7 +378,7 @@ static bool add_blk_param_from_json(DataBlock &blk, const Json::Value &key, cons
       const Json::Value &c = value[col];
       if (c.type() != Json::arrayValue || c.size() != 3)
       {
-        DEBUG_CTX("type = %d, size = %d", c.type(), c.size());
+        debug_ctx("type = %d, size = %d", c.type(), c.size());
         G_ASSERT(!"Invalid col type for TMatrix");
         return false;
       }
@@ -393,7 +391,7 @@ static bool add_blk_param_from_json(DataBlock &blk, const Json::Value &key, cons
   }
   else
   {
-    LOGERR_CTX("Unknown type of parameter '%s'", key.asCString());
+    logerr_ctx("Unknown type of parameter '%s'", key.asCString());
     G_ASSERTF(0, "Unknown parameter type");
     return false;
   }
@@ -413,7 +411,7 @@ bool json_to_blk(const Json::Value &json, DataBlock &blk, const DataBlock &schem
 
     if (!key.isString())
     {
-      LOGERR_CTX("JSON key %s is not a string", key.toStyledString().c_str());
+      logerr_ctx("JSON key %s is not a string", key.toStyledString().c_str());
       return false;
     }
 
@@ -429,11 +427,11 @@ bool json_to_blk(const Json::Value &json, DataBlock &blk, const DataBlock &schem
       {
         DataBlock *b = blk.addNewBlock(key.asCString());
         const DataBlock *childScheme = scheme.getBlockByNameEx(key.asCString());
-        // DEBUG_CTX("{%d} scheme for %s %s", nest_level, key.asCString(), childScheme!=&DataBlock::emptyBlock ? "found" : "not
+        // debug_ctx("{%d} scheme for %s %s", nest_level, key.asCString(), childScheme!=&DataBlock::emptyBlock ? "found" : "not
         // found");
         if (!json_to_blk(value, *b, *childScheme, nest_level + 1))
         {
-          LOGERR_CTX("%s subblock conversion failed", key.asCString());
+          logerr_ctx("%s subblock conversion failed", key.asCString());
           return false;
         }
         break;
@@ -453,7 +451,7 @@ bool json_to_blk(const Json::Value &json, DataBlock &blk, const DataBlock &schem
         {
           if (!add_blk_param_from_json(blk, key, value))
           {
-            LOGERR_CTX("add_blk_param_from_json() failed");
+            logerr_ctx("add_blk_param_from_json() failed");
             return false;
           }
         }
@@ -472,7 +470,7 @@ bool json_to_blk(const Json::Value &json, DataBlock &blk, const DataBlock &schem
           }
           if (!childScheme)
             childScheme = &DataBlock::emptyBlock;
-          // DEBUG_CTX("[%d] scheme for %s %s", nest_level, key.asCString(), childScheme!=&DataBlock::emptyBlock ? "found" : "not
+          // debug_ctx("[%d] scheme for %s %s", nest_level, key.asCString(), childScheme!=&DataBlock::emptyBlock ? "found" : "not
           // found");
 
           for (size_t iItem = 0, nItems = value.size(); iItem < nItems; ++iItem)
@@ -482,7 +480,7 @@ bool json_to_blk(const Json::Value &json, DataBlock &blk, const DataBlock &schem
             {
               if (!add_blk_param_from_json(blk, key, item))
               {
-                LOGERR_CTX("add_blk_param_from_json() failed");
+                logerr_ctx("add_blk_param_from_json() failed");
                 return false;
               }
             }
@@ -490,19 +488,19 @@ bool json_to_blk(const Json::Value &json, DataBlock &blk, const DataBlock &schem
             {
               if (!item.isObject())
               {
-                LOGERR_CTX("Object expected for subblock '%s'", key.asCString());
+                logerr_ctx("Object expected for subblock '%s'", key.asCString());
                 return false;
               }
               if (!item.isMember("_block_name"))
               {
-                LOGERR_CTX("No _block_name specified");
+                logerr_ctx("No _block_name specified");
                 return false;
               }
               const char *childName = item["_block_name"].asCString();
               DataBlock *blkChild = blk.addNewBlock(childName);
               if (!json_to_blk(item, *blkChild, *childScheme, nest_level + 1))
               {
-                LOGERR_CTX("Child block '%s'/'%s' conversion failed", key.asCString(), childName);
+                logerr_ctx("Child block '%s'/'%s' conversion failed", key.asCString(), childName);
                 return false;
               }
             }
@@ -514,7 +512,7 @@ bool json_to_blk(const Json::Value &json, DataBlock &blk, const DataBlock &schem
       default:
         if (!add_blk_param_from_json(blk, key, value))
         {
-          LOGERR_CTX("add_blk_param_from_json() failed");
+          logerr_ctx("add_blk_param_from_json() failed");
           return false;
         }
         break;

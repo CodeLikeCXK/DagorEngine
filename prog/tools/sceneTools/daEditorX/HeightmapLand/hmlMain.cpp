@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "hmlPlugin.h"
 #include <oldEditor/de_workspace.h>
 #include <de3_interface.h>
@@ -9,9 +7,7 @@
 bool HmapLandPlugin::defMipOrdRev = false;
 bool HmapLandPlugin::preferZstdPacking = false;
 bool HmapLandPlugin::allowOodlePacking = false;
-bool HmapLandPlugin::pcPreferASTC = false;
 
-#if !_TARGET_STATIC_LIB
 //==================================================================================================
 BOOL __stdcall DllMain(HINSTANCE instance, DWORD reason, void *)
 {
@@ -28,18 +24,6 @@ extern "C" int __fastcall get_plugin_version() { return IGenEditorPlugin::VERSIO
 
 //==================================================================================================
 extern "C" IGenEditorPlugin *__fastcall register_plugin(IDagorEd2Engine &editor)
-#else
-static IGenEditorPlugin *register_plugin(IDagorEd2Engine &editor);
-
-void init_plugin_heightmapland()
-{
-  IGenEditorPlugin *plugin = register_plugin(*DAGORED2);
-  if (!DAGORED2->registerPlugin(plugin))
-    del_it(plugin);
-}
-
-static IGenEditorPlugin *register_plugin(IDagorEd2Engine &editor)
-#endif
 {
   daeditor3_init_globals(editor);
 
@@ -70,14 +54,6 @@ static IGenEditorPlugin *register_plugin(IDagorEd2Engine &editor)
   HmapLandPlugin::allowOodlePacking = app_blk.getBlockByNameEx("projectDefaults")->getBool("allowOODLE", false);
   if (HmapLandPlugin::allowOodlePacking)
     debug("landscape allows OODLE");
-
-  if (app_blk.getBlockByNameEx("projectDefaults")->getBlockByNameEx("hmap")->getBool("preferASTC", false) &&
-      app_blk.getBlockByNameEx("assets")->getBlockByNameEx("build")->getBlockByNameEx("tex")->getBlockByNameEx("PC")->getBool(
-        "allowASTC", false))
-  {
-    HmapLandPlugin::pcPreferASTC = true;
-    debug("landscape prefers ASTC format for PC");
-  }
 
   return ::new (inimem) HmapLandPlugin;
 }

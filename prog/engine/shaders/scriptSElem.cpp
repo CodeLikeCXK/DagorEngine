@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #if !_TARGET_PC
 #undef _DEBUG_TAB_ // exec_stcode if called too frequently to allow any perfomance penalty there
 #endif
@@ -20,18 +18,7 @@
 #include "shStateBlock.h"
 #include "shRegs.h"
 #include <3d/dag_render.h>
-#include <drv/3d/dag_sampler.h>
-#include <drv/3d/dag_rwResource.h>
-#include <drv/3d/dag_dispatch.h>
-#include <drv/3d/dag_draw.h>
-#include <drv/3d/dag_matricesAndPerspective.h>
-#include <drv/3d/dag_shaderConstants.h>
-#include <drv/3d/dag_buffers.h>
-#include <drv/3d/dag_shader.h>
-#include <drv/3d/dag_texture.h>
-#include <drv/3d/dag_platform.h>
-#include <drv/3d/dag_lock.h>
-#include <drv/3d/dag_info.h>
+#include <3d/dag_drv3d_platform.h>
 #include <3d/fileTexFactory.h>
 #include <supp/dag_prefetch.h>
 #include <debug/dag_debug.h>
@@ -47,13 +34,13 @@
 #include <startup/dag_globalSettings.h>
 #include <perfMon/dag_statDrv.h>
 #include <EASTL/fixed_vector.h>
-#include <drv/3d/dag_renderStates.h>
+#include <3d/dag_renderStates.h>
 #include <shaders/dag_shaderVarsUtils.h>
-#include <supp/dag_alloca.h>
-
-#include <shaders/dag_stcode.h>
-#include "profileStcode.h"
-#include "stcode/compareStcode.h"
+#if _TARGET_PC_WIN
+#include <malloc.h>
+#elif defined(__GNUC__)
+#include <stdlib.h>
+#endif
 
 #define VEC_ALIGN(v, a)
 // #define VEC_ALIGN(v, a)  G_ASSERT((v & (a-1)) == 0)
@@ -72,7 +59,7 @@ extern bool enable_measure_stcode_perf;
 #define MEASURE_STCODE_PERF_START volatile __int64 startTime = enable_measure_stcode_perf ? ref_time_ticks() : 0;
 #define MEASURE_STCODE_PERF_END   \
   if (enable_measure_stcode_perf) \
-  shaderbindump::add_exec_stcode_time(this_elem.shClass, get_time_usec(startTime))
+  shaderbindump::add_exec_stcode_time(shClass, get_time_usec(startTime))
 #else
 #define MEASURE_STCODE_PERF_START
 #define MEASURE_STCODE_PERF_END
@@ -117,7 +104,7 @@ static inline VPROG get_vprog(int i, F get_debug_info)
 
   temporary_disable_fp_exceptions();
   ShaderBytecode tmpbuf(framemem_ptr());
-  d3d::driver_command(Drv3dCommand::GET_SHADER, void_ptr_cast(i), void_ptr_cast(ShaderCodeType::VERTEX), &vpr);
+  d3d::driver_command(DRV3D_COMMAND_GET_SHADER, void_ptr_cast(i), void_ptr_cast(ShaderCodeType::VERTEX), &vpr);
   if (vpr == BAD_VPROG)
     vpr = d3d::create_vertex_shader(shBinDumpOwner().getCode(i, ShaderCodeType::VERTEX, tmpbuf).data());
   restore_fp_exceptions_state();
@@ -125,10 +112,10 @@ static inline VPROG get_vprog(int i, F get_debug_info)
   if (vpr != BAD_VPROG)
   {
     VPROG pvpr = interlocked_compare_exchange(shBinDumpRW().vprId[i], vpr, BAD_VPROG);
-    if (DAGOR_LIKELY(pvpr == BAD_VPROG))
+    if (EASTL_LIKELY(pvpr == BAD_VPROG))
     {
 #if DAGOR_DBGLEVEL > 0
-      d3d::driver_command(Drv3dCommand::SET_VS_DEBUG_INFO, (void *)&vpr, (void *)get_debug_info());
+      d3d::driver_command(DRV3D_COMMAND_SET_VS_DEBUG_INFO, (void *)&vpr, (void *)get_debug_info(), NULL);
 #endif
     }
     else // unlikely case when other thread created and set this vprog slot first
@@ -155,7 +142,7 @@ static inline FSHADER get_fshader(int i, F get_debug_info)
 
   temporary_disable_fp_exceptions();
   ShaderBytecode tmpbuf(framemem_ptr());
-  d3d::driver_command(Drv3dCommand::GET_SHADER, void_ptr_cast(i), void_ptr_cast(ShaderCodeType::PIXEL), &fsh);
+  d3d::driver_command(DRV3D_COMMAND_GET_SHADER, void_ptr_cast(i), void_ptr_cast(ShaderCodeType::PIXEL), &fsh);
   if (fsh == BAD_FSHADER)
     fsh = d3d::create_pixel_shader(shBinDumpOwner().getCode(i, ShaderCodeType::PIXEL, tmpbuf).data());
   restore_fp_exceptions_state();
@@ -163,10 +150,10 @@ static inline FSHADER get_fshader(int i, F get_debug_info)
   if (fsh != BAD_FSHADER)
   {
     FSHADER pfsh = interlocked_compare_exchange(shBinDumpRW().fshId[i], fsh, BAD_FSHADER);
-    if (DAGOR_LIKELY(pfsh == BAD_FSHADER))
+    if (EASTL_LIKELY(pfsh == BAD_FSHADER))
     {
 #if DAGOR_DBGLEVEL > 0
-      d3d::driver_command(Drv3dCommand::SET_PS_DEBUG_INFO, (void *)&fsh, (void *)get_debug_info());
+      d3d::driver_command(DRV3D_COMMAND_SET_PS_DEBUG_INFO, (void *)&fsh, (void *)get_debug_info(), NULL);
 #endif
     }
     else // unlikely case when other thread created and set this fsh slot first
@@ -181,47 +168,27 @@ static inline FSHADER get_fshader(int i, F get_debug_info)
   return fsh;
 }
 
-template <typename F>
-static PROGRAM get_compute_prg(int i, F get_debug_info)
+static PROGRAM get_compute_prg(int i)
 {
   G_ASSERT(d3d::is_inited());
   if (i < 0 || i >= shBinDump().fshId.size())
     return BAD_PROGRAM;
-
-  static constexpr PROGRAM CS_FLAG_BIT = 0x10000000;
-
-  PROGRAM csh = interlocked_acquire_load(shBinDump().fshId[i]);
-  if (csh != BAD_PROGRAM)
+  if (shBinDump().fshId[i] == BAD_PROGRAM)
   {
-    G_ASSERT(csh & CS_FLAG_BIT);
-    return csh & ~CS_FLAG_BIT;
+    temporary_disable_fp_exceptions();
+    ShaderBytecode tmpbuf(framemem_ptr());
+    FSHADER sh = BAD_PROGRAM;
+    d3d::driver_command(DRV3D_COMMAND_GET_SHADER, void_ptr_cast(i), void_ptr_cast(ShaderCodeType::COMPUTE), &sh);
+    if (sh == BAD_PROGRAM)
+      sh = d3d::create_program_cs(shBinDumpOwner().getCode(i, ShaderCodeType::COMPUTE, tmpbuf).data(), CSPreloaded::Yes);
+    shBinDumpRW().fshId[i] = sh;
+    restore_fp_exceptions_state();
+    if (shBinDump().fshId[i] == BAD_PROGRAM)
+      DAG_FATAL("Cant create CS program #%d\nDriver3d error:\n%s", i, d3d::get_last_error());
+    shBinDumpRW().fshId[i] |= 0x10000000;
   }
-
-  temporary_disable_fp_exceptions();
-  ShaderBytecode tmpbuf(framemem_ptr());
-  d3d::driver_command(Drv3dCommand::GET_SHADER, void_ptr_cast(i), void_ptr_cast(ShaderCodeType::COMPUTE), &csh);
-  if (csh == BAD_PROGRAM)
-    csh = d3d::create_program_cs(shBinDumpOwner().getCode(i, ShaderCodeType::COMPUTE, tmpbuf).data(), CSPreloaded::Yes);
-  restore_fp_exceptions_state();
-
-  if (csh != BAD_PROGRAM)
-  {
-    FSHADER pcsh = interlocked_compare_exchange(shBinDumpRW().fshId[i], csh | CS_FLAG_BIT, BAD_PROGRAM);
-    if (DAGOR_LIKELY(pcsh == BAD_FSHADER))
-    {
-      // TODO: set debug info for the driver object
-    }
-    else // unlikely case when other thread created and set this fsh slot first
-    {
-      G_ASSERT(pcsh & CS_FLAG_BIT);
-      d3d::delete_program(csh);
-      csh = pcsh & ~CS_FLAG_BIT;
-    }
-  }
-  else
-    DAG_FATAL("Cant create CS #%d: %s\nDriver3d error:\n%s", i, get_debug_info(), d3d::get_last_error());
-
-  return csh;
+  G_ASSERT(shBinDump().fshId[i] & 0x10000000);
+  return shBinDump().fshId[i] & 0x0FFFFFFF;
 }
 
 __forceinline void push_int(Tab<uint8_t> &values, const int *v) { append_items(values, sizeof(int), (const uint8_t *)v); }
@@ -280,7 +247,7 @@ __forceinline void ScriptedShaderElement::prepareShaderProgram(ID_T &pass_id, in
     PROGRAM prg = d3d::create_program(vpr, fsh, getEffectiveVDecl());
     restore_fp_exceptions_state();
     G_ASSERT(prg != BAD_PROGRAM);
-    if (DAGOR_UNLIKELY(interlocked_compare_exchange(pass_id.pr, prg, -2) != -2)) // unlikely case when other thread created and set
+    if (EASTL_UNLIKELY(interlocked_compare_exchange(pass_id.pr, prg, -2) != -2)) // unlikely case when other thread created and set
                                                                                  // this pr first
       if (prg != BAD_PROGRAM)
         d3d::delete_program(prg);
@@ -312,7 +279,7 @@ static __forceinline void applyPassIdShaders(int prog, const char *name, VDECL u
   G_UNUSED(name);
   G_UNUSED(usedVdecl);
 #if _TARGET_PC_WIN && DAGOR_DBGLEVEL > 0
-  d3d::driver_command(Drv3dCommand::AFTERMATH_MARKER, (void *)name, /*copyname*/ (void *)(uintptr_t)1);
+  d3d::driver_command(DRV3D_COMMAND_AFTERMATH_MARKER, (void *)name, /*copyname*/ (void *)(uintptr_t)1, NULL);
 #endif
 
   d3d::set_program(prog);
@@ -331,6 +298,7 @@ ScriptedShaderElement::ScriptedShaderElement(const shaderbindump::ShaderCode &ma
   shClass(*m.props.sclass), code(matcode), usedVdecl(-1)
 {
   stageDest = STAGE_PS;
+  os_spinlock_init(&stateBlocksSpinLock);
 
   S_DEBUG("make shelem for '%s'", (const char *)shClass.name);
   uint8_t *vars = getVars();
@@ -414,7 +382,7 @@ ScriptedShaderElement::ScriptedShaderElement(const shaderbindump::ShaderCode &ma
           for (unsigned tmpi = 0; tmpi < tmp_texVarOffsets.size(); tmpi++)
             if (tmp_texVarOffsets[tmpi] == v)
             {
-              // DEBUG_CTX("shader %s, var %s", shClass.name.data(), VariableMap::getVariableName(shClass.localVars.v[sv].nameId));
+              // debug_ctx("shader %s, var %s", shClass.name.data(), VariableMap::getVariableName(shClass.localVars.v[sv].nameId));
               erase_items(tmp_texVarOffsets, tmpi, 1);
               break;
             }
@@ -543,6 +511,7 @@ ScriptedShaderElement::~ScriptedShaderElement()
     ((Tex *)&vars[ofs])->term();
   }
 
+  os_spinlock_destroy(&stateBlocksSpinLock);
   shaders_internal::unregister_mat_elem(this);
 }
 
@@ -677,7 +646,7 @@ void ScriptedShaderElement::resetStateBlocks()
   //   so, in order to remove this spin lock we have to stop delete textures immediately on replace.
   //  We also have to guarantee that textures stateblocks were written with new textures
   //    which we can do by just capture shaders_internal::BlockAutoLock autoLock in replaceTexture
-  while (!stateBlocksSpinLock.tryLock())
+  while (!os_spinlock_trylock(&stateBlocksSpinLock))
     sleep_msec(1);
   for (int i = 0; i < passes.size(); i++)
   {
@@ -688,7 +657,7 @@ void ScriptedShaderElement::resetStateBlocks()
       passes[i].id.v.store(-2);
     }
   }
-  stateBlocksSpinLock.unlock();
+  os_spinlock_unlock(&stateBlocksSpinLock);
 
   for (auto &b : toDelete)
     ShaderStateBlock::delBlock(b);
@@ -764,7 +733,7 @@ __forceinline int ScriptedShaderElement::chooseDynamicVariant(dag::ConstSpan<uin
   out_variant_code = variant_code;
   int id = code.dynVariants.findVariant(variant_code);
 
-  if (DAGOR_UNLIKELY(id == code.dynVariants.FIND_NOTFOUND))
+  if (EASTL_UNLIKELY(id == code.dynVariants.FIND_NOTFOUND))
   {
 #if DAGOR_DBGLEVEL > 0
     dag::ConstSpan<shaderbindump::VariantTable::IntervalBind> pcs = code.dynVariants.codePieces;
@@ -834,16 +803,14 @@ void ScriptedShaderElement::update_stvar(ScriptedShaderMaterial &m, int stvarid)
 }
 
 #if DAGOR_DBGLEVEL > 0
-static void scripted_shader_element_default_before_resource_used_callback(const ShaderElement *selem, const D3dResource *,
-  const char *){};
-void (*scripted_shader_element_on_before_resource_used)(const ShaderElement *selem, const D3dResource *,
+static void scripted_shader_element_default_before_resource_used_callback(const D3dResource *, const char *){};
+void (*scripted_shader_element_on_before_resource_used)(const D3dResource *,
   const char *) = &scripted_shader_element_default_before_resource_used_callback;
 #else
-static void scripted_shader_element_on_before_resource_used(const ShaderElement *, const D3dResource *, const char *){};
+static void scripted_shader_element_on_before_resource_used(const D3dResource *, const char *){};
 #endif
 
-static __forceinline void exec_stcode(dag::ConstSpan<int> cod, const shaderbindump::ShaderCode::Pass *__restrict code_cp,
-  const ScriptedShaderElement &__restrict this_elem)
+void ScriptedShaderElement::exec_stcode(dag::ConstSpan<int> cod, const shaderbindump::ShaderCode::Pass *__restrict code_cp) const
 {
   alignas(16) real vpr_const[32 * 4];
   alignas(16) real fsh_const[32 * 4];
@@ -855,16 +822,14 @@ static __forceinline void exec_stcode(dag::ConstSpan<int> cod, const shaderbindu
 #define SHL1(y) 1 << (y)
 #define SHLF(y) 0xF << (y)
 
-  STCODE_PROFILE_BEGIN();
-
   MEASURE_STCODE_PERF_START;
   const vec4f *tm_world_c = NULL, *tm_lview_c = NULL;
 
   // ShUtils::shcod_dump(cod);
 
-  shader_assert::ScopedShaderAssert scoped_shader_assert(this_elem.shClass);
+  shader_assert::ScopedShaderAssert scoped_shader_assert(shClass);
 
-  const uint8_t *vars = this_elem.getVars();
+  const uint8_t *vars = getVars();
   const int *__restrict codp = cod.data(), *__restrict codp_end = codp + cod.size();
   for (; codp < codp_end; codp++)
   {
@@ -901,9 +866,6 @@ static __forceinline void exec_stcode(dag::ConstSpan<int> cod, const shaderbindu
         {
           d3d::set_vs_const(ind, get_reg_ptr<float>(regs, ofs), 1);
         }
-
-        stcode::dbg::record_set_const(stcode::dbg::RecordType::REFERENCE, STAGE_VS, ind,
-          (stcode::cpp::float4 *)get_reg_ptr<float>(regs, ofs), 1);
       }
       break;
       case SHCOD_FSH_CONST:
@@ -921,9 +883,6 @@ static __forceinline void exec_stcode(dag::ConstSpan<int> cod, const shaderbindu
         {
           d3d::set_ps_const(ind, get_reg_ptr<float>(regs, ofs), 1);
         }
-
-        stcode::dbg::record_set_const(stcode::dbg::RecordType::REFERENCE, STAGE_PS, ind,
-          (stcode::cpp::float4 *)get_reg_ptr<float>(regs, ofs), 1);
       }
       break;
       case SHCOD_CS_CONST:
@@ -932,9 +891,6 @@ static __forceinline void exec_stcode(dag::ConstSpan<int> cod, const shaderbindu
         const uint32_t ofs = shaderopcode::getOp2p2(opc);
         VEC_ALIGN(ofs, 4);
         d3d::set_cs_const(ind, get_reg_ptr<float>(regs, ofs), 1);
-
-        stcode::dbg::record_set_const(stcode::dbg::RecordType::REFERENCE, STAGE_CS, ind,
-          (stcode::cpp::float4 *)get_reg_ptr<float>(regs, ofs), 1);
       }
       break;
       case SHCOD_IMM_REAL1: int_reg(regs, shaderopcode::getOp2p1_8(opc)) = int(shaderopcode::getOp2p2_16(opc)) << 16; break;
@@ -1001,36 +957,28 @@ static __forceinline void exec_stcode(dag::ConstSpan<int> cod, const shaderbindu
         const uint32_t ind = shaderopcode::getOp2p1(opc);
         const uint32_t ofs = shaderopcode::getOp2p2(opc);
         TEXTUREID tid = tex_reg(regs, ofs);
-        mark_managed_tex_lfu(tid, this_elem.tex_level);
+        mark_managed_tex_lfu(tid, tex_level);
         S_DEBUG("ind=%d ofs=%d tid=0x%X", ind, ofs, unsigned(tid));
         BaseTexture *tex = D3dResManagerData::getBaseTex(tid);
-        scripted_shader_element_on_before_resource_used(&this_elem, tex, this_elem.shClass.name.data());
-        d3d::set_tex(this_elem.stageDest, ind, tex);
-
-        stcode::dbg::record_set_tex(stcode::dbg::RecordType::REFERENCE, this_elem.stageDest, ind, tex);
+        scripted_shader_element_on_before_resource_used(tex, shClass.name.data());
+        d3d::set_tex(stageDest, ind, tex);
       }
       break;
       case SHCOD_SAMPLER:
       {
-        const uint32_t stage = shaderopcode::getOpStageSlot_Stage(opc);
-        const uint32_t slot = shaderopcode::getOpStageSlot_Slot(opc);
-        const uint32_t id = shaderopcode::getOpStageSlot_Reg(opc);
+        const uint32_t slot = shaderopcode::getOp2p1(opc);
+        const uint32_t id = shaderopcode::getOp2p2(opc);
         d3d::SamplerHandle smp = shBinDump().globVars.get<d3d::SamplerHandle>(id);
-        if (smp != d3d::INVALID_SAMPLER_HANDLE)
-          d3d::set_sampler(stage, slot, smp);
-
-        stcode::dbg::record_set_sampler(stcode::dbg::RecordType::REFERENCE, stage, slot, smp);
+        d3d::set_sampler(stageDest, slot, smp);
       }
       break;
       case SHCOD_TEXTURE_VS:
       {
         TEXTUREID tid = tex_reg(regs, shaderopcode::getOp2p2(opc));
-        mark_managed_tex_lfu(tid, this_elem.tex_level);
+        mark_managed_tex_lfu(tid, tex_level);
         BaseTexture *tex = D3dResManagerData::getBaseTex(tid);
-        scripted_shader_element_on_before_resource_used(&this_elem, tex, this_elem.shClass.name.data());
+        scripted_shader_element_on_before_resource_used(tex, shClass.name.data());
         d3d::set_tex(STAGE_VS, shaderopcode::getOp2p1(opc), tex);
-
-        stcode::dbg::record_set_tex(stcode::dbg::RecordType::REFERENCE, STAGE_VS, shaderopcode::getOp2p1(opc), tex);
       }
       break;
       case SHCOD_BUFFER:
@@ -1040,10 +988,8 @@ static __forceinline void exec_stcode(dag::ConstSpan<int> cod, const shaderbindu
         const uint32_t ofs = shaderopcode::getOpStageSlot_Reg(opc);
         Sbuffer *buf = buf_reg(regs, ofs);
         S_DEBUG("buf: stage = %d slot=%d ofs=%d buf=%X", stage, slot, ofs, buf);
-        scripted_shader_element_on_before_resource_used(&this_elem, buf, this_elem.shClass.name.data());
+        scripted_shader_element_on_before_resource_used(buf, shClass.name.data());
         d3d::set_buffer(stage, slot, buf);
-
-        stcode::dbg::record_set_buf(stcode::dbg::RecordType::REFERENCE, stage, slot, buf);
       }
       break;
       case SHCOD_CONST_BUFFER:
@@ -1053,26 +999,8 @@ static __forceinline void exec_stcode(dag::ConstSpan<int> cod, const shaderbindu
         const uint32_t ofs = shaderopcode::getOpStageSlot_Reg(opc);
         Sbuffer *buf = buf_reg(regs, ofs);
         S_DEBUG("cb: stage = %d slot=%d ofs=%d buf=%X", stage, slot, ofs, buf);
-        scripted_shader_element_on_before_resource_used(&this_elem, buf, this_elem.shClass.name.data());
+        scripted_shader_element_on_before_resource_used(buf, shClass.name.data());
         d3d::set_const_buffer(stage, slot, buf);
-
-        stcode::dbg::record_set_const_buf(stcode::dbg::RecordType::REFERENCE, stage, slot, buf);
-      }
-      break;
-      case SHCOD_TLAS:
-      {
-        const uint32_t stage = shaderopcode::getOpStageSlot_Stage(opc);
-        const uint32_t slot = shaderopcode::getOpStageSlot_Slot(opc);
-        const uint32_t ofs = shaderopcode::getOpStageSlot_Reg(opc);
-        RaytraceTopAccelerationStructure *tlas = tlas_reg(regs, ofs);
-        S_DEBUG("tlas: stage = %d slot=%d ofs=%d tlas=%X", stage, slot, ofs, tlas);
-#if D3D_HAS_RAY_TRACING
-        d3d::set_top_acceleration_structure(ShaderStage(stage), slot, tlas);
-#else
-        logerr("exec_stcode: SHCOD_TLAS ignored for shader %s", (const char *)this_elem.shClass.name);
-#endif
-
-        stcode::dbg::record_set_tlas(stcode::dbg::RecordType::REFERENCE, stage, slot, tlas);
       }
       break;
       case SHCOD_RWTEX:
@@ -1081,11 +1009,9 @@ static __forceinline void exec_stcode(dag::ConstSpan<int> cod, const shaderbindu
         const uint32_t ofs = shaderopcode::getOp2p2(opc);
         TEXTUREID tid = tex_reg(regs, ofs);
         BaseTexture *tex = D3dResManagerData::getBaseTex(tid);
-        scripted_shader_element_on_before_resource_used(&this_elem, tex, this_elem.shClass.name.data());
+        scripted_shader_element_on_before_resource_used(tex, shClass.name.data());
         S_DEBUG("rwtex: ind=%d ofs=%d tex=%X", ind, ofs, tex);
-        d3d::set_rwtex(this_elem.stageDest, ind, tex, 0, 0);
-
-        stcode::dbg::record_set_rwtex(stcode::dbg::RecordType::REFERENCE, this_elem.stageDest, ind, tex);
+        d3d::set_rwtex(stageDest, ind, tex, 0, 0);
       }
       break;
       case SHCOD_RWBUF:
@@ -1093,11 +1019,9 @@ static __forceinline void exec_stcode(dag::ConstSpan<int> cod, const shaderbindu
         const uint32_t ind = shaderopcode::getOp2p1(opc);
         const uint32_t ofs = shaderopcode::getOp2p2(opc);
         Sbuffer *buf = buf_reg(regs, ofs);
-        scripted_shader_element_on_before_resource_used(&this_elem, buf, this_elem.shClass.name.data());
+        scripted_shader_element_on_before_resource_used(buf, shClass.name.data());
         S_DEBUG("rwbuf: ind=%d ofs=%d buf=%X", ind, ofs, buf);
-        d3d::set_rwbuffer(this_elem.stageDest, ind, buf);
-
-        stcode::dbg::record_set_rwbuf(stcode::dbg::RecordType::REFERENCE, this_elem.stageDest, ind, buf);
+        d3d::set_rwbuffer(stageDest, ind, buf);
       }
       break;
       case SHCOD_LVIEW:
@@ -1121,14 +1045,6 @@ static __forceinline void exec_stcode(dag::ConstSpan<int> cod, const shaderbindu
         const uint32_t index = shaderopcode::getOp2p2(opc);
         Sbuffer *&tex = buf_reg(regs, reg);
         tex = shBinDump().globVars.getBuf(index).buf;
-      }
-      break;
-      case SHCOD_GET_GTLAS:
-      {
-        const uint32_t reg = shaderopcode::getOp2p1(opc);
-        const uint32_t index = shaderopcode::getOp2p2(opc);
-        RaytraceTopAccelerationStructure *&tlas = tlas_reg(regs, reg);
-        tlas = shBinDump().globVars.get<RaytraceTopAccelerationStructure *>(index);
       }
       break;
       case SHCOD_G_TM:
@@ -1161,8 +1077,6 @@ static __forceinline void exec_stcode(dag::ConstSpan<int> cod, const shaderbindu
         {
           d3d::set_vs_const(ind, gtm[0], 4);
         }
-
-        stcode::dbg::record_set_const(stcode::dbg::RecordType::REFERENCE, STAGE_VS, ind, (stcode::cpp::float4 *)gtm[0], 4);
       }
       break;
       case SHCOD_DIV_REAL:
@@ -1173,8 +1087,8 @@ static __forceinline void exec_stcode(dag::ConstSpan<int> cod, const shaderbindu
         if (int_reg(regs, regR) == 0)
         {
 #if DAGOR_DBGLEVEL > 0
-          debug("shclass: %s", (const char *)this_elem.shClass.name);
-          ShUtils::shcod_dump(cod, &shBinDump().globVars, &this_elem.shClass.localVars, this_elem.code.stVarMap);
+          debug("shclass: %s", (const char *)shClass.name);
+          ShUtils::shcod_dump(cod, &shBinDump().globVars, &shClass.localVars, code.stVarMap);
           DAG_FATAL("divide by zero [real] while exec shader code. stopped at operand #%d", codp - cod.data());
 #endif
           real_reg(regs, regDst) = real_reg(regs, regL);
@@ -1196,7 +1110,7 @@ static __forceinline void exec_stcode(dag::ConstSpan<int> cod, const shaderbindu
       {
         const uint32_t reg = shaderopcode::getOp2p1(opc);
         const uint32_t ofs = shaderopcode::getOp2p2(opc);
-        ScriptedShaderElement::Tex &t = *(ScriptedShaderElement::Tex *)&vars[ofs];
+        Tex &t = *(Tex *)&vars[ofs];
         tex_reg(regs, reg) = t.texId;
         t.get();
       }
@@ -1257,17 +1171,6 @@ static __forceinline void exec_stcode(dag::ConstSpan<int> cod, const shaderbindu
         real_reg(regs, ro) = *(int *)&vars[ofs];
       }
       break;
-      case SHCOD_GET_IVEC_TOREAL:
-      {
-        const uint32_t ro = shaderopcode::getOp2p1(opc);
-        const uint32_t ofs = shaderopcode::getOp2p2(opc);
-        int *reg = get_reg_ptr<int>(regs, ro);
-        reg[0] = *(int *)&vars[ofs];
-        reg[1] = *(int *)&vars[ofs + 1];
-        reg[2] = *(int *)&vars[ofs + 2];
-        reg[3] = *(int *)&vars[ofs + 3];
-      }
-      break;
       case SHCOD_GET_INT:
       {
         const uint32_t ro = shaderopcode::getOp2p1(opc);
@@ -1307,8 +1210,8 @@ static __forceinline void exec_stcode(dag::ConstSpan<int> cod, const shaderbindu
         for (int j = 0; j < 4; j++)
           if (rvalS[j] == 0)
           {
-            debug("shclass: %s", (const char *)this_elem.shClass.name);
-            ShUtils::shcod_dump(cod, &shBinDump().globVars, &this_elem.shClass.localVars, this_elem.code.stVarMap);
+            debug("shclass: %s", (const char *)shClass.name);
+            ShUtils::shcod_dump(cod, &shBinDump().globVars, &shClass.localVars, code.stVarMap);
             DAG_FATAL("divide by zero [color4[%d]] while exec shader code. stopped at operand #%d", j, codp - cod.data());
           }
 #endif
@@ -1327,14 +1230,6 @@ static __forceinline void exec_stcode(dag::ConstSpan<int> cod, const shaderbindu
         const uint32_t ro = shaderopcode::getOp2p1(opc);
         const uint32_t index = shaderopcode::getOp2p2(opc);
         real_reg(regs, ro) = shBinDump().globVars.get<int>(index);
-      }
-      break;
-      case SHCOD_GET_GIVEC_TOREAL:
-      {
-        const uint32_t ro = shaderopcode::getOp2p1(opc);
-        const uint32_t index = shaderopcode::getOp2p2(opc);
-        const IPoint4 &ivec = shBinDump().globVars.get<IPoint4>(index);
-        color4_reg(regs, ro) = Color4(ivec.x, ivec.y, ivec.z, ivec.w);
       }
       break;
       default:
@@ -1360,8 +1255,6 @@ static __forceinline void exec_stcode(dag::ConstSpan<int> cod, const shaderbindu
   }
 
   MEASURE_STCODE_PERF_END;
-
-  STCODE_PROFILE_END();
 }
 
 #if DAGOR_DBGLEVEL > 0
@@ -1412,7 +1305,7 @@ static void check_state_blocks_conformity(const shaderbindump::ShaderCode &code,
 #endif
 
 void ScriptedShaderElement::getDynamicVariantStates(int variant_code, int cur_variant, uint32_t &program, uint32_t &state_index,
-  shaders::RenderStateId &render_state, shaders::ConstStateIdx &const_state, shaders::TexStateIdx &tex_state) const
+  shaders::RenderStateId &render_state, uint32_t &const_state, uint32_t &tex_state) const
 {
   const PackedPassId *__restrict curPasses = &passes[cur_variant];
   OSSpinlockScopedLock lock(stateBlocksSpinLock);
@@ -1474,8 +1367,7 @@ PROGRAM ScriptedShaderElement::getComputeProgram(const shaderbindump::ShaderCode
   G_ASSERTF(p->fshId != shaderbindump::ShaderCode::INVALID_FSH_VPR_ID, "Compute shader is null");
   G_ASSERTF(p->vprId == shaderbindump::ShaderCode::INVALID_FSH_VPR_ID, "Unexpected vpr=%d in compute shader", p->vprId);
 
-  // TODO: debug info for CS is not implemented yet
-  return get_compute_prg(p->fshId, [] { return (const char *)nullptr; });
+  return get_compute_prg(p->fshId);
 }
 
 void copy_current_global_variables_states(GlobalVariableStates &gv)
@@ -1490,7 +1382,7 @@ void copy_current_global_variables_states(GlobalVariableStates &gv)
 }
 
 int get_dynamic_variant_states(const GlobalVariableStates &global_variants_state, const ScriptedShaderElement &s, uint32_t &program,
-  uint32_t &state_index, shaders::RenderStateId &render_state, shaders::ConstStateIdx &const_state, shaders::TexStateIdx &tex_state)
+  uint32_t &state_index, shaders::RenderStateId &render_state, uint32_t &const_state, uint32_t &tex_state)
 {
   unsigned int variant_code;
   int curVariant = s.chooseDynamicVariant(global_variants_state.globIntervalNormValues, variant_code);
@@ -1501,7 +1393,7 @@ int get_dynamic_variant_states(const GlobalVariableStates &global_variants_state
 }
 
 int get_dynamic_variant_states(const ScriptedShaderElement &s, uint32_t &program, uint32_t &state_index,
-  shaders::RenderStateId &render_state, shaders::ConstStateIdx &const_state, shaders::TexStateIdx &tex_state)
+  shaders::RenderStateId &render_state, uint32_t &const_state, uint32_t &tex_state)
 {
   unsigned int variant_code;
   int curVariant = s.chooseDynamicVariant(variant_code);
@@ -1512,7 +1404,7 @@ int get_dynamic_variant_states(const ScriptedShaderElement &s, uint32_t &program
 }
 
 int get_cached_dynamic_variant_states(const ScriptedShaderElement &s, dag::ConstSpan<int> cache, uint32_t &program,
-  uint32_t &state_index, shaders::RenderStateId &render_state, shaders::ConstStateIdx &const_state, shaders::TexStateIdx &tex_state)
+  uint32_t &state_index, shaders::RenderStateId &render_state, uint32_t &const_state, uint32_t &tex_state)
 {
   const int variantCode = cache[s.dynVariantCollectionId];
   int curVariant = s.chooseCachedDynamicVariant(variantCode);
@@ -1523,34 +1415,6 @@ int get_cached_dynamic_variant_states(const ScriptedShaderElement &s, dag::Const
 }
 
 uintptr_t get_static_variant(const ScriptedShaderElement &s) { return uintptr_t(&s.code); }
-
-void ScriptedShaderElement::execute_chosen_stcode(uint16_t stcodeId, const shaderbindump::ShaderCode::Pass *cPass, const uint8_t *vars,
-  bool is_compute) const
-{
-  TIME_PROFILE_UNIQUE_EVENT_NAMED_DEV("execute_chosen_stcode__shader");
-
-  G_ASSERT(stcodeId < shBinDump().stcode.size());
-
-#if CPP_STCODE_PROTOTYPE
-
-  stcode::dbg::reset();
-
-  stcode::run_routine(stcodeId, vars, is_compute, tex_level, shClass.name.data());
-
-#if VALIDATE_CPP_STCODE
-  // Collect records
-  if (stcode::execution_mode() == stcode::ExecutionMode::TEST_CPP_AGAINST_BYTECODE)
-    exec_stcode(shBinDump().stcode[stcodeId], cPass, *this);
-#endif
-
-  stcode::dbg::validate_accumulated_records(stcodeId, shClass.name.data());
-
-#else
-
-  exec_stcode(shBinDump().stcode[stcodeId], cPass, *this);
-
-#endif
-}
 
 void ScriptedShaderElement::setStatesForVariant(int curVariant, uint32_t program, uint32_t state_index) const
 {
@@ -1576,9 +1440,8 @@ void ScriptedShaderElement::setStatesForVariant(int curVariant, uint32_t program
   if (codeCp->rpass->stcodeId != 0xFFFF)
   {
     const int stcodeId = codeCp->rpass->stcodeId;
-    const uint8_t *vars = getVars();
-
-    execute_chosen_stcode(stcodeId, codeCp, vars, false);
+    G_ASSERT(stcodeId < shBinDump().stcode.size());
+    exec_stcode(shBinDump().stcode[stcodeId], codeCp);
   }
 }
 
@@ -1616,7 +1479,10 @@ bool ScriptedShaderElement::setStatesDispatch() const
 
   d3d::set_program(getComputeProgram(p));
   if (p->stcodeId != shaderbindump::ShaderCode::INVALID_FSH_VPR_ID)
-    execute_chosen_stcode(p->stcodeId, codeCp, getVars(), true);
+  {
+    G_ASSERT(p->stcodeId < shBinDump().stcode.size());
+    exec_stcode(shBinDump().stcode[p->stcodeId], codeCp);
+  }
   return true;
 }
 
@@ -1636,18 +1502,15 @@ bool ScriptedShaderElement::dispatchCompute(int tgx, int tgy, int tgz, GpuPipeli
 }
 eastl::array<uint16_t, 3> ScriptedShaderElement::getThreadGroupSizes() const
 {
-  auto pPassCode = getPassCode();
-  if (!pPassCode)
+  unsigned int variant_code;
+  int curVariant = chooseDynamicVariant(variant_code);
+  if (curVariant < 0)
     return {0, 0, 0};
-  return {pPassCode->threadGroupSizeX, pPassCode->threadGroupSizeY, pPassCode->threadGroupSizeZ};
-}
-uint32_t ScriptedShaderElement::getWaveSize() const
-{
-#if _TARGET_SCARLETT
-  if (const auto pPassCode = getPassCode())
-    return (pPassCode->scarlettWave32 ? 32 : 64);
-#endif
-  return d3d::get_driver_desc().minWarpSize;
+  const shaderbindump::ShaderCode::Pass *codeCp = &code.passes[curVariant];
+  if (!codeCp->rpass)
+    return {0, 0, 0};
+
+  return codeCp->rpass->threadGroupSizes;
 }
 bool ScriptedShaderElement::dispatchComputeThreads(int threads_x, int threads_y, int threads_z, GpuPipeline gpu_pipeline,
   bool set_states) const
@@ -1655,21 +1518,8 @@ bool ScriptedShaderElement::dispatchComputeThreads(int threads_x, int threads_y,
   auto tgs = getThreadGroupSizes();
   if (tgs == eastl::array<uint16_t, 3>{0, 0, 0})
     return false;
-  G_ASSERTF_RETURN(tgs[0] > 0 && tgs[1] > 0 && tgs[2] > 0, false, "getThreadGroupSizes() returned {%u, %u, %u}", tgs[0], tgs[1],
-    tgs[2]);
 #define THREAD_GROUPS(a, i) (((a) + tgs[i] - 1) / tgs[i])
-  return dispatchCompute(THREAD_GROUPS(threads_x, 0), THREAD_GROUPS(threads_y, 1), THREAD_GROUPS(threads_z, 2), gpu_pipeline,
-    set_states);
-}
-
-int ScriptedShaderElement::getTextureCount() const { return texVarOfs.size(); }
-
-TEXTUREID ScriptedShaderElement::getTexture(int index) const
-{
-  G_ASSERT_RETURN(uint32_t(index) < texVarOfs.size(), BAD_TEXTUREID);
-
-  const uint8_t *vars = getVars();
-  return ((const Tex *)&vars[texVarOfs[index]])->texId;
+  return dispatchCompute(THREAD_GROUPS(threads_x, 0), THREAD_GROUPS(threads_y, 1), THREAD_GROUPS(threads_z, 2));
 }
 
 void ScriptedShaderElement::gatherUsedTex(TextureIdSet &tex_id_list) const
@@ -1719,16 +1569,6 @@ decltype(ShaderStateBlock::blocks) ShaderStateBlock::blocks;
 int ShaderStateBlock::deleted_blocks = 0;
 
 #include "stateBlockStCode.h"
-
-const shaderbindump::ShaderCode::ShRef *ScriptedShaderElement::getPassCode() const
-{
-  unsigned int variant_code;
-  int curVariant = chooseDynamicVariant(variant_code);
-  if (curVariant < 0)
-    return nullptr;
-  const shaderbindump::ShaderCode::Pass *codeCp = &code.passes[curVariant];
-  return &*codeCp->rpass;
-}
 
 int ScriptedShaderElement::recordStateBlock(const shaderbindump::ShaderCode::ShRef &p) const
 {
@@ -1787,17 +1627,6 @@ int ScriptedShaderElement::recordStateBlock(const shaderbindump::ShaderCode::ShR
               real_reg(regs, ro) = *(int *)&vars[ofs];
             }
             break;
-            case SHCOD_GET_IVEC_TOREAL:
-            {
-              const uint32_t ro = getOp2p1(opc);
-              const uint32_t ofs = getOp2p2(opc);
-              int *reg = get_reg_ptr<int>(regs, ro);
-              reg[0] = *(int *)&vars[ofs];
-              reg[1] = *(int *)&vars[ofs + 1];
-              reg[2] = *(int *)&vars[ofs + 2];
-              reg[3] = *(int *)&vars[ofs + 3];
-            }
-            break;
 
 
             default:
@@ -1826,7 +1655,7 @@ const char *ScriptedShaderElement::getShaderClassName() const { return (const ch
 void rebuild_shaders_stateblocks()
 {
   using namespace shaders_internal;
-  d3d::GpuAutoLock gpuLock; // this is to avoid rendering from other thread
+  d3d::driver_command(DRV3D_COMMAND_ACQUIRE_OWNERSHIP, NULL, NULL, NULL); // this is to avoid rendering from other thread
   shaders_internal::BlockAutoLock autoLock;
 
   for (auto m : shader_mats)
@@ -1838,15 +1667,17 @@ void rebuild_shaders_stateblocks()
     }
   close_shader_block_stateblocks(false);
   ShaderStateBlock::clear();
+  d3d::driver_command(DRV3D_COMMAND_RELEASE_OWNERSHIP, NULL, NULL, NULL);
 }
 
 void defrag_shaders_stateblocks(bool force)
 {
-  d3d::GpuAutoLock gpuLock; // this is to avoid rendering from other thread
+  d3d::driver_command(DRV3D_COMMAND_ACQUIRE_OWNERSHIP, NULL, NULL, NULL); // this is to avoid rendering from other thread
   shaders_internal::BlockAutoLock autoLock;
   if ((force && ShaderStateBlock::deleted_blocks > 0) ||
       (ShaderStateBlock::deleted_blocks > ShaderStateBlock::blocks.getTotalCount() / 2))
     rebuild_shaders_stateblocks();
+  d3d::driver_command(DRV3D_COMMAND_RELEASE_OWNERSHIP, NULL, NULL, NULL);
 }
 
 void reset_bindless_samplers() { ShaderStateBlock::reset_samplers(); }

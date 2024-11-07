@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 // TCP/UDP server using Winsock 2.2
 
 #include <util/dag_globDef.h>
@@ -94,7 +92,7 @@ public:
 
   ~WinSock2NetworkServer()
   {
-    DEBUG_CTX("destroying server: running=%d", running);
+    mt_debug_ctx("destroying server: running=%d", running);
     G_ASSERT(!running);
   }
 
@@ -106,7 +104,7 @@ public:
       return;
     WinAutoLock lock(refCC);
     refCount++;
-    // debug("SERVER::addRef: refCount=%d", refCount);
+    // mt_debug ( "SERVER::addRef: refCount=%d", refCount );
   }
   bool delRef()
   {
@@ -114,7 +112,7 @@ public:
       return false;
     WinAutoLock lock(refCC);
     refCount--;
-    // debug("SERVER::delRef: refCount=%d", refCount);
+    // mt_debug ( "SERVER::delRef: refCount=%d", refCount );
     return refCount == 0;
   }
   int getRefCount()
@@ -207,7 +205,7 @@ public:
     {
       strcpy(portBufUDP, s);
       portUdp = portBufUDP;
-      DEBUG_CTX("additional UDP port %s is scheduled", portUdp);
+      mt_debug_ctx("additional UDP port %s is scheduled", portUdp);
     }
 
     udpBufSize = blk.getInt("max_udp_packet_size", 1024);
@@ -242,7 +240,7 @@ public:
     val = getaddrinfo(address, port, &hints, &addrInfo);
     if (val != 0)
     {
-      DEBUG_CTX("--- getaddrinfo (%s) failed with error %d: %s", address, val, gai_strerror(val));
+      mt_debug_ctx("--- getaddrinfo (%s) failed with error %d: %s", address, val, gai_strerror(val));
       NetSockets::winsock2_term();
       return false;
     }
@@ -256,7 +254,7 @@ public:
       // Highly unlikely, but check anyway.
       if (i >= FD_SETSIZE)
       {
-        debug("--- getaddrinfo returned more addresses than we could use.");
+        mt_debug("--- getaddrinfo returned more addresses than we could use.");
         break;
       }
 
@@ -268,7 +266,7 @@ public:
       servSock[i] = socket(AI->ai_family, AI->ai_socktype, AI->ai_protocol);
       if (servSock[i] == INVALID_SOCKET)
       {
-        DEBUG_CTX("--- socket() failed with error %d: %s", WSAGetLastError(), NetSockets::decode_error(WSAGetLastError()));
+        mt_debug_ctx("--- socket() failed with error %d: %s", WSAGetLastError(), NetSockets::decode_error(WSAGetLastError()));
         continue;
       }
 
@@ -280,7 +278,7 @@ public:
       //
       if (bind(servSock[i], AI->ai_addr, (int)AI->ai_addrlen) == SOCKET_ERROR)
       {
-        DEBUG_CTX("--- bind() failed with error %d: %s", WSAGetLastError(), NetSockets::decode_error(WSAGetLastError()));
+        mt_debug_ctx("--- bind() failed with error %d: %s", WSAGetLastError(), NetSockets::decode_error(WSAGetLastError()));
         continue;
       }
 
@@ -296,12 +294,12 @@ public:
       {
         if (listen(servSock[i], 5) == SOCKET_ERROR)
         {
-          DEBUG_CTX("--- listen() failed with error %d: %s", WSAGetLastError(), NetSockets::decode_error(WSAGetLastError()));
+          mt_debug_ctx("--- listen() failed with error %d: %s", WSAGetLastError(), NetSockets::decode_error(WSAGetLastError()));
           continue;
         }
       }
 
-      debug("SERVER STARTED (%s:%s) on port %s", (socketType == SOCK_STREAM) ? "TCP" : "UDP",
+      mt_debug("SERVER STARTED (%s:%s) on port %s", (socketType == SOCK_STREAM) ? "TCP" : "UDP",
         (AI->ai_family == PF_INET) ? "PF_INET" : "PF_INET6", port);
     }
 
@@ -309,7 +307,7 @@ public:
 
     if (i == 0)
     {
-      DEBUG_CTX("--- Fatal error: unable to serve on any address.");
+      mt_debug_ctx("--- Fatal error: unable to serve on any address.");
       NetSockets::winsock2_term();
       return false;
     }
@@ -333,7 +331,7 @@ public:
       val = getaddrinfo(address, portUdp, &hints, &addrInfo);
       if (val != 0)
       {
-        DEBUG_CTX("--- getaddrinfo (%s) failed with error %d: %s", address, val, gai_strerror(val));
+        mt_debug_ctx("--- getaddrinfo (%s) failed with error %d: %s", address, val, gai_strerror(val));
         NetSockets::winsock2_term();
         return false;
       }
@@ -347,7 +345,7 @@ public:
         // Highly unlikely, but check anyway.
         if (numSocks + i >= FD_SETSIZE)
         {
-          debug("--- getaddrinfo returned more addresses than we could use.");
+          mt_debug("--- getaddrinfo returned more addresses than we could use.");
           break;
         }
 
@@ -359,7 +357,7 @@ public:
         servSock[numSocks + i] = socket(AI->ai_family, AI->ai_socktype, AI->ai_protocol);
         if (servSock[numSocks + i] == INVALID_SOCKET)
         {
-          DEBUG_CTX("--- socket() failed with error %d: %s", WSAGetLastError(), NetSockets::decode_error(WSAGetLastError()));
+          mt_debug_ctx("--- socket() failed with error %d: %s", WSAGetLastError(), NetSockets::decode_error(WSAGetLastError()));
           continue;
         }
 
@@ -371,11 +369,11 @@ public:
         //
         if (bind(servSock[numSocks + i], AI->ai_addr, (int)AI->ai_addrlen) == SOCKET_ERROR)
         {
-          DEBUG_CTX("--- bind() failed with error %d: %s", WSAGetLastError(), NetSockets::decode_error(WSAGetLastError()));
+          mt_debug_ctx("--- bind() failed with error %d: %s", WSAGetLastError(), NetSockets::decode_error(WSAGetLastError()));
           continue;
         }
 
-        debug("SERVER STARTED (%s:%s) on port %s", "UDP", (AI->ai_family == PF_INET) ? "PF_INET" : "PF_INET6", portUdp);
+        mt_debug("SERVER STARTED (%s:%s) on port %s", "UDP", (AI->ai_family == PF_INET) ? "PF_INET" : "PF_INET6", portUdp);
       }
 
       freeaddrinfo(addrInfo);
@@ -383,7 +381,7 @@ public:
     }
 
     bool sync_exec = blk.getBool("sync_exec", false);
-    DEBUG_CTX("synchronous execution: %d", sync_exec);
+    mt_debug_ctx("synchronous execution: %d", sync_exec);
     if (!sync_exec)
     {
       // asynchronous execution (another thread)
@@ -415,7 +413,7 @@ public:
 
       for (i = 0; i < regFile.size(); i++)
       {
-        debug("  registered name: %s", (char *)regFile[i]);
+        mt_debug("  registered name: %s", (char *)regFile[i]);
 
         FILE *fp = fopen(regFile[i], "wb");
         if (fp)
@@ -443,14 +441,14 @@ public:
   {
     int i;
 
-    DEBUG_CTX("stopping server: running=%d, _fatal=%d", running, _fatal);
+    mt_debug_ctx("stopping server: running=%d, _fatal=%d", running, _fatal);
     running = false;
 
     if (useShares)
     {
       for (i = 0; i < regFile.size(); i++)
       {
-        debug("  unregistered name: %s", (char *)regFile[i]);
+        mt_debug("  unregistered name: %s", (char *)regFile[i]);
         unlink(regFile[i]);
       }
     }
@@ -461,13 +459,13 @@ public:
 
     if (!waitThreadTermination(500))
     {
-      DEBUG_CTX("--- can't wait for server termination for more than %d ms", 500);
+      mt_debug_ctx("--- can't wait for server termination for more than %d ms", 500);
       if (!waitThreadTermination(9500))
         if (_fatal)
           DAG_FATAL("can't wait for server termination for more than %d ms", 10000);
         else
         {
-          DEBUG_CTX("can't wait for server termination for more than %d ms", 10000);
+          mt_debug_ctx("can't wait for server termination for more than %d ms", 10000);
           return false;
         }
     }
@@ -517,18 +515,18 @@ public:
   int sendPacket(int s, const NetMsgPacket *p)
   {
     if (TRACE_PACKETS)
-      debug("SERVER: send packet (size=%d gen=%p queryId=%d", p->hdr.size, p->hdr.generation, p->queryId);
+      mt_debug("SERVER: send packet (size=%d gen=%p queryId=%d", p->hdr.size, p->hdr.generation, p->queryId);
     // dumpPacket ( p );
     return sendBytes(s, p, sizeof(p->hdr) + p->hdr.size, true);
   }
   int sendPacket(void *adr, int adr_len, const NetMsgPacket *p)
   {
     if (TRACE_PACKETS)
-      debug("SERVER: send UDP packet (size=%d gen=%p queryId=%d", p->hdr.size, p->hdr.generation, p->queryId);
+      mt_debug("SERVER: send UDP packet (size=%d gen=%p queryId=%d", p->hdr.size, p->hdr.generation, p->queryId);
     int ret = sendto(servSock[udpSocksStart], (const char *)p, sizeof(p->hdr) + p->hdr.size, 0, (LPSOCKADDR)adr, adr_len);
     if (ret == SOCKET_ERROR)
     {
-      DEBUG_CTX("send() failed with error %d: %s\n", WSAGetLastError(), NetSockets::decode_error(WSAGetLastError()));
+      debug_ctx("send() failed with error %d: %s\n", WSAGetLastError(), NetSockets::decode_error(WSAGetLastError()));
       ret = 0;
     }
     return ret;
@@ -536,7 +534,7 @@ public:
   int sendRawBytes(int s, const void *data, int byte_num, bool whole_block)
   {
     if (TRACE_PACKETS)
-      debug("CLIENT: send raw bytes (size=%d)", byte_num);
+      mt_debug("CLIENT: send raw bytes (size=%d)", byte_num);
     return sendBytes(s, data, byte_num, whole_block);
   }
 
@@ -546,11 +544,11 @@ public:
   {
     if (s < 0 || s >= NET_MAX_CONNECTIONS || !connSock[s])
     {
-      DEBUG_CTX("--- close_socket ( %d ), while socket not connected", s);
+      mt_debug_ctx("--- close_socket ( %d ), while socket not connected", s);
       return;
     }
     WinAutoLock lock(connCC);
-    debug("close socket %d", s);
+    mt_debug("close socket %d", s);
     closesocket(connSock[s]);
     connSock[s] = NULL;
     clientsNum--;
@@ -595,10 +593,10 @@ public:
         val = select(numSocks, &sockSet, 0, 0, &tv);
         if (val == SOCKET_ERROR)
         {
-          DEBUG_CTX("--- select() failed with error %d: %s", WSAGetLastError(), NetSockets::decode_error(WSAGetLastError()));
+          mt_debug_ctx("--- select() failed with error %d: %s", WSAGetLastError(), NetSockets::decode_error(WSAGetLastError()));
           /*
           NetSockets::winsock2_term();
-          DEBUG_CTX("--- SERVER emergency exit");
+          mt_debug_ctx ( "--- SERVER emergency exit" );
           return -1;
           */
           continue;
@@ -627,7 +625,7 @@ public:
           scon = getAvailableConnection();
           if (scon == -1)
           {
-            DEBUG_CTX("--- all connections used");
+            mt_debug_ctx("--- all connections used");
             continue;
           }
 
@@ -639,9 +637,9 @@ public:
           {
             clientsNum--;
             connSock[scon] = NULL;
-            DEBUG_CTX("--- accept() failed with error %d: %s", WSAGetLastError(), NetSockets::decode_error(WSAGetLastError()));
+            mt_debug_ctx("--- accept() failed with error %d: %s", WSAGetLastError(), NetSockets::decode_error(WSAGetLastError()));
             NetSockets::winsock2_term();
-            DEBUG_CTX("--- SERVER emergency exit");
+            mt_debug_ctx("--- SERVER emergency exit");
             return -1;
           }
         }
@@ -688,14 +686,14 @@ public:
         int bytesRead = recvfrom(servSock[i], (char *)udpBuf, udpBufSize, 0, (LPSOCKADDR)&from, &fromLen);
         if (bytesRead == SOCKET_ERROR)
         {
-          DEBUG_CTX("recvfrom() failed with error %d: %s", WSAGetLastError(), NetSockets::decode_error(WSAGetLastError()));
+          mt_debug_ctx("recvfrom() failed with error %d: %s", WSAGetLastError(), NetSockets::decode_error(WSAGetLastError()));
           closesocket(servSock[i]);
           continue;
         }
         if (bytesRead == 0)
         {
           // This should never happen on an unconnected socket, but...
-          DEBUG_CTX("recvfrom() returned zero, aborting");
+          mt_debug_ctx("recvfrom() returned zero, aborting");
           closesocket(servSock[i]);
           break;
         }
@@ -703,13 +701,13 @@ public:
         val = getnameinfo((LPSOCKADDR)&from, fromLen, hostName, sizeof(hostName), NULL, 0, NI_NUMERICHOST);
         if (val != 0)
         {
-          DEBUG_CTX("getnameinfo() failed with error %d: %s", val, NetSockets::decode_error(val));
+          debug_ctx("getnameinfo() failed with error %d: %s", val, NetSockets::decode_error(val));
           strcpy(hostName, "<unknown>");
         }
 
         NetShortQueryPacket *p = (NetShortQueryPacket *)udpBuf;
         if (p->hdr.size + sizeof(p->hdr) != bytesRead)
-          DEBUG_CTX("broken packet arrived: p->size=%d p->gen=%d size=%d", p->hdr.size, p->hdr.generation, bytesRead);
+          mt_debug_ctx("broken packet arrived: p->size=%d p->gen=%d size=%d", p->hdr.size, p->hdr.generation, bytesRead);
         else
         {
           if (proc)
@@ -720,7 +718,7 @@ public:
 
     NetSockets::winsock2_term();
 
-    DEBUG_CTX("SERVER: graceful exit");
+    mt_debug_ctx("SERVER: graceful exit");
     return 0;
   }
   void streamConnectionLoop(int s)
@@ -735,7 +733,7 @@ public:
       ret = recvBytes(s, &ph, sizeof(NetMsgPacketHeader), true);
       if (ret <= 0 || !running)
       {
-        DEBUG_CTX("ret=%d running=%d", ret, running);
+        mt_debug_ctx("ret=%d running=%d", ret, running);
         break;
       }
 
@@ -756,7 +754,7 @@ public:
         ret = recvBytes(s, p->data, ph.size, true);
         if (ret <= 0 || !running)
         {
-          DEBUG_CTX("ret=%d running=%d ph.size=%d", ret, running, ph.size);
+          mt_debug_ctx("ret=%d running=%d ph.size=%d", ret, running, ph.size);
           break;
         }
       }
@@ -765,7 +763,7 @@ public:
       {
         // received Short Query Packet
         if (TRACE_PACKETS)
-          debug("SERVER: received query (size=%d query=%d)", ph.size, p->queryId);
+          mt_debug("SERVER: received query (size=%d query=%d)", ph.size, p->queryId);
         if (p->queryId < NSQP_SERVER_SPEC_QUERY_NUM)
           recvShortQueryPacket(s, *(NetShortQueryPacket *)p);
         else if (proc)
@@ -778,7 +776,7 @@ public:
       {
         // received Response Packet
         if (TRACE_PACKETS)
-          debug("SERVER: received response (size=%d query=%d)", ph.size, p->queryId);
+          mt_debug("SERVER: received response (size=%d query=%d)", ph.size, p->queryId);
         if (p->queryId < NSQP_SERVER_SPEC_QUERY_NUM)
           recvResponsePacket(s, *(NetShortQueryPacket *)p);
         else if (proc)
@@ -791,7 +789,7 @@ public:
       {
         // forward packet to processor
         if (TRACE_PACKETS)
-          debug("SERVER: received packet (size=%d gen=%d)", ph.size, ph.generation);
+          mt_debug("SERVER: received packet (size=%d gen=%d)", ph.size, ph.generation);
         if (proc)
           proc->recvPacket(s, p, ph.size < MAX_STATIC_PACKET_SIZE);
         else if (ph.size >= MAX_STATIC_PACKET_SIZE)
@@ -810,7 +808,7 @@ public:
       ret = recvBytes(s, msg_buf, sizeof(msg_buf), false);
       if (ret <= 0 || !running)
       {
-        DEBUG_CTX("ret=%d running=%d", ret, running);
+        mt_debug_ctx("ret=%d running=%d", ret, running);
         break;
       }
       proc->recvRawBytes(s, msg_buf, ret);
@@ -885,7 +883,7 @@ public:
     workThread = (HANDLE)_beginthreadex(NULL, stk_size, startProcWorkThread, proc, 0, NULL);
     if (!workThread)
     {
-      DEBUG_CTX("cannot create thread!");
+      mt_debug_ctx("cannot create thread!");
       return false;
     }
     return true;
@@ -981,7 +979,7 @@ public:
   {
     if (s < 0 || s >= NET_MAX_CONNECTIONS || !connSock[s])
     {
-      DEBUG_CTX("--- recvBytes ( %d, %p, %d ), while socket not connected", s, _p, buf_sz);
+      mt_debug_ctx("--- recvBytes ( %d, %p, %d ), while socket not connected", s, _p, buf_sz);
       return -1;
     }
 
@@ -996,7 +994,7 @@ public:
       {
         if (running)
         {
-          DEBUG_CTX("--- recv() failed with error %d: %s", WSAGetLastError(), NetSockets::decode_error(WSAGetLastError()));
+          mt_debug_ctx("--- recv() failed with error %d: %s", WSAGetLastError(), NetSockets::decode_error(WSAGetLastError()));
         }
         close_socket(s);
         return -1;
@@ -1021,7 +1019,7 @@ public:
   {
     if (s < 0 || s >= NET_MAX_CONNECTIONS || !connSock[s])
     {
-      DEBUG_CTX("--- sendBytes ( %d, %p, %d ), while socket not connected", s, _p, sz);
+      mt_debug_ctx("--- sendBytes ( %d, %p, %d ), while socket not connected", s, _p, sz);
       return -1;
     }
     WinAutoLock lock(sendCC[s]);
@@ -1036,7 +1034,7 @@ public:
       ret = send(connSock[s], (char *)p, unit_sz, 0);
       if (ret == SOCKET_ERROR)
       {
-        DEBUG_CTX("--- send() failed: error %d: %s", WSAGetLastError(), NetSockets::decode_error(WSAGetLastError()));
+        mt_debug_ctx("--- send() failed: error %d: %s", WSAGetLastError(), NetSockets::decode_error(WSAGetLastError()));
         close_socket(s);
         return -1;
       }

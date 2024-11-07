@@ -222,7 +222,7 @@ protected:
     bool isArray() const { return (bool)container[sizeof(container) - 1]; }
     ChunksArray &getArray()
     {
-      if (DAGOR_LIKELY(!isArray()))
+      if (EASTL_LIKELY(!isArray()))
       {
         ChunksArray array;
         array.emplace_back(eastl::move(*(Chunk *)container));
@@ -239,26 +239,26 @@ protected:
     }
     __forceinline const Chunk *getChunksConstPtr() const
     {
-      if (DAGOR_UNLIKELY(isArray()))
+      if (EASTL_UNLIKELY(isArray()))
         return ((ChunksArray *)container)->data();
       return (Chunk *)container;
     }
     __forceinline Chunk *getChunksPtr() { return const_cast<Chunk *>(getChunksConstPtr()); }
     __forceinline dag::Span<Chunk> getChunks()
     {
-      if (DAGOR_UNLIKELY(isArray()))
+      if (EASTL_UNLIKELY(isArray()))
         return dag::Span<Chunk>(((ChunksArray *)container)->begin(), ((ChunksArray *)container)->size());
       return dag::Span<Chunk>((Chunk *)container, 1);
     }
     __forceinline dag::ConstSpan<Chunk> getChunksConst() const
     {
-      if (DAGOR_UNLIKELY(isArray()))
+      if (EASTL_UNLIKELY(isArray()))
         return dag::ConstSpan<Chunk>(((ChunksArray *)container)->begin(), ((ChunksArray *)container)->size());
       return dag::ConstSpan<Chunk>((const Chunk *)container, 1);
     }
     __forceinline uint32_t getChunksCount() const
     {
-      if (DAGOR_UNLIKELY(isArray()))
+      if (EASTL_UNLIKELY(isArray()))
         return ((ChunksArray *)container)->size();
       return 1;
     }

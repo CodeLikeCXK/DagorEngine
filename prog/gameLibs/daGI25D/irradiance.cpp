@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <daGI25D/irradiance.h>
 #include <math/dag_frustum.h>
 #include <math/dag_math3d.h>
@@ -9,22 +7,16 @@
 #include <math/integer/dag_IBBox3.h>
 #include <3d/dag_quadIndexBuffer.h>
 
-#include <drv/3d/dag_rwResource.h>
-#include <drv/3d/dag_draw.h>
-#include <drv/3d/dag_vertexIndexBuffer.h>
-#include <drv/3d/dag_matricesAndPerspective.h>
-#include <drv/3d/dag_buffers.h>
-#include <drv/3d/dag_driver.h>
-#include <drv/3d/dag_info.h>
-#include <drv/3d/dag_tex3d.h>
+#include <3d/dag_drv3d.h>
+#include <3d/dag_tex3d.h>
 #include <perfMon/dag_statDrv.h>
 
 #include <math/dag_hlsl_floatx.h>
 #include "global_vars.h"
 #include "shaders/dagi_volmap_consts_25d.hlsli"
 #include <textureUtil/textureUtil.h>
-#include <frustumCulling/frustumPlanes.h>
 
+extern void set_frustum_planes(const Frustum &frustum);
 
 #include <util/dag_convar.h>
 CONSOLE_BOOL_VAL("render", gi_25d_force_update_volmap, false);
@@ -63,7 +55,7 @@ void Irradiance::init(bool scalar_ao, float xz_size, float y_size)
   const uint32_t sceneFmt = scalar_ao ? TEXFMT_R8 : TEXFMT_R11G11B10F;
   volmap = dag::create_voltex(GI_25D_RESOLUTION_X, GI_25D_RESOLUTION_Z, GI_25D_RESOLUTION_Y * 6, sceneFmt | TEXCF_UNORDERED, 1,
     "gi_25d_volmap");
-  d3d::clear_rwtexf(volmap.getVolTex(), ResourceClearValue{}.asFloat, 0, 0);
+  texture_util::get_shader_helper()->clear_float3_voltex_via_cs(volmap.getVolTex());
   volmap->texaddr(TEXADDR_WRAP);
   volmap->texaddrw(TEXADDR_CLAMP);
   d3d::resource_barrier({volmap.getVolTex(), RB_RO_SRV | RB_STAGE_PIXEL, 0, 0});

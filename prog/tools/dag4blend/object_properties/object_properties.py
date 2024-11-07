@@ -248,18 +248,16 @@ class DAGOR_PT_Properties(Panel):
     bl_category = 'Dagor'
     bl_options = {'DEFAULT_CLOSED'}
 
+    @classmethod
+    def poll(self, context):
+        return bpy.context.active_object is not None and bpy.context.active_object.dagorprops is not None
     def __init__(self):
         pass
 
     def draw(self, context):
         C=context
-        l = self.layout
-        l = l.column(align = True)
-        if C.object is None:
-            info = l.box()
-            info.label(text = "No active object!", icon = 'ERROR')
-            return
         pref=bpy.context.preferences.addons[basename(__package__)].preferences
+        l = self.layout
         DP = bpy.context.active_object.dagorprops
         props=l.box()
         header=props.row()
@@ -269,14 +267,12 @@ class DAGOR_PT_Properties(Panel):
         if pref.props_maximized:
             add = props.box()
             add.operator('dt.add_prop',text='',icon='ADD')
-            new_p = add.row(align = True)
+            new_p = add.row()
             new_p.prop(pref, 'prop_name',text='')
             new_p.label(text='',icon='FORWARD')
             new_p.prop(pref, 'prop_value',text='')
-            props_column = props.column(align = True)
             for key in DP.keys():
-                prop=props_column.box()
-                prop = prop.column(align = True)
+                prop=props.box()
                 rem=prop.row()
                 rem.label(text=key)
                 if DP[key] in['yes','no']:
@@ -306,28 +302,22 @@ class DAGOR_PT_Properties(Panel):
             path = pref.props_presets_path
             path_exists = os.path.exists(path)
             if path_exists:
-
-                save = presets.column(align = True)
-                save.operator('dt.save_op_preset',text = "Save preset as:")
-                save.prop(pref, 'prop_preset_name', text = '')
-
-                apply = presets.column(align = True)
-                apply.operator('dt.apply_op_preset', text = 'Apply preset:')
-                act = apply.row(align = True)
+                presets.operator('dt.save_op_preset',text = "Save preset as:")
+                presets.prop(pref, 'prop_preset_name', text = '')
+                presets.operator('dt.apply_op_preset', text = 'Apply preset:')
+                act = presets.row()
                 act.prop(pref, 'prop_preset', text = "")
                 act.operator('dt.remove_op_preset', text = "", icon = "TRASH")
-                props_dir = presets.row(align = True)
-                if pref.props_path_editing:
-                    props_dir.prop(pref, 'props_presets_path', text = "")
-                else:
-                    props_dir.operator('wm.path_open', icon = 'FILE_FOLDER', text = "open presets folder").filepath = path
-                props_dir.prop(pref, 'props_path_editing', text = "", icon = 'SETTINGS', toggle = True)
-            else:
+                #no need to use custom operator for each folder
                 col = presets.column(align = True)
+                row = col.row(align = True)
+                row.operator('wm.path_open', icon = 'FILE_FOLDER', text = "open presets folder").filepath = path
+            else:
+                col = presets.column()
                 col.label(icon = 'ERROR')
-                col.label(text = 'Presets folder not found, Please, set existing one')
-                col.separator()
-                col.prop(pref, 'props_presets_path', text = "")
+                col.label(text = 'Presets folder not found')
+                col.label(text = 'Please, set existing one')
+                col.label(text = 'in addon preferences!')
 
         tools = l.box()
         header = tools.row()
@@ -335,9 +325,9 @@ class DAGOR_PT_Properties(Panel):
             emboss=False,text='Tools')
         header.label(text='',icon='TOOL_SETTINGS')
         if pref.props_tools_maximized:
-            row = tools.row(align = True)
-            row.operator('dt.props_to_text', text='Open as text', icon = 'TEXT')
-            row.operator('dt.text_to_props', text='Apply from text', icon = 'TEXT')
+            row = tools.row()
+            row.operator('dt.props_to_text', text='Open as text')
+            row.operator('dt.text_to_props', text='Apply from text')
             tools.operator('dt.properties_transfer', text = 'Transfer Attr')
 
 classes=[dagorprops,

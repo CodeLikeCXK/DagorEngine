@@ -15,18 +15,6 @@ from ..tools.tools_panel        import apply_modifiers
 from .cmp_import                import DAGOR_OP_CmpImport
 from .cmp_export                import DAGOR_OP_CmpExport
 
-classes = []
-
-RAND_PROPS = [  'offset_x:p2',
-                'offset_y:p2',
-                'offset_z:p2',
-                'rot_x:p2',
-                'rot_y:p2',
-                'rot_z:p2',
-                'scale:p2',
-                'yScale:p2',
-                ]
-
 #FUNCTIONS
 
 def get_collection(name):
@@ -172,8 +160,10 @@ def node_to_geo(node):
         geo_node.data.use_auto_smooth = True
         geo_node.data.auto_smooth_angle = 2*pi
     else:
-        for poly in geo_node.data.polygons:
-            poly.use_smooth = True
+        with bpy.context.temp_override(object = geo_node):
+            bpy.ops.object.shade_smooth(keep_sharp_edges = True)
+    #fixing UV order
+    reorder_uv_layers(geo_node.data)
     return
 
 #hides instance_collection, spawns objects of instance_collection instead
@@ -272,8 +262,6 @@ class DAGOR_OT_node_explode(Operator):
             return {'CANCELLED'}
         node_explode(node)
         return {'FINISHED'}
-classes.append(DAGOR_OT_node_explode)
-
 
 class DAGOR_OT_node_revert(Operator):
     bl_idname = 'dt.node_revert'
@@ -298,9 +286,6 @@ class DAGOR_OT_node_revert(Operator):
             return {'CANCELLED'}
         node_revert(node)
         return {'FINISHED'}
-classes.append(DAGOR_OT_node_revert)
-
-
 
 class DAGOR_OT_node_rebuild(Operator):
     bl_idname = 'dt.node_rebuild'
@@ -325,9 +310,6 @@ class DAGOR_OT_node_rebuild(Operator):
             return {'CANCELLED'}
         node_rebuild(node)
         return {'FINISHED'}
-classes.append(DAGOR_OT_node_rebuild)
-
-
 
 class DAGOR_OT_node_make_unic(Operator):
     bl_idname = 'dt.node_make_unic'
@@ -364,8 +346,6 @@ class DAGOR_OT_node_make_unic(Operator):
             new_col.objects.link(new_obj)
         node.instance_collection = new_col
         return {'FINISHED'}
-classes.append(DAGOR_OT_node_make_unic)
-
 
 class DAGOR_OT_node_remove_entity(Operator):
     bl_idname = "dt.node_remove_entity"
@@ -390,8 +370,6 @@ class DAGOR_OT_node_remove_entity(Operator):
             return {'CANCELLED'}
         node_remove_entity(node,entity)
         return {'FINISHED'}
-classes.append(DAGOR_OT_node_remove_entity)
-
 
 class DAGOR_OT_node_add_entity(Operator):
     bl_idname = "dt.node_add_entity"
@@ -413,8 +391,6 @@ class DAGOR_OT_node_add_entity(Operator):
         node.instance_type = 'COLLECTION'
         node_add_entity(node)
         return {'FINISHED'}
-classes.append(DAGOR_OT_node_add_entity)
-
 
 class DAGOR_OT_node_init_weight(Operator):
     bl_idname = "dt.node_init_weight"
@@ -430,25 +406,6 @@ class DAGOR_OT_node_init_weight(Operator):
             return {'CANCELLED'}
         node.dagorprops['weight:r'] = 1.0
         return {'FINISHED'}
-classes.append(DAGOR_OT_node_init_weight)
-
-
-class DAGOR_OT_node_clear_weight(Operator):
-    bl_idname = "dt.node_clear_weight"
-    bl_label = 'Clear weight'
-    bl_description = 'Remove a "weight:r" property'
-    bl_options = {'UNDO'}
-
-    node: StringProperty(default = '')
-
-    def execute(self, context):
-        node = bpy.data.objects.get(self.node)
-        if node is None:
-            return {'CANCELLED'}
-        del node.dagorprops['weight:r']
-        return {'FINISHED'}
-classes.append(DAGOR_OT_node_clear_weight)
-
 
 class DAGOR_OT_bbox_to_gameobj(Operator):
     bl_idname = "dt.bbox_to_gameobj"
@@ -476,8 +433,6 @@ class DAGOR_OT_bbox_to_gameobj(Operator):
         for obj in nodes:
             bbox_to_gameobj(obj, P.node)
         return {'FINISHED'}
-classes.append(DAGOR_OT_bbox_to_gameobj)
-
 
 class DAGOR_OT_InitBlendFile(Operator):
     bl_idname       = 'dt.init_blend'
@@ -488,8 +443,6 @@ class DAGOR_OT_InitBlendFile(Operator):
     def execute(self,context):
         upd_scenes()
         return {'FINISHED'}
-classes.append(DAGOR_OT_InitBlendFile)
-
 
 class DAGOR_OT_Materialize(Operator):
     bl_idname       = 'dt.materialize_nodes'
@@ -509,9 +462,6 @@ class DAGOR_OT_Materialize(Operator):
         for obj in sel:
             node_to_geo(obj)
         return {'FINISHED'}
-classes.append(DAGOR_OT_Materialize)
-
-
 #PANELS
 class DAGOR_PT_composits(Panel):
     bl_space_type = 'VIEW_3D'
@@ -559,7 +509,7 @@ class DAGOR_PT_composits(Panel):
                     warning.operator('dt.node_make_unic', text = 'Make unic').node = context.object.name
                 for obj in col.objects:
                     node = ent_editor.box()
-                    row = node.row(align = True)
+                    row = node.row()
                     row.prop(obj,'hide_viewport',text='',emboss = False)
                     row.prop(obj,'instance_collection', text = '')
                     remove = row.operator('dt.node_remove_entity', icon = 'TRASH', text = '')
@@ -568,9 +518,7 @@ class DAGOR_PT_composits(Panel):
                     if obj.dagorprops.get('weight:r') is None:
                         node.operator('dt.node_init_weight').node = obj.name
                     else:
-                        weight = node.row(align = True)
-                        weight.prop(obj.dagorprops,'["weight:r"]')
-                        weight.operator('dt.node_clear_weight', text = "", icon = 'TRASH').node = obj.name
+                        node.prop(obj.dagorprops,'["weight:r"]')
             else:
                 node = ent_editor.box()
                 row = node.row()
@@ -668,23 +616,12 @@ class DAGOR_PT_composits(Panel):
         if pref.cmp_imp_maximized:
             importer.label(text = 'import path:')
             importer.prop(P.importer,'filepath',text='')
-            toggles = importer.column(align = True)
-            row = toggles.row()
-            row.prop(P.importer,'refresh_cache', toggle = True,
-                icon = 'CHECKBOX_HLT' if P.importer.refresh_cache else 'CHECKBOX_DEHLT')
-            row = toggles.row()
-            row.prop(P.importer,'with_sub_cmp', toggle = True,
-                icon = 'CHECKBOX_HLT' if P.importer.with_sub_cmp else 'CHECKBOX_DEHLT')
-            row = toggles.row()
-            row.prop(P.importer,'with_dags', toggle = True,
-                icon = 'CHECKBOX_HLT' if P.importer.with_dags else 'CHECKBOX_DEHLT')
+            importer.prop(P.importer,'refresh_cache')
+            importer.prop(P.importer,'with_sub_cmp')
+            importer.prop(P.importer,'with_dags')
             if P.importer.with_dags:
-                row = toggles.row()
-                row.prop(P.importer,'with_lods', toggle = True,
-                icon = 'CHECKBOX_HLT' if P.importer.with_lods else 'CHECKBOX_DEHLT')
-            button = importer.row()
-            button.scale_y = 2
-            button.operator('dt.cmp_import', icon = 'IMPORT')
+                importer.prop(P.importer,'with_lods')
+            importer.operator('dt.cmp_import')
 
         exporter = l.box()
         header = exporter.row()
@@ -695,9 +632,7 @@ class DAGOR_PT_composits(Panel):
             exporter.label(text = 'export path:')
             exporter.prop(P.exporter, 'dirpath',text = '')
             exporter.prop(P.exporter, 'collection')
-            button = exporter.row()
-            button.scale_y = 2
-            button.operator('dt.cmp_export', icon = 'EXPORT')
+            exporter.operator('dt.cmp_export')
 
         tools = l.box()
         header = tools.row()
@@ -710,8 +645,20 @@ class DAGOR_PT_composits(Panel):
             self.draw_node_props(context,tools)
             self.draw_entity_editor(context,tools)
         return
-classes.append(DAGOR_PT_composits)
 
+classes = [
+            DAGOR_OT_InitBlendFile,
+            DAGOR_OT_Materialize,
+            DAGOR_OT_node_explode,
+            DAGOR_OT_node_revert,
+            DAGOR_OT_node_rebuild,
+            DAGOR_OT_bbox_to_gameobj,
+            DAGOR_OT_node_init_weight,
+            DAGOR_OT_node_remove_entity,
+            DAGOR_OT_node_add_entity,
+            DAGOR_OT_node_make_unic,
+            DAGOR_PT_composits,
+            ]
 
 def register():
     for cl in classes:

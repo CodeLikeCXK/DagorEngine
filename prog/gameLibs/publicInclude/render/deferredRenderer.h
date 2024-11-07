@@ -1,14 +1,14 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
-#include <drv/3d/dag_decl.h>
+#include <3d/dag_drvDecl.h>
 #include <3d/dag_resPtr.h>
 #include <3d/dag_texMgr.h>
 #include <shaders/dag_postFxRenderer.h>
-#include <shaders/dag_DynamicShaderHelper.h>
 #include <render/deferredRT.h>
 #include <EASTL/array.h>
 #include <EASTL/fixed_vector.h>
@@ -94,7 +94,6 @@ public:
   void setVar() { renderTargets.setVar(); }
   void changeResolution(const int w, const int h) { renderTargets.changeResolution(w, h); }
   void debugRender(int show_gbuffer = USE_DEBUG_GBUFFER_MODE);
-  void debugRenderVectors(int show_gbuffer = USE_DEBUG_GBUFFER_MODE, int vec_count = -1, int vec_scale = 0.f);
   // returns true if 32 bit depth buffer was created
   uint32_t recreateDepth(uint32_t fmt) { return renderTargets.recreateDepth(fmt); }
   int getWidth() const { return renderTargets.getWidth(); }
@@ -109,11 +108,9 @@ public:
   const ManagedTex &getRtAll(uint32_t idx) const { return renderTargets.getRtAll(idx); }
   ManagedTexView getRtAllView(uint32_t idx) const { return {getRtAll(idx)}; }
   uint32_t getRtNum() const { return renderTargets.getRtNum(); }
-  void swapDepth(ResizableTex &ndepth) { renderTargets.swapDepth(ndepth); }
 
 protected:
   DeferredRT renderTargets;
   ShadingResolver shadingResolver;
   PostFxRenderer debugRenderer;
-  DynamicShaderHelper debugVecRenderer;
 };

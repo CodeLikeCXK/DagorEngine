@@ -1,13 +1,15 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#include "device.h"
+#if _TARGET_C3
 
-#include "device_memory.h"
+#endif
 #include <generic/dag_sort.h>
-#include <perfMon/dag_statDrv.h>
-
-#include "globals.h"
-#include "resource_manager.h"
 
 using namespace drv3d_vulkan;
+
+#if USE_NX_MEMORY_TRACKER
+WinCritSec DeviceMemoryPool::nxMemTrackingLock;
+uintptr_t DeviceMemoryPool::nxMemTrackingAdress = 0;
+#endif
 
 namespace
 {
@@ -128,12 +130,11 @@ void DeviceMemoryPool::initClassType(DeviceMemoryClass cls)
   }
   target.shrink_to_fit();
   sort(target, MemoryClassCompare(cls, memoryConfig, types));
-  String typesDump(64, "vulkan: memory class '%s' uses [", memory_class_name(cls));
+  debug("vulkan: Memory class '%s' uses memory type...", memory_class_name(cls));
   for (auto &&index : target)
-    typesDump.aprintf(4, "%u,", index);
-  typesDump.pop_back();
-  typesDump += "] memory types";
-  debug(typesDump);
+  {
+    debug("...%u...", index);
+  }
 }
 
 DeviceMemoryTypeRange DeviceMemoryPool::selectMemoryType(VkDeviceSize size, uint32_t mask, DeviceMemoryClass cls) const
@@ -318,8 +319,7 @@ DeviceMemory DeviceMemoryPool::allocate(const DeviceMemoryClassAllocationInfo &i
 
 DeviceMemory DeviceMemoryPool::allocate(const DeviceMemoryTypeAllocationInfo &info)
 {
-  TIME_PROFILE(vulkan_mem_alloc);
-  VulkanDevice &vkDev = Globals::VK::dev;
+  VulkanDevice &vkDev = get_device().getVkDevice();
 
   DeviceMemory result;
 
@@ -367,13 +367,25 @@ DeviceMemory DeviceMemoryPool::allocate(const DeviceMemoryTypeAllocationInfo &in
     if (isHostVisibleMemoryType(info.typeIndex))
     {
       VULKAN_EXIT_ON_FAIL(vkDev.vkMapMemory(vkDev.get(), result.memory, 0, VK_WHOLE_SIZE, 0, (void **)&result.pointer));
-      if (!result.pointer)
-      {
-        vkDev.vkFreeMemory(vkDev.get(), result.memory, nullptr);
-        logAllocationError(info, "vulkan map memory silent fail (mapped to nullptr!)", true /*verbose*/);
-        return DeviceMemory{};
-      }
     }
+
+#if USE_NX_MEMORY_TRACKER
+    {
+      WinAutoLock lock(nxMemTrackingLock);
+
+      uintptr_t trackingPtr = nxMemTrackingAdress;
+      if (!trackingPtr)
+      {
+        nswitch::profiler::trackHeap(nx_mem_tracking_base, nx_mem_tracking_base * 2ULL, "vk mem");
+        nxMemTrackingAdress = nx_mem_tracking_base;
+        trackingPtr = nx_mem_tracking_base;
+      }
+      nxMemTrackingAdress += info.size;
+      result.trackingPtr = (void *)trackingPtr;
+      nswitch::profiler::trackAlloc(result.trackingPtr, info.size, 0, "vk mem");
+    }
+#endif
+
     types[info.typeIndex].heap->inUse += info.size;
     ++allocations;
   }
@@ -384,7 +396,14 @@ DeviceMemory DeviceMemoryPool::allocate(const DeviceMemoryTypeAllocationInfo &in
 
 void DeviceMemoryPool::free(const DeviceMemory &memory)
 {
-  VulkanDevice &vkDev = Globals::VK::dev;
+  VulkanDevice &vkDev = get_device().getVkDevice();
+#if USE_NX_MEMORY_TRACKER
+  {
+    WinAutoLock lock(nxMemTrackingLock);
+    nswitch::profiler::trackFree(memory.trackingPtr, "vk mem");
+  }
+#endif
+
   types[memory.type].heap->inUse -= memory.size;
   VULKAN_LOG_CALL(vkDev.vkFreeMemory(vkDev.get(), memory.memory, nullptr));
   ++frees;
@@ -406,7 +425,7 @@ void DeviceMemoryPool::printStats()
   debug("%u allocations and %u frees leaves %u allocations in use", allocations, frees, allocations - frees);
   debug("%s in use, %s avrg allocation size", byte_size_unit(totalSize), byte_size_unit(totalSize / (allocations - frees)));
 
-  Globals::Mem::res.printStats(false, false);
+  get_device().resources.printStats(false, false);
 
   uint32_t deltaAlloc = allocations - lastAllocationCount;
   uint32_t deltaFree = frees - lastFreeCount;
@@ -416,18 +435,16 @@ void DeviceMemoryPool::printStats()
   lastFreeCount += deltaFree;
 }
 
-void DeviceMemoryPool::logAllocationError(const DeviceMemoryTypeAllocationInfo &info, const char *reason, bool verbose)
+void DeviceMemoryPool::logAllocationError(const DeviceMemoryTypeAllocationInfo &info, const char *reason)
 {
-  const Heap *targetHeap = types[info.typeIndex].heap;
-  if (verbose)
-    D3D_ERROR("vulkan: allocation %u failed due to [%s], asked %s of memory type %u from device heap %u (%u of %u(%u max) Mb used)",
-      allocations + 1, reason, byte_size_unit(info.size), info.typeIndex, targetHeap->index, targetHeap->inUse >> 20,
-      targetHeap->limit >> 20, targetHeap->size >> 20);
 #if DAGOR_DBGLEVEL > 0
-  else
-    debug("vulkan: allocation %u failed due to [%s], asked %s of memory type %u from device heap %u (%u of %u(%u max) Mb used)",
-      allocations + 1, reason, byte_size_unit(info.size), info.typeIndex, targetHeap->index, targetHeap->inUse >> 20,
-      targetHeap->limit >> 20, targetHeap->size >> 20);
+  const Heap *targetHeap = types[info.typeIndex].heap;
+  debug("vulkan: allocation %u failed due to [%s], asked %s of memory type %u from device heap %u (%u of %u(%u max) Mb used)",
+    allocations + 1, reason, byte_size_unit(info.size), info.typeIndex, targetHeap->index, targetHeap->inUse >> 20,
+    targetHeap->limit >> 20, targetHeap->size >> 20);
+#else
+  G_UNUSED(info);
+  G_UNUSED(reason);
 #endif
 }
 
@@ -456,10 +473,4 @@ int DeviceMemoryPool::MemoryClassCompare::order(uint32_t l, uint32_t r) const
     return 1;
   else
     return 0;
-}
-
-uint32_t DeviceMemoryPool::getCurrentAvailableDeviceKb()
-{
-  // TODO: use cached values if reading takes too much time
-  return Globals::VK::phy.getCurrentAvailableMemoryKb(Globals::VK::dev.getInstance());
 }

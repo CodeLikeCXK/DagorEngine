@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "terra.h"
 #include <debug/dag_debug.h>
 

@@ -1,5 +1,5 @@
 
-function foo(x, y) {
+let function foo(x, y) {
     return function(a, b) {
         return a + b;
     }

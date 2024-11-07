@@ -1,14 +1,9 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
-
-#include <drv/3d/rayTrace/dag_drvRayTrace.h> // for D3D_HAS_RAY_TRACING
-
-#include "device_resource.h"
-
 #if !D3D_HAS_RAY_TRACING
 #error raytrace acceleration structure resource header should not be included when RT is off
 #endif
 
+#include "device_resource.h"
 
 namespace drv3d_vulkan
 {
@@ -17,8 +12,9 @@ class ExecutionContext;
 
 struct RaytraceASDescription
 {
-  bool isTopLevel;
-  VkDeviceSize size;
+  RaytraceGeometryDescription *geometry;
+  uint32_t count;
+  RaytraceBuildFlags flags;
 
   void fillAllocationDesc(AllocationDesc &alloc_desc) const;
 };
@@ -51,7 +47,7 @@ public:
   void makeSysCopy(ExecutionContext &ctx);
 
   template <int Tag>
-  void onDelayedCleanupBackend(){};
+  void onDelayedCleanupBackend(ContextBackend &){};
 
   template <int Tag>
   void onDelayedCleanupFrontend(){};
@@ -64,8 +60,6 @@ public:
 #if VK_KHR_ray_tracing_pipeline || VK_KHR_ray_query
   VkDeviceAddress getDeviceAddress(VulkanDevice &device);
 #endif
-
-  static RaytraceAccelerationStructure *create(bool top_level, VkDeviceSize size);
 };
 
 inline VkBuildAccelerationStructureFlagsKHR ToVkBuildAccelerationStructureFlagsKHR(RaytraceBuildFlags flags)
@@ -84,7 +78,7 @@ inline VkBuildAccelerationStructureFlagsKHR ToVkBuildAccelerationStructureFlagsK
   return result;
 }
 
-VkAccelerationStructureGeometryKHR RaytraceGeometryDescriptionToVkAccelerationStructureGeometryKHR(
+VkAccelerationStructureGeometryKHR RaytraceGeometryDescriptionToVkAccelerationStructureGeometryKHR(VulkanDevice &vkDev,
   const RaytraceGeometryDescription &desc);
 
 } // namespace drv3d_vulkan

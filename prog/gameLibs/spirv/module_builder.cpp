@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "module_nodes.h"
 #include <spirv/module_builder.h>
 
@@ -260,13 +258,17 @@ IdRef ModuleBuilder::getSourceFile() const { return {}; }
 
 void ModuleBuilder::addSourceCodeExtension(eastl::string str) { sourceCodeExtension.emplace_back(eastl::move(str)); }
 
-BufferKind getBufferKindFromTypeNode(NodePointer<NodeTypedef> value_type)
+// utils
+BufferKind spirv::get_buffer_kind(NodePointer<NodeOpVariable> var)
 {
+  auto ptrType = as<NodeOpTypePointer>(var->resultType);
+  auto valueType = as<NodeTypedef>(ptrType->type);
+
   bool isUniformBlock = false;
   bool isStorageBlock = false;
   bool isReadOnly = false;
   // have to look at the properties to figure out what we got
-  for (auto &&prop : value_type->properties)
+  for (auto &&prop : valueType->properties)
   {
     if (is<PropertyBlock>(prop))
     {
@@ -287,27 +289,7 @@ BufferKind getBufferKindFromTypeNode(NodePointer<NodeTypedef> value_type)
     return BufferKind::Uniform;
   else if (isStorageBlock)
     return isReadOnly ? BufferKind::ReadOnlyStorage : BufferKind::Storage;
-
   return BufferKind::Err;
-}
-
-// utils
-BufferKind spirv::get_buffer_kind(NodePointer<NodeOpVariable> var)
-{
-  auto ptrType = as<NodeOpTypePointer>(var->resultType);
-  auto valueType = as<NodeTypedef>(ptrType->type);
-
-  BufferKind ret = getBufferKindFromTypeNode(valueType);
-
-  if (ret == BufferKind::Err)
-  {
-    // try to solve buffer kind with trace-up once for bindless buffers as they are defined via nested arrray
-    // and only inner array are decorated
-    if (is<NodeOpTypeRuntimeArray>(valueType))
-      return getBufferKindFromTypeNode(as<NodeOpTypeRuntimeArray>(valueType)->elementType);
-  }
-
-  return ret;
 }
 
 void spirv::re_index(ModuleBuilder &builder)

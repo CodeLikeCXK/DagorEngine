@@ -1,6 +1,7 @@
 //
 // Dagor Tech 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -36,7 +37,7 @@ public:
 
   virtual ~ScriptPanelParam();
 
-  void fillParameter(PropPanel::ContainerPropertyControl *panel, int &pid, SquirrelObject param);
+  void fillParameter(PropPanel2 *panel, int &pid, SquirrelObject param);
   void getFromScript();
 
   virtual void setToScript(SquirrelObject &param);
@@ -45,10 +46,10 @@ public:
   virtual void validate() {}
   virtual void getTargetList(Tab<SimpleString> &list) {}
 
-  virtual long onChanging(int pid, PropPanel::ContainerPropertyControl &panel) { return 0; }
-  virtual void onChange(int pid, PropPanel::ContainerPropertyControl &panel) = 0;
-  virtual void onClick(int pid, PropPanel::ContainerPropertyControl &panel) {}
-  virtual void onPostEvent(int pcb_id, PropPanel::ContainerPropertyControl &panel) {}
+  virtual long onChanging(int pid, PropPanel2 &panel) { return 0; }
+  virtual void onChange(int pid, PropPanel2 &panel) = 0;
+  virtual void onClick(int pid, PropPanel2 &panel) {}
+  virtual void onPostEvent(int pcb_id, PropPanel2 &panel) {}
 
   virtual void save(DataBlock &blk) = 0;
   virtual void load(const DataBlock &blk) = 0;
@@ -68,7 +69,7 @@ protected:
   virtual void createControl() {}
   virtual void getValueFromScript(SquirrelObject param);
 
-  virtual void setupParameter(PropPanel::ContainerPropertyControl *panel, int &pid);
+  virtual void setupParameter(PropPanel2 *panel, int &pid);
   virtual void removeControl();
   virtual void setVisible(bool visible);
   virtual void setEnabled(bool enabled);
@@ -76,7 +77,7 @@ protected:
   SimpleString paramName, mCaption;
   int mPid, mPriorPid;
   bool mVisible, mEnabled;
-  PropPanel::ContainerPropertyControl *mPanel;
+  PropPanel2 *mPanel;
   ScriptPanelContainer *mParent;
   SqPlus::SquirrelFunction<void> *onChangeCallback;
   SquirrelObject mParam;
@@ -89,16 +90,16 @@ public:
   ScriptPanelContainer(CSQPanelWrapper *wrapper, ScriptPanelContainer *parent, const char *name, const char *caption);
   virtual ~ScriptPanelContainer();
 
-  virtual void fillParams(PropPanel::ContainerPropertyControl *panel, int &pid, SquirrelObject param);
+  virtual void fillParams(PropPanel2 *panel, int &pid, SquirrelObject param);
   virtual void callChangeScript(bool script_update_flag);
   virtual void updateParams();
   virtual void validate();
   virtual void getTargetList(Tab<SimpleString> &list);
 
-  virtual long onChanging(int pid, PropPanel::ContainerPropertyControl &panel);
-  virtual void onChange(int pid, PropPanel::ContainerPropertyControl &panel);
-  virtual void onClick(int pid, PropPanel::ContainerPropertyControl &panel);
-  virtual void onPostEvent(int pid, PropPanel::ContainerPropertyControl &panel);
+  virtual long onChanging(int pid, PropPanel2 &panel);
+  virtual void onChange(int pid, PropPanel2 &panel);
+  virtual void onClick(int pid, PropPanel2 &panel);
+  virtual void onPostEvent(int pid, PropPanel2 &panel);
 
   virtual void save(DataBlock &blk);
   virtual void load(const DataBlock &blk);
@@ -114,8 +115,8 @@ public:
   virtual void sendMessage(int pid, int message, void *arg);
 
 protected:
-  void scriptControlFactory(PropPanel::ContainerPropertyControl *panel, int &pid, SquirrelObject param);
-  virtual bool scriptExtFactory(PropPanel::ContainerPropertyControl *panel, int &pid, SquirrelObject param);
+  void scriptControlFactory(PropPanel2 *panel, int &pid, SquirrelObject param);
+  virtual bool scriptExtFactory(PropPanel2 *panel, int &pid, SquirrelObject param);
 
   const char *getParamName(SquirrelObject param);
   const char *getParamCaption(SquirrelObject param, const char *name);

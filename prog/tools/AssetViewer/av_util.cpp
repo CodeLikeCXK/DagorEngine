@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "av_util.h"
 
 #include <libTools/staticGeom/geomObject.h>

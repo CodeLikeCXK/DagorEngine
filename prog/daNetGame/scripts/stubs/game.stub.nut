@@ -1,3 +1,0 @@
-global const ANIM_SINGLE = "ANIM_SINGLE"
-global const ANIM_CYCLIC = "ANIM_CYCLIC"
-global const ANIM_EXTRAPOLATED = "ANIM_EXTRAPOLATED"

@@ -1,8 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-#pragma once
-
 // defines full draw/dispatch ready state that can be applied to execution context
-
+#pragma once
 #include "util/tracked_state.h"
 #include "state_field_graphics.h"
 #include "dynamic_graphics_state.h"
@@ -10,7 +7,6 @@
 #include "front_framebuffer_state.h"
 #include "front_render_pass_state.h"
 #include "render_pass_resource.h"
-#include "state_field_graphics.h"
 
 namespace drv3d_vulkan
 {

@@ -1,5 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
+#include <string.h>
 #include <stdio.h>
 #include <osApiWrappers/dag_direct.h>
 #include <osApiWrappers/dag_symHlp.h>
@@ -49,12 +48,12 @@ static bool read_dump(IGenLoad &load_cb, Cb proc)
   return true;
 };
 
-inline eastl::string replace_slashes(eastl::string &&s)
+inline eastl::string replace_slashes(eastl::string &s)
 {
   for (auto &c : s)
     if (c == '\\')
       c = '/';
-  return std::move(s);
+  return s;
 }
 
 inline eastl::string read_short_string_str(IGenLoad &stream)
@@ -67,10 +66,6 @@ inline eastl::string read_short_string_str(IGenLoad &stream)
   r[length] = 0;
   return r;
 };
-
-#if !defined(_WIN32) && !defined(_WIN64)
-#define _cdecl
-#endif
 
 int _cdecl main(int argc, char **argv)
 {

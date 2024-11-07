@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -61,8 +62,7 @@ protected:
       return;
     if (!vf.isScreenRatioVisible(v_bbox3_center(node.bbox), node.sphRad2(), node.sphMaxSubRad2()))
       return;
-    const Occlusion *occlusion = vf.getOcclusion();
-    if (occlusion != nullptr && occlusion->isOccludedBox(node.bbox))
+    if (vf.isUsingOcclusion() && current_occlusion && current_occlusion->isOccludedBox(node.bbox)) // fixme: pass occlusion
       return;
     if (!is_obj)
     {

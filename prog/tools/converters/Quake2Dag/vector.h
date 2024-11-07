@@ -1,5 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-#pragma once
+#ifndef VECTOR_H
+
+#define VECTOR_H
 
 // ############################################################################
 // ##                                                                        ##
@@ -676,3 +677,5 @@ private:
   Vector3d<float> mP1;
   Vector3d<float> mP2;
 };
+
+#endif

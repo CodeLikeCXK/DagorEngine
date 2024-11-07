@@ -1,8 +1,8 @@
-function foo() {
+let function foo() {
   const x = "asdf"
   println(x)
 
-  function bar() {
+  let function bar() {
     let a = x
   }
   bar()

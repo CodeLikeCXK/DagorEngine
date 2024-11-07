@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <stdint.h>
 #include <windows.h>
 
@@ -239,7 +237,7 @@ ThreadStackUnwinder *start_unwind_thread_stack(ThreadStackUnwindProvider &, intp
 
 void stop_unwind_thread_stack(ThreadStackUnwinder *s) { delete s; }
 
-#if !ARCH_X86_64 && !ARCH_ARM_64
+#if !ARCH_X86_64
 struct RUNTIME_FUNCTION
 {
   DWORD BeginAddress;
@@ -250,7 +248,7 @@ using PRUNTIME_FUNCTION = RUNTIME_FUNCTION *;
 
 static inline ULONG64 ContextPC(CONTEXT &context) { return ULONG64(context_instruction_pointer(context)); }
 
-#if defined(ARCH_X86_64) || ARCH_ARM_64
+#if defined(ARCH_X86_64)
 static __forceinline PRUNTIME_FUNCTION LookupFunctionEntry(DWORD64 program_counter, PDWORD64 image_base)
 {
   return ::RtlLookupFunctionEntry(program_counter, image_base, nullptr);
@@ -296,8 +294,8 @@ static bool TryUnwindModule(bool at_top_frame, CONTEXT &context)
     // For leaf function on Windows ARM64, return address is at LR(X30).  Add
     // CONTEXT_UNWOUND_TO_CALL flag to avoid unwind ambiguity for tailcall on
     // ARM64, because padding after tailcall is not guaranteed.
-    context.Pc = context.Lr;
-    context.ContextFlags |= CONTEXT_UNWOUND_TO_CALL;
+    context->Pc = context->Lr;
+    context->ContextFlags |= CONTEXT_UNWOUND_TO_CALL;
 #else
 #error Unsupported Windows 64-bit Arch
 #endif

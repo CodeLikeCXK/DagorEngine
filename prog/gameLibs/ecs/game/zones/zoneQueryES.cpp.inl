@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <ecs/game/zones/zoneQuery.h>
 #include <ecs/core/entityManager.h>
 #include <math/dag_mathUtils.h>

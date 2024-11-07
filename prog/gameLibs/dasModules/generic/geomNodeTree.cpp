@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <dasModules/aotGeomNodeTree.h>
 
 #include "math/dag_geomNodeUtils.h"

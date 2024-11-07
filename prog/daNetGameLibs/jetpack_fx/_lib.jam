@@ -1,4 +1,0 @@
-if $(HaveRenderer) = yes {
-  gamePulls += framework_jetpack_fx_pull ;
-  UseProgLibs += daNetGameLibs/jetpack_fx ;
-}

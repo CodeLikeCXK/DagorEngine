@@ -1,10 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <3d/dag_texMgr.h>
-#include <drv/3d/dag_texture.h>
-#include <drv/3d/dag_tex3d.h>
+#include <3d/dag_tex3d.h>
 #include <3d/dag_createTex.h>
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
 #include <3d/ddsxTex.h>
 #include <ioSys/dag_fileIo.h>
 #include <ioSys/dag_fastSeqRead.h>
@@ -155,14 +152,6 @@ public:
       file_ptr_t fp = ::df_open(fileName, DF_READ);
       if (!fp)
         return NULL;
-
-      struct AutoClose
-      {
-        file_ptr_t filePtr;
-        AutoClose(file_ptr_t f) : filePtr(f) {}
-        ~AutoClose() { ::df_close(filePtr); }
-      } autoClose(fp);
-
       int flen = ::df_length(fp);
 
       if (offset)
@@ -172,14 +161,16 @@ public:
       }
 
       if (flen <= 0)
+      {
+        ::df_close(fp);
         return NULL;
+      }
 
       t = d3d::create_tex(NULL, width, height, format, 1, fn);
 
       if (t)
       {
         apply_gen_tex_props(t, tmd);
-        set_texture_separate_sampler(id, get_sampler_info(tmd));
 
         uint8_t *data = NULL;
         int stride = 0;
@@ -262,6 +253,7 @@ public:
         }
         else
         {
+          ::df_close(fp);
           G_ASSERTF(0, "cannot lock raw texture");
           del_d3dres(t);
           return NULL;

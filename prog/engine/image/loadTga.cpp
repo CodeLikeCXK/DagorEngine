@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <image/dag_tga.h>
 #include <image/dag_texPixel.h>
 #include <osApiWrappers/dag_files.h>
@@ -190,7 +188,7 @@ static bool readhdr(TgaHeader &hdr, IGenLoad &crd)
     if (hdr.cmlen)
       crd.seekrel(hdr.cmlen * ((hdr.cmes + 7) / 8));
   }
-  DAGOR_CATCH(const IGenLoad::LoadException &) { return false; }
+  DAGOR_CATCH(IGenLoad::LoadException &) { return false; }
   return true;
 }
 
@@ -295,7 +293,7 @@ TexImage32 *load_tga32(IGenLoad &crd, IMemAlloc *mem, bool *out_used_alpha, unsi
         ptr -= hdr.w;
     }
     memfree(buf, tmpmem);
-    // DEBUG_CTX("TGA32 loaded well");
+    // debug_ctx ( "TGA32 loaded well" );
     if (app_data_len)
       *app_data_len = read_app_data(crd, app_data, *app_data_len);
     if (out_used_alpha)

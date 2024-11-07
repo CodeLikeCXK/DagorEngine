@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -9,8 +10,6 @@
 #include <daScript/misc/sysos.h>
 #include <osApiWrappers/dag_files.h>
 #include <osApiWrappers/dag_vromfs.h>
-#include <osApiWrappers/dag_basePath.h>
-#include <osApiWrappers/dag_direct.h>
 #include <ska_hash_map/flat_hash_map2.hpp>
 
 #define DASLIB_MODULE_NAME "daslib"
@@ -85,11 +84,6 @@ class DagFileAccess : public das::ModuleFileAccess
 {
   das::das_map<das::string, das::string> extraRoots;
   das::FileAccess *localAccess;
-
-public:
-  bool verbose = true;
-
-private:
   das::FileAccessPtr makeLocalFileAccess()
   {
     auto res = das::make_smart<DagFileAccess>(bind_dascript::HotReload::DISABLED);
@@ -127,7 +121,6 @@ public:
       modGet = modAccess->modGet;
       includeGet = modAccess->includeGet;
       moduleAllowed = modAccess->moduleAllowed;
-      verbose = modAccess->verbose;
       derivedAccess = true;
     }
   }
@@ -167,8 +160,8 @@ public:
       auto res = owner->getFileInfo(fname);
       if (storeOpenedFiles && res)
       {
-        auto it = owner->filesOpened.find(fname);
-        if (DAGOR_LIKELY(it != owner->filesOpened.end()))
+        auto it = owner->filesOpened.find_as(fname);
+        if (EASTL_LIKELY(it != owner->filesOpened.end()))
         {
           filesOpened.emplace(fname, it->second);
         }
@@ -182,8 +175,7 @@ public:
     file_ptr_t f = df_open(fname.c_str(), DF_READ | DF_IGNORE_MISSING);
     if (!f)
     {
-      if (verbose)
-        logerr("Script file %s not found", fname.c_str());
+      logerr("Script file %s not found", fname.c_str());
       return nullptr;
     }
     if (storeOpenedFiles)
@@ -231,25 +223,6 @@ public:
   {
     extraRoots[mod] = path;
     return true;
-  }
-  virtual bool isSameFileName(const das::string &f1, const das::string &f2) const override
-  {
-    G_UNUSED(f1);
-    G_UNUSED(f2);
-    return true;
-    // TODO: implement this
-    // das::string fixed1;
-    // das::string fixed2;
-    // G_ASSERT(f1.size() < DAGOR_MAX_PATH && f2.size() < DAGOR_MAX_PATH);
-    // if (!dd_resolve_named_mount(fixed1, f1.c_str()))
-    //   fixed1 = f1;
-    // if (!dd_resolve_named_mount(fixed2, f2.c_str()))
-    //   fixed2 = f2;
-    // dd_simplify_fname_c(fixed1.data());
-    // dd_simplify_fname_c(fixed2.data());
-    // fixed1.force_size(strlen(fixed1.data()));
-    // fixed2.force_size(strlen(fixed2.data()));
-    // return das::ModuleFileAccess::isSameFileName(fixed1, fixed2);
   }
 };
 } // namespace bind_dascript

@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.4)
 project(sqjsrepl VERSION 4.0 LANGUAGES C CXX)
 
+option(DISABLE_STATIC "Avoid building/installing static libraries." OFF)
+option(DISABLE_DYNAMIC "Avoid building/installing dynamic libraries." ON)
 option(ENABLE_VAR_TRACE "Enable variable change tracing feature." OFF)
 
 add_subdirectory(../../squirrel "${PROJECT_BINARY_DIR}/squirrel")
@@ -9,21 +11,20 @@ add_subdirectory(../../sqmodules "${PROJECT_BINARY_DIR}/sqmodules")
 
 #add_library(sqjsrepl native.cpp)
 add_executable(sqjsrepl native.cpp)
-target_link_libraries(sqjsrepl squirrel sqstdlib sqmodules)
+target_link_libraries(sqjsrepl squirrel_static sqstdlib_static sqmodules_static)
 
-target_include_directories(squirrel PUBLIC
+target_include_directories(squirrel_static PUBLIC
   "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/../../include>"
   "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/../../internal>"
-  "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/../../helpers>"
 )
 
-target_include_directories(sqstdlib PUBLIC
+target_include_directories(sqstdlib_static PUBLIC
   "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/../../include>"
   "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/../../internal>"
   "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/../..>"
 )
 
-target_include_directories(sqmodules PUBLIC
+target_include_directories(sqmodules_static PUBLIC
   "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/../../include>"
 )
 

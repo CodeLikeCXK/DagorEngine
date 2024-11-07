@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-#pragma once
 
 #define I_DAGORMAT 0x70a066e2
 

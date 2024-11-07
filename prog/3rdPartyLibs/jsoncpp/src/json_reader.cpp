@@ -178,8 +178,6 @@ Reader::readValue()
       commentsBefore_ = "";
    }
 
-   if (nodes_.size() > 1000)
-     return addError( "Syntax error: too deep json > 1000", token );
 
    switch ( token.type_ )
    {

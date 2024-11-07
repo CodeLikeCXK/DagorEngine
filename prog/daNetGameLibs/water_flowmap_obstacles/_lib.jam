@@ -1,4 +1,0 @@
-if $(HaveRenderer) = yes {
-  gamePulls += framework_water_flowmap_obstacles_pull ;
-  UseProgLibs += daNetGameLibs/water_flowmap_obstacles ;
-}

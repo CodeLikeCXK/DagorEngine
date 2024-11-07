@@ -20,7 +20,6 @@ namespace das {
         AstExprStringBuilderAnnotation(ModuleLibrary & ml)
             :  AstExpressionAnnotation<ExprStringBuilder> ("ExprStringBuilder", ml) {
             addField<DAS_BIND_MANAGED_FIELD(elements)>("elements");
-            addFieldEx ( "stringBuilderFlags", "stringBuilderFlags", offsetof(ExprStringBuilder, stringBuilderFlags), makeExprStringBuilderFlags() );
         }
     };
 
@@ -49,19 +48,6 @@ namespace das {
         virtual SimNode * simulateDeletePtr ( Context & context, const LineInfo & at, SimNode * sube, uint32_t count ) const override {
             return context.code->makeNode<SimNode_DeleteHandlePtr<MakeStruct,true>>(at,sube,count);
         }
-        static void * jit_new ( Context * ) {
-            auto res = new MakeStruct();
-            res->addRef();
-            return res;
-        }
-        static void jit_delete ( void * ptr, Context * ) {
-            if ( ptr ) {
-                auto res = (MakeStruct *) ptr;
-                res->delRef();
-            }
-        }
-        virtual void * jitGetNew() const override { return (void *) &jit_new; }
-        virtual void * jitGetDelete() const override { return (void *) &jit_delete; }
     };
 
     struct AstExprNamedCallAnnotation : AstExpressionAnnotation<ExprNamedCall> {
@@ -87,7 +73,6 @@ namespace das {
             :  AstExprCallFuncAnnotation<ExprCall> ("ExprCall", ml) {
             addField<DAS_BIND_MANAGED_FIELD(doesNotNeedSp)>("doesNotNeedSp");
             addField<DAS_BIND_MANAGED_FIELD(cmresAlias)>("cmresAlias");
-            addField<DAS_BIND_MANAGED_FIELD(notDiscarded)>("notDiscarded");
         }
     };
 
@@ -192,7 +177,6 @@ namespace das {
             :  AstExprMakeLocalAnnotation<ExprMakeStruct> ("ExprMakeStruct", ml) {
             addField<DAS_BIND_MANAGED_FIELD(structs)>("structs");
             addField<DAS_BIND_MANAGED_FIELD(block)>("_block","block");
-            addField<DAS_BIND_MANAGED_FIELD(constructor)>("constructor","constructor");
             this->addFieldEx ( "makeStructFlags", "makeStructFlags", offsetof(ExprMakeStruct, makeStructFlags), makeExprMakeStructFlags() );
         }
     };
@@ -218,7 +202,6 @@ namespace das {
             addField<DAS_BIND_MANAGED_FIELD(exprWhere)>("exprWhere");
             addField<DAS_BIND_MANAGED_FIELD(subexpr)>("subexpr");
             addField<DAS_BIND_MANAGED_FIELD(generatorSyntax)>("generatorSyntax");
-            addField<DAS_BIND_MANAGED_FIELD(tableSyntax)>("tableSyntax");
         }
     };
 

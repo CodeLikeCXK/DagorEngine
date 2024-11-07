@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -30,9 +31,6 @@ enum ShaderMeshResourceFlags
 
   // load only vdata src (packed block) and don't load it ot vertex/index buffers
   SRLOAD_SRC_ONLY = 0x10,
-
-  // vertex and index buffers can be bound as shader resources
-  SRLOAD_BIND_SHADER_RES = 0x20,
 };
 
 

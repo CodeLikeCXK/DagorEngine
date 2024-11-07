@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <animChar/dag_animate2ndPass.h>
 #include <anim/dag_animBlendCtrl.h>
 #include <gameRes/dag_gameResSystem.h>
@@ -117,8 +115,9 @@ void Animate2ndPassCtx::Ctrl::initAnimState(const GeomNodeTree &tree)
     am.animId = anim.getGraph().getNodeId(tree.getNodeName(i));
     if (am.animId != -1)
     {
-      if (!anim.getA2D().anim.pos.getNodeId(tree.getNodeName(i)) && !anim.getA2D().anim.scl.getNodeId(tree.getNodeName(i)) &&
-          !anim.getA2D().anim.rot.getNodeId(tree.getNodeName(i)))
+      if (!anim.getA2D().getPoint3Anim(AnimV20::CHTYPE_POSITION, tree.getNodeName(i)) &&
+          !anim.getA2D().getPoint3Anim(AnimV20::CHTYPE_SCALE, tree.getNodeName(i)) &&
+          !anim.getA2D().getQuatAnim(AnimV20::CHTYPE_ROTATION, tree.getNodeName(i)))
         continue; // skip not-animated node
       am.geomId = i;
       animMap.push_back(am);
@@ -145,7 +144,7 @@ void Animate2ndPassCtx::Ctrl::update(real dt, GeomNodeTree &tree, AnimV20::Animc
         anim.getGraph().getNodeTm(tls, animMap[i].animId, tree.getNodeTm(animMap[i].geomId), NULL);
     else
     {
-      vec4f wt = v_splats(w);
+      vec4f wt = v_splat4(&w);
       for (int i = 0, e = animMap.size(); i < e; i++)
       {
         const vec4f *p1 = NULL, *s1 = NULL;

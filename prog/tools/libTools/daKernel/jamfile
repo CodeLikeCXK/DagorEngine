@@ -2,14 +2,17 @@ Root    ?= ../../../.. ;
 Location = prog/tools/libTools/daKernel ;
 
 StrictCompile = yes ;
-KernelLinkage = dynamic ;
+DriverLinkage = dynamic ;
 ProjectAllowsOodle = yes ;
-UseQuirrel = none ;
 include $(Root)/prog/tools/tools_setup.jam ;
 
 TargetType    = dll ;
 Target        = tools/libTools/daKernel ;
-include $(Root)/prog/tools/tools_setup_outdir_bin.jam ;
+include $(Root)/prog/_jBuild/defaults.jam ;
+
+OutDir = $(Root)/tools/dagor3_cdk/bin ;
+if $(Platform) = win64 { OutDir = $(OutDir)64 ; }
+if $(Platform) in linux64 macosx { OutDir = $(OutDir)-$(Platform) ; }
 
 Sources =
   daKernel.cpp
@@ -22,7 +25,7 @@ AddIncludes =
   $(Root)/prog/engine/sharedInclude
 ;
 
-CPPopt = -D__B_KERNEL_LIB ;
+CPPopt = -D__B_MINICORE ;
 
 UseProgLibs =
   engine/osApiWrappers
@@ -33,7 +36,7 @@ UseProgLibs =
   engine/perfMon/daProfiler
 ;
 
-if $(Platform) in windows {
+if $(Platform) in win32 win64 {
   UseProgLibs +=
     engine/osApiWrappers/messageBox
   ;
@@ -45,7 +48,7 @@ if $(Platform) in windows {
 }
 
 # separate fpic code from everything else
-if $(Platform) in linux {
+if $(Platform) in linux64 {
   UseProgLibs +=
     engine/osApiWrappers/messageBox/stub
     engine/workCycle/stub

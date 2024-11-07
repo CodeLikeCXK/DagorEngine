@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <de3_interface.h>
 #include <de3_dxpFactory.h>
 #include <assets/asset.h>
@@ -7,12 +5,10 @@
 #include <oldEditor/de_interface.h>
 #include <libTools/dtx/ddsxPlugin.h>
 #include <coolConsole/coolConsole.h>
-#include <drv/3d/dag_texture.h>
-#include <drv/3d/dag_driver.h>
-#include <drv/3d/dag_info.h>
+#include <3d/dag_drv3d.h>
 #include <3d/dag_texMgr.h>
 #include <3d/dag_createTex.h>
-#include <drv/3d/dag_tex3d.h>
+#include <3d/dag_tex3d.h>
 #include <generic/dag_smallTab.h>
 #include <ioSys/dag_memIo.h>
 #include <osApiWrappers/dag_direct.h>
@@ -466,13 +462,13 @@ public:
           InPlaceMemLoadCB crd(bq->ptr, bq->len);
           crd.seekrel(sizeof(ddsx::Header));
           bt->allocateTex();
-          if (d3d_load_ddsx_tex_contents(bt, tid, bt_ref.id, bq_hdr, crd, 0, target_lev - bq_lev, 1) != TexLoadRes::OK)
+          if (!d3d_load_ddsx_tex_contents(bt, tid, bt_ref.id, bq_hdr, crd, 0, target_lev - bq_lev, 1))
             DAEDITOR3.conError("error loading tex %s", a->getName());
           bq->free();
 
           InPlaceMemLoadCB crd_hq(hq->ptr, hq->len);
           crd_hq.seekrel(sizeof(ddsx::Header));
-          if (d3d_load_ddsx_tex_contents(bt, tid, bt_ref.id, hq_hdr, crd_hq, 0, 0, bq_lev) != TexLoadRes::OK)
+          if (!d3d_load_ddsx_tex_contents(bt, tid, bt_ref.id, hq_hdr, crd_hq, 0, 0, bq_lev))
             DAEDITOR3.conError("error loading tex %s", hq_a->getName());
           hq->free();
 
@@ -494,7 +490,7 @@ public:
       InPlaceMemLoadCB crd(bq->ptr, bq->len);
       crd.seekrel(sizeof(ddsx::Header));
       bt->allocateTex();
-      if (d3d_load_ddsx_tex_contents(bt, tid, bt_ref.id, bq_hdr, crd, 0, 0, 1) != TexLoadRes::OK)
+      if (!d3d_load_ddsx_tex_contents(bt, tid, bt_ref.id, bq_hdr, crd, 0, 0, 1))
         DAEDITOR3.conError("error loading tex %s", a->getName());
       bq->free();
 
@@ -549,7 +545,7 @@ public:
     InPlaceMemLoadCB crd(bq->ptr, bq->len);
     crd.seekrel(sizeof(ddsx::Header));
     bt->allocateTex();
-    if (d3d_load_ddsx_tex_contents(bt, tid, BAD_TEXTUREID, *(ddsx::Header *)bq->ptr, crd, 0, 0, 1) != TexLoadRes::OK)
+    if (!d3d_load_ddsx_tex_contents(bt, tid, BAD_TEXTUREID, *(ddsx::Header *)bq->ptr, crd, 0, 0, 1))
       DAEDITOR3.conError("error loading tex %s", a ? a->getName() : tex_fn);
     bq->free();
     _bt->replaceTexResObject(bt);

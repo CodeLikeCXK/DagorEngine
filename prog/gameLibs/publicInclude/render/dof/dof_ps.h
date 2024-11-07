@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -73,5 +74,4 @@ protected:
   bool performedNearDof = false, performedFarDof = false;
   float minCheckDist = 0.08f;
   bool on = true;
-  d3d::SamplerHandle clampSampler = d3d::INVALID_SAMPLER_HANDLE;
 };

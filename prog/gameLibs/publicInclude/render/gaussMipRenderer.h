@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -15,6 +16,6 @@ public:
   ~GaussMipRenderer() {}
   GaussMipRenderer() {}
   void close() { mipRenderer.close(); }
-  bool init(bool alpha = false) { return mipRenderer.init(alpha ? "gaussian_mipchain_alpha" : "gaussian_mipchain"); }
+  bool init() { return mipRenderer.init("gaussian_mipchain"); }
   void render(BaseTexture *tex) { mipRenderer.render(tex); }
 };

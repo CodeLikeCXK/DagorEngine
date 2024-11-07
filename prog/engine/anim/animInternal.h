@@ -1,6 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
-
 #include <startup/dag_globalSettings.h>
 #include <debug/dag_log.h>
 

@@ -1,2 +1,0 @@
-gamePulls += daNetGameLibs_ri_phys_DAS_pull_AOT ;
-UseProgLibs += daNetGameLibs/ri_phys ;

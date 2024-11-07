@@ -1,8 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <libTools/dagFileRW/dagMatRemapUtil.h>
-#include <propPanel/c_control_event_handler.h>
+#include <propPanel2/c_control_event_handler.h>
 #include <assets/asset.h>
 #include <shaders/dag_shMaterialUtils.h>
 #include <3d/dag_materialData.h>
@@ -14,19 +13,14 @@
 #include <dag/dag_vector.h>
 #include "entityMatFileResource.h"
 
-class Node;
-
-class EntityMaterialEditor : public PropPanel::ControlEventHandler
+class EntityMaterialEditor : public ControlEventHandler
 {
 public:
-  void loadSettings(const DataBlock &settings);
-  void saveSettings(DataBlock &settings) const;
-
   void begin(DagorAsset *asset, IObjEntity *asset_entity);
   bool end();
 
   void saveAllChanges();
-  void fillPropPanel(PropPanel::ContainerPropertyControl &panel);
+  void fillPropPanel(PropertyContainerControlBase &panel);
 
 private:
   struct EntityLodMatData
@@ -40,11 +34,11 @@ private:
     void save(const dag::Vector<int> &mats_to_save_ids);
   };
 
-  void fillMatPropPanel(int lod, int mat_id, PropPanel::ContainerPropertyControl &mat_panel);
-  void refillMatPropPanel(int lod, int mat_id, PropPanel::ContainerPropertyControl &editor_panel);
-  static void addShaderProps(int mat_gui_elements_baseid, PropPanel::ContainerPropertyControl &mat_panel,
-    const dag::Vector<MatVarDesc> &vars, const dag::Vector<int> &var_indices = {});
-  void addShaderPropsCategories(int mat_gui_elements_baseid, PropPanel::ContainerPropertyControl &mat_panel,
+  void fillMatPropPanel(int lod, int mat_id, PropertyContainerControlBase &mat_panel);
+  void refillMatPropPanel(int lod, int mat_id, PropertyContainerControlBase &editor_panel);
+  static void addShaderProps(int mat_gui_elements_baseid, PropertyContainerControlBase &mat_panel, const dag::Vector<MatVarDesc> &vars,
+    const dag::Vector<int> &var_indices = {});
+  void addShaderPropsCategories(int mat_gui_elements_baseid, PropertyContainerControlBase &mat_panel,
     const dag::Vector<MatVarDesc> &vars, const ShaderSeparatorToPropsType &shaderSeparatorToProps);
   void updateAssetShaderMaterial(int lod, int mat_id);
   bool applyMaterialOverride(int lod, int mat_id);
@@ -67,22 +61,15 @@ private:
   Tab<String> getAvailableShaderClasses() const;
   DataBlock makeCurMatPropertiesBlk(int lod, int mat_id) const;
 
-  void onChange(int pcb_id, PropPanel::ContainerPropertyControl *panel) override;
-  void onClick(int pcb_id, PropPanel::ContainerPropertyControl *panel) override;
+  void onChange(int pcb_id, PropertyContainerControlBase *panel) override;
+  void onClick(int pcb_id, PropertyContainerControlBase *panel) override;
 
   static dag::Vector<DagorAsset *> getLoadedRendInstAssets(const DagorAssetMgr &assetMgr);
   static bool isAssetDependsOnProxyMat(const DagorAssetMgr &assetMgr, const DagorAsset &asset, const char *proxy_mat_asset_file_name);
   void modifyAllAffectedLoadedAssets(const char *proxy_mat_Name);
 
-  static int getMaterialIndexByName(const DagMatFileResourcesHandler &file_res, const char *name);
-  static void createSubMaterialToMaterialIndexMap(const char *dag_name, const Node &node, const DagMatFileResourcesHandler &file_res,
-    dag::Vector<int> &map);
-  static void countMaterialUsage(const char *dag_name, const Node &node, const DagMatFileResourcesHandler &file_res,
-    dag::Span<int> materials);
-
   bool active = false;
   bool isReloading = false;
-  bool showTriangleCount = false;
 
   dag::Vector<EntityLodMatData> matDataPerLod;
   String assetSrcFolderPath;
@@ -93,7 +80,7 @@ private:
   const DataBlock *shRemapBlk;
   ska::flat_hash_map<eastl::string, ShaderSeparatorToPropsType> shaderPropSeparators;
 
-  void transferChangesToLods(int lod, int mat_id, PropPanel::ContainerPropertyControl *panel);
+  void transferChangesToLods(int lod, int mat_id, PropertyContainerControlBase *panel);
 
   static void applyToCommonVars(dag::Vector<MatVarDesc> &dst_vars, const dag::Vector<MatVarDesc> &src_vars,
     eastl::function<void(MatVarDesc &, const MatVarDesc &)> common_var_cb);

@@ -1,6 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
-
 #include "timeline.h"
 #include "driver.h"
 #include "render_work.h"
@@ -22,8 +20,8 @@ class TimelineManager
   {};
 
 public:
-  typedef Timeline<RenderWork, CpuReplaySync, REPLAY_TIMELINE_HISTORY_SIZE> CpuReplay;
-  typedef Timeline<FrameInfo, GpuExecuteSync, GPU_TIMELINE_HISTORY_SIZE> GpuExecute;
+  typedef Timeline<RenderWork, CpuReplaySync, MAX_RETIREMENT_QUEUE_ITEMS> CpuReplay;
+  typedef Timeline<FrameInfo, GpuExecuteSync, FRAME_FRAME_BACKLOG_LENGTH> GpuExecute;
 
 private:
   CpuReplay cpuReplay;
@@ -40,23 +38,6 @@ public:
   void init();
 
   TimelineManager() = default;
-};
-
-// wrappers to make them accesible via forward declaration
-class GpuExecuteTimelineSpan : public TimelineSpan<TimelineManager::GpuExecute>
-{
-public:
-  template <typename Manager>
-  GpuExecuteTimelineSpan(Manager &tl_man) : TimelineSpan<TimelineManager::GpuExecute>(tl_man)
-  {}
-};
-
-class CpuReplayTimelineSpan : public TimelineSpan<TimelineManager::CpuReplay>
-{
-public:
-  template <typename Manager>
-  CpuReplayTimelineSpan(Manager &tl_man) : TimelineSpan<TimelineManager::CpuReplay>(tl_man)
-  {}
 };
 
 } // namespace drv3d_vulkan

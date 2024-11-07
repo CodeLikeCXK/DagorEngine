@@ -1,4 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __GAIJIN_EDITORCORE_EC_GIZMOFILTER_H__
+#define __GAIJIN_EDITORCORE_EC_GIZMOFILTER_H__
 #pragma once
 
 #include <EditorCore/ec_interface.h>
@@ -187,3 +188,5 @@ private:
 
   void surfaceMove(IGenViewportWnd *wnd, int x, int y, int vp_i, const Point3 &pos, Point3 &move_delta);
 };
+
+#endif

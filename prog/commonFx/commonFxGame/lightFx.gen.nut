@@ -25,11 +25,10 @@ declare_struct("LightFxSize", 1,
 ]);
 
 
-declare_struct("LightFxParams", 3,
+declare_struct("LightFxParams", 2,
 [
   { name="phaseTime", type="real", defVal=1 },
   { name="burstMode", type="bool", defVal=false },
-  { name="cloudLight", type="bool", defVal=false },
   { name="color", type="LightFxColor" },
   { name="size", type="LightFxSize" },
 ]);

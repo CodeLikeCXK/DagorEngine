@@ -1,15 +1,11 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
-#include <drv/3d/dag_rwResource.h>
-#include <drv/3d/dag_viewScissor.h>
-#include <drv/3d/dag_renderTarget.h>
-#include <drv/3d/dag_buffers.h>
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
+#include <3d/dag_drv3dCmd.h>
 #include <math/dag_Point3.h>
 #include <math/dag_TMatrix4.h>
 #include <perfMon/dag_statDrv.h>
 #include <shaders/dag_computeShaders.h>
 #include <shaders/dag_postFxRenderer.h>
+#include <shaders/dag_shaderBlock.h>
 #include <shaders/dag_shaders.h>
 #include <util/dag_convar.h>
 #include <util/dag_string.h>
@@ -96,9 +92,7 @@ void ShadingResolver::resolve(BaseTexture *resolveTarget, const TMatrix &view_tm
       for (int i = 0; i < RESOLVE_GBUFFER_MAX_PERMUTATIONS; ++i)
         d3d::set_rwbuffer(STAGE_CS, 1 + i, tileBufs[i].getBuf());
 
-      // Group size != RESOLVE_GBUFFER_TILE_SIZE, but it still has to dispatch a group for each tile
-      classifyTilesCS->dispatch((info.w + RESOLVE_GBUFFER_TILE_SIZE - 1) / RESOLVE_GBUFFER_TILE_SIZE,
-        (info.h + RESOLVE_GBUFFER_TILE_SIZE - 1) / RESOLVE_GBUFFER_TILE_SIZE, 1);
+      classifyTilesCS->dispatchThreads(info.w, info.h, 1);
 
       for (int i = 0; i < RESOLVE_GBUFFER_MAX_PERMUTATIONS; ++i)
         d3d::set_rwbuffer(STAGE_CS, 1 + i, nullptr);
@@ -202,8 +196,10 @@ void ShadingResolver::resolve(BaseTexture *resolveTarget, const TMatrix &view_tm
 
 void ShadingResolver::recreateTileBuffersIfNeeded(const int w, const int h)
 {
-  const int new_tiles_w = (w + RESOLVE_GBUFFER_TILE_SIZE - 1) / RESOLVE_GBUFFER_TILE_SIZE;
-  const int new_tiles_h = (h + RESOLVE_GBUFFER_TILE_SIZE - 1) / RESOLVE_GBUFFER_TILE_SIZE;
+  // Unfortunately, eastl::array does not know how to bind to elements unlike the std one
+  auto group_sizes = classifyTilesCS->getThreadGroupSizes();
+  const int new_tiles_w = (w + group_sizes[0] - 1) / group_sizes[0];
+  const int new_tiles_h = (h + group_sizes[1] - 1) / group_sizes[1];
   if (new_tiles_w == tiles_w && new_tiles_h == tiles_h)
   {
     G_ASSERT(tileBufs.size() == RESOLVE_GBUFFER_MAX_PERMUTATIONS);
@@ -282,15 +278,4 @@ void DeferredRenderTarget::debugRender(int mode)
   if (debugRenderer.getMat() == NULL)
     debugRenderer = PostFxRenderer(DEBUG_RENDER_GBUFFER_SHADER_NAME);
   debug_render_gbuffer(debugRenderer, renderTargets, mode);
-}
-
-void DeferredRenderTarget::debugRenderVectors(int mode, int vec_count, int vec_scale)
-{
-  if (debugVecRenderer.material == NULL)
-  {
-    debugVecRenderer = DynamicShaderHelper();
-    debugVecRenderer.init(DEBUG_RENDER_GBUFFER_WITH_VECTORS_SHADER_NAME, nullptr, 0, DEBUG_RENDER_GBUFFER_WITH_VECTORS_SHADER_NAME,
-      true);
-  }
-  debug_render_gbuffer_with_vectors(debugVecRenderer, renderTargets, mode, vec_count, vec_scale);
 }

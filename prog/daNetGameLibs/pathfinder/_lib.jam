@@ -1,2 +1,0 @@
-gamePulls += framework_pathfinder_pull daNetGameLibs_pathfinder_DAS_pull_AOT ;
-UseProgLibs += daNetGameLibs/pathfinder ;

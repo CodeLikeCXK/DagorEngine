@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -168,8 +169,6 @@ public:
     }
   }
 };
-
-using Matrix44 = TMatrix4;
 
 INLINE TMatrix4 operator*(real, const TMatrix4 &);
 INLINE TMatrix4 inverse43(const TMatrix4 &);

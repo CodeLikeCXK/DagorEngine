@@ -5,8 +5,6 @@
 #endif
 #include <memory/dag_framemem.h>
 #include <EASTL/algorithm.h>
-#include <osApiWrappers/dag_atomic.h>
-
 
 #ifndef APPROVED_STATES_COUNT_IN_STATS
 #define APPROVED_STATES_COUNT_IN_STATS 0
@@ -17,10 +15,10 @@ void apply_authority_state(PhysActor *unit, PhysImpl &phys, float current_time, 
   bool client_smoothing = true, bool dump_phys_update_info = false, danet::BitStream **sync_dump_output_stream = NULL,
   bool update_by_controls = false)
 {
-  if (!phys.isAuthorityApprovedStateProcessed && phys.authorityApprovedState->atTick < phys.currentState.atTick &&
+  if (!phys.isAuthorityApprovedStateProcessed && phys.authorityApprovedState.atTick < phys.currentState.atTick &&
       (update_by_controls ? (phys.currentState.lastAppliedControlsForTick <= 0 ||
-                              phys.currentState.lastAppliedControlsForTick > phys.authorityApprovedState->lastAppliedControlsForTick)
-                          : (phys.unapprovedCT.size() && phys.unapprovedCT[0].producedAtTick <= phys.authorityApprovedState->atTick)))
+                              phys.currentState.lastAppliedControlsForTick > phys.authorityApprovedState.lastAppliedControlsForTick)
+                          : (phys.unapprovedCT.size() && phys.unapprovedCT[0].producedAtTick <= phys.authorityApprovedState.atTick)))
   {
     TIME_PROFILE(apply_authority_state);
     if (phys.authorityApprovedStateDumpFromTime >= 0.f)
@@ -31,8 +29,7 @@ void apply_authority_state(PhysActor *unit, PhysImpl &phys, float current_time, 
     }
     else
     {
-      G_ASSERT(phys.authorityApprovedState); // Assume that it cant be nullptr if !isAuthorityApprovedStateProcessed
-      const typename PhysImpl::PhysStateBase &incomingAAS = *phys.authorityApprovedState;
+      const typename PhysImpl::PhysStateBase &incomingAAS = phys.authorityApprovedState;
       phys.desyncStats.processed++;
 
       bool isStateMatching = false;
@@ -53,11 +50,9 @@ void apply_authority_state(PhysActor *unit, PhysImpl &phys, float current_time, 
         }
         matchingStateIndex = i;
         numMatches++;
-        if (phys.historyStates[i] == incomingAAS && phys.forEachCustomStateSyncer([&](auto ss) {
-              return ss->isHistoryStateEqualAuth(phys.historyStates[i].atTick, incomingAAS.atTick);
-            }))
+        if (phys.historyStates[i] == incomingAAS)
         {
-          oldHistoryStatesCount = matchingStateIndex + 1;
+          oldHistoryStatesCount = i + 1;
           isStateMatching = true;
           break;
         }
@@ -114,10 +109,9 @@ void apply_authority_state(PhysActor *unit, PhysImpl &phys, float current_time, 
         previousVisualLocation.add(phys.currentState.location, curError);
 
         dag::Vector<typename PhysImpl::PhysStateBase, framemem_allocator> alternativeHistoryStates;
-        if (int numStatesToErase = phys.historyStates.size() - oldHistoryStatesCount; numStatesToErase > 0) // Erase alt history (tail)
+        int numStatesToErase = phys.historyStates.size() - oldHistoryStatesCount;
+        if (numStatesToErase > 0)
         {
-          int tickToEraseSince =
-            oldHistoryStatesCount < phys.historyStates.size() ? phys.historyStates[oldHistoryStatesCount].atTick : -1;
           if (eastl::is_trivially_destructible<typename PhysImpl::PhysStateBase>::value)
             alternativeHistoryStates = make_span_const(safe_at(phys.historyStates, oldHistoryStatesCount), numStatesToErase);
           else
@@ -125,17 +119,13 @@ void apply_authority_state(PhysActor *unit, PhysImpl &phys, float current_time, 
             alternativeHistoryStates.resize(numStatesToErase);
             eastl::move_n(safe_at(phys.historyStates, oldHistoryStatesCount), numStatesToErase, alternativeHistoryStates.begin());
           }
-          if (tickToEraseSince >= 0)
-            phys.forEachCustomStateSyncer([&](auto ss) { ss->eraseHistoryStateTail(tickToEraseSince); });
-          phys.historyStates.erase(phys.historyStates.begin() + oldHistoryStatesCount, phys.historyStates.end());
+          erase_items(phys.historyStates, oldHistoryStatesCount, numStatesToErase);
         }
 
-        auto pCustomDesyncCb = phys.getCustomResyncCb();
-
-        typename PhysImpl::PhysStateBase desyncedState, prevDesyncedState;
+        typename PhysImpl::PhysStateBase desyncedState;
+        typename PhysImpl::PhysStateBase prevDesyncedState;
         phys.saveCurrentStateTo(desyncedState, phys.currentState.atTick);
-        if (pCustomDesyncCb)
-          phys.saveCurrentStateTo(prevDesyncedState, phys.previousState.atTick);
+        phys.saveCurrentStateTo(prevDesyncedState, phys.previousState.atTick);
 
         int32_t updateControlsUpToTick = (update_by_controls && phys.currentState.lastAppliedControlsForTick > 0)
                                            ? phys.currentState.lastAppliedControlsForTick + 1
@@ -143,7 +133,6 @@ void apply_authority_state(PhysActor *unit, PhysImpl &phys, float current_time, 
         // Move aircraft to the approved position
         phys.setCurrentState(incomingAAS);
         unit->teleportToPos(true, Point3::xyz(incomingAAS.location.P));
-        phys.forEachCustomStateSyncer([&](auto ss) { return ss->applyAuthState(incomingAAS.atTick); });
 
         // State is restored as we have a desync.
         // If we don't expect it here, then it's time to send update data for the first update
@@ -189,6 +178,7 @@ void apply_authority_state(PhysActor *unit, PhysImpl &phys, float current_time, 
             debug("REacting cur=%d, ctl=%d, pos=(%f,%f,%f)", tick, phys.appliedCT.producedAtTick,
               (float)phys.currentState.location.P.x, (float)phys.currentState.location.P.y, (float)phys.currentState.location.P.z);
 
+
           for (; currentAlternativeHistoryStateIndex < alternativeHistoryStates.size(); ++currentAlternativeHistoryStateIndex)
           {
             if (alternativeHistoryStates[currentAlternativeHistoryStateIndex].atTick > tick)
@@ -205,10 +195,7 @@ void apply_authority_state(PhysActor *unit, PhysImpl &phys, float current_time, 
 
           currentStateIndex = newStateIndex;
           if (phys.historyStates.size() < 4.f / phys.timeStep)
-          {
-            phys.saveCurrentStateToHistory();
-            phys.forEachCustomStateSyncer([&](auto ss) { ss->saveHistoryState(phys.currentState.atTick); });
-          }
+            phys.saveCurrentStateTo(phys.historyStates.push_back(), phys.currentState.atTick);
         }
         // atTime of the flight model is now updateToTick, not updateToTick-1 !!!
 
@@ -238,17 +225,11 @@ void apply_authority_state(PhysActor *unit, PhysImpl &phys, float current_time, 
 
         phys.desyncStats.lastPosDifference.substract(desyncedState.location, phys.currentState.location);
 
-        if (pCustomDesyncCb)
-          (*pCustomDesyncCb)(&phys, prevDesyncedState, desyncedState, incomingAAS, safe_at(phys.historyStates, matchingStateIndex));
+        phys.doCustomResync(prevDesyncedState, desyncedState, incomingAAS, safe_at(phys.historyStates, matchingStateIndex));
       }
 
-      if (oldHistoryStatesCount)
-      {
-        int tickToEraseUpTo =
-          oldHistoryStatesCount < phys.historyStates.size() ? phys.historyStates[oldHistoryStatesCount].atTick : -1;
-        phys.forEachCustomStateSyncer([&](auto ss) { ss->eraseHistoryStateHead(tickToEraseUpTo); });
-        phys.historyStates.erase(phys.historyStates.begin(), phys.historyStates.begin() + oldHistoryStatesCount);
-      }
+      if (oldHistoryStatesCount > 0)
+        erase_items(phys.historyStates, 0, oldHistoryStatesCount);
 
       // Profit!
       phys.isAuthorityApprovedStateProcessed = true;
@@ -278,27 +259,32 @@ void apply_authority_state(PhysActor *unit, PhysImpl &phys, float current_time, 
       const typename PhysImpl::PhysPartialState &incomingPAAS = phys.authorityApprovedPartialState;
       phys.partialStateDesyncStats.processed++;
 
-      int oldHistoryStatesCount = -1;
-      for (int i = 0; i < phys.historyStates.size(); ++i)
+      bool isStateMatching = false;
+      int correspondingStateIndex = -1;
+      for (int index = 0; index < phys.historyStates.size(); ++index)
       {
-        if (phys.historyStates[i].atTick < incomingPAAS.atTick)
+        if (phys.historyStates[index].atTick < incomingPAAS.atTick)
           continue;
-        if (phys.historyStates[i].atTick > incomingPAAS.atTick)
+        if (phys.historyStates[index].atTick > incomingPAAS.atTick)
           break;
 
-        typename PhysImpl::PhysStateBase augmentedState = phys.historyStates[i];
+        correspondingStateIndex = index;
+
+        typename PhysImpl::PhysStateBase augmentedState = phys.historyStates[correspondingStateIndex];
         augmentedState.applyPartialState(incomingPAAS);
-        if (augmentedState == phys.historyStates[i])
+        if (augmentedState == phys.historyStates[correspondingStateIndex])
+        {
+          isStateMatching = true;
           break;
+        }
         else
         {
-          oldHistoryStatesCount = i + 1;
           // partialStateDesyncStats can log more specific stats, currently it isn't implemented here, but in a future it may be
           phys.partialStateDesyncStats.untestable++;
         }
       }
 
-      if (oldHistoryStatesCount >= 0) // No match found
+      if (!isStateMatching && correspondingStateIndex >= 0)
       {
         gamephys::Loc curError;
         phys.calculateCurrentVisualLocationError(current_time, curError);
@@ -307,28 +293,26 @@ void apply_authority_state(PhysActor *unit, PhysImpl &phys, float current_time, 
 
         // Clear the 'alternative future' part of the history
         dag::Vector<typename PhysImpl::PhysStateBase, framemem_allocator> alternativeHistoryStates;
-        if (int numStatesToErase = phys.historyStates.size() - oldHistoryStatesCount; numStatesToErase > 0)
+        int numStatesToErase = phys.historyStates.size() - correspondingStateIndex - 1;
+        if (numStatesToErase > 0)
         {
-          // int tickToEraseSince = oldHistoryStatesCount < phys.historyStates.size() ?
-          // phys.historyStates[oldHistoryStatesCount].atTick : -1;
           if (eastl::is_trivially_destructible<typename PhysImpl::PhysStateBase>::value)
-            alternativeHistoryStates = make_span_const(safe_at(phys.historyStates, oldHistoryStatesCount), numStatesToErase);
+            alternativeHistoryStates = make_span_const(safe_at(phys.historyStates, correspondingStateIndex + 1), numStatesToErase);
           else
           {
             alternativeHistoryStates.resize(numStatesToErase);
-            eastl::move_n(safe_at(phys.historyStates, oldHistoryStatesCount), numStatesToErase, alternativeHistoryStates.begin());
+            eastl::move_n(safe_at(phys.historyStates, correspondingStateIndex + 1), numStatesToErase,
+              alternativeHistoryStates.begin());
           }
-          phys.historyStates.erase(phys.historyStates.begin() + oldHistoryStatesCount, phys.historyStates.end());
+          erase_items(phys.historyStates, correspondingStateIndex + 1, numStatesToErase);
         }
 
-        auto pCustomDesyncCb = phys.getCustomResyncCb();
-
-        typename PhysImpl::PhysStateBase desyncedState, prevDesyncedState;
+        typename PhysImpl::PhysStateBase desyncedState;
+        typename PhysImpl::PhysStateBase prevDesyncedState;
         phys.saveCurrentStateTo(desyncedState, phys.currentState.atTick);
-        if (pCustomDesyncCb)
-          phys.saveCurrentStateTo(prevDesyncedState, phys.previousState.atTick);
+        phys.saveCurrentStateTo(prevDesyncedState, phys.previousState.atTick);
 
-        typename PhysImpl::PhysStateBase augmentedState = phys.historyStates[oldHistoryStatesCount - 1];
+        typename PhysImpl::PhysStateBase augmentedState = phys.historyStates[correspondingStateIndex];
         augmentedState.applyPartialState(incomingPAAS);
         augmentedState.applyDesyncedState(desyncedState);
 
@@ -372,7 +356,7 @@ void apply_authority_state(PhysActor *unit, PhysImpl &phys, float current_time, 
           currentStateIndex = newStateIndex;
 
           if (phys.historyStates.size() < 4.f / phys.timeStep)
-            phys.saveCurrentStateToHistory();
+            phys.saveCurrentStateTo(phys.historyStates.push_back(), phys.currentState.atTick);
         }
         // atTime of the flight model is now forceUpdateUpToTick, not forceUpdateUpToTick-1 !!!
 
@@ -401,9 +385,7 @@ void apply_authority_state(PhysActor *unit, PhysImpl &phys, float current_time, 
 
         phys.partialStateDesyncStats.lastPosDifference.substract(desyncedState.location, phys.currentState.location);
 
-        if (pCustomDesyncCb)
-          (*pCustomDesyncCb)(&phys, prevDesyncedState, desyncedState, augmentedState,
-            safe_at(phys.historyStates, oldHistoryStatesCount - 1));
+        phys.doCustomResync(prevDesyncedState, desyncedState, augmentedState, safe_at(phys.historyStates, correspondingStateIndex));
       }
 
       phys.authorityApprovedPartialState.isProcessed = true;
@@ -416,21 +398,15 @@ void send_authority_state(IPhysActor *unit, PhysImpl &phys, float state_send_per
   void (*send_auth_state_cb)(IPhysActor *, danet::BitStream &&, float),
   void (*send_part_auth_state_cb)(IPhysActor *, danet::BitStream &&, int))
 {
-  G_ASSERT(send_auth_state_cb);
-  if (!phys.authorityApprovedState)
-  {
-    phys.authorityApprovedState = eastl::make_unique<typename PhysImpl::PhysStateBase>();
-    return; // Wait for next update
-  }
-  if (phys.authorityApprovedState->atTick <= 0) // not updated yet
+  if (phys.authorityApprovedState.atTick <= 0) // not updated yet
     return;
+  G_ASSERT(send_auth_state_cb);
   // Send authority approved state to the controlling client
   if (phys.physicsTimeToSendState < 0.f)
   {
     {
       danet::BitStream stateData(sizeof(typename PhysImpl::PhysStateBase));
-      phys.authorityApprovedState->serialize(stateData);
-      phys.forEachCustomStateSyncer([&](auto ss) { ss->serializeAuthState(stateData, phys.authorityApprovedState->atTick); });
+      phys.authorityApprovedState.serialize(stateData);
 
       float dumpFromTime = 0;
 #if !DISABLE_SYNC_DEBUG
@@ -453,7 +429,7 @@ void send_authority_state(IPhysActor *unit, PhysImpl &phys, float state_send_per
     }
     // Save authority approved state production time, effectively
     // marking current state as a good state to start recording desync data.
-    phys.lastProcessedAuthorityApprovedStateAtTick = phys.authorityApprovedState->atTick;
+    phys.lastProcessedAuthorityApprovedStateAtTick = phys.authorityApprovedState.atTick;
 
     phys.physicsTimeToSendState = state_send_period;
     phys.physicsTimeToSendPartialState = state_send_period * 0.25f;
@@ -502,8 +478,11 @@ ResyncState start_update_phys_for_multiplayer(IPhysActor *unit, PhysImpl &phys, 
   if (currentTick - phys.currentState.atTick >= forceUpdatesGracePeriod)
   {
     int32_t newAtTick = currentTick - deferredControllsGracePeriod - max(timespeededMaxUpdatesPerFrame - 1, 0);
-    if (is_model_leaping && !interlocked_compare_exchange(*is_model_leaping, true, false))
+    if (is_model_leaping && !(*is_model_leaping))
+    {
       debug("leaping network unit %d from %u to %u", (int)unit->getId(), phys.currentState.atTick, newAtTick);
+      *is_model_leaping = true;
+    }
     phys.currentState.atTick = newAtTick;
     phys.currentState.canBeCheckedForSync = false;
   }
@@ -572,10 +551,10 @@ void tick_phys_for_multiplayer(IPhysActor *unit, PhysImpl &phys, int32_t tick, i
     {
       if (!phys.fmsyncCurrentData)
         phys.fmsyncCurrentData = new danet::BitStream();
-      interlocked_release_store_ptr(*sync_dump_output_stream, phys.fmsyncCurrentData);
+      *sync_dump_output_stream = phys.fmsyncCurrentData;
     }
     else
-      interlocked_release_store_ptr(*sync_dump_output_stream, (danet::BitStream *)nullptr);
+      *sync_dump_output_stream = NULL;
   }
 
   float curTime = tick * phys.timeStep;
@@ -584,7 +563,7 @@ void tick_phys_for_multiplayer(IPhysActor *unit, PhysImpl &phys, int32_t tick, i
   phys.updatePhys(curTime, phys.timeStep, true);
   unit->postPhysUpdate(tick, phys.timeStep, true);
   if (sync_dump_output_stream)
-    interlocked_release_store_ptr(*sync_dump_output_stream, (danet::BitStream *)nullptr);
+    *sync_dump_output_stream = NULL;
 
   // Authority keeps an extrapolated fakeState of remotely controlled ships,
   // If we update through time, where fakeState is, we can calculate the extrapolation error and fix it slowly
@@ -598,10 +577,7 @@ void tick_phys_for_multiplayer(IPhysActor *unit, PhysImpl &phys, int32_t tick, i
     resync_state.isCorrectedStateObtained = true;
   }
   if (unit->isShadow() && phys.historyStates.size() < 4.f / phys.timeStep)
-  {
-    phys.saveCurrentStateToHistory();
-    phys.forEachCustomStateSyncer([&](auto ss) { ss->saveHistoryState(phys.currentState.atTick); });
-  }
+    phys.saveCurrentStateTo(phys.historyStates.push_back(), phys.currentState.atTick);
 }
 
 template <typename PhysImpl>
@@ -620,10 +596,9 @@ void finish_update_phys_for_multiplayer(IPhysActor *unit, PhysImpl &phys, Resync
   phys.physicsTimeToSendPartialState -= updatedBySeconds;
 
   // save the state we've just obtained
-  if (unit->isAuthority() && phys.physicsTimeToSendState < 0.f && phys.authorityApprovedState) // Note: allocated on first send
+  if (unit->isAuthority() && phys.physicsTimeToSendState < 0.f)
   {
-    phys.saveCurrentStateTo(*phys.authorityApprovedState, phys.currentState.atTick);
-    phys.forEachCustomStateSyncer([&](auto ss) { ss->saveAuthState(phys.currentState.atTick); });
+    phys.saveCurrentStateTo(phys.authorityApprovedState, phys.currentState.atTick);
   }
 
   // Calculate visual location error in order to smoothen visual location of the aircraft on the authority.

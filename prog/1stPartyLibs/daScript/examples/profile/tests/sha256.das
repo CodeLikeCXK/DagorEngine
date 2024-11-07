@@ -1,11 +1,7 @@
 // options log_nodes=true
 
-options solid_context
-
 require math
 require strings
-
-include ../config.das
 
 let
     primes = [[uint
@@ -33,7 +29,6 @@ def toHex(hash:uint[8])
             format(writer,"%08x",i)
     return st
 
-[unsafe_deref,hint(alwaysinline,unsafe_range_check,noalias=data,noalias=hash)]
 def digestBlock(data:uint?; var hash:uint[8])
     var digest:uint[64]
     for j in range(16)
@@ -77,7 +72,6 @@ def digestBlock(data:uint?; var hash:uint[8])
     hash[6] += g
     hash[7] += h
 
-[unsafe_deref,hint(noalias=msg)]
 def sha256(msg:array<uint8>)
     var hash = [[uint
         0x6a09e667;
@@ -95,17 +89,12 @@ def sha256(msg:array<uint8>)
             digestBlock(reinterpret<uint?>(addr(msg[i*64])),hash)
     return toHex(hash)
 
-[export,no_jit,no_aot]
-def main
+[export]
+def test
     let input <- [{for i in range(1024); uint8('.')}]
     let dt = profile(20,"sha256") <|
         for i in range(1024)
             sha256(input)
     verify(sha256(input)=="8adcaee60bb05a9964a1df12d2f007adcb8f3fa20ff7d1ecfde0a2ac301ff412")
-    print("\t{1.0/dt} mb/sec\n")
-    if is_cpp_time()
-        run_files([[TestFile
-            luauFile = "sha256.luau",
-            luaJitFile = "sha256.lua",
-            dotNetFile = "sha256.cs",
-        ]])
+    print("{1.0/dt} mb/sec\n")
+    return true

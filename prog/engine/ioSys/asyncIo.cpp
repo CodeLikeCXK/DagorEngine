@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <ioSys/dag_asyncIo.h>
 #include <osApiWrappers/dag_asyncRead.h>
 #include <osApiWrappers/dag_miscApi.h>
@@ -35,7 +33,7 @@ AsyncLoadCB::AsyncLoadCB(const char *realname)
   }
   else
   {
-    DEBUG_CTX("!getFreeSize");
+    debug_ctx("!getFreeSize");
     buf.minimumChunk = 1;
     buf.size = 64 << 10;
     file.handle = dfa_open_for_read(realname, false);
@@ -74,7 +72,7 @@ void AsyncLoadCB::readBuffered(void *ptr, int size)
     return;
   if (file.pos + size > file.size)
   {
-    DEBUG_CTX("read(%p,%d), file.size=%d, file.pos=%d", ptr, size, file.size, file.pos);
+    debug_ctx("read(%p,%d), file.size=%d, file.pos=%d", ptr, size, file.size, file.pos);
     DAGOR_THROW(LoadException("eof", file.pos));
   }
   if (file.pos >= buf.pos && file.pos < buf.pos + buf.used)
@@ -125,7 +123,7 @@ void AsyncLoadCB::readBuffered(void *ptr, int size)
 
     if (lres != size)
     {
-      DEBUG_CTX("read(%p,%d), file.size=%d, file.pos=%d", ptr, size, file.size, file.pos);
+      debug_ctx("read(%p,%d), file.size=%d, file.pos=%d", ptr, size, file.size, file.pos);
       DAGOR_THROW(LoadException("incomplete read", file.pos));
     }
 
@@ -166,7 +164,7 @@ void AsyncLoadCB::readBuffered(void *ptr, int size)
   dfa_free_asyncdata(asyncdata_handle);
   if (lres != buf.used)
   {
-    DEBUG_CTX("read(%p,%d), file.size=%d, file.pos=%d", ptr, size, file.size, file.pos);
+    debug_ctx("read(%p,%d), file.size=%d, file.pos=%d", ptr, size, file.size, file.pos);
     DAGOR_THROW(LoadException("incomplete read", file.pos));
   }
 
@@ -185,7 +183,7 @@ void AsyncLoadCB::read(void *ptr, int size)
   }
   if (file.pos + size > file.size)
   {
-    DEBUG_CTX("read(%p,%d), file.size=%d, file.pos=%d", ptr, size, file.size, file.pos);
+    debug_ctx("read(%p,%d), file.size=%d, file.pos=%d", ptr, size, file.size, file.pos);
     DAGOR_THROW(LoadException("eof", file.pos));
   }
 
@@ -242,7 +240,7 @@ void AsyncLoadCB::read(void *ptr, int size)
 
     if (lres != buf.size)
     {
-      DEBUG_CTX("read(%p,%d), file.size=%d, file.pos=%d", ptr, buf.size, file.size, file.pos);
+      debug_ctx("read(%p,%d), file.size=%d, file.pos=%d", ptr, buf.size, file.size, file.pos);
       DAGOR_THROW(LoadException("incomplete read", file.pos));
     }
 
@@ -289,7 +287,7 @@ void AsyncLoadCB::read(void *ptr, int size)
 
   if (lres != sizeLeft && lres != file.size - posStart)
   { // readSize - useLessData
-    DEBUG_CTX("%d read(%p, size=%d readSize=%d), file.size=%d, file.pos=%d posStart=%d", lres, ptr, size, sizeLeft, file.size,
+    debug_ctx("%d read(%p, size=%d readSize=%d), file.size=%d, file.pos=%d posStart=%d", lres, ptr, size, sizeLeft, file.size,
       file.pos, posStart);
     DAGOR_THROW(LoadException("incomplete read", file.pos));
   }
@@ -320,10 +318,10 @@ void AsyncLoadCB::seekto(int pos)
 {
   if (pos < 0 || pos > file.size)
   {
-    DEBUG_CTX("seekto(%d), file.size=%d, file.pos=%d", pos, file.size, file.pos);
+    debug_ctx("seekto(%d), file.size=%d, file.pos=%d", pos, file.size, file.pos);
     DAGOR_THROW(LoadException("seek out of range", file.pos));
   }
-  // DEBUG_CTX("seekto(%d), file.size=%d, file.pos=%d", pos, file.size, file.pos);
+  // debug_ctx ( "seekto(%d), file.size=%d, file.pos=%d", pos, file.size, file.pos );
   file.pos = pos;
 }
 

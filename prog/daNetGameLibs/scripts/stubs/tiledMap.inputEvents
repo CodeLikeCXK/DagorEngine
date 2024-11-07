@@ -1,3 +1,0 @@
-return {
-  EventTiledMapZoomed = class { name = "EventTiledMapZoomed" }
-}

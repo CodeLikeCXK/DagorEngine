@@ -48,4 +48,4 @@ CALLSTACK
 LOCALS
 [foo] CLOSURE=FN:foo
 [vargv] ARRAY=[]
-[this] NULL
+[this] TABLE={}

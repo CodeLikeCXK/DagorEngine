@@ -1,7 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
-#include <drv/hid/dag_hiDecl.h>
+#include <humanInput/dag_hiDecl.h>
 
 namespace humaninputxbox360
 {

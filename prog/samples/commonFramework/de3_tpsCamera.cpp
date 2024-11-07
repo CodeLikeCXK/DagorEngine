@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "de3_tpsCamera.h"
 #include <workCycle/dag_workCycle.h>
 

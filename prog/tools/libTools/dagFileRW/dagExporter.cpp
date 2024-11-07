@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <string.h>
 #include <libTools/util/strUtil.h>
 #include <libTools/dagFileRW/dagFileNode.h>
@@ -263,8 +261,6 @@ void DagExporter::saveBigMeshNode(Node *node, const PtrTab<MaterialData> &materi
     flags |= IMP_NF_CASTSHADOW;
   if (node->flags & NODEFLG_RCVSHADOW)
     flags |= IMP_NF_RCVSHADOW;
-  if (node->flags & NODEFLG_POINTCLOUD)
-    flags |= IMP_NF_POINTCLOUD;
 
   if (!dagSaver.start_save_node(node->name, node->wtm, flags))
     goto process_children;
@@ -298,8 +294,6 @@ void DagExporter::saveBigMeshNodeHier(Node *node, const PtrTab<MaterialData> &ma
     flags |= IMP_NF_CASTSHADOW;
   if (node->flags & NODEFLG_RCVSHADOW)
     flags |= IMP_NF_RCVSHADOW;
-  if (node->flags & NODEFLG_POINTCLOUD)
-    flags |= IMP_NF_POINTCLOUD;
 
   dagSaver.start_save_node_raw(node->name, flags, node->child.size());
 

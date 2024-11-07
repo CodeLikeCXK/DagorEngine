@@ -1,8 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <daECS/net/netbase.h>
 #include <daECS/net/connection.h>
-#include <daECS/core/entityManager.h>
 
 class StubNetDriver final : public net::INetDriver
 {
@@ -18,12 +15,12 @@ public:
 class StubConnection final : public net::Connection
 {
 public:
-  StubConnection() : Connection(*g_entity_mgr, 0) {}
+  StubConnection() : Connection(0) {}
   virtual bool isBlackHole() const override { return true; }
   virtual void sendEcho(const char *, uint32_t) override{};
   virtual bool send(int, const danet::BitStream &, PacketPriority, PacketReliability, uint8_t, int) override { return true; }
   virtual int getMTU() const override { return 1 << 30; } // unlimited
-  SystemAddress getIP() const override { return SystemAddress(); }
+  uint32_t getIP() const override { return 0; }
   const char *getIPStr() const override { return nullptr; }
   virtual danet::PeerQoSStat getPeerQoSStat() const override { return danet::PeerQoSStat{}; }
   virtual void disconnect(DisconnectionCause) override { G_ASSERTF(0, "Not supported!"); }

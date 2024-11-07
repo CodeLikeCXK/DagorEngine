@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <util/dag_fastStrMap.h>
 
 #ifdef _TARGET_STATIC_LIB

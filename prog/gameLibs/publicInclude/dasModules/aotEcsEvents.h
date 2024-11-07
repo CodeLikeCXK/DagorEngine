@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -109,7 +110,7 @@ __forceinline void _builtin_send_blobevent2_impl(ecs::EntityManager *mgr, char *
   ecs::Event *evt = (ecs::Event *)evt_data;
   G_UNUSED(evt_type_name);
   fn(*evt);
-  if (DAGOR_UNLIKELY(evt->getFlags() & ecs::EVFLG_DESTROY)) // we have to do it, as it can be that there is immediate strategy.
+  if (EASTL_UNLIKELY(evt->getFlags() & ecs::EVFLG_DESTROY)) // we have to do it, as it can be that there is immediate strategy.
     mgr->getEventsDb().destroy(*evt);
 }
 

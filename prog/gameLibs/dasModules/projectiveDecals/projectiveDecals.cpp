@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <dasModules/aotProjectiveDecals.h>
 #include <dasModules/dasModulesCommon.h>
 #include <dasModules/aotDagorMath.h>

@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -31,18 +32,13 @@ namespace bind_dascript
 
 inline void gun_shoot_node_data_calc_shoot_tm(const ::daweap::GunShootNodeData &data, const Point3 &dir, TMatrix &tm)
 {
-  v_mat_43cu_from_mat44(tm.array, data.calcShootTm(v_ldu(&dir.x), V_C_UNIT_0100));
+  tm = data.calcShootTm(dir);
 }
 
 inline TMatrix gun_shoot_node_data_calc_shoot_tm2(const ::daweap::GunShootNodeData &data, const Point3 &gun_dir, const TMatrix &vis_tm,
   const TMatrix &phys_tm)
 {
   return data.calcShootTm(gun_dir, vis_tm, phys_tm);
-}
-
-inline Point3 gun_shoot_node_data_calc_root_relative_shoot_pos(const ::daweap::GunShootNodeData &data, const GeomNodeTree &tree)
-{
-  return data.calcRootRelativeShootPos(tree);
 }
 
 inline void gun_force_next_shot_time(daweap::Gun &gun, const float at_time) { gun.forceNextShotTime(at_time); }
@@ -52,7 +48,7 @@ inline void gun_calculate_shoot_tm(const daweap::Gun &gun, const Point3 &gun_dir
 {
   TMatrix &result = reinterpret_cast<TMatrix &>(out_tm);
   if (gunPos)
-    v_mat_43cu_from_mat44(result.array, gun.shootNodeData.calcShootTm(v_ldu(&gun_dir.x), V_C_UNIT_0100, v_ldu(&gunPos->x)));
+    result = gun.shootNodeData.calcShootTm(gun_dir, *gunPos);
   else
   {
     if (!vis_tm)
@@ -80,10 +76,6 @@ inline void gun_launch(daweap::Gun &gun, const daweap::LaunchDesc &ld, ecs::Enti
 inline void gun_loadShootNode(daweap::Gun &gun, int shoot_node_idx, const GeomNodeTree &tree)
 {
   gun.loadShootNode(dag::Index16(shoot_node_idx), tree);
-}
-inline void gun_loadShootNode2(daweap::Gun &gun, const char *shoot_node_name, const GeomNodeTree &tree)
-{
-  gun.loadShootNode(shoot_node_name, tree);
 }
 inline void gun_getSpreadSettings(daweap::Gun const &gun, const daweap::GunState &state, SpreadSettings &out)
 {

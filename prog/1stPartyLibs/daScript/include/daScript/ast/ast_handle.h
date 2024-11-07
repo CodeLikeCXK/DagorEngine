@@ -44,7 +44,6 @@ namespace das
                 dw.String(pss);
             }
         }
-        virtual bool hasStringData(das_set<void *> &) const override { return true; }
         virtual bool canCopy() const override { return false; }
         virtual bool canMove() const override { return false; }
         virtual bool canClone() const override { return true; }
@@ -84,7 +83,6 @@ namespace das
             : TypeAnnotation(n,cpn), mlib(l) {
             mlib->getThisModule()->registerAnnotation(this);
         }
-        virtual uint64_t getOwnSemanticHash ( HashBuilder & hb, das_set<Structure *> &, das_set<Annotation *> & ) const override;
         virtual string getSmartAnnotationCloneFunction() const override { return "smart_ptr_clone"; }
         virtual void seal(Module * m) override;
         virtual bool rtti_isHandledTypeAnnotation() const override { return true; }
@@ -100,8 +98,7 @@ namespace das
         virtual void aotVisitGetField(TextWriter & ss, const string & fieldName) override;
         virtual void aotVisitGetFieldPtr(TextWriter & ss, const string & fieldName) override;
         virtual bool canSubstitute(TypeAnnotation * ann) const override;
-        virtual bool hasStringData(das_set<void *> & dep) const override;
-        StructureField & addFieldEx(const string & na, const string & cppNa, off_t offset, const TypeDeclPtr & pT);
+        StructureField & addFieldEx(const string & na, const string & cppNa, off_t offset, TypeDeclPtr pT);
         virtual void walk(DataWalker & walker, void * data) override;
         void updateTypeInfo() const;
         int32_t fieldCount() const { return int32_t(fields.size()); }
@@ -317,10 +314,8 @@ namespace das
             return res;
         }
         static void jit_delete ( void * ptr, Context * ) {
-            if ( ptr ) {
-                OT * res = (OT *) ptr;
-                res->delRef();
-            }
+            OT * res = (OT *) ptr;
+            res->delRef();
         }
     };
 
@@ -495,11 +490,6 @@ namespace das
             walker.walk_dim((char *)pVec->data(), &atit);
         }
         virtual bool isYetAnotherVectorTemplate() const override { return true; }
-        virtual uint64_t getOwnSemanticHash ( HashBuilder & hb, das_set<Structure *> & dep, das_set<Annotation *> & adep ) const override {
-            hb.updateString(getMangledName());
-            vecType->getOwnSemanticHash(hb, dep, adep);
-            return hb.getHash();
-        }
         TypeDeclPtr                vecType;
         DebugInfoHelper            helpA;
         TypeInfo *                 ati = nullptr;
@@ -640,10 +630,10 @@ namespace das
                     ->args({"vec","index","count","context"})->generated = true;
             addExtern<DAS_BIND_FUN(das_vector_each<TT>),SimNode_ExtFuncCallAndCopyOrMove,explicitConstArgFn>(*mod, lib, "each",
                 SideEffects::none, "das_vector_each")
-                    ->args({"vec","context","at"})->generated = true;
+                    ->args({"vec","context"})->generated = true;
             addExtern<DAS_BIND_FUN(das_vector_each_const<TT>),SimNode_ExtFuncCallAndCopyOrMove,explicitConstArgFn>(*mod, lib, "each",
                 SideEffects::none, "das_vector_each_const")
-                    ->args({"vec","context","at"})->generated = true;
+                    ->args({"vec","context"})->generated = true;
             addExtern<DAS_BIND_FUN(das_vector_length<TT>)>(*mod, lib, "length",
                 SideEffects::none, "das_vector_length")->generated = true;
             addExtern<DAS_BIND_FUN(das_vector_capacity<TT>)>(*mod, lib, "capacity",
@@ -693,8 +683,6 @@ namespace das
         ManagedValueAnnotation(ModuleLibrary & mlib, const string & n, const string & cpn = string())
             : TypeAnnotation(n,cpn) {
             using wrapType = typename WrapType<OT>::type;
-            static_assert(sizeof(wrapType)<=sizeof(vec4f), "wrap types have to fit to vec4f");
-            static_assert(sizeof(wrapType)>=sizeof(OT), "value types have to fit to their wrap type");
             valueType = makeType<wrapType>(mlib);
         }
         virtual TypeDeclPtr makeValueType() const override {
@@ -703,7 +691,6 @@ namespace das
         virtual bool rtti_isHandledTypeAnnotation() const override { return true; }
         virtual bool canMove() const override { return true; }
         virtual bool canCopy() const override { return true; }
-        virtual bool canClone() const override { return true; }
         virtual bool isLocal() const override { return true; }
         virtual bool hasNonTrivialCtor() const override {
             return !is_trivially_constructible<OT>::value;
@@ -728,14 +715,6 @@ namespace das
         }
         virtual SimNode * simulateNullCoalescing ( Context & context, const LineInfo & at, SimNode * s, SimNode * dv ) const override {
             return context.code->makeNode<SimNode_NullCoalescing<OT>>(at,s,dv);
-        }
-        das::SimNode *simulateClone(das::Context &context, const das::LineInfo &at, das::SimNode *l, das::SimNode *r) const override {
-            return context.code->makeNode<SimNode_Set<OT>>(at, l, r);
-        }
-        virtual uint64_t getOwnSemanticHash ( HashBuilder & hb, das_set<Structure *> & dep, das_set<Annotation *> & adep ) const override {
-            hb.updateString(getMangledName());
-            valueType->getOwnSemanticHash(hb, dep, adep);
-            return hb.getHash();
         }
         TypeDeclPtr valueType;
     };

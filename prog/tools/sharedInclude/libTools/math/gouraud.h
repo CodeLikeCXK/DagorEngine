@@ -1,6 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __DAGOR_GOUARUD_H
+#define __DAGOR_GOUARUD_H
 #pragma once
-
 #include <math/dag_mathBase.h>
 
 #define FLT_ERROR 1e-4f
@@ -183,3 +183,5 @@ private:
 };
 
 #undef FLT_ERROR
+
+#endif

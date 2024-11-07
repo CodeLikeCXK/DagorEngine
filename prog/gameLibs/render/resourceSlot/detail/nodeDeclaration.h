@@ -1,19 +1,11 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <render/resourceSlot/detail/registerAccess.h>
-#include <render/resourceSlot/detail/actionList.h>
-#include <render/resourceSlot/actions.h>
+#include <detail/accessDecl.h>
 #include <detail/expectedLimits.h>
 
 #include <render/daBfg/nodeHandle.h>
 #include <generic/dag_fixedVectorMap.h>
-
-
-namespace das
-{
-class Context;
-} // namespace das
 
 namespace resource_slot::detail
 {
@@ -31,20 +23,16 @@ struct NodeDeclaration
   NodeStatus status = NodeStatus::Empty;
   NodeId id = NodeId::Invalid;
   unsigned generation = 0;
+  const char *source_location = nullptr;
   bool createsSlot = false;
-  ActionList actionList;
+  AccessDeclList action_list;
   resource_slot::detail::AccessCallback declaration_callback;
   dabfg::NodeHandle nodeHandle;
   dag::FixedVectorMap<SlotId, ResourceId, EXPECTED_MAX_DECLARATIONS> resourcesBeforeNode;
-  const das::Context *context = nullptr;
 
   explicit NodeDeclaration(unsigned gen) : generation(gen) {}
-  NodeDeclaration(NodeId node_id, unsigned gen, ActionList &&action_list, resource_slot::detail::AccessCallback decl_cb) :
-    status(NodeStatus::Valid),
-    id(node_id),
-    generation(gen),
-    actionList(eastl::move(action_list)),
-    declaration_callback(eastl::move(decl_cb))
+  NodeDeclaration(NodeId node_id, unsigned gen, const char *source_loc, resource_slot::detail::AccessCallback decl_cb) :
+    status(NodeStatus::Valid), id(node_id), generation(gen), source_location(source_loc), declaration_callback(eastl::move(decl_cb))
   {}
 
   NodeDeclaration() = default;

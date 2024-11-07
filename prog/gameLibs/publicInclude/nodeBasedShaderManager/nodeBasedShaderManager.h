@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -15,7 +16,6 @@
 #include <util/dag_string.h>
 #include <webui/nodeBasedShaderType.h>
 #include <3d/dag_resMgr.h>
-#include <drv/3d/dag_samplerHandle.h>
 
 class InPlaceMemLoadCB;
 class BaseTexture;
@@ -36,8 +36,12 @@ public:
     PS5,
     MTL,
     VULKAN_BINDLESS,
-    MTL_BINDLESS,
-    COUNT,
+    LOAD_COUNT,
+#if IS_OFFLINE_SHADER_COMPILER
+    SAVE_COUNT = LOAD_COUNT,
+#else
+    SAVE_COUNT = 1,
+#endif
     ALL = -1,
   };
 
@@ -83,10 +87,8 @@ private:
 
   struct NodeBasedTexture
   {
-    BaseTexture *usedTextureResId = nullptr;
-    int dynamicTextureVarId = -1;
-    d3d::SamplerHandle sampler = d3d::INVALID_SAMPLER_HANDLE;
-    int dynamicSamplerVarId = -1;
+    BaseTexture *usedTextureResId;
+    int dynamicTextureVarId;
   };
 
   struct NodeBasedBuffer
@@ -96,6 +98,7 @@ private:
   };
 
   dag::Vector<NodeBasedTexture> nodeBasedTextures;
+  dag::Vector<NodeBasedTexture> nodeBasedTexturesNoSampler;
   dag::Vector<NodeBasedBuffer> nodeBasedBuffers;
   dag::Vector<D3DRESID> resIdsToRelease;
   bool isDirty = true;
@@ -109,7 +112,7 @@ private:
   void precacheVariables();
 
   void setConstantBuffer();
-  void setTextures(dag::Vector<NodeBasedTexture> &node_based_textures, int &offset) const;
+  void setTextures(dag::Vector<NodeBasedTexture> &node_based_textures, int &offset, bool has_sampler) const;
   void setBuffers(int &offset) const;
 
   void loadShaderFromStream(uint32_t idx, uint32_t platform_id, InPlaceMemLoadCB &load_stream, uint32_t variant_id);
@@ -118,11 +121,10 @@ private:
 
   bool invalidateCachedResources();
 
-  void fillTextureCache(dag::Vector<NodeBasedTexture> &node_based_textures, const DataBlock &src_block, int offset, bool &has_loaded,
-    bool has_sampler);
+  void fillTextureCache(dag::Vector<NodeBasedTexture> &node_based_textures, const DataBlock &src_block, int offset, bool &has_loaded);
   void fillBufferCache(const DataBlock &src_block, int offset, bool &has_loaded);
 
-  eastl::array<ShaderBinVariants, PLATFORM::COUNT> shaderBin;
+  eastl::array<ShaderBinVariants, PLATFORM::LOAD_COUNT> shaderBin;
   eastl::vector<DataBlock> permParameters;
 
 public:
@@ -164,6 +166,7 @@ public:
     for (D3DRESID id : resIdsToRelease)
       release_managed_res(id);
     nodeBasedTextures.clear();
+    nodeBasedTexturesNoSampler.clear();
     nodeBasedBuffers.clear();
     resIdsToRelease.clear();
     cachedVariableGeneration = ~0u;
@@ -171,7 +174,6 @@ public:
   }
 
   static void clearAllCachedResources();
-  static void initCompilation();
 };
 
 const char *node_based_shader_current_platform_suffix();

@@ -1,12 +1,13 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
 #include <math/dag_TMatrix4.h>
 #include <math/dag_e3dColor.h>
-#include <drv/3d/dag_resId.h>
+#include <3d/dag_resId.h>
 
 
 class DynShaderMeshBuf;

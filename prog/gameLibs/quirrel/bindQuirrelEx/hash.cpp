@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <quirrel/sqModules/sqModules.h>
 #include <hash/md5.h>
 #include <hash/sha1.h>
@@ -90,12 +88,11 @@ void register_hash(SqModules *module_mgr)
   Sqrat::Table exports(module_mgr->getVM());
 
   ///@module hash
-  exports //
+  exports // comments to supress clang-format and allow qdox to generate doc
     .SquirrelFunc("md5", sq_md5, 2, ".s")
     .SquirrelFunc("sha1", sq_sha1, 2, ".s")
     .SquirrelFunc("crc32", sq_crc32, -2, ".si")
-    .SquirrelFunc("crc32_int", sq_crc32_int, -2, ".si")
-    /**/;
+    .SquirrelFunc("crc32_int", sq_crc32_int, -2, ".si");
 
   module_mgr->addNativeModule("hash", exports);
 }

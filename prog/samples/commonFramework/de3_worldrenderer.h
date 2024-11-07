@@ -1,4 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright 2023 by Gaijin Games KFT, All rights reserved.
+
 #pragma once
 
 /** \addtogroup de3Common
@@ -13,10 +14,9 @@
 #include <render/waterObjects.h>
 #include <render/rain.h>
 #include <fx/dag_leavesWind.h>
+#include <render/dag_cur_view.h>
 #include "de3_envi.h"
-#include "dag_cur_view.h"
 #include <shaders/dag_overrideStateId.h>
-#include <scene/dag_visibility.h>
 
 class BaseTexture;
 typedef BaseTexture Texture;
@@ -68,7 +68,6 @@ public:
 
 public:
   SceneEnviSettings envSetts;
-  VisibilityFinder visbilityFinder;
 
   WaterRender reflectionRender, waterRender;
   RainDroplets droplets;

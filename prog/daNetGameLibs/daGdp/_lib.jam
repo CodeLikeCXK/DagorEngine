@@ -1,4 +1,0 @@
-if $(HaveRenderer) = yes {
-  gamePulls += framework_daGdp_pull ;
-  UseProgLibs += daNetGameLibs/daGdp ;
-}

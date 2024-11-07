@@ -1,10 +1,10 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __GAIJIN_ENVIRONMENT_HDR_SETTINGS_DLG__
+#define __GAIJIN_ENVIRONMENT_HDR_SETTINGS_DLG__
 #pragma once
 
-namespace PropPanel
-{
-class DialogWindow;
-}
+
+#include <propPanel2/comWnd/dialog_window.h>
+
 class DataBlock;
 
 
@@ -20,10 +20,12 @@ public:
   bool isHdrModeNone() { return hdrModeNone; }
 
 private:
-  PropPanel::DialogWindow *dlg;
+  CDialogWindow *dlg;
   DataBlock *hdrBlk;
 
   bool levelReloadRequired;
   bool hdrModeNone;
   bool isAcesEnvironment;
 };
+
+#endif //__GAIJIN_ENVIRONMENT_HDR_SETTINGS_DLG__

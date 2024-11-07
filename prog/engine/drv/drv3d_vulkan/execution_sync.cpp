@@ -1,15 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "execution_sync.h"
 #include "pipeline_barrier.h"
-#include "device_resource.h"
-#include "image_resource.h"
-#include "buffer_resource.h"
-#include "resource_manager.h"
-#include "globals.h"
-#include "backend.h"
-#include "execution_state.h"
-#include "execution_context.h"
+#include "device.h"
 
 using namespace drv3d_vulkan;
 
@@ -50,7 +41,11 @@ struct OpsProcessAlgorithm
         if (currObj == ((void *)ops.arr[j].obj))
         {
           if (j > i + 1)
-            eastl::swap(ops.arr[j], ops.arr[i + 1]);
+          {
+            auto swapTemp = ops.arr[i + 1];
+            ops.arr[i + 1] = ops.arr[j];
+            ops.arr[j] = swapTemp;
+          }
           ++i;
         }
       }
@@ -73,13 +68,8 @@ struct OpsProcessAlgorithm
         {
           // means that command stream will have conflicting RW ops that are not solvable
           // add additional sync at caller site between such ops
-          if (!ops.arr[k].verifySelfConflict(ops.arr[j]))
-          {
-            D3D_ERROR("vulkan: mutual-conflicting sync ops %u-%u in complete step!\n %s vs %s from %s", k, j, ops.arr[k].format(),
-              ops.arr[j].format(), Backend::State::exec.getExecutionContext().getCurrentCmdCaller());
-            G_ASSERTF(false,
-              "vulkan: mutual-conflicting sync ops in complete step! \n This is application error! Check log and fix at callsite!\n");
-          }
+          G_ASSERTF(ops.arr[k].verifySelfConflict(ops.arr[j]),
+            "vulkan: mutual-conflicting sync ops %u-%u in complete step!\n %s vs %s", k, j, ops.arr[k].format(), ops.arr[j].format());
         }
       i = rangeEnd + 1;
     }
@@ -89,15 +79,18 @@ struct OpsProcessAlgorithm
   {
     PROFILE_SYNC(vk_sync_partial_covering);
     auto &srcOp = ops.arr[srcOpIndex];
-    scratch.coverageMap.init(srcOp.area);
     auto cachedArea = ops.arr[scratch.partialCoveringDsts[0]].area;
+    scratch.coverageMap.init(srcOp.area);
 
-    // exclude completed areas while merging them if possible
+    // merge dsts if possible
     for (size_t j : scratch.partialCoveringDsts)
     {
       auto &dstOp = ops.arr[j];
       if (cachedArea.mergable(dstOp.area))
+      {
         cachedArea.merge(dstOp.area);
+        continue;
+      }
       else
       {
         scratch.coverageMap.exclude(cachedArea);
@@ -105,9 +98,6 @@ struct OpsProcessAlgorithm
       }
     }
     scratch.coverageMap.exclude(cachedArea);
-
-    // get processable areas from coverage map till its empty
-    // (getArea returns false when coverage map is empty)
 
     // replace original first
     bool replaceArea = scratch.coverageMap.getArea(cachedArea);
@@ -124,7 +114,6 @@ struct OpsProcessAlgorithm
       // read from proper memory if vector was reallocated
       ops.arr.back() = ops.arr[srcOpIndex];
       ops.arr.back().area = cachedArea;
-      ops.arr.back().onPartialSplit();
     }
 
     // cleanup scratches
@@ -152,7 +141,7 @@ struct OpsProcessAlgorithm
         auto &dstOp = ops.arr[j];
         if (dstOp.conflicts(srcOp))
         {
-          srcOp.onConflictWithDst(dstOp);
+          srcOp.onConflictWithDst(dstOp, gpuWorkId);
           if (srcOp.processPartials())
           {
             // use partial solving if we already faced partial coverage
@@ -207,18 +196,28 @@ struct OpsProcessAlgorithm
     if (scratch.src.size() == 0 && scratch.dst.size() == 0)
       return;
 
-    // fill barrier
+    // merge logical addresses
+    ExecutionSyncTracker::LogicAddress srcLA = {VK_PIPELINE_STAGE_NONE, VK_ACCESS_NONE};
+    ExecutionSyncTracker::LogicAddress dstLA = {VK_PIPELINE_STAGE_NONE, VK_ACCESS_NONE};
+
+    // dangerous when we have src-less dst together with full src-dst pair
+    // but most of time it is handled properly because full src-dst pair stage will match src-less only
+    if (scratch.src.size() == 0)
+      srcLA.stage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+
     for (size_t i : scratch.src)
-      ops.arr[i].addToBarrierByTemplateSrc(barrier);
+      srcLA.merge(ops.arr[i].laddr);
 
     for (size_t i : scratch.dst)
-      ops.arr[i].addToBarrierByTemplateDst(barrier);
+      dstLA.merge(ops.arr[i].laddr);
 
-    // if src ops did not added any stages due to suppresion or full src-less conflicts
-    // do src less barrier as-is if synchronization2 is available
-    // otherwise do full commands barrier
-    if (!Globals::VK::phy.hasSynchronization2 && barrier.getStagesSrc() == VK_PIPELINE_STAGE_NONE)
-      barrier.addStagesSrc(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+    // fill barrier
+    barrier.addStages(srcLA.stage, dstLA.stage);
+    ops.arr[0].modifyBarrierTemplate(barrier, srcLA, dstLA);
+    for (size_t i : scratch.src)
+      ops.arr[i].addToBarrierByTemplateSrc(barrier);
+    for (size_t i : scratch.dst)
+      ops.arr[i].addToBarrierByTemplateDst(barrier, gpuWorkId);
   }
 
   void reduceLoopRanges()
@@ -226,8 +225,6 @@ struct OpsProcessAlgorithm
     PROFILE_SYNC(vk_sync_reduce_ranges);
     for (size_t i : scratch.src)
     {
-      if (ops.arr[i].processPartials() && !ops.arr[i].completed)
-        continue;
       if (i != ops.lastIncompleted)
         ops.arr[i] = ops.arr[ops.lastIncompleted];
       ++ops.lastIncompleted;
@@ -260,7 +257,7 @@ struct OpsProcessAlgorithm
 };
 
 template <typename OpsArrayType, typename Resource, typename AreaType, typename Optional>
-bool mergeToLastSyncOp(OpsArrayType &ops, Resource *obj, LogicAddress laddr, AreaType area, Optional opt)
+bool mergeToLastSyncOp(OpsArrayType &ops, Resource *obj, ExecutionSyncTracker::LogicAddress laddr, AreaType area, Optional opt)
 {
   size_t lastSyncOp = obj->getLastSyncOpIndex();
   if (lastSyncOp < ops.arr.size())
@@ -287,32 +284,28 @@ bool mergeToLastSyncOp(OpsArrayType &ops, Resource *obj, LogicAddress laddr, Are
 }
 
 template <typename OpsArrayType, typename Resource, typename Optional>
-bool filterReadsOnSealedObjects(size_t gpu_work_id, OpsArrayType &ops, Resource *obj, LogicAddress laddr, Optional opt)
+bool filterReadsOnSealedObjects(size_t gpu_work_id, OpsArrayType &ops, Resource *obj, ExecutionSyncTracker::LogicAddress laddr,
+  Optional opt)
 {
   if (obj->hasRoSeal())
   {
     if (laddr.isWrite() || !ops.isRoSealValidForOperation(obj, opt))
     {
-      // if seal removal is not silent - we must add last RO op to current uncompleted ops
-      if (!obj->removeRoSealSilently(gpu_work_id))
-      {
-        ops.arr.push_back();
-        ops.arr.back() = ops.arr[ops.lastProcessed];
-        ops.removeRoSeal(obj);
-        ++ops.lastProcessed;
-      }
+      if (obj->tryRemoveRoSeal(gpu_work_id))
+        return false;
+      else
+        DAG_FATAL("vulkan: trying to write into this work item RO sealed %s %p-%s\n%s", obj->resTypeString(), obj, obj->getDebugName(),
+          obj->getCallers());
     }
     else
-    {
-      obj->updateRoSeal(gpu_work_id, laddr);
       return true;
-    }
   }
   return false;
 }
 
 template <typename OpsArrayType, typename Resource, typename AreaType, typename Optional>
-bool filterAccessTracking(size_t gpu_work_id, OpsArrayType &ops, Resource *obj, LogicAddress laddr, AreaType area, Optional opt)
+bool filterAccessTracking(size_t gpu_work_id, OpsArrayType &ops, Resource *obj, ExecutionSyncTracker::LogicAddress laddr,
+  AreaType area, Optional opt)
 {
   if (filterReadsOnSealedObjects(gpu_work_id, ops, obj, laddr, opt))
     return true;
@@ -321,85 +314,14 @@ bool filterAccessTracking(size_t gpu_work_id, OpsArrayType &ops, Resource *obj, 
   return false;
 }
 
-template <typename SrcResource, typename OpsArrayType>
-void aliasSyncInOpsArray(SrcResource *lobj, const AliasedResourceMemory &lmem, OpsArrayType &ops, VkPipelineStageFlags src_stage,
-  ExecutionSyncTracker &tracker)
-{
-#if EXECUTION_SYNC_CHECK_SELF_CONFLICTS > 0
-  const size_t loopRange = ops.arr.size();
-#else
-  const size_t loopRange = ops.lastProcessed;
-#endif
-  for (size_t i = ops.lastIncompleted; i < loopRange; ++i)
-  {
-    auto &op = ops.arr[i];
-    auto *robj = op.obj;
-    if (robj == lobj)
-      continue;
-
-    if (!robj->mayAlias())
-      continue;
-
-    // "alias deactivate" pending op should not generate more alias deactivate actions
-    if (op.laddr.access == VK_ACCESS_NONE)
-      continue;
-
-    const AliasedResourceMemory &rmem = Backend::aliasedMemory.get(robj->getMemoryId());
-    if (rmem.intersects(lmem))
-    {
-#if EXECUTION_SYNC_CHECK_SELF_CONFLICTS > 0
-      if (i >= ops.lastProcessed)
-        D3D_ERROR("vulkan: alias %p:%s from %p:%s in single sync step! objects are used at same time!", lobj, lobj->getDebugName(),
-          robj, robj->getDebugName());
-      else
-#endif
-      {
-        op.aliasEndAccess(src_stage, tracker);
-      }
-    }
-  }
-}
-
-// need this because there is no mayAlias inside base resource object type
-template <typename SrcResource>
-void aliasCheckAndSync(SrcResource *lobj, LogicAddress laddr, ExecutionSyncTracker &tracker)
-{
-  // TODO: optimize: check once per alias change (right now checks for all sync ops)
-  if (laddr.access == VK_ACCESS_NONE)
-    return;
-
-  if (!lobj->mayAlias())
-    return;
-
-  tracker.aliasSync(lobj, laddr.stage);
-}
-
-void ExecutionSyncTracker::aliasSync(Resource *lobj, VkPipelineStageFlags stage)
-{
-  // use special storage to avoid locking memory mutex
-  const AliasedResourceMemory &lmem = Backend::aliasedMemory.get(lobj->getMemoryId());
-  {
-    PROFILE_SYNC(vulkan_alias_sync_buf);
-    aliasSyncInOpsArray(lobj, lmem, bufOps, stage, *this);
-  }
-  {
-    PROFILE_SYNC(vulkan_alias_sync_img);
-    aliasSyncInOpsArray(lobj, lmem, imgOps, stage, *this);
-  }
-}
-
 void ExecutionSyncTracker::addBufferAccess(LogicAddress laddr, Buffer *buf, BufferArea area)
 {
-  buf->checkFrameMemAccess();
-
   if (filterAccessTracking(gpuWorkId, bufOps, buf, laddr, area, 0))
     return;
-  aliasCheckAndSync(buf, laddr, *this);
-  bufOps.arr.push_back({laddr, buf, area, getCaller(), VK_ACCESS_NONE, /*completed*/ false, /*dstConflict*/ false});
+  bufOps.arr.push_back({laddr, buf, area, getCaller(), /*completed*/ false, /*dstConflict*/ false});
 }
 
-void ExecutionSyncTracker::addImageAccessImpl(LogicAddress laddr, Image *img, VkImageLayout layout, ImageArea area,
-  bool nrp_attachment, bool discard)
+void ExecutionSyncTracker::addImageAccess(LogicAddress laddr, Image *img, VkImageLayout layout, ImageArea area)
 {
   // 3d image has no array range, but image view uses it to select the slices, so reset array range.
   if (VK_IMAGE_TYPE_3D == img->getType())
@@ -418,21 +340,11 @@ void ExecutionSyncTracker::addImageAccessImpl(LogicAddress laddr, Image *img, Vk
   if (filterAccessTracking(gpuWorkId, imgOps, img, laddr, area, opAddParams))
     return;
 
-  aliasCheckAndSync(img, laddr, *this);
-  imgOps.arr.push_back({laddr, img, area, getCaller(), VK_ACCESS_NONE, layout, currentRenderSubpass, nativeRPIndex,
-    /*completed*/ false, /*dstConflict*/ false,
-    /*changesLayout*/ false, nrp_attachment, /*handledBySubpassDependency*/ false, /* discard */ discard});
+  imgOps.arr.push_back({laddr, img, area, getCaller(), layout, currentRenderSubpass, /*completed*/ false, /*dstConflict*/ false,
+    /*changesLayout*/ false});
 }
 
-void ExecutionSyncTracker::setCurrentRenderSubpass(uint8_t subpass_idx)
-{
-  currentRenderSubpass = subpass_idx;
-  if (subpass_idx == SUBPASS_NON_NATIVE)
-  {
-    ++nativeRPIndex;
-    G_ASSERTF(nativeRPIndex != NATIVE_RP_INDEX_MAX, "vulkan: sync: too much native RPs in single frame, increase tracker field size");
-  }
-}
+void ExecutionSyncTracker::setCurrentRenderSubpass(uint8_t subpass) { currentRenderSubpass = subpass; }
 
 void ExecutionSyncTracker::ScratchData::clear()
 {
@@ -442,22 +354,24 @@ void ExecutionSyncTracker::ScratchData::clear()
 
 void ExecutionSyncTracker::completeNeeded(VulkanCommandBufferHandle cmd_buffer, const VulkanDevice &dev)
 {
-  // early exit if nothing to be done or delay is enabled
-  if (!anyNonProcessed() || delayCompletion)
+  // early exit if nothing to be done
+  if (!anyNonProcessed())
     return;
+
+  TIME_PROFILE(vulkan_sync_complete_needed);
 
   InternalPipelineBarrier barrier(dev);
 
   if (bufOps.lastProcessed != bufOps.arr.size())
   {
-    PROFILE_SYNC(vulkan_buf_sync);
+    TIME_PROFILE(vulkan_buf_sync);
     OpsProcessAlgorithm<BufferOpsArray> bufAlg(bufOps, scratch, barrier, gpuWorkId);
     bufAlg.completeNeeded();
   }
 
   if (imgOps.lastProcessed != imgOps.arr.size())
   {
-    PROFILE_SYNC(vulkan_img_sync);
+    TIME_PROFILE(vulkan_img_sync);
     OpsProcessAlgorithm<ImageOpsArray> imgAlg(imgOps, scratch, barrier, gpuWorkId);
     imgAlg.completeNeeded();
   }
@@ -465,17 +379,14 @@ void ExecutionSyncTracker::completeNeeded(VulkanCommandBufferHandle cmd_buffer, 
 #if D3D_HAS_RAY_TRACING
   if (asOps.lastProcessed != asOps.arr.size())
   {
-    PROFILE_SYNC(vulkan_as_sync);
+    TIME_PROFILE(vulkan_as_sync);
     OpsProcessAlgorithm<AccelerationStructureOpsArray> asAlg(asOps, scratch, barrier, gpuWorkId);
     asAlg.completeNeeded();
   }
 #endif
 
   if (!barrier.empty())
-  {
-    PROFILE_SYNC(vulkan_sync_barrier);
     barrier.submit(cmd_buffer);
-  }
 }
 
 void ExecutionSyncTracker::clearOps()
@@ -491,7 +402,6 @@ void ExecutionSyncTracker::clearOps()
 void ExecutionSyncTracker::completeAll(VulkanCommandBufferHandle cmd_buffer, const VulkanDevice &dev, size_t gpu_work_id)
 {
   completeNeeded(cmd_buffer, dev);
-  G_ASSERTF(!delayCompletion, "vulkan: sync delay must not be interrupted by GPU job change");
 
   // ending current block, so increment in advance
   gpuWorkId = gpu_work_id + 1;
@@ -510,10 +420,6 @@ void ExecutionSyncTracker::completeAll(VulkanCommandBufferHandle cmd_buffer, con
     if (op.completed)
       continue;
 
-    // can't complain based on this logic as some writes can be leaved for frame end sync
-    // if (op.laddr.isWrite() && op.obj->isUsedInBindless())
-    //  D3D_ERROR("vulkan: sync: buffer: incompleted write while registered in bindless, must handle it! %s", op.format());
-
     // seal obj on frame end if last op was uncompleted read
     // it will be auto-unsealed on next frame if someone wants to write to it
     if (!op.laddr.isWrite())
@@ -529,7 +435,7 @@ void ExecutionSyncTracker::completeAll(VulkanCommandBufferHandle cmd_buffer, con
       continue;
 
     if (op.laddr.isWrite() && op.obj->isUsedInBindless())
-      D3D_ERROR("vulkan: sync: image: incompleted write while registered in bindless, must handle it! %s", op.format());
+      logerr("vulkan: sync: image: incompleted write while registered in bindless, must handle it! %s", op.format());
 
     if (!op.laddr.isWrite() && op.obj->layout.roSealTargetLayout != VK_IMAGE_LAYOUT_UNDEFINED)
     {
@@ -563,15 +469,13 @@ void ExecutionSyncTracker::completeAll(VulkanCommandBufferHandle cmd_buffer, con
   }
 #endif
 
-  InternalPipelineBarrier barrier(dev, srcLA.stage, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+  InternalPipelineBarrier barrier(dev, srcLA.stage, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
   barrier.addMemory({srcLA.access, VK_ACCESS_MEMORY_WRITE_BIT | VK_ACCESS_MEMORY_READ_BIT});
   // can be empty due to native RP sync exclusion
   if (srcLA.stage != VK_PIPELINE_STAGE_NONE)
     barrier.submit(cmd_buffer);
 
   clearOps();
-
-  nativeRPIndex = 0;
 }
 
 bool ExecutionSyncTracker::anyNonProcessed()
@@ -594,13 +498,9 @@ bool ExecutionSyncTracker::allCompleted()
 
 #if EXECUTION_SYNC_TRACK_CALLER > 0
 
-ExecutionSyncTracker::OpCaller ExecutionSyncTracker::getCaller()
-{
-  return {backtrace::get_hash(1), Backend::State::exec.getExecutionContext().getCurrentCmdCallerHash()};
-}
+ExecutionSyncTracker::OpCaller ExecutionSyncTracker::getCaller() { return {backtrace::get_hash(1), 0}; }
 
 String ExecutionSyncTracker::OpCaller::getInternal() const { return backtrace::get_stack_by_hash(internal); }
-String ExecutionSyncTracker::OpCaller::getExternal() const { return backtrace::get_stack_by_hash(external); }
 
 #endif
 
@@ -611,7 +511,7 @@ void ExecutionSyncTracker::addAccelerationStructureAccess(LogicAddress laddr, Ra
   AccelerationStructureArea area;
   if (filterAccessTracking(gpuWorkId, asOps, as, laddr, area, 0))
     return;
-  asOps.arr.push_back({laddr, as, area, getCaller(), VK_ACCESS_NONE, /*completed*/ false, /*dstConflict*/ false});
+  asOps.arr.push_back({laddr, as, area, getCaller(), /*completed*/ false, /*dstConflict*/ false});
 }
 
 #endif

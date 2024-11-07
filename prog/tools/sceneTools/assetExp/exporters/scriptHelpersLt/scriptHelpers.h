@@ -1,5 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __GAIJIN_SCRIPTHELPERS_SCRIPTHELPERS_H__
+#define __GAIJIN_SCRIPTHELPERS_SCRIPTHELPERS_H__
 #pragma once
+
 
 #include <util/dag_string.h>
 #include <generic/dag_tab.h>
@@ -67,3 +69,6 @@ void save_helpers(DataBlock &blk, SaveValuesCB *save_cb);
 
 void save_params_data(mkbindump::BinDumpSaveCB &cwr, SaveDataCB *save_cb);
 }; // namespace ScriptHelpers
+
+
+#endif

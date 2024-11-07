@@ -1,8 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include "vulkan_device.h"
-#include "util/masked_slice.h"
 
 namespace drv3d_vulkan
 {
@@ -62,6 +60,9 @@ struct DeviceMemory
   VkDeviceSize size = 0;
   uint32_t type = (uint32_t)-1;
   uint8_t *pointer = nullptr;
+#if USE_NX_MEMORY_TRACKER
+  void *trackingPtr;
+#endif
 };
 inline void swap(DeviceMemory &left, DeviceMemory &right)
 {
@@ -150,6 +151,14 @@ private:
   VkDeviceSize hostLocalLimit = 0;
 #if !_TARGET_C3
   DeviceMemoryConfiguration memoryConfig = DeviceMemoryConfiguration::DEDICATED_DEVICE_MEMORY;
+#else //!_TARGET_C3
+
+
+
+
+
+
+
 #endif
   uint32_t allocations = 0;
   uint32_t frees = 0;
@@ -190,22 +199,11 @@ public:
     return ret;
   }
   VkDeviceSize getFeeMemoryForMemoryType(uint32_t type) const { return types[type].heap->size - types[type].heap->inUse; }
-  VkDeviceSize getMaxAllocatableMemorySizeForClass(DeviceMemoryClass memory_class)
-  {
-    VkDeviceSize ret = 0;
-    for (uint32_t i : classTypes[uint32_t(memory_class)])
-    {
-      VkDeviceSize heapSz = types[i].heap->size;
-      if (heapSz > ret)
-        ret = heapSz;
-    }
-    return ret;
-  }
   DeviceMemory allocate(const DeviceMemoryClassAllocationInfo &info);
   DeviceMemory allocate(const DeviceMemoryTypeAllocationInfo &info);
   void free(const DeviceMemory &memory);
   bool checkAllocationLimits(const DeviceMemoryTypeAllocationInfo &info);
-  void logAllocationError(const DeviceMemoryTypeAllocationInfo &info, const char *reason, bool verbose = false);
+  void logAllocationError(const DeviceMemoryTypeAllocationInfo &info, const char *reason);
 
   DeviceMemoryConfiguration getMemoryConfiguration() const
   {
@@ -236,7 +234,6 @@ public:
   }
 
   void printStats();
-  uint32_t getCurrentAvailableDeviceKb();
 };
 } // namespace drv3d_vulkan
 

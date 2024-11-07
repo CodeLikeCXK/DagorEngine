@@ -1,4 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef _DAGOR_GAMELIB_SOUNDSYSTEM_DEBUGINTERNAL_H_
+#define _DAGOR_GAMELIB_SOUNDSYSTEM_DEBUGINTERNAL_H_
 #pragma once
 
 #include <debug/dag_assert.h>
@@ -39,3 +40,5 @@ namespace sndsys
 {
 void debug_init(const DataBlock &blk);
 } // namespace sndsys
+
+#endif

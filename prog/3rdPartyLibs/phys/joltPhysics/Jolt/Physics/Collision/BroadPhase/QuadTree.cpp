@@ -3,8 +3,6 @@
 // SPDX-License-Identifier: MIT
 
 #include <Jolt/Jolt.h>
-
-#include <Jolt/Physics/Collision/BroadPhase/QuadTree.h>
 #include <Jolt/Physics/Collision/BroadPhase/BroadPhaseQuadTree.h>
 #include <Jolt/Physics/Collision/RayCast.h>
 #include <Jolt/Physics/Collision/AABoxCast.h>
@@ -192,7 +190,7 @@ uint32 QuadTree::AllocateNode(bool inIsChanged)
 	if (index == Allocator::cInvalidObjectIndex)
 	{
 		Trace("QuadTree: Out of nodes!");
-		std::abort();
+		JPH_CRASH;
 	}
 	return index;
 }
@@ -223,17 +221,6 @@ void QuadTree::DiscardOldTree()
 	}
 }
 
-AABox QuadTree::GetBounds() const
-{
-	uint32 node_idx = GetCurrentRoot().mIndex;
-	JPH_ASSERT(node_idx != cInvalidNodeIndex);
-	const Node &node = mAllocator->Get(node_idx);
-
-	AABox bounds;
-	node.GetNodeBounds(bounds);
-	return bounds;
-}
-
 void QuadTree::UpdatePrepare(const BodyVector &inBodies, TrackingVector &ioTracking, UpdateState &outUpdateState, bool inFullRebuild)
 {
 #ifdef JPH_ENABLE_ASSERTS
@@ -255,7 +242,7 @@ void QuadTree::UpdatePrepare(const BodyVector &inBodies, TrackingVector &ioTrack
 #endif
 
 	// Assert sane data
-#ifdef JPH_DEBUG
+#ifdef _DEBUG
 	ValidateTree(inBodies, ioTracking, root_node.mIndex, mNumBodies);
 #endif
 
@@ -388,7 +375,7 @@ void QuadTree::UpdateFinalize([[maybe_unused]] const BodyVector &inBodies, [[may
 	DumpTree(new_root_node.GetNodeID(), StringFormat("%s_POST", mName).c_str());
 #endif
 
-#ifdef JPH_DEBUG
+#ifdef _DEBUG
 	ValidateTree(inBodies, inTracking, new_root_node.mIndex, mNumBodies);
 #endif
 }
@@ -803,7 +790,7 @@ void QuadTree::AddBodiesPrepare(const BodyVector &inBodies, TrackingVector &ioTr
 	// so they will stay together as a batch and will make the tree rebuild cheaper
 	outState.mLeafID = BuildTree(inBodies, ioTracking, (NodeID *)ioBodyIDs, inNumber, 0, outState.mLeafBounds);
 
-#ifdef JPH_DEBUG
+#ifdef _DEBUG
 	if (outState.mLeafID.IsNode())
 		ValidateTree(inBodies, ioTracking, outState.mLeafID.GetNodeIndex(), inNumber);
 #endif
@@ -1332,11 +1319,10 @@ void QuadTree::CastAABox(const AABoxCast &inBox, CastShapeBodyCollector &ioColle
 		JPH_INLINE int				VisitNodes(Vec4Arg inBoundsMinX, Vec4Arg inBoundsMinY, Vec4Arg inBoundsMinZ, Vec4Arg inBoundsMaxX, Vec4Arg inBoundsMaxY, Vec4Arg inBoundsMaxZ, UVec4 &ioChildNodeIDs, int inStackTop)
 		{
 			// Enlarge them by the casted aabox extents
-			Vec4 bounds_min_x = inBoundsMinX, bounds_min_y = inBoundsMinY, bounds_min_z = inBoundsMinZ, bounds_max_x = inBoundsMaxX, bounds_max_y = inBoundsMaxY, bounds_max_z = inBoundsMaxZ;
-			AABox4EnlargeWithExtent(mExtent, bounds_min_x, bounds_min_y, bounds_min_z, bounds_max_x, bounds_max_y, bounds_max_z);
+			AABox4EnlargeWithExtent(mExtent, inBoundsMinX, inBoundsMinY, inBoundsMinZ, inBoundsMaxX, inBoundsMaxY, inBoundsMaxZ);
 
 			// Test 4 children
-			Vec4 fraction = RayAABox4(mOrigin, mInvDirection, bounds_min_x, bounds_min_y, bounds_min_z, bounds_max_x, bounds_max_y, bounds_max_z);
+			Vec4 fraction = RayAABox4(mOrigin, mInvDirection, inBoundsMinX, inBoundsMinY, inBoundsMinZ, inBoundsMaxX, inBoundsMaxY, inBoundsMaxZ);
 
 			// Sort so that highest values are first (we want to first process closer hits and we process stack top to bottom)
 			return SortReverseAndStore(fraction, mCollector.GetPositiveEarlyOutFraction(), ioChildNodeIDs, &mFractionStack[inStackTop]);
@@ -1456,7 +1442,7 @@ void QuadTree::FindCollidingPairs(const BodyVector &inBodies, const BodyID *inAc
 	JPH_ASSERT(&root_node == &GetCurrentRoot());
 }
 
-#ifdef JPH_DEBUG
+#ifdef _DEBUG
 
 void QuadTree::ValidateTree(const BodyVector &inBodies, const TrackingVector &inTracking, uint32 inNodeIndex, uint32 inNumExpectedBodies) const
 {

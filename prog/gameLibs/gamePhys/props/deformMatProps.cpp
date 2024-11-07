@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <gamePhys/props/deformMatProps.h>
 #include <ioSys/dag_dataBlock.h>
 #include <propsRegistry/commonPropsRegistry.h>

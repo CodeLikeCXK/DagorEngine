@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "profiler.h"
 
 #include <perfMon/dag_cpuFreq.h>

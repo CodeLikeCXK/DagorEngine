@@ -1,12 +1,12 @@
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 
 #pragma once
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <signal.h>
-#include <locale.h>
 #include "dag_winCommons.h"
 #include <util/dag_string.h>
 #include <util/dag_globDef.h>
@@ -21,11 +21,6 @@
 #include <osApiWrappers/dag_progGlobals.h>
 #include <direct.h>
 #include <eh.h>
-
-#if _TARGET_GDK
-#include <osApiWrappers/xbox/app.h>
-#endif
-
 #include "dag_addBasePathDef.h"
 #include "dag_loadSettings.h"
 
@@ -45,18 +40,16 @@ extern void default_crt_init_core_lib();
 extern void apply_hinstance(void *hInstance, void *hPrevInstance);
 
 extern void messagebox_win_report_fatal_error(const char *title, const char *msg, const char *call_stack);
-static int dagor_program_exec(int nCmdShow, int debugmode, WinDeferredStartupLogs &deferredLogs);
+static int dagor_program_exec(int nCmdShow, int debugmode);
 
 static void __cdecl abort_handler(int) { DAG_FATAL("SIGABRT"); }
 
 int PASCAL WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR /*lpCmdLine*/, int nCmdShow)
 {
   int retcode = 0;
-  WinDeferredStartupLogs deferredLogs{};
 
-  win_set_process_dpi_aware(deferredLogs);
+  win_set_process_dpi_aware();
   win_recover_systemroot_env();
-  setlocale(LC_NUMERIC, "C");
 
   setvbuf(stdout, NULL, _IONBF, 0);
   setvbuf(stderr, NULL, _IONBF, 0);
@@ -82,7 +75,7 @@ int PASCAL WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR /*lpCmdLi
   {
     DagorHwException::setHandler("main");
 
-    DAGOR_TRY { retcode = dagor_program_exec(nCmdShow, debugmode, deferredLogs); }
+    DAGOR_TRY { retcode = dagor_program_exec(nCmdShow, debugmode); }
     DAGOR_CATCH(DagorException e)
     {
 #ifdef DAGOR_EXCEPTIONS_ENABLED
@@ -95,10 +88,10 @@ int PASCAL WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR /*lpCmdLi
   else
   {
 #pragma warning(push, 0) // to avoid C4297 in VC8
-    DAGOR_TRY { retcode = dagor_program_exec(nCmdShow, debugmode, deferredLogs); }
+    DAGOR_TRY { retcode = dagor_program_exec(nCmdShow, debugmode); }
     DAGOR_CATCH(...)
     {
-      DEBUG_CP();
+      debug_cp();
       flush_debug_file();
       DAGOR_RETHROW();
     }
@@ -108,7 +101,7 @@ int PASCAL WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR /*lpCmdLi
   return retcode;
 }
 
-static int dagor_program_exec(int nCmdShow, int debugmode, WinDeferredStartupLogs &deferredLogs)
+static int dagor_program_exec(int nCmdShow, int debugmode)
 {
   default_crt_init_kernel_lib();
 
@@ -137,22 +130,6 @@ static int dagor_program_exec(int nCmdShow, int debugmode, WinDeferredStartupLog
       AttachConsole(ATTACH_PARENT_PROCESS); // Optional, because `>` won't work in cmd.exe/PowerShell
     set_debug_console_handle((intptr_t)::GetStdHandle(STD_OUTPUT_HANDLE));
   }
-
-#if _TARGET_GDK
-  if (!xbox::app_initialize())
-  {
-    logerr("Failed to initialize GDK application");
-    return 1;
-  }
-#endif
-
-  if (deferredLogs.failed_SetProcessDPIAware)
-    logwarn("SetProcessDPIAware failed");
-  if (deferredLogs.failed_SetProcessDpiAwarenessContext)
-    logwarn("SetProcessDpiAwarenessContext failed");
-  if (deferredLogs.failed_SetThreadDpiAwarenessContext)
-    logwarn("SetThreadDpiAwarenessContext failed");
-
   if (dgs_get_argv("rdp_mode"))
     win32_rdp_compatible_mode = true;
   else if (const char *var = getenv("DAGOR_RDP_MODE"))

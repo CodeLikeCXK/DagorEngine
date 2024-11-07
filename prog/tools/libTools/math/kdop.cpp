@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <libTools/math/kdop.h>
 #include <math/dag_mathAng.h>
 #include <EASTL/sort.h>

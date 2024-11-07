@@ -1,6 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
-
 inline bool fast_isalnum(char c_)
 {
   unsigned char c = (unsigned char)c_;

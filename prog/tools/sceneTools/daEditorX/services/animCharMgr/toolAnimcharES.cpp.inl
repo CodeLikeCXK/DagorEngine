@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <ecs/core/entitySystem.h>
 #include <ecs/anim/anim.h>
 #include <animChar/dag_animCharVis.h>

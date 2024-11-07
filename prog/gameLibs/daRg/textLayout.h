@@ -1,11 +1,9 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <util/dag_string.h>
 #include <math/dag_e3dColor.h>
 #include <math/dag_Point2.h>
 #include <EASTL/vector.h>
-#include <EASTL/string.h>
 #include <generic/dag_tab.h>
 #include <memory/dag_fixedBlockAllocator.h>
 #include "stdRendObj.h"
@@ -25,12 +23,11 @@ struct TextBlock
   {
     TBT_NONE,
     TBT_TEXT,
-    TBT_SPACE,
-    TBT_LINE_BREAK,
+    TBT_SPACE
   };
 
   Type type = TBT_NONE;
-  eastl::string text;
+  String text;
   E3DCOLOR customColor = E3DCOLOR(255, 255, 255, 255);
   short fontId = -1, fontHt = 0;
 
@@ -40,12 +37,8 @@ struct TextBlock
   Point2 size = Point2(0, 0);     //< only valid afer format() call
   Point2 position = Point2(0, 0); //< only valid afer format() call
 
+  bool lineBreak = false;
   bool useCustomColor = false;
-
-  int numChars = -1; // Calculated only for editable texteare, otherwise -1
-
-  int toWChar(Tab<wchar_t> &wtext);
-  void calcNumChars();
 };
 
 
@@ -126,8 +119,6 @@ public:
 
   bool hasFormatError() const { return !formatErrorMsg.empty(); }
 
-  void join(eastl::string &dest);
-
   int preformattedFlags;
 
 private:
@@ -148,6 +139,5 @@ public:
   String formatErrorMsg;
 };
 
-bool is_space(char c);
 
 } // namespace textlayout

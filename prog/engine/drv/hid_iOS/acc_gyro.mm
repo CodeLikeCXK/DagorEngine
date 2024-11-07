@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #import <UIKit/UIKit.h>
 #import <CoreMotion/coreMotion.h>
 #include <debug/dag_debug.h>
@@ -34,7 +32,7 @@ void hid_iOS_init_motion()
     refAtt = nil;
     [motion release];
     motion = NULL;
-    DEBUG_CTX("no gyroscope");
+    debug_ctx("no gyroscope");
   }
 }
 

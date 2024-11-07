@@ -1,4 +1,0 @@
-if $(HaveRenderer) = yes {
-  gamePulls += framework_timelapse_screener_pull ;
-  UseProgLibs += daNetGameLibs/timelapse_screener ;
-}

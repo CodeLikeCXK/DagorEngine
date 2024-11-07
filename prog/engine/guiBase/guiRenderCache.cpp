@@ -1,5 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
+// Copyright 2023 by Gaijin Games KFT, All rights reserved.
 #include "guiRenderCache.h"
 #include <shaders/dag_dynShaderBuf.h>
 #include <3d/dag_ringDynBuf.h>
@@ -9,9 +8,6 @@
 #include <shaders/dag_shaders.h>
 #include <shaders/dag_shaderBlock.h>
 #include <startup/dag_globalSettings.h>
-#include <drv/3d/dag_viewScissor.h>
-#include <drv/3d/dag_draw.h>
-#include <drv/3d/dag_vertexIndexBuffer.h>
 
 #define LOG_WRITES_FRAMES_RATE (60) // once per sec on 60FPS
 
@@ -33,8 +29,7 @@ bool GuiVertexData::create(int num_vertices, int num_indices, const char *name)
   int minIndices = max(num_indices, 6); // dummy minimal index buffer
   int flag32 = (indexSize() > 2) ? SBCF_INDEX32 : 0;
   vb = d3d::create_vb(int(num_vertices * elemSize()), SBCF_DYNAMIC, name);
-  String ibName(0, "%s_ib", name);
-  ib = d3d::create_ib(int(minIndices * indexSize()), SBCF_DYNAMIC | flag32, ibName);
+  ib = d3d::create_ib(int(minIndices * indexSize()), SBCF_DYNAMIC | flag32);
   if (vb && ib)
   {
     verticesTotal = num_vertices;
@@ -48,38 +43,36 @@ bool GuiVertexData::create(int num_vertices, int num_indices, const char *name)
 
 void GuiVertexData::destroy()
 {
-  verticesTmpStorage.clear();
-  indicesTmpStorage.clear();
-  verticesTmpStorage.shrink_to_fit();
-  indicesTmpStorage.shrink_to_fit();
   destroy_it(vb);
   destroy_it(ib);
 }
 
 void GuiVertexData::lock(bool need_discard)
 {
-  if (!vb && !ib)
-    return;
+  if (vb && ib)
+  {
+    int flag = need_discard ? VBLOCK_DISCARD : VBLOCK_NOOVERWRITE;
+    if (vb->lock(0, 0, (void **)&vertices, flag | VBLOCK_WRITEONLY | VBLOCK_NOSYSLOCK))
+    {
+      if (ib->lock(0, 0, (void **)&indices, flag | VBLOCK_WRITEONLY | VBLOCK_NOSYSLOCK))
+        return;
 
-  G_UNUSED(need_discard);
-  G_ASSERTF(!need_discard || (need_discard && (currVertex == 0) && (currIndex == 0)), "discarding to non zero offset");
-  currLockedVertex = currVertex;
-  currLockedIndex = currIndex;
+      vb->unlock();
+    }
+  }
+
+  vertices = NULL;
+  indices = NULL;
 }
 
 void GuiVertexData::unlock()
 {
-  if (vb && (currVertex - currLockedVertex) > 0)
+  if (vb && ib)
   {
-    int flag = currLockedVertex ? VBLOCK_NOOVERWRITE : VBLOCK_DISCARD;
-    vb->updateData(currLockedVertex * stride, (currVertex - currLockedVertex) * stride, (void *)verticesTmpStorage.data(),
-      flag | VBLOCK_WRITEONLY | VBLOCK_NOSYSLOCK);
-  }
-  if (ib && (currIndex - currLockedIndex) > 0)
-  {
-    int flag = currLockedIndex ? VBLOCK_NOOVERWRITE : VBLOCK_DISCARD;
-    ib->updateData(currLockedIndex * sizeof(IndexType), (currIndex - currLockedIndex) * sizeof(IndexType),
-      (void *)indicesTmpStorage.data(), flag | VBLOCK_WRITEONLY | VBLOCK_NOSYSLOCK);
+    if (vertices)
+      vb->unlock();
+    if (indices)
+      ib->unlock();
   }
 }
 
@@ -495,7 +488,7 @@ void BufferedRenderer::renderChunk(int chunk_id, int targetW, int targetH)
     int bufferId = de.shaderId_bufferId & (MAX_BUFFERS - 1);
     DrawElem::Command command = de.command;
 
-    if (DAGOR_UNLIKELY(command == DrawElem::EXEC_CMD))
+    if (EASTL_UNLIKELY(command == DrawElem::EXEC_CMD))
     {
       oldShaderId = -1;
       oldViewport = -1;
@@ -543,7 +536,7 @@ void BufferedRenderer::renderChunk(int chunk_id, int targetW, int targetH)
 #endif
       G_FAST_ASSERT(oldvp >= viewports.data() && oldvp < (viewports.data() + viewports.size()));
       shaders[shaderId]->setStates(&oldvp->l, guiStates[de.guiState], &extStates[de.extState], oldViewport != de.view,
-        oldGuiState != de.guiState, oldExtState != de.extState, targetW, targetH);
+        oldGuiState != de.guiState, oldExtState != de.extState, NULL, NULL, targetW, targetH);
       oldViewport = de.view;
       oldGuiState = de.guiState;
       oldExtState = de.extState;

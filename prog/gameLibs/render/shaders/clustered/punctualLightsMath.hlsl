@@ -1,28 +1,27 @@
 #include <fast_shader_trig.hlsl>
 
   //Window1 from http://www.frostbite.com/wp-content/uploads/2014/11/course_notes_moving_frostbite_to_pbr.pdf
-  half smoothDistanceAtt ( half squaredDistance, half invSqrAttRadius )
+  float smoothDistanceAtt ( float squaredDistance, float invSqrAttRadius )
   {
-    half factor = squaredDistance * invSqrAttRadius ;
-    half smoothFactor = saturate (1.0h - factor * factor );
+    float factor = squaredDistance * invSqrAttRadius ;
+    float smoothFactor = saturate (1.0f - factor * factor );
     return smoothFactor * smoothFactor;
   }
 
-
-  half getDistanceAtt ( half sqrDist, half invSqrAttRadius )
+  float getDistanceAtt ( float sqrDist, float invSqrAttRadius )
   {
-    half attenuation = rcp(max(sqrDist, 0.0001h));
+    float attenuation = rcp(max(sqrDist, 0.0001));
     attenuation = saturate(attenuation * smoothDistanceAtt ( sqrDist, invSqrAttRadius ));
     return attenuation;
   }
-  half getAngleAtt ( half3 normalizedLightVector, half3 lightDir, half lightAngleScale , half lightAngleOffset)
+  float getAngleAtt ( float3 normalizedLightVector, float3 lightDir, float lightAngleScale , float lightAngleOffset)
   {
     // On the CPU
     // float lightAngleScale = 1.0f / max (0.001f, ( cosInner - cosOuter ));
     // float lightAngleOffset = -cosOuter * angleScale ;
 
-    half cd = dot ( lightDir , normalizedLightVector );
-    half attenuation = saturate (cd * lightAngleScale + lightAngleOffset );
+    float cd = dot ( lightDir , normalizedLightVector );
+    float attenuation = saturate (cd * lightAngleScale + lightAngleOffset );
     // smooth the transition
     return attenuation * attenuation ;
   }
@@ -35,11 +34,11 @@
 // sinSigmaSqr = sin( subtended angle )^2, it is (r^2 / d^2) for a sphere
 // and (r^2 / ( r^2 + d ^2) ) for a disk
 // cosTheta is not clamped
-half illuminanceSphereOrDisk ( half cosTheta , half sinSigmaSqr )
+float illuminanceSphereOrDisk ( float cosTheta , float sinSigmaSqr )
 {
-  half sinTheta = sqrt (1.0h - cosTheta * cosTheta );
+  float sinTheta = sqrt (1.0f - cosTheta * cosTheta );
 
-  half illuminance = 0.0h;
+  float illuminance = 0.0f;
   // Note : Following test is equivalent to the original formula .
   // There is 3 phase in the curve : cosTheta > sqrt ( sinSigmaSqr ),
   // cosTheta > -sqrt ( sinSigmaSqr ) and else it is 0
@@ -51,79 +50,79 @@ half illuminanceSphereOrDisk ( half cosTheta , half sinSigmaSqr )
   }
   else
   {
-    half x = sqrt (1.0h / sinSigmaSqr - 1.0h); // For a disk this simplify to x = d / r
-    half y = -x * ( cosTheta / sinTheta );
-    half sinThetaSqrtY = sinTheta * sqrt (1.0h - y * y);
+    float x = sqrt (1.0f / sinSigmaSqr - 1.0f); // For a disk this simplify to x = d / r
+    float y = -x * ( cosTheta / sinTheta );
+    float sinThetaSqrtY = sinTheta * sqrt (1.0f - y * y);
     illuminance = ( cosTheta * acosFast4 (y) - x * sinThetaSqrtY ) * sinSigmaSqr + atan (sinThetaSqrtY / x);
     illuminance /= PI;
   }
-  return max ( illuminance , 0.0h);
+  return max ( illuminance , 0.0f);
 }
 
-half illuminanceSphereAttenuation ( half3 worldNormal, half3 dirToLight, half lightRadius, half sqrDist)
+float illuminanceSphereAttenuation ( float3 worldNormal, float3 dirToLight, float lightRadius, float sqrDist)
 {
   // Sphere evaluation
-  half cosTheta = clamp ( dot ( worldNormal, dirToLight), -0.999h, 0.999h) ; // Clamp to avoid edge case
+  float cosTheta = clamp ( dot ( worldNormal, dirToLight), -0.999, 0.999) ; // Clamp to avoid edge case
   // We need to prevent the object penetrating into the surface
   // and we must avoid divide by 0, thus the 0.9999 f
 
-  half sqrLightRadius = lightRadius * lightRadius ;
-  half sinSigmaSqr = min( sqrLightRadius / sqrDist, 0.9999h);
-  half illuminance = illuminanceSphereOrDisk ( cosTheta , sinSigmaSqr );
+  float sqrLightRadius = lightRadius * lightRadius ;
+  float sinSigmaSqr = min( sqrLightRadius / sqrDist, 0.9999f);
+  float illuminance = illuminanceSphereOrDisk ( cosTheta , sinSigmaSqr );
   return illuminance;
 }
 
 
-half illuminanceDiskAttenuation ( half3 worldNormal, half3 dirToLight, half3 planeNormal, half lightRadius, half sqrDist)
+float illuminanceDiskAttenuation ( float3 worldNormal, float3 dirToLight, float3 planeNormal, float lightRadius, float sqrDist)
 {
   // Disk evaluation
-  half cosTheta = dot ( worldNormal, dirToLight);
-  half sqrLightRadius = lightRadius * lightRadius ;
+  float cosTheta = dot ( worldNormal, dirToLight);
+  float sqrLightRadius = lightRadius * lightRadius ;
   // Do not let the surface penetrate the light
-  half sinSigmaSqr = sqrLightRadius / ( sqrLightRadius + max ( sqrLightRadius , sqrDist ));
+  float sinSigmaSqr = sqrLightRadius / ( sqrLightRadius + max ( sqrLightRadius , sqrDist ));
   // Multiply by saturate ( dot ( planeNormal , -dirToLight)) to better match ground truth .
-  half illuminance = illuminanceSphereOrDisk ( cosTheta , sinSigmaSqr ) * saturate ( dot( planeNormal , -dirToLight));
+  float illuminance = illuminanceSphereOrDisk ( cosTheta , sinSigmaSqr ) * saturate ( dot( planeNormal , -dirToLight));
   return illuminance;
 }
 
-void spot_light_params(float3 worldPos, float4 pos_and_radius, half3 light_direction, half lightAngleScale, half lightAngleOffset, out half geomAttenuation, out half3 dirFromLight, out half3 point2light)
+void spot_light_params(float3 worldPos, float4 pos_and_radius, float3 light_direction, float lightAngleScale, float lightAngleOffset, out half geomAttenuation, out float3 dirFromLight, out float3 point2light)
 {
-  point2light = half3(pos_and_radius.xyz-worldPos.xyz);
-  half distSqFromLight = dot(point2light, point2light);
-  half rcpDistFromLight = rsqrt(0.0000001h+distSqFromLight);
+  point2light = pos_and_radius.xyz-worldPos.xyz;
+  float distSqFromLight = dot(point2light, point2light);
+  float rcpDistFromLight = rsqrt(0.0000001+distSqFromLight);
   dirFromLight = point2light*rcpDistFromLight;
-  half invSqrRad = rcp(pow2(half(pos_and_radius.w)));
-
+  float invSqrRad = rcp(pow2(pos_and_radius.w));
+  
   geomAttenuation = getDistanceAtt( distSqFromLight, invSqrRad );
   geomAttenuation = geomAttenuation*getAngleAtt ( -dirFromLight, light_direction, lightAngleScale, lightAngleOffset);
 }
 
-half areaSphereNormalization( half len, half lightSize, half m )
+half areaSphereNormalization( float len, float lightSize, float m )
 {
   // Compute the normalization factors.
   // Note: just using sphere normalization (todo: come up with proper disk/plane normalization)
   half dist = saturate(lightSize / len);
-  half normFactor = m / ( m + 0.5h * dist );
+  half normFactor = m / ( m + 0.5 * dist );
   return normFactor * normFactor;
 }
 
 half3 areaSphereLight(half3 R, half3 L, half m, half lightSize)
-{
+{	
   // Intersect the sphere.
   half3 centerDir = L - dot(L, R) * R;
-  L = L - centerDir * saturate( lightSize / (length(centerDir)+1e-6h) );
+  L = L - centerDir * saturate( lightSize / (length(centerDir)+1e-6) );			
   return L.xyz;
 }
 
 half4 SphereAreaLightIntersection( half3 N, half3 V, half3 L, half ggx_alpha, half lightSize )
 {
-  half4 lightVec = half4(L.xyz, 1.0h);
+  half4 lightVec = half4(L.xyz, 1.0f);
   half3 R = reflect(V, N);
 
   lightVec.xyz = areaSphereLight(R, L, ggx_alpha, lightSize);
 
   // Normalize.
-  half len = max(length( lightVec.xyz ),  1e-6h);
+  half len = max(length( lightVec.xyz ),  1e-6);
   lightVec.xyz /= len;
 
   // Energy normalization

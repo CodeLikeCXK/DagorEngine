@@ -18,7 +18,6 @@
 #include <image/dag_dxtCompress.h>
 #include <generic/dag_smallTab.h>
 #include <3d/tql.h>
-#include <vecmath/dag_vecMathDecl.h>
 
 extern void decompress_dxt1(unsigned char *decompressedData, int lw, int lh, int row_pitch, unsigned char *src_data);
 extern void decompress_dxt3(unsigned char *decompressedData, int lw, int lh, int row_pitch, unsigned char *src_data);
@@ -549,14 +548,14 @@ struct AutoAcquireMem
 #endif
 
 template <class Filter, bool force_gamma_space = true>
-TexLoadRes create_dxt_mip_chain(Texture *tex, TEXTUREID tid, unsigned char *base_tex, int base_tex_fmt, const ddsx::Header &hdr,
+bool create_dxt_mip_chain(Texture *tex, TEXTUREID tid, unsigned char *base_tex, int base_tex_fmt, const ddsx::Header &hdr,
   IGenLoad &crd, unsigned fmt, int start_level, int levels, int skip_levels, int dest_slice, Filter &f, int dxt_alg)
 {
   G_ASSERT(tex || (hdr.flags & hdr.FLG_HOLD_SYSMEM_COPY));
   int offset;
   uint8_t *dxtData = genmip_commit_source(hdr.w * hdr.h, offset);
   if (dxtData == NULL)
-    return TexLoadRes::ERR;
+    return false;
   struct ReleasePhysMem
   {
     ~ReleasePhysMem() { genmip_release_phys_mem(); }
@@ -565,7 +564,7 @@ TexLoadRes create_dxt_mip_chain(Texture *tex, TEXTUREID tid, unsigned char *base
   bool diff_tex = (hdr.flags & hdr.FLG_NEED_PAIRED_BASETEX) ? true : false;
   if (!diff_tex)
     if (!crd.readExact(dxtData, hdr.getSurfaceSz(0)))
-      return TexLoadRes::ERR;
+      return false;
   const float gamma = crd.readReal();
   f.read_parameters(crd, diff_tex);
 
@@ -593,7 +592,7 @@ TexLoadRes create_dxt_mip_chain(Texture *tex, TEXTUREID tid, unsigned char *base
     else if (blk_empty == blk_total)
       mem_set_0(map);
     else if (!crd.readExact(map.data(), data_size(map)))
-      return TexLoadRes::ERR;
+      return false;
 
     int dxt_blk_sz = (fmt == D3DFMT_DXT1) ? 8 : 16;
     if (base_tex_fmt == fmt)
@@ -622,7 +621,7 @@ TexLoadRes create_dxt_mip_chain(Texture *tex, TEXTUREID tid, unsigned char *base
 
           Dxt5AlphaBlock pa, &ba = *(Dxt5AlphaBlock *)(dxtData + (i * 32 + j) * dxt_blk_sz);
           if (!crd.readExact(&pa, sizeof(pa)))
-            return TexLoadRes::ERR;
+            return false;
 
           if (base_tex_fmt == D3DFMT_DXT5)
           {
@@ -648,7 +647,7 @@ TexLoadRes create_dxt_mip_chain(Texture *tex, TEXTUREID tid, unsigned char *base
 
         Dxt1ColorBlock pc, &bc = *(Dxt1ColorBlock *)(dxtData + (i * 32 + j) * dxt_blk_sz + (fmt == D3DFMT_DXT5 ? 8 : 0));
         if (!crd.readExact(&pc, sizeof(pc)))
-          return TexLoadRes::ERR;
+          return false;
 
         pc.c0r += bc.c0r;
         pc.c0g += bc.c0g;
@@ -666,7 +665,7 @@ TexLoadRes create_dxt_mip_chain(Texture *tex, TEXTUREID tid, unsigned char *base
   {
     d3d_genmip_store_sysmem_copy(tid, hdr, dxtData);
     if (!tex)
-      return TexLoadRes::OK;
+      return true;
   }
 
   uint32_t w = hdr.w;
@@ -680,13 +679,13 @@ TexLoadRes create_dxt_mip_chain(Texture *tex, TEXTUREID tid, unsigned char *base
 
   if (!skip_levels)
   {
-    TexLoadRes res = TexLoadRes::OK;
+    bool res = true;
     if (d3d::ResUpdateBuffer *rub = d3d::allocate_update_buffer_for_tex(tex, start_level, dest_slice))
     {
       char *dst = d3d::get_update_buffer_addr_for_write(rub);
       int dst_pitch = d3d::get_update_buffer_pitch(rub), src_pitch = hdr.getSurfacePitch(skip_levels);
       if (!dst)
-        res = TexLoadRes::ERR;
+        res = false;
       else if (dst_pitch == src_pitch)
         memcpy(dst, dxtData, hdr.getSurfaceSz(skip_levels));
       else if (dst_pitch > src_pitch)
@@ -703,18 +702,18 @@ TexLoadRes create_dxt_mip_chain(Texture *tex, TEXTUREID tid, unsigned char *base
         logerr("tex(%s) mip=%dx%d src=%dx%d lockimg(%d) gives dst_pitch=%d < src_pitch=%d", tex->getTexName(), ti.w, ti.h, w, h,
           start_level, dst_pitch, src_pitch);
         d3d::release_update_buffer(rub);
-        return TexLoadRes::ERR;
+        return false;
       }
       GENMIP_ON_MIP_DONE(tex, dst, src_pitch, dst_pitch, hdr.getSurfaceScanlines(0), levels == 1, w, h);
       if (!d3d::update_texture_and_release_update_buffer(rub))
-        res = TexLoadRes::ERR;
+        res = false;
       d3d::release_update_buffer(rub);
     }
     else
-      res = TexLoadRes::ERR_RUB;
+      res = false;
 
-    if (res != TexLoadRes::OK)
-      return res;
+    if (!res)
+      return false;
   }
 
   if (w > 4 && h > 4 && w * h * (4 + 2) > genmip_memsz) // rgba(4)+dxt(2)
@@ -737,7 +736,7 @@ TexLoadRes create_dxt_mip_chain(Texture *tex, TEXTUREID tid, unsigned char *base
       genmip_commit_phys_mem_char_dxt(offset, hdr.w, hdr.h, hdr.w, hdr.h, f.needTemp(), rgbaData, kaiserTemp);
   }
   if (!rgbaData)
-    return TexLoadRes::ERR;
+    return false;
 
   if (skip_first_downsample)
   {
@@ -802,7 +801,7 @@ TexLoadRes create_dxt_mip_chain(Texture *tex, TEXTUREID tid, unsigned char *base
     }
   }
 
-  TexLoadRes res = TexLoadRes::OK;
+  bool res = true;
   if (skip_levels > 0)
   {
     skip_first_downsample = false;
@@ -817,14 +816,14 @@ TexLoadRes create_dxt_mip_chain(Texture *tex, TEXTUREID tid, unsigned char *base
       ManualDXT(mode, (TexPixel32 *)rgbaData, w, h, dst_pitch, dst, dxt_alg);
       GENMIP_ON_MIP_DONE(tex, dst, (w / 4) << hdr.dxtShift, dst_pitch, h / 4, levels == 1, w, h);
       if (!d3d::update_texture_and_release_update_buffer(rub))
-        res = TexLoadRes::ERR;
+        res = false;
       d3d::release_update_buffer(rub);
     }
     else
-      res = TexLoadRes::ERR_RUB;
+      res = false;
   }
 
-  for (int i = 1; i < levels && (res == TexLoadRes::OK); i++)
+  for (int i = 1; i < levels && res; i++)
   {
     w >>= 1;
     h >>= 1;
@@ -854,31 +853,31 @@ TexLoadRes create_dxt_mip_chain(Texture *tex, TEXTUREID tid, unsigned char *base
       ManualDXT(mode, (TexPixel32 *)rgbaData, w, h, dst_pitch, dst, dxt_alg);
       GENMIP_ON_MIP_DONE(tex, dst, (w / 4) << hdr.dxtShift, dst_pitch, h / 4, i + 1 == levels, w, h);
       if (!d3d::update_texture_and_release_update_buffer(rub))
-        res = TexLoadRes::ERR;
+        res = false;
       d3d::release_update_buffer(rub);
     }
     else
-      res = TexLoadRes::ERR_RUB;
+      res = false;
   }
   return res;
 }
 
 template <class Filter, bool force_gamma_space = true>
-TexLoadRes create_rgba8_mip_chain(Texture *tex, const ddsx::Header &hdr, IGenLoad &crd, int start_level, int levels, int skip_levels,
+bool create_rgba8_mip_chain(Texture *tex, const ddsx::Header &hdr, IGenLoad &crd, int start_level, int levels, int skip_levels,
   int dest_slice, Filter &f)
 {
   G_ASSERT(tex);
   int offset;
   uint8_t *rgbaData = genmip_commit_source(hdr.w * hdr.h * sizeof(uint32_t), offset);
   if (rgbaData == NULL)
-    return TexLoadRes::ERR;
+    return false;
   struct ReleasePhysMem
   {
     ~ReleasePhysMem() { genmip_release_phys_mem(); }
   } genmip_auto_release_phys_mem;
 
   if (!crd.readExact(rgbaData, hdr.getSurfaceSz(0)))
-    return TexLoadRes::ERR;
+    return false;
   const float gamma = crd.readReal();
   f.read_parameters(crd, false);
 
@@ -892,7 +891,7 @@ TexLoadRes create_rgba8_mip_chain(Texture *tex, const ddsx::Header &hdr, IGenLoa
       genmip_commit_phys_mem_char_rgba(offset, hdr.w, hdr.h, f.needTemp(), kaiserTemp);
   }
   if (!kaiserTemp)
-    return TexLoadRes::ERR;
+    return false;
 
   f.setTemp(kaiserTemp);
 
@@ -909,8 +908,8 @@ TexLoadRes create_rgba8_mip_chain(Texture *tex, const ddsx::Header &hdr, IGenLoa
     f.downsample4x(rgbaData, rgbaData, w, h);
   }
 
-  TexLoadRes res = TexLoadRes::OK;
-  for (int i = 0; i < levels && (res == TexLoadRes::OK); i++)
+  bool res = true;
+  for (int i = 0; i < levels && res; i++)
   {
     if (!force_gamma_space)
       if (skip_levels || i) // split for pvs studio
@@ -921,7 +920,7 @@ TexLoadRes create_rgba8_mip_chain(Texture *tex, const ddsx::Header &hdr, IGenLoa
       char *dst = d3d::get_update_buffer_addr_for_write(rub);
       int dst_pitch = d3d::get_update_buffer_pitch(rub), src_pitch = w * 4;
       if (!dst)
-        res = TexLoadRes::ERR;
+        res = false;
       else if (dst_pitch == src_pitch)
         memcpy(dst, rgbaData, h * src_pitch);
       else if (dst_pitch > src_pitch)
@@ -937,18 +936,18 @@ TexLoadRes create_rgba8_mip_chain(Texture *tex, const ddsx::Header &hdr, IGenLoa
         logerr("tex(%s) mip=%dx%d src=%dx%d lockimg(%d) gives dst_pitch=%d < src_pitch=%d", tex->getTexName(), ti.w, ti.h, w, h,
           start_level, dst_pitch, src_pitch);
         d3d::release_update_buffer(rub);
-        res = TexLoadRes::ERR;
+        res = false;
         break;
       }
       GENMIP_ON_MIP_DONE(tex, dst, w * 4, dst_pitch, h, i + 1 == levels, w, h);
       if (!d3d::update_texture_and_release_update_buffer(rub))
-        res = TexLoadRes::ERR;
+        res = false;
       d3d::release_update_buffer(rub);
     }
     else
-      res = TexLoadRes::ERR_RUB;
+      res = false;
 
-    if (i < levels - 1 && (res == TexLoadRes::OK))
+    if (i < levels - 1 && res)
     {
       w >>= 1;
       h >>= 1;

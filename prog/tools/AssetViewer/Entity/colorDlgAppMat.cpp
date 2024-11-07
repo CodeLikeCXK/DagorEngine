@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "colorDlgAppMat.h"
 #include "../av_environment.h"
 
@@ -9,7 +7,7 @@ ColorDialogAppMat::ColorDialogAppMat(void *phandle, const char caption[]) :
   getPanel()->createCheckBox(ID_CHECKBOX_MODE, "Apply color to entity mode", environment::isUsingSinglePaintColor());
 }
 
-void ColorDialogAppMat::onChange(int pcb_id, PropPanel::ContainerPropertyControl *panel)
+void ColorDialogAppMat::onChange(int pcb_id, PropPanel2 *panel)
 {
   if (pcb_id == ID_CHECKBOX_MODE)
   {

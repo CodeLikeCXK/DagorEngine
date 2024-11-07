@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <image/dag_texPixel.h>
 #include <math/dag_mathBase.h>
 #include <util/dag_globDef.h>

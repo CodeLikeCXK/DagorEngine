@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #import <UIKit/UIKit.h>
 #import <GameKit/GameKit.h>
 #import <CloudKit/CloudKit.h>

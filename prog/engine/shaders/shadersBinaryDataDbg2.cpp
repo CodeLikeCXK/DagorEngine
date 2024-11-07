@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "shadersBinaryData.h"
 #include <shaders/dag_shaderCommon.h>
 #include <shaders/dag_shaderDbg.h>
@@ -170,10 +168,10 @@ static uint32_t shader_pass_size(const shaderbindump::ShaderCode::Pass &p)
 
 static inline bool shader_code_used(const shaderbindump::ShaderCode &code)
 {
-  if (!(interlocked_relaxed_load(code.codeFlags) & shaderbindump::ShaderCode::CF_USED))
+  if (!(code.codeFlags & 0x8000))
     return false;
-  for (auto &cp : code.passes)
-    if (shader_pass_used(cp))
+  for (int i = 0; i < code.passes.size(); i++)
+    if (shader_pass_used(code.passes[i]))
       return true;
   return false;
 }
@@ -194,7 +192,7 @@ static inline bool shader_pass_allused(const shaderbindump::ShaderCode::Pass &p)
 
 static inline bool shader_code_allused(const shaderbindump::ShaderCode &code)
 {
-  if (!(interlocked_relaxed_load(code.codeFlags) & shaderbindump::ShaderCode::CF_USED))
+  if (!(code.codeFlags & 0x8000))
     return false;
   for (int i = 0; i < code.passes.size(); i++)
     if (!shader_pass_used(code.passes[i]))

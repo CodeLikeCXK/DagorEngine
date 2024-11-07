@@ -1,4 +1,0 @@
-if $(HaveRenderer) = yes {
-  gamePulls += framework_gpu_benchmark_pull ;
-  UseProgLibs += daNetGameLibs/gpu_benchmark ;
-}

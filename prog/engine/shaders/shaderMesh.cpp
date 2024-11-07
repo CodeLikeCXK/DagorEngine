@@ -1,5 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
+// Copyright 2023 by Gaijin Games KFT, All rights reserved.
 #include <shaders/dag_shaderMesh.h>
 #include <shaders/dag_shaders.h>
 #include "scriptSElem.h"
@@ -10,8 +9,6 @@
 #include <ioSys/dag_readToUncached.h>
 #include <debug/dag_debug.h>
 #include <meshoptimizer/include/meshoptimizer.h>
-#include <drv/3d/dag_vertexIndexBuffer.h>
-#include <drv/3d/dag_info.h>
 
 
 #if DAGOR_DBGLEVEL > 0
@@ -66,8 +63,6 @@ void GlobalVertexData::initGvd(const char *name, unsigned vNum, unsigned vStride
     unsigned ibFlags = 0;
     if (flags & VDATA_I32)
       ibFlags |= SBCF_INDEX32;
-    if (flags & VDATA_BIND_SHADER_RES)
-      ibFlags |= SBCF_BIND_SHADER_RES;
     if (flags & VDATA_NO_IB)
     {
       ibMem = memalloc(idxSize + sizeof(int), tmpmem);
@@ -75,8 +70,7 @@ void GlobalVertexData::initGvd(const char *name, unsigned vNum, unsigned vStride
     }
     else
     {
-      String ibName(0, "%s_globalVertexData_ib", name);
-      indices = d3d::create_ib(idxSize, ibFlags, ibName);
+      indices = d3d::create_ib(idxSize, ibFlags);
       d3d_err(indices);
     }
   }
@@ -215,61 +209,35 @@ void GlobalVertexData::unpackToSharedBuffer(IGenLoad &zcrd, Vbuffer *shared_vb, 
   vb_byte_pos = (vb_byte_pos + vstride - 1) / vstride * vstride; // align on stride boundary
   vOfs = vb_byte_pos / vstride;
   iOfs = ib_byte_pos / 2;
-#if _TARGET_PC_WIN
-  // FIXME: dx11 is seems to be the only driver impl which doesn't support partial buf updates via temp memory
-  const bool forceIntermediateBufUpdate = d3d::get_driver_code().is(d3d::dx11);
-#else
-  constexpr bool forceIntermediateBufUpdate = false;
-#endif
-  auto updateSBufData = [&](Sbuffer *sbuf, int ofs, int size, auto writecb) {
-    if (!forceIntermediateBufUpdate)
-    {
-      void *xbdata = nullptr;
-      if (DAGOR_LIKELY(sbuf->lock(ofs, size, &xbdata, VBLOCK_WRITEONLY)))
-      {
-        G_FAST_ASSERT(xbdata);
-        writecb(xbdata);
-        sbuf->unlock();
-      }
-      else
-        d3d_err(xbdata);
-    }
-    else
-    {
-      buf_stor.resize(buf_stor.size() + size);
-      writecb(buf_stor.end() - size);
-      d3d_err(sbuf->updateData(ofs, size, buf_stor.end() - size, VBLOCK_WRITEONLY));
-    }
-  };
 
-  {
-    int sz = vCnt * vstride;
-    G_ASSERTF((vb_byte_pos % 4) == 0 && (sz % 4) == 0, "broken VB alignment: vb_byte_pos==%d sz=%d", vb_byte_pos, sz);
-    buf_stor.clear();
-    updateSBufData(shared_vb, vb_byte_pos, sz, [&](void *data) { zcrd.read(data, sz); });
-    vb_byte_pos += sz;
-  }
+  int sz = vCnt * vstride;
+  buf_stor.resize(0);
+  buf_stor.resize(sz);
+  zcrd.read(buf_stor.data(), sz);
+  G_ASSERTF((vb_byte_pos % 4) == 0 && (sz % 4) == 0, "broken VB alignment: vb_byte_pos==%d sz=%d", vb_byte_pos, sz);
+  d3d_err(shared_vb->updateData(vb_byte_pos, sz, buf_stor.data(), VBLOCK_WRITEONLY));
+  vb_byte_pos += sz;
 
+  sz = iCnt * 2;
+  buf_stor.resize(0);
+  buf_stor.resize(sz + ((iCnt & 1) ? 2 : 0) + iPackedSz); // align on 4-byte; + decoder buffer
+  if (iPackedSz)
   {
-    clear_and_resize(buf_stor, iPackedSz);
-    if (iPackedSz)
-      zcrd.read(buf_stor.data(), iPackedSz);
-    int sz = iCnt * sizeof(uint16_t), sza = sz + (iCnt & 1) * 2 /* align on 4-byte */;
-    updateSBufData(shared_ib, ib_byte_pos, sza, [&](void *data) {
-      if (iPackedSz)
-      {
-        int ret = meshopt_decodeIndexSequence((uint16_t *)data, iCnt, buf_stor.data(), iPackedSz);
-        G_ASSERTF(ret == 0, "error unpacking IB (packedSz=%d sz=%d flags=0x%X)", iPackedSz, sz, cflags);
-        G_UNUSED(ret);
-      }
-      else
-        zcrd.read(data, sz);
-      if (iCnt & 1)
-        ((char *)data)[sz + 1] = ((char *)data)[sz] = 0;
-    });
-    G_ASSERTF(!(ib_byte_pos & 3) && !(sza & 3), "broken IB alignment: ib_byte_pos==%d sz=%d", ib_byte_pos, sz);
-    ib_byte_pos += sza;
+    zcrd.read(buf_stor.end() - iPackedSz, iPackedSz);
+
+    int ret = meshopt_decodeIndexSequence((uint16_t *)buf_stor.data(), iCnt, buf_stor.end() - iPackedSz, iPackedSz);
+    G_ASSERTF(ret == 0, "error unpacking IB (packedSz=%d sz=%d flags=0x%X)", iPackedSz, iCnt * 2, cflags);
+    G_UNUSED(ret);
+    buf_stor.resize(buf_stor.size() - iPackedSz);
   }
+  else
+    zcrd.read(buf_stor.data(), sz);
+  if (iCnt & 1)
+    buf_stor[sz + 1] = buf_stor[sz] = 0;
+  G_ASSERTF(!(ib_byte_pos & 3) && !(buf_stor.size() & 3), "broken IB alignment: ib_byte_pos==%d buf_stor.size()=%d", ib_byte_pos,
+    buf_stor.size());
+  d3d_err(shared_ib->updateData(ib_byte_pos, buf_stor.size(), buf_stor.data(), VBLOCK_WRITEONLY));
+  ib_byte_pos += buf_stor.size();
 }
 
 void GlobalVertexData::free()
@@ -401,8 +369,9 @@ void ShaderMesh::patchData(void *base, ShaderMatVdata &smvd)
       stageEndElemIdx[i] = (i < STG_trans) ? elems.size() : elems.size() + telem_cnt;
     elems.init(elems.data(), stageEndElemIdx[STG_trans]);
   }
-  for (RElem &re : elems)
+  for (int i = 0; i < elems.size(); i++)
   {
+    RElem &re = elems[i];
     int mat_idx = (int)(intptr_t)re.mat.get();
 
     re.mat.init(smvd.getMaterial(mat_idx));
@@ -456,8 +425,7 @@ int ShaderMesh::calcTotalFaces() const
   return faces;
 }
 
-bool ShaderMesh::getVbInfo(RElem &relem, int usage, int usage_index, unsigned int &stride, unsigned int &offset, int &type,
-  int &mod) const
+bool ShaderMesh::getVbInfo(RElem &relem, int usage, int usage_index, unsigned int &stride, unsigned int &offset, int &type) const
 {
   // Parse vertex format for normal offset and vertex buffer stride.
   const ScriptedShaderElement *shaderElem = (const ScriptedShaderElement *)relem.e.get();
@@ -471,7 +439,6 @@ bool ShaderMesh::getVbInfo(RElem &relem, int usage, int usage_index, unsigned in
     {
       type = channel.t;
       offset = stride;
-      mod = channel.mod;
     }
 
     unsigned int channelSize = 0;
@@ -486,7 +453,7 @@ bool ShaderMesh::getVbInfo(RElem &relem, int usage, int usage_index, unsigned in
 // render items
 void ShaderMesh::render(dag::Span<RElem> elem_array) const
 {
-  //  debug("render %d items", elem_array.size());
+  //  mt_debug("render %d items", elem_array.size());
   GlobalVertexData *vertexData = NULL;
   for (const RElem &re : elem_array)
   {

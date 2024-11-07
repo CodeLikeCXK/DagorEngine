@@ -1,9 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <EditorCore/ec_newProjDlg.h>
 #include <libTools/util/strUtil.h>
 
-#include <propPanel/control/container.h>
 #include <winGuiWrapper/wgw_dialogs.h>
 
 enum
@@ -16,9 +13,9 @@ enum
 
 
 NewProjectDialog::NewProjectDialog(void *phandle, const char *caption, const char *name_label, const char *_note) :
-  DialogWindow(phandle, hdpi::_pxScaled(460), hdpi::_pxScaled(230), caption)
+  CDialogWindow(phandle, hdpi::_pxScaled(460), hdpi::_pxScaled(230), caption)
 {
-  PropPanel::ContainerPropertyControl *_panel = getPanel();
+  PropertyContainerControlBase *_panel = getPanel();
   G_ASSERT(_panel && "NewProjectDialog::NewProjectDialog: NO PANEL FOUND");
 
   _panel->createEditBox(ID_NAME, name_label, "");
@@ -30,7 +27,7 @@ NewProjectDialog::NewProjectDialog(void *phandle, const char *caption, const cha
 }
 
 
-void NewProjectDialog::onChange(int pcb_id, PropPanel::ContainerPropertyControl *panel)
+void NewProjectDialog::onChange(int pcb_id, PropertyContainerControlBase *panel)
 {
   switch (pcb_id)
   {
@@ -63,7 +60,7 @@ void NewProjectDialog::setName(const char *_s)
       erase_items(s, i, s.length() - 1 - i);
   mName = s;
 
-  PropPanel::ContainerPropertyControl *_panel = getPanel();
+  PropertyContainerControlBase *_panel = getPanel();
   G_ASSERT(_panel && "NewProjectDialog: NO PANEL FOUND");
 
   _panel->setText(ID_NAME, mName.str());
@@ -81,7 +78,7 @@ void NewProjectDialog::setLocation(const char *_s)
   ::simplify_fname(s);
   mLocation = s;
 
-  PropPanel::ContainerPropertyControl *_panel = getPanel();
+  PropertyContainerControlBase *_panel = getPanel();
   G_ASSERT(_panel && "NewProjectDialog: NO PANEL FOUND");
 
   _panel->setText(ID_LOCATION, mLocation.str());

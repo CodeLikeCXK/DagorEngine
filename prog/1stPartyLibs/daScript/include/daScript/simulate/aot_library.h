@@ -3,7 +3,7 @@
 #include "daScript/simulate/simulate.h"
 
 namespace das {
-    typedef SimNode * (*AotFactory) (Context &);
+    typedef function<SimNode * (Context &)> AotFactory;
     typedef unordered_map<uint64_t,AotFactory> AotLibrary;  // unordered map for thread safety
 
     typedef void ( * RegisterAotFunctions ) ( AotLibrary & );

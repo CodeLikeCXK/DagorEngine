@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <crypto/cipher.h>
 #include <openssl/opensslv.h>
 #include <openssl/aes.h>

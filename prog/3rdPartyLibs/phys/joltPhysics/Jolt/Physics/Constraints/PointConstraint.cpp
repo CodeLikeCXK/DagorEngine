@@ -97,11 +97,6 @@ void PointConstraint::SetupVelocityConstraint(float inDeltaTime)
 	CalculateConstraintProperties();
 }
 
-void PointConstraint::ResetWarmStart()
-{
-	mPointConstraintPart.Deactivate();
-}
-
 void PointConstraint::WarmStartVelocityConstraint(float inWarmStartImpulseRatio)
 {
 	// Warm starting: Apply previous frame impulse

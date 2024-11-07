@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <daECS/net/netbase.h>
 #include <daECS/net/time.h>
 #include <daECS/net/msgDecl.h>

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <sound/dag_genAudio.h>
 #include <soundSystem/fmodApi.h>
 #include <fmod_studio_common.h>
@@ -28,7 +26,7 @@ public:
     result = get_system()->createSound(::df_get_real_name(fname), (FMOD_MODE)(FMOD_DEFAULT | FMOD_2D), 0, &snd);
     if (result != FMOD_OK)
     {
-      DEBUG_CTX("FMOD error:\n%s %s(%s)", FMOD_ErrorString(result), fname, ::df_get_real_name(fname));
+      debug_ctx("FMOD error:\n%s %s(%s)", FMOD_ErrorString(result), fname, ::df_get_real_name(fname));
       return NULL;
     }
     return (IGenSound *)snd;
@@ -43,19 +41,19 @@ public:
     result = get_system()->playSound((FMOD::Sound *)snd, 0, false, &chan);
     if (result != FMOD_OK)
     {
-      DEBUG_CTX("FMOD error:\n%s", FMOD_ErrorString(result));
+      debug_ctx("FMOD error:\n%s", FMOD_ErrorString(result));
       return;
     }
     result = chan->setLoopCount(loop_cnt);
     if (result != FMOD_OK)
     {
-      DEBUG_CTX("FMOD error:\n%s", FMOD_ErrorString(result));
+      debug_ctx("FMOD error:\n%s", FMOD_ErrorString(result));
       return;
     }
     result = chan->setVolume(volume);
     if (result != FMOD_OK)
     {
-      DEBUG_CTX("FMOD error:\n%s", FMOD_ErrorString(result));
+      debug_ctx("FMOD error:\n%s", FMOD_ErrorString(result));
       return;
     }
   }
@@ -79,7 +77,7 @@ public:
     if (result != FMOD_OK)
     {
       delete m;
-      DEBUG_CTX("FMOD error %s %s:\n%s", fname, ::df_get_real_name(fname), FMOD_ErrorString(result));
+      debug_ctx("FMOD error %s %s:\n%s", fname, ::df_get_real_name(fname), FMOD_ErrorString(result));
       return NULL;
     }
     return (IGenMusic *)m;
@@ -96,7 +94,7 @@ public:
 
     FMOD_RESULT result = m->chan->setVolume(volume);
     if (result != FMOD_OK)
-      DEBUG_CTX("FMOD error:\n%s", FMOD_ErrorString(result));
+      debug_ctx("FMOD error:\n%s", FMOD_ErrorString(result));
   }
 
   virtual void playMusic(IGenMusic *music, int loop_cnt, float volume)
@@ -110,19 +108,19 @@ public:
     result = get_system()->playSound(m->music, 0, false, &m->chan);
     if (result != FMOD_OK)
     {
-      DEBUG_CTX("FMOD error:\n%s", FMOD_ErrorString(result));
+      debug_ctx("FMOD error:\n%s", FMOD_ErrorString(result));
       return;
     }
     result = m->chan->setLoopCount(loop_cnt);
     if (result != FMOD_OK)
     {
-      DEBUG_CTX("FMOD error:\n%s", FMOD_ErrorString(result));
+      debug_ctx("FMOD error:\n%s", FMOD_ErrorString(result));
       return;
     }
     result = m->chan->setVolume(volume);
     if (result != FMOD_OK)
     {
-      DEBUG_CTX("FMOD error:\n%s", FMOD_ErrorString(result));
+      debug_ctx("FMOD error:\n%s", FMOD_ErrorString(result));
       return;
     }
 
@@ -130,7 +128,7 @@ public:
     result = get_system()->setReverbProperties(0, &noReverb);
     if (result != FMOD_OK)
     {
-      DEBUG_CTX("FMOD error:\n%s", FMOD_ErrorString(result));
+      debug_ctx("FMOD error:\n%s", FMOD_ErrorString(result));
       return;
     }
   }
@@ -145,7 +143,7 @@ public:
       return;
     result = m->chan->stop();
     if (result != FMOD_OK)
-      DEBUG_CTX("FMOD error:\n%s", FMOD_ErrorString(result));
+      debug_ctx("FMOD error:\n%s", FMOD_ErrorString(result));
     m->chan = NULL;
   }
 

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <streaming/dag_streamingMgr.h>
 #include <shaders/dag_shaders.h>
 #include <osApiWrappers/dag_miscApi.h>
@@ -13,8 +11,8 @@
 #include <startup/dag_globalSettings.h>
 #include <util/dag_delayedAction.h>
 
+#include <3d/dag_drv3dCmd.h>
 #include <osApiWrappers/dag_cpuJobs.h>
-#include <osApiWrappers/dag_threads.h>
 
 class BasicStreamingSceneManager;
 
@@ -66,6 +64,7 @@ class BasicStreamingSceneManager : public IStreamingSceneManager
         ssm.bdRec[id].bindump = NULL;
       }
 
+      d3d::driver_command(DRV3D_COMMAND_ENABLE_MT, NULL, NULL, NULL);
       ::enable_tex_mgr_mt(true, 0);
     }
 
@@ -130,6 +129,7 @@ class BasicStreamingSceneManager : public IStreamingSceneManager
 
     virtual void releaseJob()
     {
+      d3d::driver_command(DRV3D_COMMAND_DISABLE_MT, NULL, NULL, NULL);
       ::enable_tex_mgr_mt(false, 0);
 
       if (loadJob)
@@ -190,7 +190,7 @@ public:
       if (!cpujobs::is_inited())
         cpujobs::init();
       const int priority = cpujobs::DEFAULT_THREAD_PRIORITY + cpujobs::THREAD_PRIORITY_LOWER_STEP * 2;
-      jobCoreId = cpujobs::create_virtual_job_manager(128 << 10, WORKER_THREADS_AFFINITY_MASK, "streaming", priority);
+      jobCoreId = cpujobs::create_virtual_job_manager(128 << 10, ~0u, "streaming", priority);
       G_ASSERT(jobCoreId >= 0);
     }
     return jobCoreId;
@@ -230,7 +230,7 @@ public:
         curLoading = new LevelStreamJob(*this);
         curLoading->startJob(id, false);
         curLoadingIsUnloading = true;
-        DEBUG_CTX("started scene unloading: %s, id=#%d, queue.depth=%d", (char *)bdRec[id].name, id, toUnload.size());
+        debug_ctx("started scene unloading: %s, id=#%d, queue.depth=%d", (char *)bdRec[id].name, id, toUnload.size());
         cpujobs::add_job(getJobCoreId(), curLoading);
       }
       else
@@ -253,7 +253,7 @@ public:
           if (id != 0)
           {
             // swap to make first
-            DEBUG_CTX("chosen item #%d in queue", id);
+            debug_ctx("chosen item #%d in queue", id);
             int tmp = toLoad[id];
             toLoad[id] = toLoad[0];
             toLoad[0] = tmp;
@@ -266,7 +266,7 @@ public:
         curLoading = new LevelStreamJob(*this);
         curLoading->startJob(id, true);
         curLoadingIsUnloading = false;
-        DEBUG_CTX("started scene loading: %s, id=#%d, queue.depth=%d", (char *)bdRec[id].name, id, toLoad.size());
+        debug_ctx("started scene loading: %s, id=#%d, queue.depth=%d", (char *)bdRec[id].name, id, toLoad.size());
         cpujobs::add_job(getJobCoreId(), curLoading);
       }
     }
@@ -289,7 +289,7 @@ public:
         G_ASSERTF(toUnload.size() > 0, "BasicStreamingSceneManager::act() : toUnload.erase(0,1) [done]");
 
         int id = toUnload[0];
-        DEBUG_CTX("scene unloading done: %s, id=#%d", (char *)bdRec[id].name, id);
+        debug_ctx("scene unloading done: %s, id=#%d", (char *)bdRec[id].name, id);
         (void)id;
         erase_items(toUnload, 0, 1);
       }
@@ -298,7 +298,7 @@ public:
         G_ASSERTF(toLoad.size() > 0, "BasicStreamingSceneManager::act() : toLoad.erase(0,1) [done]");
 
         int id = toLoad[0];
-        DEBUG_CTX("scene loading done: %s, id=#%d", (char *)bdRec[id].name, id);
+        debug_ctx("scene loading done: %s, id=#%d", (char *)bdRec[id].name, id);
         (void)id;
         erase_items(toLoad, 0, 1);
       }
@@ -426,7 +426,7 @@ public:
 
       return;
     }
-    // DEBUG_CTX("not found bindump: %s", bindump);
+    // debug_ctx ( "not found bindump: %s", bindump );
   }
 
   virtual void unloadAllBinDumps()
@@ -531,12 +531,12 @@ protected:
   {
     if (id < 0 || id >= bdRec.size())
     {
-      DEBUG_CTX("invalid id=%d, bdRec.size()=%d", id, bdRec.size());
+      debug_ctx("invalid id=%d, bdRec.size()=%d", id, bdRec.size());
       return;
     }
     if (bdRec[id].bindump)
     {
-      DEBUG_CTX("scene id=%d already loaded", id);
+      debug_ctx("scene id=%d already loaded", id);
       return;
     }
     debug("[STRM] started foregnd scene loading: %s, id=#%d", (char *)bdRec[id].name, id);

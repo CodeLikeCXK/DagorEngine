@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <max.h>
 #include <stdmat.h>
 #include <math.h>
@@ -17,7 +15,6 @@
 #include "debug.h"
 
 #include <d3dx9.h>
-#include <d3d9types.h>
 #include <IHardwareMaterial.h>
 #include "dag_auto_ptr.h"
 
@@ -941,14 +938,10 @@ BOOL MaterDlg2::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
       }
 
       FillSlotNames();
-      break;
+
+      RestoreParams();
     }
-    case WM_SHOWWINDOW:
-      if (wParam)
-        RestoreParams();
-      else
-        SaveParams();
-      break;
+    break;
 
     case WM_PAINT:
       if (!valid)
@@ -1196,11 +1189,7 @@ void MaterDlg2::UpdateTexDisplay(int i)
   Texmap *t = theMtl->texmaps->gettex(i);
   TSTR nm;
   if (t)
-#if defined(MAX_RELEASE_R27) && MAX_RELEASE >= MAX_RELEASE_R27
-    nm = t->GetFullName(false).data();
-#else
     nm = t->GetFullName();
-#endif
   else
     nm = GetString(IDS_NONE);
   texbut[i]->SetText(nm);

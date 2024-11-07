@@ -75,18 +75,10 @@ namespace das
     }
 
     TypeDeclPtr TypeDecl::visit ( Visitor & vis ) {
-        if ( baseType==Type::typeDecl || baseType==Type::typeMacro ) {
-            for ( size_t i=0, is=dimExpr.size(); i!=is; ++i ) {
+        for ( size_t i=0, is=dim.size(); i!=is; ++i ) {
+            if ( dim[i]==TypeDecl::dimConst ) {
                 if ( dimExpr[i] ) {
                     dimExpr[i] = dimExpr[i]->visit(vis);
-                }
-            }
-        } else {
-            for ( size_t i=0, is=dim.size(); i!=is; ++i ) {
-                if ( dim[i]==TypeDecl::dimConst ) {
-                    if ( dimExpr[i] ) {
-                        dimExpr[i] = dimExpr[i]->visit(vis);
-                    }
                 }
             }
         }
@@ -356,7 +348,7 @@ namespace das
             // if it's a table, infer table keys and values types separately
             TT->firstType = inferGenericType(autoT->firstType, initT->firstType, false, false, options);
             if ( !TT->firstType ) return nullptr;
-            if ( !TT->firstType->isTableKeyType() ) return nullptr;            // table key has to be hashable too
+            if ( !TT->firstType->isWorkhorseType() ) return nullptr;            // table key has to be hashable too
             TT->secondType = inferGenericType(autoT->secondType, initT->secondType, false, false, options);
             if ( !TT->secondType ) return nullptr;
         } else if ( autoT->baseType==Type::tBlock || autoT->baseType==Type::tFunction
@@ -378,117 +370,11 @@ namespace das
         return TT;
     }
 
-    // semantic hash
-
-    uint64_t TypeDecl::getSemanticHash() const {
-        HashBuilder hb;
-        return getSemanticHash(hb);
-    }
-
-    uint64_t TypeDecl::getSemanticHash(HashBuilder & hb) const {
-        TextWriter wr;
-        hb.update(baseType);
-        if ( structType ) {
-            DAS_ASSERT(structType->ownSemanticHash!=0);
-            hb.update(structType->ownSemanticHash);
-        } else if ( enumType ) {
-            hb.updateString(enumType->getMangledName());
-            hb.update(enumType->baseType);
-            for ( auto & e : enumType->list ) {
-                hb.updateString(e.name);
-                wr << *(e.value);
-            }
-        } else if ( annotation ) {
-            DAS_ASSERT(annotation->ownSemanticHash!=0);
-            hb.update(annotation->ownSemanticHash);
-        }
-        if ( firstType ) {
-            firstType->getSemanticHash(hb);
-        }
-        if ( secondType ) {
-            secondType->getSemanticHash(hb);
-        }
-        for ( auto & argT : argTypes ) {
-            argT->getSemanticHash(hb);
-        }
-        for ( auto & argN : argNames ) {
-            hb.updateString(argN);
-        }
-       for ( auto & d : dim ) {
-            hb.update(d);
-        }
-        for ( auto & de : dimExpr ) {
-            hb.update(de != nullptr);
-            if ( de ) {
-                wr << *(de);
-            }
-        }
-        hb.update(flags);
-        hb.updateString(wr.str());
-        return hb.getHash();
-    }
-
-    uint64_t TypeDecl::getOwnSemanticHash() const {
-        HashBuilder hb;
-        das_set<Structure *> dep;
-        das_set<Annotation *> adep;
-        return getOwnSemanticHash(hb, dep, adep);
-    }
-
-    uint64_t TypeDecl::getOwnSemanticHash(HashBuilder & hb,das_set<Structure *> & dep, das_set<Annotation *> & adep) const {
-        TextWriter wr;
-        hb.update(baseType);
-        if ( structType ) {
-            if ( dep.find(structType) == dep.end() ) {
-                dep.insert(structType);
-                structType->getOwnSemanticHash(hb, dep, adep);
-            }
-        } else if ( enumType ) {
-            hb.updateString(enumType->getMangledName());
-            hb.update(enumType->baseType);
-            for ( auto & e : enumType->list ) {
-                hb.updateString(e.name);
-                wr << *(e.value);
-            }
-        } else if ( annotation ) {
-            if ( adep.find(annotation) == adep.end() ) {
-                adep.insert(annotation);
-                annotation->getOwnSemanticHash(hb, dep, adep);
-            }
-        }
-        if ( firstType ) {
-            firstType->getOwnSemanticHash(hb, dep, adep);
-        }
-        if ( secondType ) {
-            secondType->getOwnSemanticHash(hb, dep, adep);
-        }
-        for ( auto & argT : argTypes ) {
-            argT->getOwnSemanticHash(hb, dep, adep);
-        }
-        for ( auto & argN : argNames ) {
-            hb.updateString(argN);
-        }
-       for ( auto & d : dim ) {
-            hb.update(d);
-        }
-        for ( auto & de : dimExpr ) {
-            hb.update(de != nullptr);
-            if ( de ) {
-                wr << *(de);
-            }
-        }
-        hb.update(flags);
-        hb.updateString(wr.str());
-        return hb.getHash();
-    }
 
     // TypeDecl
 
     string TypeDecl::describe ( DescribeExtra extra, DescribeContracts contracts, DescribeModule dmodule ) const {
         TextWriter stream;
-        if ( autoToAlias ) {
-            stream << "type<";
-        }
         if ( baseType==Type::alias ) {
             if ( isTag ) {
                 if ( firstType) {
@@ -510,28 +396,11 @@ namespace das
             }
         } else if ( baseType==Type::option ) {
             for ( auto & argT : argTypes ) {
-                stream << argT->describe(extra, contracts, dmodule);
+                stream << argT->describe(extra);
                 if ( argT != argTypes.back() ) {
                     stream << "|";
                 }
             }
-        } else if ( baseType==Type::typeDecl ) {
-            if ( dimExpr.size()==1 ) {
-                stream << "typedecl(" << (*dimExpr[0]) << ")";
-            } else {
-                stream << "typedecl(/*invalid expression*/)";
-            }
-        } else if ( baseType==Type::typeMacro ) {
-            stream << "$" << typeMacroName() << "(";
-            for ( size_t i=1; i!=dimExpr.size(); ++i ) {
-                if ( i!=1 ) stream << ",";
-                if ( dimExpr[i] ) {
-                    stream << *(dimExpr[i]);
-                } else {
-                    stream << "/*invalid expression*/";
-                }
-            }
-            stream << ")";
         } else if ( baseType==Type::tHandle ) {
             if ( annotation ) {
                 if (dmodule == DescribeModule::yes && annotation->module && !annotation->module->name.empty()) {
@@ -543,13 +412,13 @@ namespace das
             }
         } else if ( baseType==Type::tArray ) {
             if ( firstType ) {
-                stream << "array<" << firstType->describe(extra, contracts, dmodule) << ">";
+                stream << "array<" << firstType->describe(extra) << ">";
             } else {
                 stream << "array";
             }
         } else if ( baseType==Type::tTable ) {
             if ( firstType && secondType ) {
-                stream << "table<" << firstType->describe(extra, contracts, dmodule) << ";" << secondType->describe(extra, contracts, dmodule) << ">";
+                stream << "table<" << firstType->describe(extra) << ";" << secondType->describe(extra) << ">";
             } else {
                 stream << "table";
             }
@@ -565,7 +434,7 @@ namespace das
         } else if ( baseType==Type::tPointer ) {
             if ( smartPtr ) stream << "smart_ptr<";
             if ( firstType ) {
-                stream << firstType->describe(extra, contracts, dmodule);
+                stream << firstType->describe(extra);
             } else {
                 stream << "void";
             }
@@ -581,7 +450,7 @@ namespace das
             }
         } else if ( baseType==Type::tIterator ) {
             if ( firstType ) {
-                stream << "iterator<" << firstType->describe(extra, contracts, dmodule) << ">";
+                stream << "iterator<" << firstType->describe(extra) << ">";
             } else {
                 stream << "iterator";
             }
@@ -599,7 +468,7 @@ namespace das
                     } else {
                         stream << "arg" << ai << ":";
                     }
-                    stream << argTypes[ai]->describe(extra, contracts, dmodule);
+                    stream << argTypes[ai]->describe(extra);
                 }
                 stream << ")";
             }
@@ -607,7 +476,7 @@ namespace das
                 if ( argTypes.size() ) {
                     stream << ":";
                 }
-                stream << firstType->describe(extra, contracts, dmodule);
+                stream << firstType->describe(extra);
             }
             stream << ">";
             if ( argNames.size() && argNames.size()!=argTypes.size() ) {
@@ -622,7 +491,7 @@ namespace das
                         const auto & argName = argNames[ai];
                         if ( !argName.empty() ) stream << argName << ":";
                     }
-                    stream << arg->describe(extra, contracts, dmodule);
+                    stream << arg->describe(extra);
                     if ( arg != argTypes.back() ) {
                         stream << ";";
                     }
@@ -639,7 +508,7 @@ namespace das
                         const auto & argName = argNames[ai];
                         if ( !argName.empty() ) stream << argName << ":";
                     }
-                    stream << arg->describe(extra, contracts, dmodule);
+                    stream << arg->describe(extra);
                     if ( arg != argTypes.back() ) {
                         stream << ";";
                     }
@@ -709,13 +578,10 @@ namespace das
                 }
             }
         }
-        if ( autoToAlias ) {
-            stream << ">";
-        }
         return stream.str();
     }
 
-    StringWriter& operator<< (StringWriter& stream, const TypeDecl & decl) {
+    TextWriter& operator<< (TextWriter& stream, const TypeDecl & decl) {
         stream << decl.describe();
         return stream;
     }
@@ -918,8 +784,6 @@ namespace das
             return false;
         } else if (baseType == Type::tPointer) {
             return true;
-        } else if ( baseType == Type::tLambda ) {
-            return false;
         } else {
             return true;
         }
@@ -1005,66 +869,6 @@ namespace das
             }
         }
         return true;
-    }
-
-    bool TypeDecl::hasStringData() const {
-        das_set<void *> dep;
-        return hasStringData(dep);
-    }
-
-    bool TypeDecl::hasStringData( das_set<void*> & dep ) const {
-        if ( baseType==Type::tString ) {
-            return true;
-        } else if ( baseType==Type::tHandle ) {
-            if(dep.find(annotation) != dep.end()) return false;
-            dep.insert(annotation);
-            return annotation->hasStringData(dep);
-        } else if ( baseType==Type::tStructure ) {
-            if (structType) {
-                if (dep.find(structType) != dep.end()) return false;
-                dep.insert(structType);
-                return structType->hasStringData(dep);
-            }
-        } else if ( baseType==Type::tTuple || baseType==Type::tVariant || baseType == Type::option ) {
-            for ( const auto & arg : argTypes ) {
-                if ( arg->hasStringData(dep) ) {
-                    return true;
-                }
-            }
-            return false;
-        } else if ( baseType==Type::tArray || baseType==Type::tTable ) {
-            if ( firstType && firstType->hasStringData(dep) ) return true;
-            if ( secondType && secondType->hasStringData(dep) ) return true;
-        } else if ( baseType==Type::tPointer) {
-            return firstType && firstType->hasStringData(dep);
-        }
-        return false;
-    }
-
-
-    bool TypeDecl::unsafeInit() const {
-        das_set<Structure *> dep;
-        return unsafeInit(dep);
-    }
-
-    bool TypeDecl::unsafeInit( das_set<Structure*> & dep ) const {
-        if ( baseType==Type::tHandle ) {
-            return  annotation->hasNonTrivialCtor();
-        } if ( baseType==Type::tStructure ) {
-            if (structType) {
-                if (dep.find(structType) != dep.end()) return false;
-                dep.insert(structType);
-                return structType->unsafeInit(dep);
-            }
-        } else if ( baseType==Type::tTuple || baseType==Type::tVariant ) {
-            for ( const auto & arg : argTypes ) {
-                if ( arg->unsafeInit(dep) ) {
-                    return true;
-                }
-            }
-            return false;
-        }
-        return false;
     }
 
     bool TypeDecl::needInScope() const {
@@ -1614,11 +1418,6 @@ namespace das
                 }
             }
         }
-        if ( baseType==Type::alias || baseType==Type::autoinfer ) {
-            if ( alias!=decl.alias ) {
-                return false;
-            }
-        }
         return true;
     }
 
@@ -1845,44 +1644,33 @@ namespace das
     }
 
     bool TypeDecl::isAlias() const {
-        return isAliasOrA2A(false);
-    }
-
-    bool TypeDecl::isAliasOrA2A(bool a2a) const {
-        a2a |= autoToAlias;
         // auto is auto.... or auto....?
-        if ( baseType==Type::typeDecl ) {
-            return true;
-        } else if ( baseType==Type::typeMacro ) {
-            return true;
-        } else if ( baseType==Type::autoinfer && a2a ) {
-            return true;
-        } else if ( baseType==Type::alias ) {
+        if ( baseType==Type::alias ) {
             return true;
         } else  if ( baseType==Type::tPointer ) {
             if ( firstType )
-                return firstType->isAliasOrA2A(a2a);
+                return firstType->isAlias();
         } else  if ( baseType==Type::tIterator ) {
             if ( firstType )
-                return firstType->isAliasOrA2A(a2a);
+                return firstType->isAlias();
         } else if ( baseType==Type::tArray ) {
             if ( firstType )
-                return firstType->isAliasOrA2A(a2a);
+                return firstType->isAlias();
         } else if ( baseType==Type::tTable ) {
             bool any = false;
             if ( firstType )
-                any |= firstType->isAliasOrA2A(a2a);
+                any |= firstType->isAlias();
             if ( secondType )
-                any |= secondType->isAliasOrA2A(a2a);
+                any |= secondType->isAlias();
             return any;
         } else if ( baseType==Type::tBlock || baseType==Type::tFunction ||
                    baseType==Type::tLambda || baseType==Type::tTuple ||
                    baseType==Type::tVariant || baseType==Type::option ) {
             bool any = false;
             if ( firstType )
-                any |= firstType->isAliasOrA2A(a2a);
+                any |= firstType->isAlias();
             for ( auto & arg : argTypes )
-                any |= arg->isAliasOrA2A(a2a);
+                any |= arg->isAlias();
             return any;
         }
         return false;
@@ -1896,11 +1684,7 @@ namespace das
             }
         }
         // auto is auto.... or auto....?
-        if ( baseType==Type::typeMacro ) {
-            return true;
-        } else if ( baseType==Type::typeDecl ) {
-            return true;
-        } else if ( baseType==Type::alias ) {
+        if ( baseType==Type::alias ) {
             return true;
         } else  if ( baseType==Type::tPointer ) {
             if ( firstType )
@@ -1948,11 +1732,7 @@ namespace das
                 return true;
             }
         }
-        if ( baseType==Type::typeMacro ) {
-            return true;
-        } else if ( baseType==Type::typeDecl ) {
-            return true;
-        } else if ( baseType==Type::autoinfer ) {
+        if ( baseType==Type::autoinfer ) {
             return true;
         } else if ( baseType==Type::option ) {
             return true;
@@ -1993,11 +1773,7 @@ namespace das
                 return true;
             }
         }
-        if ( baseType==Type::typeMacro ) {
-            return true;
-        } else if ( baseType==Type::typeDecl ) {
-            return true;
-        } else if ( baseType==Type::autoinfer ) {
+        if ( baseType==Type::autoinfer ) {
             return true;
         } else if ( baseType==Type::tPointer ) {
             if ( firstType )
@@ -2038,11 +1814,7 @@ namespace das
                 return true;
             }
         }
-        if (baseType == Type::typeMacro) {
-            return true;
-        } else if (baseType == Type::typeDecl ) {
-            return true;
-        } else if (baseType == Type::autoinfer) {
+        if (baseType == Type::autoinfer) {
             return true;
         } else if ( baseType==Type::option ) {
             return true;
@@ -2106,7 +1878,6 @@ namespace das
             case Type::tEnumeration:
             case Type::tEnumeration8:
             case Type::tEnumeration16:
-            case Type::tEnumeration64:
             case Type::tRange:
             case Type::tURange:
             case Type::tRange64:
@@ -2154,18 +1925,6 @@ namespace das
         }
     }
 
-    bool TypeDecl::isTableKeyType() const {
-        if ( dim.size() ) {
-            return false;
-        } else if ( isWorkhorseType() ) {
-            return true;
-        } else if ( baseType==Type::tHandle && annotation->isRefType()==false ) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-
     bool TypeDecl::isWorkhorseType() const {
         if ( dim.size() )
             return false;
@@ -2180,7 +1939,6 @@ namespace das
             case Type::tEnumeration:
             case Type::tEnumeration8:
             case Type::tEnumeration16:
-            case Type::tEnumeration64:
             case Type::tInt:
             case Type::tInt2:
             case Type::tInt3:
@@ -2243,7 +2001,6 @@ namespace das
             case Type::tEnumeration:
             case Type::tEnumeration8:
             case Type::tEnumeration16:
-            case Type::tEnumeration64:
             case Type::tBool:
                 /*
             case Type::tInt8:
@@ -2556,10 +2313,6 @@ namespace das
         return (baseType==Type::tInt || baseType==Type::tUInt) && dim.size()==0;
     }
 
-    bool TypeDecl::isIndexExt() const {
-        return (baseType==Type::tInt || baseType==Type::tUInt || baseType==Type::tInt64 || baseType==Type::tUInt64) && dim.size()==0;
-    }
-
     int TypeDecl::getTupleFieldOffset ( int index ) const {
         DAS_ASSERT(baseType==Type::tTuple);
         DAS_ASSERT(index>=0 && index<int(argTypes.size()));
@@ -2782,8 +2535,8 @@ namespace das
         if ( type->baseType==Type::tPointer ) {
             return false;
         }
-        // if ( type->firstType && isCircularType(type->firstType, all) ) return true;
-        // if ( type->secondType && isCircularType(type->secondType, all) ) return true;
+        if ( type->firstType && isCircularType(type->firstType, all) ) return true;
+        if ( type->secondType && isCircularType(type->secondType, all) ) return true;
         auto pt = type.get();
         for (auto it : all) {
             if ( it == pt ) return true;
@@ -2884,11 +2637,10 @@ namespace das
                 ss << structType->module->name << "::";
             }
             ss << structType->name << ">";
-        } else if ( baseType==Type::tEnumeration || baseType==Type::tEnumeration8 || baseType==Type::tEnumeration16 || baseType==Type::tEnumeration64 ) {
+        } else if ( baseType==Type::tEnumeration || baseType==Type::tEnumeration8 || baseType==Type::tEnumeration16 ) {
             ss << "E";
             if ( baseType==Type::tEnumeration8 ) ss << "8";
             else if ( baseType==Type::tEnumeration16 ) ss << "16";
-            else if ( baseType==Type::tEnumeration64 ) ss << "64";
             if ( enumType ) {
                 ss << "<" << enumType->getMangledName() << ">";
             }
@@ -2897,13 +2649,6 @@ namespace das
             if ( smartPtr ) {
                 ss << (smartPtrNative ? "W" : "M");
             }
-        } else if ( baseType==Type::typeMacro ) {
-            TextWriter tw;
-            for ( size_t i=1; i<dimExpr.size(); ++i ) {
-                if ( i!=1 ) tw << ",";
-                tw << *dimExpr[i];
-            }
-            ss << "^<" << typeMacroName() << ";" << hash64z(tw.str().c_str()) << ">";
         } else {
             switch ( baseType ) {
                 case Type::anyArgument:     ss << "*"; break;
@@ -2911,7 +2656,6 @@ namespace das
                 case Type::fakeLineInfo:    ss << "_l"; break;
                 case Type::autoinfer:       ss << "."; break;
                 case Type::option:          ss << "|"; break;
-                case Type::typeDecl:        ss << "D"; break;
                 case Type::alias:           ss << "L"; break;
                 case Type::tIterator:       ss << "G"; break;
                 case Type::tArray:          ss << "A"; break;
@@ -3192,9 +2936,6 @@ namespace das
                 } else if ( ch[0]=='1' && ch[1]=='6' ) {
                     ch += 2;
                     pt = make_smart<TypeDecl>(Type::tEnumeration16);
-                } else if ( ch[0]=='6' && ch[1]=='4' ) {
-                    ch += 2;
-                    pt = make_smart<TypeDecl>(Type::tEnumeration64);
                 } else {
                     pt = make_smart<TypeDecl>(Type::tEnumeration);
                 }
@@ -3248,8 +2989,6 @@ namespace das
                 else                                        { ch+=1; return make_smart<TypeDecl>(Type::tFloat); }
             case '.':   ch++; return make_smart<TypeDecl>(Type::autoinfer);
             case '|':   ch++; return make_smart<TypeDecl>(Type::option);
-            case 'D':   ch++; return make_smart<TypeDecl>(Type::typeDecl);
-            case '^':   ch++; return make_smart<TypeDecl>(Type::typeMacro);
             case '*':   ch++; return make_smart<TypeDecl>(Type::anyArgument);
             case 'L':   ch++; return make_smart<TypeDecl>(Type::alias);
             case 'A':   ch++; return make_smart<TypeDecl>(Type::tArray);
@@ -3397,7 +3136,7 @@ namespace das
         return false;
     }
 
-    bool isMatchingArgumentType ( const TypeDeclPtr & argType, const TypeDeclPtr & passType ) {
+    bool isMatchingArgumentType (TypeDeclPtr argType, TypeDeclPtr passType) {
         if (!passType) {
             return false;
         }
@@ -3429,32 +3168,5 @@ namespace das
         }
         // all good
         return true;
-    }
-
-    void findMatchingOptions ( const TypeDeclPtr & type, vector<MatchingOptionError> & matching ) {
-        if ( type->baseType == Type::option ) {
-            // lets see if one of the argTypes is the same as the other
-            for ( size_t ai=0, as=type->argTypes.size(); ai<as; ++ai ) {
-                auto & argT = type->argTypes[ai];
-                for ( size_t bi=ai+1; bi<as; ++bi ) {
-                    auto & argB = type->argTypes[bi];
-                    if ( argT->isSameType(*argB, RefMatters::yes, ConstMatters::yes, TemporaryMatters::yes, AllowSubstitute::no, true, false) ) {
-                        matching.push_back({type,argT,argB});
-                        goto found;
-                    }
-                }
-            }
-            found:;
-        } else {
-            if ( type->firstType ) {
-                findMatchingOptions(type->firstType, matching);
-            }
-            if ( type->secondType ) {
-                findMatchingOptions(type->secondType, matching);
-            }
-            for ( auto & argT : type->argTypes ) {
-                findMatchingOptions(argT, matching);
-            }
-        }
     }
 }

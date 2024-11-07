@@ -20,7 +20,7 @@ Example
    print(a) // => 123
    print(b) // => 567
 
-   function foo() {
+   let function foo() {
      return {x = 555, y=777, z=999, w=111}
    }
    let {x, y=1, q=3} = foo()

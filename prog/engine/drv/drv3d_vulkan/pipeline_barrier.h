@@ -1,6 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright 2023 by Gaijin Games KFT, All rights reserved.
 #pragma once
-
 #include "driver.h"
 #include "vulkan_device.h"
 
@@ -51,8 +50,6 @@ public:
 #endif
   };
 
-  static bool dbgUseSplitSubmits;
-
 private:
   const VulkanDevice &device;
   BarrierCache &cache;
@@ -86,7 +83,6 @@ private:
   } barriersCount;
 
   void reset();
-  void submitSplitted(VulkanCommandBufferHandle cmd_buffer);
 
 public:
   PipelineBarrier(const VulkanDevice &in_device, BarrierCache &cache, VkPipelineStageFlags src_stages = 0,
@@ -94,13 +90,10 @@ public:
   ~PipelineBarrier();
 
   // primary barrier adders
-  void addStagesSrc(VkPipelineStageFlags stages);
-  void addStagesDst(VkPipelineStageFlags stages);
   void addStages(VkPipelineStageFlags src_stages, VkPipelineStageFlags dst_stages);
   void addDependencyFlags(VkDependencyFlags new_flag);
   void addMemory(AccessFlags mask);
-  // merge_by_object will try to merge last element with newly adding one
-  void addBuffer(AccessFlags mask, VulkanBufferHandle buf, VkDeviceSize offset, VkDeviceSize size, bool merge_by_object);
+  void addBuffer(AccessFlags mask, VulkanBufferHandle buf, VkDeviceSize offset, VkDeviceSize size);
   void addImage(AccessFlags mask, VulkanImageHandle img, VkImageLayout old_layout, VkImageLayout new_layout,
     const VkImageSubresourceRange &subresources);
 
@@ -111,8 +104,7 @@ public:
   void modifyBufferTemplate(AccessFlags mask);
   void modifyBufferTemplate(const Buffer *buf);
   void modifyBufferTemplate(VulkanBufferHandle buf);
-  void addBufferByTemplate(VkDeviceSize offset, VkDeviceSize size);
-  void addBufferByTemplateMerged(VkDeviceSize offset, VkDeviceSize size);
+  void addBufferByTemplate(VkDeviceSize offset, VkDeviceSize size, VkAccessFlags srcAccessMask);
 
   void modifyImageTemplate(AccessFlags mask);
   void modifyImageTemplateOldLayout(VkImageLayout layout);
@@ -122,8 +114,6 @@ public:
   void modifyImageTemplate(uint32_t mip_index, uint32_t mip_range, uint32_t array_index, uint32_t array_range);
   void addImageByTemplate();
   void addImageByTemplate(AccessFlags mask);
-  void addImageByTemplateWithSrcAccess(VkAccessFlags mask);
-  void addImageByTemplateWithDstAccess(VkAccessFlags mask);
 
   // special methods
 
@@ -136,7 +126,6 @@ public:
 
   void submit(VulkanCommandBufferHandle cmd_buffer, bool keep_cache = false);
   bool empty();
-  VkPipelineStageFlags getStagesSrc();
 
   void dbgPrint();
 };

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <gamePhys/collision/collisionLib.h>
 #include <gamePhys/collision/rendinstCollision.h>
 #include <gamePhys/collision/collisionInstances.h>
@@ -18,7 +16,11 @@
 #include <math/dag_mathUtils.h>
 
 
-void WrapperRendinstContactResultCB::addSingleResult(contact_data_t &, obj_user_data_t *, obj_user_data_t *) {}
+float WrapperRendinstContactResultCB::addSingleResult(contact_data_t &, obj_user_data_t *, obj_user_data_t *,
+  gamephys::CollisionObjectInfo *)
+{
+  return 0.f;
+}
 
 void WrapperRendinstContactResultCB::applyRiGenDamage() const {}
 

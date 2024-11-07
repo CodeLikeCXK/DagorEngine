@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <string.h>
 #define __BITARRAYCPP__
 #include <util/dag_bitArray.h>

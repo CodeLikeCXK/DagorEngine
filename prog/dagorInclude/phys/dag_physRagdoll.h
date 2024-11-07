@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -15,14 +16,10 @@ class PhysRagdoll final : public AnimV20::IAnimCharPostController
 {
 public:
   PhysRagdoll();
-  PhysRagdoll(PhysRagdoll &&) = default;
-  PhysRagdoll(const PhysRagdoll &) = delete;
   ~PhysRagdoll();
-  PhysRagdoll &operator=(PhysRagdoll &&) = default;
-  PhysRagdoll &operator=(const PhysRagdoll &) = delete;
 
   void update(real dt, GeomNodeTree &tree, AnimV20::AnimcharBaseComponent *ac) override;
-  bool overridesBlender() const override { return !driveBodiesToAnimchar; }
+  bool overridesBlender() const override { return true; }
 
   static PhysRagdoll *create(PhysicsResource *phys, PhysWorld *world);
 
@@ -52,7 +49,6 @@ public:
   // sets overrides
   void setOverrideVel(const Point3 &vel);
   void setOverrideOmega(const Point3 &omega);
-  void setDriveBodiesToAnimchar(bool doDrive);
   void applyImpulse(int node_id, const Point3 &pos, const Point3 &impulse);
 
   PhysSystemInstance *getPhysSys() const { return physSys; }
@@ -82,15 +78,12 @@ protected:
   PhysWorld *physWorld;
   PhysObjectUserData ud = {_MAKE4C('PRGD')};
   Point3 addVelImpulse;
-#ifdef USE_BULLET_PHYSICS
   Point3 dynamicClipoutPos;
-  float dynamicClipoutT = 0.f;
-#endif
+  float dynamicClipoutT;
   Point3 overrideVelocity;
   Point3 overrideOmega;
 
   SmallTab<TMatrix *, MidmemAlloc> nodeHelpers;
-  SmallTab<mat44f *, MidmemAlloc> driveBodiesToSkeletonWtms;
   SmallTab<TMatrix, TmpmemAlloc> lastNodeTms;
   Tab<NodeAlignCtrl> nodeAlignCtrl;
   Tab<int> nodeBody;
@@ -99,5 +92,4 @@ protected:
   bool ccdMode;
   bool shouldOverrideVelocity;
   bool shouldOverrideOmega;
-  bool driveBodiesToAnimchar;
 };

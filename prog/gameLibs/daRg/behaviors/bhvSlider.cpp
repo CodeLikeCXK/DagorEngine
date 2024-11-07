@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "bhvSlider.h"
 
 #include <daRg/dag_element.h>
@@ -11,7 +9,7 @@
 #include "behaviorHelpers.h"
 #include "dargDebugUtils.h"
 
-#include <drv/hid/dag_hiKeybIds.h>
+#include <humanInput/dag_hiKeybIds.h>
 
 #define DEF_MIN       0
 #define DEF_MAX       100
@@ -280,8 +278,6 @@ bool BhvSlider::getValueFromMousePos(BhvSliderData *bhvData, Element *elem, int 
   float minVal = elem->props.getFloat(elem->csk->min, DEF_MIN);
   float maxVal = elem->props.getFloat(elem->csk->max, DEF_MAX);
 
-  Point2 localPos = elem->screenPosToElemLocal(Point2(mx, my));
-
   if (orient == O_HORIZONTAL)
   {
     if (elem->screenCoord.size.x <= 1e-3f)
@@ -293,7 +289,7 @@ bool BhvSlider::getValueFromMousePos(BhvSliderData *bhvData, Element *elem, int 
       dragOffs = bhvData->knobOffset;
     else
       dragOffs = knobW * 0.5f;
-    float ratio = (localPos.x - dragOffs) / (elem->screenCoord.size.x - knobW);
+    float ratio = (mx - elem->screenCoord.screenPos.x - dragOffs) / (elem->screenCoord.size.x - knobW);
     out = minVal + ratio * (maxVal - minVal);
     return true;
   }
@@ -308,7 +304,7 @@ bool BhvSlider::getValueFromMousePos(BhvSliderData *bhvData, Element *elem, int 
       dragOffs = bhvData->knobOffset;
     else
       dragOffs = knobH * 0.5f;
-    float ratio = (localPos.y - dragOffs) / (elem->screenCoord.size.y - knobH);
+    float ratio = (my - elem->screenCoord.screenPos.y - dragOffs) / (elem->screenCoord.size.y - knobH);
     out = minVal + ratio * (maxVal - minVal);
     return true;
   }

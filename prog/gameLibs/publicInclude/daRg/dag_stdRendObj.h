@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -38,7 +39,8 @@ public:
 class RenderObjectBox : public RenderObject
 {
 protected:
-  virtual void render(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *, const RenderState &render_state);
+  virtual void renderCustom(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *,
+    const RenderState &render_state);
   void renderNoRadius(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *rdata,
     const RenderState &render_state);
 };
@@ -68,7 +70,8 @@ private:
 class RenderObjectVectorCanvas : public RenderObject
 {
 protected:
-  virtual void render(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *, const RenderState &render_state);
+  virtual void renderCustom(StdGuiRender::GuiContext &ctx, const Element *elem, const ElemRenderData *,
+    const RenderState &render_state);
 };
 
 

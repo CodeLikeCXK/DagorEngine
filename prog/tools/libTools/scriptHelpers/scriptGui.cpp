@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <ioSys/dag_genIo.h>
 
 #include <EditorCore/ec_ObjectEditor.h>
@@ -123,7 +121,7 @@ public:
     */
   }
 
-  virtual void onPPChange(int pid, bool edit_finished, PropPanel::ContainerPropertyControl &panel,
+  virtual void onPPChange(int pid, bool edit_finished, PropertyContainerControlBase &panel,
     dag::ConstSpan<RenderableEditableObject *> objects)
   {}
 
@@ -186,9 +184,9 @@ public:
   virtual TunedElement *getSubElem(int index) const { return NULL; }
 
 
-  virtual void fillPropPanel(int &pid, PropPanel::ContainerPropertyControl &panel) {}
+  virtual void fillPropPanel(int &pid, PropertyContainerControlBase &panel) {}
 
-  virtual void getValues(int &pid, PropPanel::ContainerPropertyControl &panel) {}
+  virtual void getValues(int &pid, PropertyContainerControlBase &panel) {}
 
   virtual void saveData(mkbindump::BinDumpSaveCB &cwr, SaveDataCB *save_cb)
   {

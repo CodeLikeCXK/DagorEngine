@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <UnitTest++/UnitTestPP.h>
 #include <streamIO/streamIO.h>
 #include <osApiWrappers/dag_cpuJobs.h>

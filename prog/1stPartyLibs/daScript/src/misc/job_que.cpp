@@ -4,30 +4,12 @@
 
 namespace das {
 
-#if defined(_MSC_VER) && !defined(_GAMING_XBOX) && !defined(_DURANGO) && !defined(_M_ARM64)
-
-    int GetLogicalProcessorCountInWindows();
-
-    int JobQue::get_num_threads() {
-        if ( int nThreads = GetLogicalProcessorCountInWindows() ) return nThreads;
-        return max(1,static_cast<int>(thread::hardware_concurrency()));
-    }
-
-
-#else
-
-    int JobQue::get_num_threads() {
-        return max(1,static_cast<int>(thread::hardware_concurrency()));
-    }
-
-#endif
-
     JobQue::JobQue()
         : mSleepMs(1)
         , mShutdown(false)
         , mThreadCount( 0 )
         , mJobsRunning(0) {
-        mThreadCount = get_num_threads();
+        mThreadCount = max(1,(static_cast<int>(thread::hardware_concurrency())));
         SetCurrentThreadPriority(JobPriority::High);
         for (int j = 0, js = mThreadCount; j < js; j++) {
             mThreads.emplace_back(make_unique<thread>([=]() {

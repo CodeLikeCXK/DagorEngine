@@ -1,2 +1,1 @@
-skip functions
-skip void?
+Creates `JsonValue` out of value.

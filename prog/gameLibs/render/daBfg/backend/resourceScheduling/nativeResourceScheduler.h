@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include "resourceScheduler.h"
@@ -32,10 +31,9 @@ private:
   DestroyedHeapSet allocateHeaps(const HeapRequests &heap_requests) override;
 
   void placeResource(int frame, intermediate::ResourceIndex res_idx, HeapIndex heap_idx, const ResourceDescription &desc,
-    uint32_t offset, const ResourceAllocationProperties &properties, const DynamicResolution &dyn_resolution) override;
+    uint32_t offset, const ResourceAllocationProperties &properties) override;
 
-  template <class T>
-  void resizeTexture(intermediate::ResourceIndex res_idx, int frame, const T &resolution);
+  void resizeTexture(intermediate::ResourceIndex res_idx, int frame, const Point2 &resolution);
   void shutdownInternal() override;
 
 private:
@@ -49,7 +47,6 @@ private:
   {
     ResourceKey(const ResourceDescription &description, const ResourceAllocationProperties &properties, uint32_t allignment);
     ResourceKey(const ResourceKey &key, const Point2 &resolution);
-    ResourceKey(const ResourceKey &key, const Point3 &resolution);
     inline bool operator==(const ResourceKey &key) const;
     size_t hash;
     size_t rawHash;

@@ -1,4 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright 2023 by Gaijin Games KFT, All rights reserved.
+
+#ifndef _HID_IOS_GAMEPAD_EX_H
+#define _HID_IOS_GAMEPAD_EX_H
 #pragma once
 
 #import <GameController/GameController.h>
@@ -9,7 +12,7 @@ namespace HumanInput
 {
 enum
 {
-  IOS_SENSOR_ADDITIONAL_AXIS_NUM = 8
+  IOS_SENSOR_ADDITIONAL_AXIS_NUM = 5
 };
 } // namespace HumanInput
 
@@ -101,3 +104,4 @@ private:
   float stickDeadZoneScale[2] = {1.f, 1.f};
   float stickDeadZoneBase[2] = {0.2f, 0.2f};
 };
+#endif //_HID_IOS_GAMEPAD_EX_H

@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -24,6 +25,11 @@ public:
   BloomPS() : width(0), height(0), mipsCount(0) {}
   ~BloomPS() { close(); }
   void close();
+  static void getLumaResolution(uint32_t postfx_width, uint32_t postfx_height, uint32_t &w, uint32_t &h)
+  {
+    w = postfx_width >> 4;
+    h = postfx_height >> 4;
+  }
   void init(int w, int h);
   void perform(ManagedTexView downsampled_frame);
   const BloomSettings &getSettings() const { return settings; }

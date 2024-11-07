@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -14,9 +15,9 @@ public:
 
   bool init(AnimV20::AnimData *a, const char *node_name);
 
-  void calcAnimTm(TMatrix &tm, int t);
+  void calcAnimTm(TMatrix &tm, int t, int d_keys_no_blend = -1);
 
-  bool isValid() const { return anim.get() && prs.valid(); }
+  bool isValid() const { return anim.get() && (pos || rot || scl); }
 
   bool setTargetNode(const char *node_name);
 
@@ -24,5 +25,7 @@ public:
 
 protected:
   Ptr<AnimV20::AnimData> anim;
-  AnimV20::PrsAnimNodeRef prs;
+  const AnimV20::AnimChanPoint3 *pos;
+  const AnimV20::AnimChanQuat *rot;
+  const AnimV20::AnimChanPoint3 *scl;
 };

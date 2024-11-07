@@ -1,6 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "pipeline_cache_file.h"
+#include "driver_defs.h"
 #include <hash/sha1.h>
 
 #include <osApiWrappers/dag_files.h>
@@ -11,8 +10,6 @@
 #include <osApiWrappers/dag_miscApi.h>
 #include <util/dag_string.h>
 #include "driver.h"
-#include "driver_config.h"
-#include "globals.h"
 
 #if _TARGET_C3
 
@@ -25,7 +22,7 @@
 using namespace drv3d_vulkan;
 // time based uuid
 static const PipelineCacheFile::UUID file_magic =
-  PipelineCacheFile::UUID(0x8F8ED0A2, 0xC419, 0x11EE, 0xBD08, 0x32, 0x50, 0x96, 0xB3, 0x9F, 0x47);
+  PipelineCacheFile::UUID(0x0A80C2FF, 0x2EB0, 0x4474, 0xBA47, 0xDF, 0x01, 0x02, 0x2F, 0x89, 0xB3);
 
 uint32_t getPipelineSignificantAppVersion()
 {
@@ -38,11 +35,7 @@ uint32_t getPipelineSignificantAppVersion()
 
 void PipelineCacheFile::load(const char *path)
 {
-  const DataBlock *cfgBlk = Globals::cfg.getPerDriverPropertyBlock("pipelineCompiler");
-  const bool allowPipelineCache = ::dgs_get_settings()->getBlockByNameEx("vulkan")->getBool("allowPipelineCache", true) &&
-                                  cfgBlk->getBool("allowPipelineCache", true);
-
-  if (!allowPipelineCache)
+  if (!::dgs_get_settings()->getBlockByNameEx("vulkan")->getBool("allowPipelineCache", true))
     return;
 
   const char *filePath = path ? path : getDataPath();

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "resampleImage.h"
 #include <image/imageresampler/resampler.h>
 #include <dag/dag_vector.h>

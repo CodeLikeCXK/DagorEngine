@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -42,8 +43,7 @@ struct E3DCOLOR;
 namespace bind_dascript
 {
 void datablock_debug_print_datablock(const char *name, const DataBlock &blk);
-const char *datablock_to_string(const DataBlock &blk, das::Context *context, das::LineInfoArg *at);
-const char *datablock_to_compact_string(const DataBlock &blk, das::Context *context, das::LineInfoArg *at);
+const char *datablock_to_string(const DataBlock &blk, das::Context *context);
 const DataBlock &datablock_get_empty();
 void datablock_set_from(DataBlock &blk, const DataBlock &from, const char *src_fname);
 } // namespace bind_dascript

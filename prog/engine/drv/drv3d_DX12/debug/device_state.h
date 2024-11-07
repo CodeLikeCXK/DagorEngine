@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #if _TARGET_PC_WIN
@@ -7,15 +6,18 @@
 
 #include "device_state_null.h"
 
-namespace drv3d_dx12::debug
+namespace drv3d_dx12
+{
+namespace debug
 {
 #if _TARGET_PC_WIN
 #if COMMAND_BUFFER_DEBUG_INFO_DEFINED
-using DeviceState = pc::DeviceState;
+using DeviceState = ::drv3d_dx12::debug::pc::DeviceState;
 #else
-using DeviceState = null::DeviceState;
+using DeviceState = ::drv3d_dx12::debug::null::DeviceState;
 #endif
 #else
-using DeviceState = null::DeviceState;
+using DeviceState = ::drv3d_dx12::debug::null::DeviceState;
 #endif
-} // namespace drv3d_dx12::debug
+} // namespace debug
+} // namespace drv3d_dx12

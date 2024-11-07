@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "materials.h"
 #include "mat_cm.h"
 #include "mat_shader.h"
@@ -12,7 +10,7 @@
 #include <assets/assetMgr.h>
 
 #include <sepGui/wndPublic.h>
-#include <propPanel/control/container.h>
+#include <propPanel2/c_panel_base.h>
 
 #include <3d/dag_materialData.h>
 
@@ -20,7 +18,7 @@
 
 
 //==================================================================================================
-void MaterialsPlugin::fillPropPanel(PropPanel::ContainerPropertyControl &panel)
+void MaterialsPlugin::fillPropPanel(PropertyContainerControlBase &panel)
 {
   panel.setEventHandler(this);
 
@@ -42,11 +40,11 @@ void MaterialsPlugin::fillPropPanel(PropPanel::ContainerPropertyControl &panel)
 
 //==================================================================================================
 
-void MaterialsPlugin::fillShaderPanel(PropPanel::ContainerPropertyControl *panel)
+void MaterialsPlugin::fillShaderPanel(PropertyContainerControlBase *panel)
 {
   G_ASSERT(panel->getById(PID_SHADER_PANEL) && "MaterialsPlugin::fillPropPanel: No shader panel found!!!");
 
-  PropPanel::ContainerPropertyControl *_shader_panel = panel->getById(PID_SHADER_PANEL)->getContainer();
+  PropertyContainerControlBase *_shader_panel = panel->getById(PID_SHADER_PANEL)->getContainer();
 
   G_ASSERT(_shader_panel && "MaterialsPlugin::fillPropPanel: No shader panel found!!! (line 2)");
 
@@ -60,7 +58,7 @@ void MaterialsPlugin::fillShaderPanel(PropPanel::ContainerPropertyControl *panel
 }
 
 
-void MaterialsPlugin::fillShaderParams(PropPanel::ContainerPropertyControl *panel, const MaterialRec &mat, const MatShader &shader)
+void MaterialsPlugin::fillShaderParams(PropertyContainerControlBase *panel, const MaterialRec &mat, const MatShader &shader)
 {
   shaderParamsNames.clear();
 
@@ -102,7 +100,7 @@ void MaterialsPlugin::fillShaderParams(PropPanel::ContainerPropertyControl *pane
 
 //==================================================================================================
 
-void MaterialsPlugin::addTexture(PropPanel::ContainerPropertyControl *panel, const MaterialRec &mat, const char *caption, int ctrl_idx,
+void MaterialsPlugin::addTexture(PropertyContainerControlBase *panel, const MaterialRec &mat, const char *caption, int ctrl_idx,
   int tex_idx) const
 {
   const char *texCapt = mat.getTexRef(tex_idx);
@@ -113,7 +111,7 @@ void MaterialsPlugin::addTexture(PropPanel::ContainerPropertyControl *panel, con
 
 //==================================================================================================
 
-void MaterialsPlugin::addTripleInt(PropPanel::ContainerPropertyControl *panel, const char *caption, const char *script_param,
+void MaterialsPlugin::addTripleInt(PropertyContainerControlBase *panel, const char *caption, const char *script_param,
   const IPoint2 &constrains, int ctrl_idx) const
 {
   String paramVal(::get_script_param(curMat->script, script_param));
@@ -125,7 +123,7 @@ void MaterialsPlugin::addTripleInt(PropPanel::ContainerPropertyControl *panel, c
 
 //==================================================================================================
 
-void MaterialsPlugin::addTripleReal(PropPanel::ContainerPropertyControl *panel, const char *caption, const char *script_param,
+void MaterialsPlugin::addTripleReal(PropertyContainerControlBase *panel, const char *caption, const char *script_param,
   const Point2 &constrains, int ctrl_idx) const
 {
   String paramVal(::get_script_param(curMat->script, script_param));
@@ -138,7 +136,7 @@ void MaterialsPlugin::addTripleReal(PropPanel::ContainerPropertyControl *panel, 
 
 //==================================================================================================
 
-void MaterialsPlugin::addE3dColor(PropPanel::ContainerPropertyControl *panel, const char *caption, const char *script_param, int slot,
+void MaterialsPlugin::addE3dColor(PropertyContainerControlBase *panel, const char *caption, const char *script_param, int slot,
   int ctrl_idx) const
 {
   if (slot == -1)
@@ -161,7 +159,7 @@ void MaterialsPlugin::addE3dColor(PropPanel::ContainerPropertyControl *panel, co
 
 //==================================================================================================
 
-void MaterialsPlugin::addCombo(PropPanel::ContainerPropertyControl *panel, const char *caption, const char *script_param,
+void MaterialsPlugin::addCombo(PropertyContainerControlBase *panel, const char *caption, const char *script_param,
   const Tab<String> &vals, const char *def, int ctrl_idx)
 {
   String paramVal(::get_script_param(curMat->script, script_param));
@@ -186,7 +184,7 @@ void MaterialsPlugin::addCombo(PropPanel::ContainerPropertyControl *panel, const
 
 //==================================================================================================
 
-void MaterialsPlugin::addCustom(PropPanel::ContainerPropertyControl *panel, const char *script_param, int ctrl_idx) const
+void MaterialsPlugin::addCustom(PropertyContainerControlBase *panel, const char *script_param, int ctrl_idx) const
 {
   if (!stricmp(script_param, "two_sided"))
   {
@@ -224,7 +222,7 @@ IPoint2 MaterialsPlugin::getParamIdxFromPid(int pid) const
 
 //==================================================================================================
 
-void MaterialsPlugin::onChange(int pcb_id, PropPanel::ContainerPropertyControl *panel)
+void MaterialsPlugin::onChange(int pcb_id, PropertyContainerControlBase *panel)
 {
   if (pcb_id >= PID_FIRST_PARAM)
     onShaderParamChange(pcb_id, panel);
@@ -241,7 +239,7 @@ void MaterialsPlugin::onChange(int pcb_id, PropPanel::ContainerPropertyControl *
 
 //==================================================================================================
 
-void MaterialsPlugin::onShaderParamChange(int pid, PropPanel::ContainerPropertyControl *panel)
+void MaterialsPlugin::onShaderParamChange(int pid, PropertyContainerControlBase *panel)
 {
   IPoint2 paramIdx = getParamIdxFromPid(pid);
 
@@ -272,8 +270,7 @@ void MaterialsPlugin::onShaderParamChange(int pid, PropPanel::ContainerPropertyC
 
 //==================================================================================================
 
-void MaterialsPlugin::onTripleIntChange(PropPanel::ContainerPropertyControl *panel, const IPoint2 &param_idx,
-  MatTripleInt &param) const
+void MaterialsPlugin::onTripleIntChange(PropertyContainerControlBase *panel, const IPoint2 &param_idx, MatTripleInt &param) const
 {
   const int checkPid = PID_FIRST_PARAM + param_idx.x * PID_PARAM_PIDS_COUNT;
   const int trackPid = checkPid + 1;
@@ -287,8 +284,7 @@ void MaterialsPlugin::onTripleIntChange(PropPanel::ContainerPropertyControl *pan
 
 //==================================================================================================
 
-void MaterialsPlugin::onTripleRealChange(PropPanel::ContainerPropertyControl *panel, const IPoint2 &param_idx,
-  MatTripleReal &param) const
+void MaterialsPlugin::onTripleRealChange(PropertyContainerControlBase *panel, const IPoint2 &param_idx, MatTripleReal &param) const
 {
   const int checkPid = PID_FIRST_PARAM + param_idx.x * PID_PARAM_PIDS_COUNT;
   const int realPid = checkPid + 1;
@@ -301,7 +297,7 @@ void MaterialsPlugin::onTripleRealChange(PropPanel::ContainerPropertyControl *pa
 
 //==================================================================================================
 
-void MaterialsPlugin::onE3dColorChange(PropPanel::ContainerPropertyControl *panel, const IPoint2 &param_idx, MatE3dColor &param) const
+void MaterialsPlugin::onE3dColorChange(PropertyContainerControlBase *panel, const IPoint2 &param_idx, MatE3dColor &param) const
 {
   const int checkPid = PID_FIRST_PARAM + param_idx.x * PID_PARAM_PIDS_COUNT;
   const int realPid = checkPid + 1;
@@ -314,7 +310,7 @@ void MaterialsPlugin::onE3dColorChange(PropPanel::ContainerPropertyControl *pane
 
 //==================================================================================================
 
-void MaterialsPlugin::onComboChange(PropPanel::ContainerPropertyControl *panel, const IPoint2 &param_idx, MatCombo &param) const
+void MaterialsPlugin::onComboChange(PropertyContainerControlBase *panel, const IPoint2 &param_idx, MatCombo &param) const
 {
   const int comboPid = PID_FIRST_PARAM + param_idx.x * PID_PARAM_PIDS_COUNT;
   param.val = panel->getText(comboPid);
@@ -322,20 +318,28 @@ void MaterialsPlugin::onComboChange(PropPanel::ContainerPropertyControl *panel, 
 
 //==================================================================================================
 
-void MaterialsPlugin::onTextureChange(PropPanel::ContainerPropertyControl *panel, const IPoint2 &param_idx, MatTexture &param) const
+void MaterialsPlugin::onTextureChange(PropertyContainerControlBase *panel, const IPoint2 &param_idx, MatTexture &param) const
 {
   int type = curAsset->getMgr().getTexAssetTypeId();
 
-  SelectAssetDlg dlg(0, &curAsset->getMgr(), "Select texture", "Select texture", "Reset texture", make_span_const(&type, 1));
+  int _x, _y;
+  unsigned _w, _h;
+
+  G_ASSERT(getPropPanel() && "Plugin panel closed!");
+  if (!getWndManager().getWindowPosSize(getPropPanel()->getParentWindowHandle(), _x, _y, _w, _h))
+    return;
+  getWndManager().clientToScreen(_x, _y);
+
+  SelectAssetDlg dlg(0, &curAsset->getMgr(), "Select texture", "Select texture", "Reset texture", make_span_const(&type, 1),
+    _x - _w - 5, _y, _w, _h);
+
   dlg.selectObj(curMat->getTexRef(param.getSlot()));
-  dlg.setManualModalSizingEnabled();
-  dlg.positionLeftToWindow("Properties", true);
   int ret = dlg.showDialog();
 
-  if (ret == PropPanel::DIALOG_ID_CLOSE)
+  if (ret == DIALOG_ID_CLOSE)
     return;
 
-  if (ret == PropPanel::DIALOG_ID_OK)
+  if (ret == DIALOG_ID_OK)
     param.texAsset = dlg.getSelObjName();
   else
     param.texAsset = "";
@@ -356,7 +360,7 @@ void MaterialsPlugin::onTextureChange(PropPanel::ContainerPropertyControl *panel
 
 //==================================================================================================
 
-void MaterialsPlugin::onCustomChange(PropPanel::ContainerPropertyControl *panel, const IPoint2 &param_idx, MatCustom &param) const
+void MaterialsPlugin::onCustomChange(PropertyContainerControlBase *panel, const IPoint2 &param_idx, MatCustom &param) const
 {
   switch (param.getCustomType())
   {
@@ -366,7 +370,7 @@ void MaterialsPlugin::onCustomChange(PropPanel::ContainerPropertyControl *panel,
 
 //==================================================================================================
 
-void MaterialsPlugin::onTwoSidedChange(PropPanel::ContainerPropertyControl *panel, const IPoint2 &param_idx, Mat2Sided &param) const
+void MaterialsPlugin::onTwoSidedChange(PropertyContainerControlBase *panel, const IPoint2 &param_idx, Mat2Sided &param) const
 {
   const int comboPid = PID_FIRST_PARAM + param_idx.x * PID_PARAM_PIDS_COUNT;
 
@@ -384,7 +388,7 @@ void MaterialsPlugin::onTwoSidedChange(PropPanel::ContainerPropertyControl *pane
 
 //==================================================================================================
 
-void MaterialsPlugin::onClick(int pcb_id, PropPanel::ContainerPropertyControl *panel)
+void MaterialsPlugin::onClick(int pcb_id, PropertyContainerControlBase *panel)
 {
   if (pcb_id >= PID_FIRST_PARAM)
     onShaderParamChange(pcb_id, panel);

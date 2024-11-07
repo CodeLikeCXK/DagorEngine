@@ -1,4 +1,0 @@
-if $(HaveRenderer) = yes {
-  gamePulls += framework_water_ripples_pull ;
-  UseProgLibs += daNetGameLibs/water_ripples ;
-}

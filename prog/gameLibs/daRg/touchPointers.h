@@ -1,7 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
-#include <drv/hid/dag_hiPointing.h>
+#include <humanInput/dag_hiPointing.h>
 #include <daRg/dag_inputIds.h>
 #include <math/dag_Point2.h>
 #include <dag/dag_vector.h>

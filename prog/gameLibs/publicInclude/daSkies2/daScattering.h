@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -12,7 +13,7 @@
 #include <math.h>
 #include <math/dag_Point3.h>
 #include <math/dag_color.h>
-#include <drv/3d/dag_consts.h>
+#include <3d/dag_drv3dConsts.h>
 
 
 struct AtmosphereParameters;
@@ -168,10 +169,9 @@ public:
     float clouds_end_altitude2, float clouds_shadow_coverage, float global_clouds_sigma);
 
 protected:
-  Color3 getCpuSingleInscatter(const Point3 &camera, const Point3 &viewdir, float d, const Point3 &skies_sun_light_dir, int steps,
-    bool need_rayleigh) const;
   void initMsApproximation();
   void initCommon();
+  void initCB();
   bool finishGpuReadback();
   void startGpuReadback();
   void invalidateCPUData();

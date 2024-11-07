@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "scnCacheUtil.h"
 #include <libTools/util/binDumpReader.h>
 #include <ioSys/dag_ioUtils.h>

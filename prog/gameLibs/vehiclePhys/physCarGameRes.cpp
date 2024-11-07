@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #undef USE_BULLET_PHYSICS
 
 #include <gameRes/dag_gameResSystem.h>
@@ -473,7 +471,7 @@ const DataBlock &load_car_params_data_block(const char *car_name, const DataBloc
       DAG_FATAL("block <%s> not found, and <default> is also missing", blkName.str());
 
     G_ASSERT(car_blk);
-    LOGERR_CTX("no block '%s' in file '%s', using default", blkName.str(), global_car_params_blk_fn);
+    logerr_ctx("no block '%s' in file '%s', using default", blkName.str(), global_car_params_blk_fn);
   }
   return *globalCarParamsBlk;
 }

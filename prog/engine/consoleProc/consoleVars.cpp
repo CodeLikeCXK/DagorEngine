@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <util/dag_convar.h>
 #include <util/dag_console.h>
 #include <imgui/imgui.h>

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "globalData.h"
 #include "context.h"
 #include <daFx/dafx_global_data_desc.hlsli>
@@ -23,13 +21,9 @@ bool init_global_values(GlobalData &dst)
   return v;
 }
 
-static bool get_value_bind(Context &ctx, const char *name, size_t name_len, uint32_t name_hash, int size, ValueBind &v)
+bool get_value_bind(Context &ctx, const char *name, size_t name_len, int size, ValueBind &v)
 {
-#ifdef _DEBUG_TAB_
-  G_ASSERT(name_hash == DefaultOAHasher<false>().hash_data(name, name_len));
-#endif
-
-  int nameId = fxSysNameMap.getNameId(name, name_len, name_hash);
+  int nameId = fxSysNameMap.getNameId(name, name_len);
   if (nameId < 0)
     return false;
 
@@ -48,14 +42,14 @@ static bool get_value_bind(Context &ctx, const char *name, size_t name_len, uint
   return true;
 }
 
-void set_global_value(Context &ctx, const char *name, size_t name_len, uint32_t name_hash, const void *data, int size)
+void set_global_value(Context &ctx, const char *name, size_t name_len, const void *data, int size)
 {
   G_ASSERT_RETURN(name_len && data && size > 0, );
 
   ValueBind v;
   {
-    OSSpinlockScopedLock lock{GlobalData::bindSpinLock};
-    if (!get_value_bind(ctx, name, name_len, name_hash, size, v))
+    OSSpinlockScopedLock(ctx.globalData.bindSpinLock);
+    if (!get_value_bind(ctx, name, name_len, size, v))
       return;
   }
 
@@ -63,16 +57,16 @@ void set_global_value(Context &ctx, const char *name, size_t name_len, uint32_t 
   memcpy(ptr + v.offset, data, size);
 }
 
-void set_global_value_ext(ContextId cid, const char *name, size_t name_len, uint32_t name_hash, const void *data, int size)
+void set_global_value(ContextId cid, const char *name, size_t name_len, const void *data, int size)
 {
   GET_CTX();
-  set_global_value(ctx, name, name_len, name_hash, data, size);
+  set_global_value(ctx, name, name_len, data, size);
 }
 
 bool get_global_value(Context &ctx, const eastl::string &name, void *data, int size)
 {
   ValueBind v;
-  if (!get_value_bind(ctx, name.c_str(), name.length(), wyhash_const((const uint8_t *)name.c_str(), name.length(), 1), size, v))
+  if (!get_value_bind(ctx, name.c_str(), name.length(), size, v))
     return false;
 
   unsigned char *ptr = ctx.globalData.cpuRes.get();

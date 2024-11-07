@@ -1,6 +1,7 @@
 //
 // DaEditorX
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -59,6 +60,7 @@ public:
   float sweep2Width, addFuzzySweep2HalfWidth;
   float lmeshHtConstrSweepWidth;
   float navMeshStripeWidth;
+  float zeroOpacityDistAtEnds;
   bool isCustomJumplink;
 
 protected:
@@ -342,7 +344,6 @@ public:
     int stage;
     float roadMaxAbsAng, roadMaxInterAng;
     float roadTestWidth;
-    float marginAtStart = 0, marginAtEnd = 0, zeroOpacityDistAtEnds = 0;
     Point2 randomOpacityMulAlong, randomOpacityMulAcross;
     SimpleString layerTag;
 

@@ -1,11 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <videoPlayer/dag_videoPlayer.h>
 
-#include <drv/3d/dag_driver.h>
-#include <drv/3d/dag_info.h>
-#include <drv/3d/dag_query.h>
-#include <drv/3d/dag_tex3d.h>
+#include <3d/dag_drv3d.h>
+#include <3d/dag_tex3d.h>
 #include <image/dag_texPixel.h>
 #include <perfMon/dag_cpuFreq.h>
 #include <generic/dag_tab.h>
@@ -20,7 +16,7 @@
 #include "data_pc.h"
 #else
 #include "data_min.h"
-#include <drv/3d/dag_platform.h>
+#include <3d/dag_drv3d_platform.h>
 #endif
 
 #ifdef SUPPORT_AV1
@@ -41,6 +37,7 @@ class Av1VideoPlayer : public IGenVideoPlayer, public VideoPlaybackData
   int lastFrameTime, frameTime;
   int64_t referenceTime;
   int basePosMsec;
+  bool pictureProcessed;
   int movieDurMsec;
   int prebufDelay;
 
@@ -67,6 +64,7 @@ public:
   bool openFile(const char *fname)
   {
     lastRdPos = -1;
+    pictureProcessed = 1;
     isPlayed = false;
     movieDurMsec = -1;
     autoRewind = false;
@@ -142,7 +140,13 @@ public:
 
   virtual void rewind()
   {
-    cleanupDav1d();
+    pictureProcessed = 1;
+    if (inCtx)
+      input_close(inCtx);
+    if (libContext)
+      dav1d_close(&libContext);
+    if (data.sz > 0)
+      dav1d_data_unref(&data);
     int res;
     unsigned dims[2];
     res = input_open(&inCtx, "ivf", name.c_str(), fps, &total, timebase, dims);
@@ -210,6 +214,7 @@ public:
     if (!tex->lockimgEx(&ptr, stride, 0, TEXLOCK_WRITE | TEXLOCK_RAWDATA))
     {
       dav1d_picture_unref(&picture);
+      pictureProcessed = 1;
       tex->unlockimg();
       return;
     }
@@ -223,6 +228,7 @@ public:
     // u
     if (!vBuf.getWr().texU->lockimgEx(&ptr, stride, 0, TEXLOCK_WRITE | TEXLOCK_RAWDATA))
     {
+      pictureProcessed = 1;
       dav1d_picture_unref(&picture);
       tex->unlockimg();
       return;
@@ -234,6 +240,7 @@ public:
     // v
     if (!vBuf.getWr().texV->lockimgEx(&ptr, stride, 0, TEXLOCK_WRITE | TEXLOCK_RAWDATA))
     {
+      pictureProcessed = 1;
       dav1d_picture_unref(&picture);
       tex->unlockimg();
       return;
@@ -247,6 +254,7 @@ public:
       vBuf.incWr();
 
     dav1d_picture_unref(&picture);
+    pictureProcessed = 1;
   }
 
   int rebaseTimer(int t_usec)
@@ -284,8 +292,9 @@ public:
     int res;
     do
     {
-      if (!picture.p.w)
+      if (pictureProcessed)
       {
+        picture = {0};
         if (data.sz > 0 || !input_read(inCtx, &data))
         {
           res = dav1d_send_data(libContext, &data);
@@ -322,6 +331,7 @@ public:
             return;
           }
         }
+        pictureProcessed = 0;
       }
 
       if (vBuf.bufLeft() < 2)
@@ -377,13 +387,10 @@ public:
     return true;
   }
 
-  virtual void onCurrentFrameDispatched() override
+  virtual void onCurrentFrameDispatched()
   {
     if (vBuf.buf[0].texIdY != BAD_TEXTUREID && lastRdPos >= 0)
     {
-      auto &ev = vBuf.buf[lastRdPos].ev;
-      if (!ev)
-        ev = d3d::create_event_query(); // Init on demand to ensure that it's called from render (main) thread
 #if _TARGET_C1
 
 
@@ -393,7 +400,7 @@ public:
 
 
 #endif
-      d3d::issue_event_query(ev);
+      d3d::issue_event_query(vBuf.buf[lastRdPos].ev);
     }
   }
 
@@ -422,6 +429,7 @@ public:
 
   Av1VideoPlayer(int q_depth)
   {
+    pictureProcessed = 1;
     picture = {0};
     data = {0};
     name = "";
@@ -449,30 +457,14 @@ public:
   }
   ~Av1VideoPlayer()
   {
-    cleanupDav1d();
-    termVideoBuffers();
-    termBuffers();
-  }
-  void cleanupDav1d()
-  {
     if (inCtx)
       input_close(inCtx);
     if (libContext)
-    {
-      if (picture.p.w)
-        dav1d_picture_unref(&picture);
-      for (;;)
-      {
-        int res = dav1d_get_picture(libContext, &picture);
-        if (res == DAV1D_ERR(EAGAIN))
-          break;
-        if (res >= 0)
-          dav1d_picture_unref(&picture);
-      }
       dav1d_close(&libContext);
-    }
     if (data.sz > 0)
       dav1d_data_unref(&data);
+    termVideoBuffers();
+    termBuffers();
   }
 
   static void setThreadsCounts(int threads_num) { threadsNum = threads_num; }

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <assets/assetHlp.h>
 #include <assets/daBuildInterface.h>
 #include <assets/assetMgr.h>
@@ -102,26 +100,20 @@ bool dabuildcache::init(const char *start_dir, ILogWriter *l, IDaBuildInterface 
   startDir = start_dir;
   dabuild = _dabuild;
   buildLog = l;
-  DEBUG_CTX("dabuildcache inited with static dabuild lib");
+  debug_ctx("dabuildcache inited with static dabuild lib");
   return true;
 }
 
 bool dabuildcache::init(const char *start_dir, ILogWriter *l)
 {
-  const char *dabuild_bin_fn =
-#if _TARGET_PC_LINUX | _TARGET_PC_MACOSX
-    "lib"
-#endif
-    "daBuild" DAGOR_DLL;
-
   startDir = start_dir;
-  dabuild = get_dabuild(startDir + "/" + dabuild_bin_fn);
+  dabuild = get_dabuild(startDir + "/daBuild" DAGOR_DLL);
   if (!dabuild)
   {
-    debug("ERR: cannot load %s", dabuild_bin_fn);
+    debug("ERR: cannot load daBuild" DAGOR_DLL);
     return false;
   }
-  DEBUG_CTX("daBuild loaded");
+  debug_ctx("daBuild loaded");
   buildLog = l;
   return true;
 }
@@ -144,7 +136,7 @@ void dabuildcache::term()
   dabuild->term();
   release_dabuild(dabuild);
   dabuild = NULL;
-  DEBUG_CTX("daBuild unloaded");
+  debug_ctx("daBuild unloaded");
 }
 
 IDaBuildInterface *dabuildcache::get_dabuild() { return dabuild; }

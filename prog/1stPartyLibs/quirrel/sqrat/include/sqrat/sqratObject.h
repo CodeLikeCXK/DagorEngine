@@ -36,6 +36,7 @@
 #include "sqratAllocator.h"
 #include "sqratTypes.h"
 #include "sqratUtil.h"
+#include <dag/dag_relocatable.h>
 
 namespace Sqrat {
 
@@ -203,7 +204,8 @@ public:
         if (GetVM() != so.GetVM())
             return false;
 
-        return sq_direct_is_equal(vm, &obj, &so.obj);
+        SQInteger res = 0;
+        return sq_direct_cmp(vm, &obj, &so.obj, &res) && (res==0);
     }
 
     /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -424,7 +426,7 @@ public:
         obj._flags &= ~SQOBJ_FLAG_IMMUTABLE;
     }
 
-    const SQRAT_STD::string_view GetString(const SQRAT_STD::string_view def_val = {}) const {
+    const SQRAT_STD::string_view GetString(const SQRAT_STD::string_view def_val = {}) {
         if (obj._type != OT_STRING)
           return def_val;
         sq_pushobject(vm, GetObject());
@@ -644,5 +646,7 @@ inline bool Object::Next(iterator& iter) const {
 }
 
 } // namespace Sqrat
+
+DAG_DECLARE_RELOCATABLE(Sqrat::Object);
 
 #endif

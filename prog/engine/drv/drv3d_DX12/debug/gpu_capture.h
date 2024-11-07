@@ -1,13 +1,15 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <EASTL/variant.h>
 #include <EASTL/span.h>
 #include <supp/dag_comPtr.h>
-#include <winapi_helpers.h>
 
 #include "driver.h"
 #include "configuration.h"
+#include "winapi_helpers.h"
+
+
+struct RENDERDOC_API_1_5_0;
 
 interface DECLSPEC_UUID("9f251514-9d4d-4902-9d60-18988ab7d4b5") DECLSPEC_NOVTABLE IDXGraphicsAnalysis : public IUnknown
 {
@@ -15,11 +17,13 @@ interface DECLSPEC_UUID("9f251514-9d4d-4902-9d60-18988ab7d4b5") DECLSPEC_NOVTABL
   STDMETHOD_(void, EndCapture)() PURE;
 };
 
-struct RENDERDOC_API_1_5_0;
-
 namespace drv3d_dx12
 {
 struct Direct3D12Enviroment;
+}
+
+namespace drv3d_dx12
+{
 namespace debug
 {
 namespace gpu_capture
@@ -28,7 +32,7 @@ class NoTool
 {
 public:
   void configure() { logdbg("DX12: ...no frame capturing tool is active..."); }
-  void beginCapture(const wchar_t *) {}
+  void beginCapture() {}
   void endCapture() {}
   void onPresent() {}
   void captureFrames(const wchar_t *, int) {}
@@ -47,7 +51,7 @@ class RenderDoc
 
 public:
   void configure();
-  void beginCapture(const wchar_t *name);
+  void beginCapture();
   void endCapture();
   void onPresent();
   void captureFrames(const wchar_t *, int);
@@ -84,7 +88,7 @@ class LegacyPIX
 
 public:
   void configure();
-  void beginCapture(const wchar_t *name);
+  void beginCapture();
   void endCapture();
   void onPresent();
   void captureFrames(const wchar_t *, int);
@@ -123,7 +127,7 @@ class PIX
 
 public:
   void configure();
-  void beginCapture(const wchar_t *name);
+  void beginCapture();
   void endCapture();
   void onPresent();
   void captureFrames(const wchar_t *, int);
@@ -187,7 +191,7 @@ class NSight
 
 public:
   void configure();
-  void beginCapture(const wchar_t *name);
+  void beginCapture();
   void endCapture();
   void onPresent();
   void captureFrames(const wchar_t *, int);
@@ -217,7 +221,7 @@ class RadeonGPUProfiler
 {
 public:
   void configure() {}
-  void beginCapture(const wchar_t *) {}
+  void beginCapture() {}
   void endCapture() {}
   void onPresent() {}
   void captureFrames(const wchar_t *, int) {}
@@ -239,7 +243,7 @@ class GraphicsPerformanceAnalyzers
 {
 public:
   void configure() {}
-  void beginCapture(const wchar_t *) {}
+  void beginCapture() {}
   void endCapture() {}
   void onPresent() {}
   void captureFrames(const wchar_t *, int) {}
@@ -289,17 +293,10 @@ private:
   }
 };
 } // namespace detail
-
 class GpuCapture
 {
-  using ToolTableType = detail::ToolSet<              //
-    gpu_capture::NoTool,                              //
-    gpu_capture::nvidia::NSight,                      //
-    gpu_capture::amd::RadeonGPUProfiler,              //
-    gpu_capture::intel::GraphicsPerformanceAnalyzers, //
-    gpu_capture::RenderDoc,                           //
-    gpu_capture::PIX,                                 //
-    gpu_capture::LegacyPIX>;                          //
+  using ToolTableType = detail::ToolSet<gpu_capture::NoTool, gpu_capture::nvidia::NSight, gpu_capture::amd::RadeonGPUProfiler,
+    gpu_capture::intel::GraphicsPerformanceAnalyzers, gpu_capture::RenderDoc, gpu_capture::PIX, gpu_capture::LegacyPIX>;
 
   ToolTableType::StorageType tool = ToolTableType::DefaultType{};
 
@@ -325,11 +322,11 @@ public:
     eastl::visit([](auto &tool) { tool.configure(); }, tool);
   }
   void teardown() { tool = ToolTableType::DefaultType{}; }
-  void beginCapture(const wchar_t *name)
+  void beginCapture()
   {
     if (isAnyActive())
     {
-      eastl::visit([name](auto &tool) { tool.beginCapture(name); }, tool);
+      eastl::visit([](auto &tool) { tool.beginCapture(); }, tool);
     }
   }
   void endCapture()

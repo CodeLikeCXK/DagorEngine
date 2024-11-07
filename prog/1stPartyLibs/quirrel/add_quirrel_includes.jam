@@ -1,4 +1,3 @@
-if $(UseQuirrel) = none { return ; }
 switch $(ProjectUseQuirrel) {
   case sq3+ : AddIncludes +=
     $(Root)/prog/1stPartyLibs/quirrel/quirrel/include

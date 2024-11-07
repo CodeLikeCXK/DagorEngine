@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -48,9 +49,9 @@ public:
   AmbientWind() { init(); };
   ~AmbientWind() { close(); };
 
-  float getWindStrength() const; // return strength in beaufort
-  float getWindSpeed() const;    // return speed in mps. Use meter_per_second_to_beaufort after to get beaufort.
-  const Point2 &getWindDir() const;
+
+  float getWindSpeed(); // return speed in mps. Use meter_per_second_to_beaufort after to get beaufort.
+  const Point2 &getWindDir();
 
 private:
   static AmbientWind *instance;
@@ -63,8 +64,7 @@ private:
   bool parametersInitialized = false;
 
   bool enabled = false;
-  float windStrength = 0.0f; // beaufort scale
-  float windSpeed = 0.0f;    // meters per second
+  float windSpeed = 0.0f;
   Point2 windDir = Point2(1, 0);
   float noiseStrength = 0.0f;
   Color4 windParams = {};

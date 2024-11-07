@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -13,7 +14,6 @@ struct RoDataBlock;
 class IEffectRayTracer;
 struct ObjectsToPlace;
 class BaseEffectObject;
-class Occlusion;
 
 struct Effect
 {
@@ -42,7 +42,7 @@ void clear();
 
 void set_raytracer(IEffectRayTracer *);
 
-void render(int render_type, const TMatrix &view_itm, const Occlusion *occlusion);
+void render(int render_type, const TMatrix &view_itm);
 void update(real dt);
 
 void on_device_reset();

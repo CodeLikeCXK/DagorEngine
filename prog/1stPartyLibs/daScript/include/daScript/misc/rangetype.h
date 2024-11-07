@@ -19,7 +19,8 @@ namespace das
         __forceinline RangeType( TT t ) : from(0), to(t) {}
         __forceinline RangeType( TT f, TT t ) : from(f), to(t) {}
         __forceinline RangeType(vec4f t) : from(vec_extract<TT>::x(t)), to(vec_extract<TT>::y(t)) {}
-        __forceinline friend StringWriter & operator<< (StringWriter & stream, const RangeType<TT> & vec) {
+        template <typename AP>
+        __forceinline friend StringWriter<AP> & operator<< (StringWriter<AP> & stream, const RangeType<TT> & vec) {
             stream << vec.from << DAS_PRINT_VEC_SEPARATROR << vec.to;
             return stream;
         }

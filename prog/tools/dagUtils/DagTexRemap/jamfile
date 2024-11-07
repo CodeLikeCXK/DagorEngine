@@ -1,5 +1,6 @@
 Root    ?= ../../../.. ;
 Location = prog/tools/dagUtils/DagTexRemap ;
+DriverLinkage   = static ;
 ConsoleExe      = yes ;
 
 TargetType  = exe ;

@@ -1,20 +1,8 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <ioSys/dag_dataBlock.h>
-#include <drv/3d/dag_rwResource.h>
-#include <drv/3d/dag_viewScissor.h>
-#include <drv/3d/dag_renderTarget.h>
-#include <drv/3d/dag_draw.h>
-#include <drv/3d/dag_vertexIndexBuffer.h>
-#include <drv/3d/dag_shaderConstants.h>
-#include <drv/3d/dag_shader.h>
-#include <drv/3d/dag_texture.h>
-#include <drv/3d/dag_driver.h>
-#include <drv/3d/dag_buffers.h>
-#include <drv/3d/dag_platform_pc.h>
-#include <drv/3d/dag_commands.h>
-#include <drv/3d/dag_info.h>
-
+#include <3d/dag_drv3d.h>
+#include <3d/dag_drv3d_buffers.h>
+#include <3d/dag_drv3d_pc.h>
+#include <3d/dag_drv3dCmd.h>
 #include <util/dag_string.h>
 #include <generic/dag_carray.h>
 #include <generic/dag_smallTab.h>
@@ -36,7 +24,7 @@
 #include <EASTL/hash_map.h>
 #include <EASTL/unique_ptr.h>
 #include <shaders/dag_overrideStates.h>
-#include <drv/3d/dag_renderStates.h>
+#include <3d/dag_renderStates.h>
 #include <shaders/dag_renderStateId.h>
 // #include <EASTL/shared_ptr.h>
 #include <ioSys/dag_memIo.h>
@@ -257,7 +245,6 @@ public:
     }
 
     ShaderCode() : shader(0), prog(BAD_PROGRAM), particlesProg(BAD_PROGRAM) {}
-    ShaderCode &operator=(ShaderCode &&) = default;
 
     ~ShaderCode() { close(); }
 
@@ -621,13 +608,13 @@ public:
         ShaderCode code;
         if (linkShader(shader_postcode, code, params_override.getBlockByName("substitutions"), *texgen_get_logger(&texGen)))
         {
-          shaders[shader_postcode] = eastl::move(code);
+          shaders[shader_postcode] = code;
           d3d::set_program(particles ? code.particlesProg : code.prog);
           code.reset();
         }
         else
         {
-          shaders[shader_postcode] = eastl::move(ShaderCode());
+          shaders[shader_postcode] = ShaderCode();
           texgen_get_logger(&texGen)->log(LOGLEVEL_ERR, String(128, "can not link shader name<%s> post<%s>", name, shader_postcode));
           return false;
         }
@@ -681,7 +668,7 @@ public:
     d3d::set_render_target();
     d3d::set_const_buffer(STAGE_PS, 1, 0);
 
-    d3d::driver_command(Drv3dCommand::D3D_FLUSH);
+    d3d::driver_command(DRV3D_COMMAND_D3D_FLUSH, NULL, NULL, NULL);
 
     shaders::overrides::reset();
 

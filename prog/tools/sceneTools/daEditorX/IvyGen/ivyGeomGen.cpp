@@ -1,7 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "ivyObject.h"
-#include <EditorCore/ec_IEditorCore.h>
+#include <dllPluginCore/core.h>
 #include <de3_interface.h>
 #include <de3_assetService.h>
 #include <assets/asset.h>
@@ -11,9 +9,6 @@
 #include <debug/dag_debug.h>
 #include <3d/dag_render.h>
 #include <render/dag_cur_view.h>
-
-using editorcore_extapi::dagGeom;
-using editorcore_extapi::dagRender;
 
 #define MAX_OF(x, y) (x > y ? x : y)
 #define MIN_OF(x, y) (x < y ? x : y)

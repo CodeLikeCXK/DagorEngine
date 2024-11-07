@@ -17,7 +17,7 @@ AddIncludes =
 
 UseProgLibs = 3rdPartyLibs/arc/zlib-$(UseZlibVer) ;
 
-if $(Platform) in windows {
+if $(Platform) in win32 win64 {
 
   CPPopt += -DUNICODE ;
   UseProgLibs +=
@@ -32,7 +32,7 @@ if $(Platform) in windows {
   ;
 }
 
-if $(Platform) in linux {
+if $(Platform) in linux64 {
   UseProgLibs +=
     3rdPartyLibs/breakpad/common
     3rdPartyLibs/breakpad/common/linux
@@ -55,7 +55,7 @@ if $(Platform) in linux {
   ;
 }
 
-if $(Platform) in macOS {
+if $(Platform) in macosx {
   UseProgLibs +=
     3rdPartyLibs/breakpad/common
     3rdPartyLibs/breakpad/common/mac

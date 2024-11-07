@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "main.h"
 #include "fileDropHandler.h"
 #include "scriptBindings.h"
@@ -30,12 +28,7 @@
 #include <workCycle/dag_gameScene.h>
 #include <workCycle/dag_workCycle.h>
 #include <workCycle/dag_gameSettings.h>
-#include <drv/3d/dag_viewScissor.h>
-#include <drv/3d/dag_renderTarget.h>
-#include <drv/3d/dag_matricesAndPerspective.h>
-#include <drv/3d/dag_texture.h>
-#include <drv/3d/dag_driver.h>
-#include <drv/3d/dag_lock.h>
+#include <3d/dag_drv3d.h>
 #include <3d/dag_texPackMgr2.h>
 #include <3d/dag_render.h>
 #include <render/dag_cur_view.h>
@@ -45,9 +38,9 @@
 #include <debug/dag_logSys.h>
 #include <startup/dag_restart.h>
 #include <startup/dag_inpDevClsDrv.h>
-#include <drv/hid/dag_hiGlobals.h>
-#include <drv/hid/dag_hiJoyData.h>
-#include <drv/hid/dag_hiXInputMappings.h>
+#include <humanInput/dag_hiGlobals.h>
+#include <humanInput/dag_hiJoyData.h>
+#include <humanInput/dag_hiXInputMappings.h>
 #include <gui/dag_stdGuiRender.h>
 #include <debug/dag_debug.h>
 #include <gui/dag_visualLog.h>
@@ -79,13 +72,12 @@
 #if HAS_MATCHING_MODULE
 #include <quirrel/matchingModule/matchingModule.h>
 #endif
-#include <quirrel/nestdb/nestdb.h>
 
 #include <daRg/soundSystem/uiSoundSystem.h>
 
 #include <gui/dag_visConsole.h>
 #include <visualConsole/dag_visualConsole.h>
-#include <drv/hid/dag_hiKeyboard.h>
+#include <humanInput/dag_hiKeyboard.h>
 #include <forceFeedback/forceFeedback.h>
 #include <ioEventsPoll/ioEventsPoll.h>
 
@@ -94,14 +86,13 @@
 #if _TARGET_PC || _TARGET_ANDROID || _TARGET_C3
 #include <startup/dag_inpDevClsDrv.h>
 #include <math/dag_bounds2.h>
-#include <drv/hid/dag_hiKeybIds.h>
-#include <drv/hid/dag_hiPointing.h>
-#include <drv/hid/dag_hiKeyboard.h>
+#include <humanInput/dag_hiKeybIds.h>
+#include <humanInput/dag_hiPointing.h>
+#include <humanInput/dag_hiKeyboard.h>
 #endif
 
-#include <drv/hid/dag_hiJoystick.h>
+#include <humanInput/dag_hiJoystick.h>
 
-#include <folders/folders.h>
 
 // Error log:
 //  0 - disabled
@@ -112,7 +103,7 @@
 #define LOG_LEVEL 3
 
 bool scripts_used = true;
-int requested_exit_code = -1;
+bool exit_button_pressed = false;
 int cur_update = 0;
 int limit_updates = 0;
 bool benchmark = false;
@@ -321,7 +312,7 @@ public:
 #if _TARGET_PC_WIN && !_TARGET_64BIT
     if (dgs_get_settings()->getBool("dumpMemLeaksAfterScene", false))
     {
-      DEBUG_CTX("%s: dump leaks", __FUNCTION__);
+      debug_ctx("%s: dump leaks", __FUNCTION__);
       DagDbgMem::dump_leaks(true);
     }
 #endif
@@ -408,7 +399,6 @@ public:
 
   void reloadScripts(bool full_reinit)
   {
-    release_file_drop_handler();
     if (full_reinit)
     {
       // hard reload
@@ -643,7 +633,6 @@ public:
       vrScene.entityTmResolver = [](uint32_t, const char *) { return TMatrix::IDENT; };
       vrScene.vrSurfaceIntersector = vr_surface_intersect;
       darg_scene->updateSpatialElements(vrScene);
-      darg_scene->refreshVrCursorProjections();
 
       joystick_handler->processPendingBtnStack(darg_scene);
       darg_scene->update(::dagor_game_act_time);
@@ -652,18 +641,18 @@ public:
 #if _TARGET_PC
     // Exit
     if (HumanInput::raw_state_kbd.isKeyDown(HumanInput::DKEY_F10))
-      requested_exit_code = 0;
+      exit_button_pressed = true;
 #if _TARGET_PC_MACOSX
     if (HumanInput::raw_state_kbd.isKeyDown(HumanInput::DKEY_LWIN) && HumanInput::raw_state_kbd.isKeyDown(HumanInput::DKEY_Q))
     {
       debug("request to close (Cmd+Q)");
-      requested_exit_code = 0;
+      exit_button_pressed = true;
     }
 #endif
 #else
     // Exit
     if (HumanInput::raw_state_joy.buttons.get(5))
-      requested_exit_code = 0;
+      exit_button_pressed = true;
 #endif
 
     // updateWebcache();
@@ -671,8 +660,8 @@ public:
     StdGuiRender::update_internals_per_act();
 
     // Quit Game
-    if (requested_exit_code >= 0)
-      quit_game(requested_exit_code);
+    if (exit_button_pressed)
+      quit_game(1);
   }
 
   virtual void drawScene()
@@ -833,7 +822,7 @@ protected:
 
       // sub-scene panel
       darg_scene->buildPanelRender(0);
-      darg_scene->flushPanelRender();
+      darg_scene->flushRender();
     }
 
     StdGuiRender::ScopeStarterOptional strt;
@@ -965,11 +954,6 @@ static void das_init()
   NEED_MODULE(Module_Math);
   NEED_MODULE(Module_Strings);
   NEED_MODULE(DagorMath);
-  NEED_MODULE(DagorTexture3DModule);
-  NEED_MODULE(DagorResPtr);
-  NEED_MODULE(DagorShaders);
-  NEED_MODULE(DagorDriver3DModule);
-  NEED_MODULE(DagorStdGuiRender);
   NEED_MODULE(ModuleDarg);
   das::Module::Initialize();
 }
@@ -982,8 +966,6 @@ void reload_scripts(bool full_reinit)
     game_scene->reloadScripts(full_reinit);
 }
 
-static void sq_exit_func(int code) { requested_exit_code = code; }
-
 void dargbox_app_init()
 {
   init_webui(NULL);
@@ -993,12 +975,8 @@ void dargbox_app_init()
   darg::ui_sound_player = &dummy_ui_sound_player;
   force_feedback::rumble::init();
 
-  bindquirrel::set_sq_exit_function_ptr(sq_exit_func);
-
   init_sound();
   gamelib::input::initialize();
-
-  nestdb::init();
 
   das_init();
 
@@ -1011,8 +989,6 @@ void dargbox_app_init()
   use_system_cursor = dgs_get_settings()->getBool("use_system_cursor", false);
 
   visuallog::setMaxItems(dgs_get_settings()->getInt("visualLogItems", 32));
-
-  folders::initialize("dargbox");
 
   game_scene = new UiGameScene();
   dagor_select_game_scene(game_scene);
@@ -1046,8 +1022,6 @@ void dargbox_app_shutdown()
   dagor_select_game_scene(NULL);
   del_it(game_scene);
   io_events_poll.reset();
-
-  nestdb::shutdown();
 
   webui::shutdown();
 

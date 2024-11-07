@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 /** \addtogroup de3Common
@@ -7,7 +6,7 @@
 
 #include <math/dag_math3d.h>
 #include <math/dag_capsule.h>
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
 #include <debug/dag_debug3d.h>
 
 /**

@@ -1,6 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
-
 #include <daScript/daScript.h>
 #include <daScript/simulate/runtime_matrices.h>
 #include <daECS/core/entityId.h>

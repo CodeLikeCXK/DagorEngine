@@ -1,4 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef _GAIJIN_RACE_UTILS_GAMEPAD_BUTTONS_H
+#define _GAIJIN_RACE_UTILS_GAMEPAD_BUTTONS_H
 #pragma once
 
 enum GamepadButtonId
@@ -52,3 +53,5 @@ enum GamepadAxisId
   JOY_AXIS_L_TRIGGER = 4,
   JOY_AXIS_R_TRIGGER = 5,
 };
+
+#endif

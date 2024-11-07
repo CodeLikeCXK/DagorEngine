@@ -1,10 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-#pragma once
-
 // this file is for dump processing (i.e. reading)
-
-#include <cstdio>
+#pragma once
 #include "daProfilerTypes.h"
+#include "daProfilerDescriptions.h"
 #include "dumpLayer.h"
 
 #include <ioSys/dag_fileIo.h>
@@ -112,7 +109,7 @@ inline bool copy_cb(IGenLoad &cb, IGenSave &save_cb, size_t size)
     const size_t readSz = sz < sizeof(buf) ? sz : sizeof(buf);
     if (cb.tryRead(buf, readSz) != readSz)
     {
-      printf("can't read %zu bytes from source stream of size = %zu\n", readSz, size);
+      printf("can't read %d bytes from source stream of size = %d\n", readSz, size);
       return false;
     }
     save_cb.write(buf, readSz);

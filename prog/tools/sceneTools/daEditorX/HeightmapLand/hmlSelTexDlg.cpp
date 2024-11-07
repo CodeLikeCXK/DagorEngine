@@ -1,6 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "hmlSelTexDlg.h"
+#include <dllPluginCore/core.h>
 #include <generic/dag_sort.h>
 #include <debug/dag_debug.h>
 
@@ -55,12 +54,12 @@ void HmapLandPlugin::HmlSelTexDlg::rebuildTexList(const char *sel)
 
 bool HmapLandPlugin::HmlSelTexDlg::execute()
 {
-  PropPanel::DialogWindow *dlg = EDITORCORE->createDialog(_pxScaled(250), _pxScaled(510), "Select mask");
-  PropPanel::ContainerPropertyControl *_panel = dlg->getPanel();
+  CDialogWindow *dlg = EDITORCORE->createDialog(_pxScaled(250), _pxScaled(510), "Select mask");
+  PropertyContainerControlBase *_panel = dlg->getPanel();
   G_ASSERT(_panel && "HmlSelTexDlg: NO PANEL FOUND!!!");
   _panel->setEventHandler(this);
 
-  PropPanel::ContainerPropertyControl &bpp_panel = *_panel->createRadioGroup(PID_BPP_GROUP, "Mask depth, bits per pixel");
+  PropertyContainerControlBase &bpp_panel = *_panel->createRadioGroup(PID_BPP_GROUP, "Mask depth, bits per pixel");
   bpp_panel.createRadio(1, "1 bit");
   bpp_panel.createRadio(8, "8 bits");
   _panel->createSeparator();
@@ -75,10 +74,10 @@ bool HmapLandPlugin::HmlSelTexDlg::execute()
   _panel->setInt(PID_BPP_GROUP, reqBpp);
   int ret = dlg->showDialog();
   EDITORCORE->deleteDialog(dlg);
-  return ret == PropPanel::DIALOG_ID_OK;
+  return ret == DIALOG_ID_OK;
 }
 
-void HmapLandPlugin::HmlSelTexDlg::onChange(int pcb_id, PropPanel::ContainerPropertyControl *panel)
+void HmapLandPlugin::HmlSelTexDlg::onChange(int pcb_id, PropertyContainerControlBase *panel)
 {
   switch (pcb_id)
   {
@@ -96,7 +95,7 @@ void HmapLandPlugin::HmlSelTexDlg::onChange(int pcb_id, PropPanel::ContainerProp
     case PID_TEX_LIST: selTex = panel->getInt(pcb_id) <= 0 ? "" : texNamesCur->at(panel->getInt(pcb_id)); break;
   }
 }
-void HmapLandPlugin::HmlSelTexDlg::onClick(int pcb_id, PropPanel::ContainerPropertyControl *panel)
+void HmapLandPlugin::HmlSelTexDlg::onClick(int pcb_id, PropertyContainerControlBase *panel)
 {
   switch (pcb_id)
   {
@@ -121,4 +120,4 @@ void HmapLandPlugin::HmlSelTexDlg::onClick(int pcb_id, PropPanel::ContainerPrope
       break;
   }
 }
-void HmapLandPlugin::HmlSelTexDlg::onDoubleClick(int pcb_id, PropPanel::ContainerPropertyControl *panel) {}
+void HmapLandPlugin::HmlSelTexDlg::onDoubleClick(int pcb_id, PropertyContainerControlBase *panel) {}

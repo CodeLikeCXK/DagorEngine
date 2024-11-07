@@ -1,5 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-#pragma once
+
+#ifndef _NAV_PATHFIND_H_
+#define _NAV_PATHFIND_H_
 
 //-------------------------------------------------------------------------------------------------------------------
 /**
@@ -525,3 +526,6 @@ CNavArea *FindMinimumCostArea(CNavArea *startArea, CostFunctor &costFunc)
   }
   return cheapAreaSet[RandomInt(0, cheapAreaSetCount - 1)].area;
 }
+
+
+#endif // _NAV_PATHFIND_H_

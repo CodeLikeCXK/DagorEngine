@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <ecs/game/generic/grid.h>
 #include <ecs/rendInst/riExtra.h>
 #include <ecs/phys/collRes.h>
@@ -50,7 +48,7 @@ template <typename Callable>
 static void all_doors_ecs_query(Callable fn);
 
 static ecs::HashedConstString invalid_grid_holder_hints[] = {ECS_HASH("human"), ECS_HASH("humans"), ECS_HASH("vehicle"),
-  ECS_HASH("vehicles"), ECS_HASH("stationary_guns"), ECS_HASH("interactable"), ECS_HASH("loot"), ECS_HASH("attract_point"),
+  ECS_HASH("vehicles"), ECS_HASH("stationary_guns"), ECS_HASH("interactable"), ECS_HASH("loot"), ECS_HASH("attract_points"),
   ECS_HASH("zones"), ECS_HASH("doors")};
 
 // logerr spam limit
@@ -94,7 +92,7 @@ GridHolder *find_grid_holder(ecs::EntityId gridh_ent)
 {
   GridHolder *res = nullptr;
   get_grid_holder_from_eid_ecs_query(gridh_ent, [&](GridHolder &grid_holder) { res = &grid_holder; });
-  if (DAGOR_UNLIKELY(!res))
+  if (EASTL_UNLIKELY(!res))
     grid_logerr("Invalid grid holder eid %u passed to grid query", ecs::entity_id_t(gridh_ent));
   return res;
 }
@@ -102,7 +100,7 @@ GridHolder *find_grid_holder(ecs::EntityId gridh_ent)
 GridHolder *find_grid_holder(uint32_t grid_name_hash)
 {
   GridHolder *holder = find_grid_holder_by_hash_impl(grid_name_hash);
-  if (DAGOR_LIKELY(holder))
+  if (EASTL_LIKELY(holder))
     return holder;
   for (ecs::HashedConstString hint : invalid_grid_holder_hints)
   {
@@ -119,7 +117,7 @@ GridHolder *find_grid_holder(uint32_t grid_name_hash)
 GridHolder *find_grid_holder(ecs::HashedConstString grid_name_hash)
 {
   GridHolder *holder = find_grid_holder_by_hash_impl(grid_name_hash.hash);
-  if (DAGOR_LIKELY(holder))
+  if (EASTL_LIKELY(holder))
     return holder;
   grid_logerr("Invalid grid type %s passed to grid query, grid holder not found", grid_name_hash.str);
   return nullptr;
@@ -169,7 +167,7 @@ void GridObjComponent::updatePos(vec4f new_pos, float new_bounding_rad)
   {
     vec4f oldWbsph = wbsph;
     wbsph = v_perm_xyzd(new_pos, v_splats(new_bounding_rad));
-    if (DAGOR_UNLIKELY(!inserted))
+    if (EASTL_UNLIKELY(!inserted))
     {
       inserted = true;
       ownerGrid->insert(*this, wbsph, new_bounding_rad);
@@ -259,7 +257,7 @@ void grid_obj_update_es_event_handler(const ecs::Event &, GridObjComponent &grid
   const CollisionResource *collres = nullptr, const RiExtraComponent *ri_extra = nullptr, float grid_obj__fixedTmScale = -1.f,
   const ecs::Tag *grid_obj__scaledBoxBounding = nullptr)
 {
-  if (DAGOR_UNLIKELY(grid_obj.hidden))
+  if (EASTL_UNLIKELY(grid_obj.hidden))
     return;
 
   mat44f tm;
@@ -271,16 +269,16 @@ void grid_obj_update_es_event_handler(const ecs::Event &, GridObjComponent &grid
   if (collres)
   {
     newPos = v_mat44_mul_vec3p(tm, collres->vBoundingSphere);
-    if (DAGOR_UNLIKELY(grid_obj__fixedTmScale < 0.f || scaledBoundingRad < FLT_EPSILON))
+    if (EASTL_UNLIKELY(grid_obj__fixedTmScale < 0.f || scaledBoundingRad < FLT_EPSILON))
     {
       float boundingRad = sqrtf(v_extract_w(collres->vBoundingSphere));
       float boundingScale = grid_obj__fixedTmScale;
-      if (DAGOR_UNLIKELY(boundingScale < 0.f))
+      if (EASTL_UNLIKELY(boundingScale < 0.f))
         boundingScale = v_extract_x(v_mat44_max_scale43_x(tm));
       scaledBoundingRad = max(boundingRad * boundingScale, FLT_EPSILON);
 
 #if DAGOR_DBGLEVEL > 0
-      if (DAGOR_UNLIKELY(isnan(boundingRad) || boundingRad > MAX_VALID_BOUNDING_RADIUS))
+      if (EASTL_UNLIKELY(isnan(boundingRad) || boundingRad > MAX_VALID_BOUNDING_RADIUS))
       {
         grid_logerr("Grid entity %i (%s) update error: bounding radius %f is too big or NaN", ecs::entity_id_t(grid_obj.eid),
           g_entity_mgr->getEntityTemplateName(grid_obj.eid), boundingRad);
@@ -293,7 +291,7 @@ void grid_obj_update_es_event_handler(const ecs::Event &, GridObjComponent &grid
   {
     float boundingRad = 0.5f;
     float boundingScale = grid_obj__fixedTmScale;
-    if (DAGOR_UNLIKELY(boundingScale < 0.f))
+    if (EASTL_UNLIKELY(boundingScale < 0.f))
       boundingScale = v_extract_x(v_mat44_max_scale43_x(tm));
     scaledBoundingRad = max(boundingRad * boundingScale, FLT_EPSILON);
   }
@@ -309,13 +307,13 @@ void grid_obj_update_with_animchar(GridObjComponent &grid_obj, const TMatrix &tr
     mat44f tm;
     v_mat44_make_from_43cu_unsafe(tm, transform.array);
     float scaledBoundingRad = v_extract_w(grid_obj.wbsph);
-    if (DAGOR_UNLIKELY(grid_obj__fixedTmScale < 0.f || scaledBoundingRad < FLT_EPSILON))
+    if (EASTL_UNLIKELY(grid_obj__fixedTmScale < 0.f || scaledBoundingRad < FLT_EPSILON))
     {
       float boundingScale = grid_obj__fixedTmScale;
-      if (DAGOR_UNLIKELY(boundingScale < 0.f))
+      if (EASTL_UNLIKELY(boundingScale < 0.f))
         boundingScale = v_extract_x(v_mat44_max_scale43_x(tm));
       float boundingRad = sqrtf(v_extract_w(collres.vBoundingSphere));
-      if (DAGOR_UNLIKELY(isnan(boundingRad) || boundingRad > MAX_VALID_BOUNDING_RADIUS))
+      if (EASTL_UNLIKELY(isnan(boundingRad) || boundingRad > MAX_VALID_BOUNDING_RADIUS))
       {
         grid_logerr("Grid entity %i (%s) update error: bounding radius %f is too big or NaN", ecs::entity_id_t(grid_obj.eid),
           g_entity_mgr->getEntityTemplateName(grid_obj.eid), boundingRad);

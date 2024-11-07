@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "writeStream.h"
 #include <ioSys/dag_asyncWrite.h>
 

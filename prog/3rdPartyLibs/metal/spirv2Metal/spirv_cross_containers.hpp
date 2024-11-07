@@ -26,7 +26,6 @@
 
 #include "spirv_cross_error_handling.hpp"
 #include <algorithm>
-#include <exception>
 #include <functional>
 #include <iterator>
 #include <limits>
@@ -211,8 +210,7 @@ public:
 		buffer_capacity = N;
 	}
 
-	template <typename U>
-	SmallVector(const U *arg_list_begin, const U *arg_list_end) SPIRV_CROSS_NOEXCEPT : SmallVector()
+	SmallVector(const T *arg_list_begin, const T *arg_list_end) SPIRV_CROSS_NOEXCEPT : SmallVector()
 	{
 		auto count = size_t(arg_list_end - arg_list_begin);
 		reserve(count);
@@ -221,13 +219,7 @@ public:
 		this->buffer_size = count;
 	}
 
-	template <typename U>
-	SmallVector(std::initializer_list<U> init) SPIRV_CROSS_NOEXCEPT : SmallVector(init.begin(), init.end())
-	{
-	}
-
-	template <typename U, size_t M>
-	explicit SmallVector(const U (&init)[M]) SPIRV_CROSS_NOEXCEPT : SmallVector(init, init + M)
+	SmallVector(std::initializer_list<T> init) SPIRV_CROSS_NOEXCEPT : SmallVector(init.begin(), init.end())
 	{
 	}
 

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #if DAGOR_DBGLEVEL > 0
 
 #include <perfMon/dag_memoryReport.h>

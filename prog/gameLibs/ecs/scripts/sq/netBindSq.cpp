@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <bindQuirrelEx/autoBind.h>
 #include <bindQuirrelEx/bindQuirrelEx.h>
 #include <quirrel/sqModules/sqModules.h>
@@ -22,12 +20,11 @@ void bind_net(SqModules *module_mgr)
   Sqrat::Object *existingModule = module_mgr->findNativeModule("net");
   auto tbl = existingModule ? Sqrat::Table(*existingModule) : Sqrat::Table(module_mgr->getVM());
 
-  tbl //
+  tbl // comments to supress clang-format and allow qdox to generate doc
     .Func("is_server", is_server)
     .Func("has_network", has_network)
     .Func("get_replay_proto_version", net::get_replay_proto_version)
-    .SetValue("INVALID_CONNECTION_ID", net::INVALID_CONNECTION_ID_VALUE)
-    /**/;
+    .SetValue("INVALID_CONNECTION_ID", net::INVALID_CONNECTION_ID_VALUE);
 #define DC(x) tbl.SetValue(#x, x);
   DANET_DEFINE_DISCONNECTION_CAUSES
 #undef DC

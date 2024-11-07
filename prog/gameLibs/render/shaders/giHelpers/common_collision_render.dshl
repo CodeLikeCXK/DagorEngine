@@ -3,7 +3,7 @@ int gi_voxelize_use_multidraw;
 interval gi_voxelize_use_multidraw: off<1, on;
 
 
-macro COMMON_COLLISION_BASE_RENDER()
+macro COMMON_COLLISION_RENDER()
   channel half4 pos=pos;
 
   (vs) { globtm@f44 = globtm; } //not changing
@@ -11,9 +11,6 @@ macro COMMON_COLLISION_BASE_RENDER()
   (vs) {
     matrices@buf = collision_voxelization_tm hlsl { StructuredBuffer<float4> matrices@buf; };
   }
-endmacro
-
-macro COMMON_COLLISION_RENDER_RASTERIZE()
   (vs) {immediate_dword_count = 1;}
   if (gi_voxelize_use_multidraw == on)
   {
@@ -31,9 +28,4 @@ macro COMMON_COLLISION_RENDER_RASTERIZE()
       #endif
     };
   }
-endmacro
-
-macro COMMON_COLLISION_RENDER()
-  COMMON_COLLISION_BASE_RENDER()
-  COMMON_COLLISION_RENDER_RASTERIZE()
 endmacro

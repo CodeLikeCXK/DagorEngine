@@ -1,4 +1,0 @@
-if $(HaveRenderer) = yes {
-  gamePulls += framework_spline_geometry_pull ;
-  UseProgLibs += daNetGameLibs/spline_geometry ;
-}

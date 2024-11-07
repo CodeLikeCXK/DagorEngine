@@ -1,16 +1,12 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <scriptHelpers/tunedParams.h>
 #include <scriptHelpers/scriptPanel.h>
 #include "scriptHelpersPanelUserData.h"
 
 #include <sepGui/wndPublic.h>
-#include <propPanel/control/container.h>
-#include <propPanel/control/container.h>
-#include <propPanel/commonWindow/treeviewPanel.h>
+#include <propPanel2/c_panel_base.h>
+#include <propPanel2/comWnd/panel_window.h>
+#include <propPanel2/comWnd/treeview_panel.h>
 #include <winGuiWrapper/wgw_dialogs.h>
-
-#include <imgui/imgui.h>
 
 
 using namespace ScriptHelpers;
@@ -31,7 +27,7 @@ class ScriptHelpersPropPanelBar;
 IWndManager *wnd_manager = NULL;
 
 ScriptHelpersPropPanelBar *prop_bar = NULL;
-PropPanel::TreeBaseWindow *tree_list = NULL;
+TreeBaseWindow *tree_list = NULL;
 ParamsTreeCB *tree_callback = NULL;
 
 extern TunedElement *root_element;
@@ -45,7 +41,7 @@ extern ParamChangeCB *param_change_cb;
 
 namespace ScriptHelpers
 {
-class ScriptHelpersPropPanelBar : public PropPanel::ControlEventHandler, public IPropPanelCB
+class ScriptHelpersPropPanelBar : public ControlEventHandler, public IPropPanelCB
 {
 public:
   static const int START_PID = 100;
@@ -53,30 +49,39 @@ public:
   bool shouldRebuild;
 
 
-  ScriptHelpersPropPanelBar(int x, int y, unsigned w, unsigned h) :
+  ScriptHelpersPropPanelBar(void *phandle, int x, int y, unsigned w, unsigned h) :
 
     mPanel(NULL), shouldRebuild(false)
   {
-    mPanel = new PropPanel::ContainerPropertyControl(0, this, nullptr, x, y, _pxActual(w), _pxActual(h));
+    mPanel = new CPanelWindow(this, phandle, x, y, _pxActual(w), _pxActual(h), "");
   }
 
 
   ~ScriptHelpersPropPanelBar() { del_it(mPanel); }
 
 
-  PropPanel::ContainerPropertyControl *getPanelWindow() { return mPanel; }
+  void *getParentWindowHandle()
+  {
+    if (mPanel)
+      return mPanel->getParentWindowHandle();
+
+    return 0;
+  }
+
+
+  CPanelWindow *getPanelWindow() { return mPanel; }
 
 
   virtual void rebuildTreeList() { shouldRebuild = true; }
 
-  void updateArrayItemCaption(int pcb_id, PropPanel::ContainerPropertyControl &panel)
+  void updateArrayItemCaption(int pcb_id, PropertyContainerControlBase &panel)
   {
-    PropPanel::PropertyControlBase *control = panel.getById(pcb_id);
+    PropertyControlBase *control = panel.getById(pcb_id);
     if (!control)
       return;
 
     // The first parent is the structure's group, the parent's parent is the array item.
-    PropPanel::PropertyControlBase *arrayItemGroup = control->getParent();
+    PropertyControlBase *arrayItemGroup = control->getParent();
     arrayItemGroup = arrayItemGroup ? arrayItemGroup->getParent() : nullptr;
     if (!arrayItemGroup)
       return;
@@ -86,7 +91,7 @@ public:
     if (!arrayItem || dataType != ScriptHelpersPanelUserData::DataType::ArrayItem)
       return;
 
-    PropPanel::PropertyControlBase *arrayGroup = arrayItemGroup->getParent();
+    PropertyControlBase *arrayGroup = arrayItemGroup->getParent();
     if (!arrayGroup)
       return;
 
@@ -99,7 +104,7 @@ public:
       arrayItemGroup->setCaptionValue(caption);
   }
 
-  virtual void onChange(int pcb_id, PropPanel::ContainerPropertyControl *panel)
+  virtual void onChange(int pcb_id, PropertyContainerControlBase *panel)
   {
     TunedElement *elem = NULL;
 
@@ -110,7 +115,7 @@ public:
 
     if ((elem) && (mPanel))
     {
-      PropPanel::ContainerPropertyControl *_pp = mPanel->getContainer();
+      PropertyContainerControlBase *_pp = mPanel->getContainer();
       G_ASSERT(_pp && "ScriptHelpersPropPanelBar: There is no container found!");
 
       int pid = START_PID;
@@ -122,7 +127,7 @@ public:
   }
 
 
-  virtual void onClick(int pcb_id, PropPanel::ContainerPropertyControl *panel)
+  virtual void onClick(int pcb_id, PropertyContainerControlBase *panel)
   {
     shouldRebuild = false;
 
@@ -136,17 +141,17 @@ public:
   }
 
 
-  virtual void onPostEvent(int pcb_id, PropPanel::ContainerPropertyControl *panel)
+  virtual void onPostEvent(int pcb_id, PropertyContainerControlBase *panel)
   {
     rebuild_tree_list();
     on_param_change();
 
     // maximize first group
 
-    PropPanel::PropertyControlBase *cb = mPanel->getById(START_PID + 1);
+    PropertyControlBase *cb = mPanel->getById(START_PID + 1);
     if (cb)
     {
-      PropPanel::ContainerPropertyControl *ccb = cb->getContainer();
+      PropertyContainerControlBase *ccb = cb->getContainer();
       if (ccb)
         ccb->setBoolValue(false);
     }
@@ -155,8 +160,10 @@ public:
 
   virtual void fillPanel()
   {
+    mPanel->showPanel(false);
+
     G_ASSERT(mPanel && "ScriptHelpersPropPanelBar: There is no panel found!");
-    PropPanel::ContainerPropertyControl *_pp = mPanel->getContainer();
+    PropertyContainerControlBase *_pp = mPanel->getContainer();
     G_ASSERT(_pp && "ScriptHelpersPropPanelBar: There is no container found!");
     _pp->clear();
 
@@ -170,10 +177,12 @@ public:
     }
     else if (root_element)
       root_element->fillPropPanel(pid, *_pp);
+
+    mPanel->showPanel(true);
   }
 
 protected:
-  PropPanel::ContainerPropertyControl *mPanel;
+  CPanelWindow *mPanel;
 };
 
 
@@ -192,10 +201,10 @@ void set_param_change_cb(ParamChangeCB *cb) { param_change_cb = cb; }
 // ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ//
 
 
-class ScriptHelpers::ParamsTreeCB : public PropPanel::ITreeViewEventHandler
+class ScriptHelpers::ParamsTreeCB : public ITreeViewEventHandler
 {
 public:
-  virtual void onTvSelectionChange(PropPanel::TreeBaseWindow &tree, PropPanel::TLeafHandle new_sel) override
+  virtual void onTvSelectionChange(TreeBaseWindow &tree, TLeafHandle new_sel)
   {
     selected_elem = (TunedElement *)tree.getItemData(new_sel);
 
@@ -203,20 +212,20 @@ public:
       prop_bar->fillPanel();
   }
 
-  virtual void onTvListSelection(PropPanel::TreeBaseWindow &tree, int index) override {}
+  virtual void onTvListSelection(TreeBaseWindow &tree, int index) {}
 
-  virtual bool onTvContextMenu(PropPanel::TreeBaseWindow &tree_base_window, PropPanel::ITreeInterface &tree) override { return false; }
+  virtual bool onTvContextMenu(TreeBaseWindow &tree, TLeafHandle under_mouse, IMenu &menu) { return false; }
 };
 
 
 // ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ//
 
 
-void tree_fill(PropPanel::TreeBaseWindow *tree, PropPanel::TLeafHandle parent, TunedElement *e)
+void tree_fill(TreeBaseWindow *tree, TLeafHandle parent, TunedElement *e)
 {
   G_ASSERT(e);
 
-  PropPanel::TLeafHandle cur = tree->addItem(e->getName(), nullptr, parent, e);
+  TLeafHandle cur = tree->addItem(e->getName(), -1, parent, e);
 
   int num = e->subElemCount();
   for (int i = 0; i < num; ++i)
@@ -253,17 +262,17 @@ void ScriptHelpers::rebuild_tree_list()
 // ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ//
 
 
-bool ScriptHelpers::create_helper_bar(IWndManager *manager)
+bool ScriptHelpers::create_helper_bar(IWndManager *manager, void *htree, void *hpropbar)
 {
   wnd_manager = manager;
 
-  manager->setWindowType(nullptr, EFFECTS_TREE_WINDOW_TYPE);
-  manager->setWindowType(nullptr, EFFECTS_PROP_WINDOW_TYPE);
+  manager->setWindowType(htree, EFFECTS_TREE_WINDOW_TYPE);
+  manager->setWindowType(hpropbar, EFFECTS_PROP_WINDOW_TYPE);
   return true;
 }
 
 
-void *ScriptHelpers::on_wm_create_window(int type)
+IWndEmbeddedWindow *ScriptHelpers::on_wm_create_window(void *handle, int type)
 {
   switch (type)
   {
@@ -272,7 +281,11 @@ void *ScriptHelpers::on_wm_create_window(int type)
       if (prop_bar)
         return NULL;
 
-      prop_bar = new ScriptHelpersPropPanelBar(0, 0, 0, 0);
+      wnd_manager->setCaption(handle, "Effects Props");
+
+      unsigned w, h;
+      wnd_manager->getWindowClientSize(handle, w, h);
+      prop_bar = new ScriptHelpersPropPanelBar(handle, 0, 0, w, h);
 
       return prop_bar->getPanelWindow();
     }
@@ -283,8 +296,12 @@ void *ScriptHelpers::on_wm_create_window(int type)
       if (tree_list)
         return NULL;
 
+      wnd_manager->setCaption(handle, "Effects Tree");
+
+      unsigned w, h;
+      wnd_manager->getWindowClientSize(handle, w, h);
       tree_callback = new ParamsTreeCB();
-      tree_list = new PropPanel::TreeBaseWindow(tree_callback, nullptr, 0, 0, _pxActual(0), _pxActual(0), "", false);
+      tree_list = new TreeBaseWindow(tree_callback, handle, 0, 0, _pxActual(w), _pxActual(h), "", false);
 
       return tree_list;
     }
@@ -294,24 +311,20 @@ void *ScriptHelpers::on_wm_create_window(int type)
 }
 
 
-void ScriptHelpers::removeWindows()
+bool ScriptHelpers::on_wm_destroy_window(void *handle)
 {
-  del_it(tree_list);
-  del_it(tree_callback);
-  del_it(prop_bar);
-}
-
-
-void ScriptHelpers::updateImgui()
-{
-  if (tree_list)
+  if (prop_bar && prop_bar->getParentWindowHandle() == handle)
   {
-    if (ImGui::BeginChild("tree", ImVec2(0.0f, 250.0f), ImGuiChildFlags_ResizeY, ImGuiWindowFlags_NoBackground))
-      tree_list->updateImgui();
-    ImGui::EndChild();
+    del_it(prop_bar);
+    return true;
   }
 
-  PropPanel::ContainerPropertyControl *propertyPanel = prop_bar ? prop_bar->getPanelWindow() : nullptr;
-  if (propertyPanel)
-    propertyPanel->updateImgui();
+  if (tree_list && tree_list->getParentWindowHandle() == handle)
+  {
+    del_it(tree_list);
+    del_it(tree_callback);
+    return true;
+  }
+
+  return false;
 }

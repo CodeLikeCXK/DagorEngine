@@ -1,20 +1,17 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "de_appwnd.h"
 #include "de_batch.h"
-#include <EditorCore/ec_IEditorCore.h>
+#include <dllPluginCore/core.h>
 
 #include <workCycle/dag_gameSettings.h>
 #include <startup/dag_globalSettings.h>
 #include <startup/dag_fatalHandler.inc.cpp>
-#include <drv/3d/dag_info.h>
+#include <3d/dag_drv3d.h>
 #include <debug/dag_logSys.h>
 #include <debug/dag_debug.h>
 #include <debug/dag_except.h>
 #include <osApiWrappers/dag_direct.h>
 #include <osApiWrappers/dag_cpuJobs.h>
 
-#include <EditorCore/ec_mainWindow.h>
 #include <libTools/util/strUtil.h>
 #include <libTools/dtx/ddsxPlugin.h>
 
@@ -33,9 +30,6 @@
 
 #include <perfMon/dag_cpuFreq.h>
 #include <perfMon/dag_daProfilerSettings.h>
-
-using editorcore_extapi::dagConsole;
-
 extern "C" const char *dagor_get_build_stamp_str(char *buf, size_t bufsz, const char *suffix);
 
 static InitOnDemand<SplashScreen> screen;
@@ -105,18 +99,13 @@ public:
     // test switches
     for (int i = 1; i < __argc; ++i)
     {
-      if (__argv[i][0] != '/' && __argv[i][0] != '-')
+      if (__argv[i][0] != '/' && __argv[i][0] != '-' && ::dd_file_exist(__argv[i]))
       {
         const char *ext = ::get_file_ext(__argv[i]);
 
         if (ext && !stricmp(ext, "dcmd"))
-        {
-          if (::dd_file_exist(__argv[i]))
-            batchFname = __argv[i];
-          else
-            logwarn("Batch file \"%s\" does not exist!", __argv[i]);
-        }
-        else if (!openFname && ::dd_file_exist(__argv[i]))
+          batchFname = __argv[i];
+        else if (!openFname)
           openFname = __argv[i];
       }
       if (strnicmp(__argv[i], "-ws:", 4) == 0)
@@ -131,7 +120,11 @@ public:
     app->init();
 
     //----------------------------------
-    int pc = ddsx::load_plugins(::make_full_path(sgg::get_exe_path_full(), "plugins/ddsx"));
+#if _TARGET_64BIT
+    int pc = ddsx::load_plugins(::make_full_path(sgg::get_exe_path_full(), "../bin64/plugins/ddsx"));
+#else
+    int pc = ddsx::load_plugins(::make_full_path(sgg::get_exe_path_full(), "../bin/plugins/ddsx"));
+#endif
     debug("loaded %d DDSx export plugin(s)", pc);
 
     if (batchFname)
@@ -175,8 +168,6 @@ public:
 
 
   virtual void onDestroy() { del_it(app); }
-
-  bool onDropFiles(const dag::Vector<String> &files) { return app && app->onDropFiles(files); }
 
   static void clearBusy()
   {
@@ -231,10 +222,10 @@ int DagorWinMain(int nCmdShow, bool /*debugmode*/)
   prev_dev_fatal_handler = dgs_fatal_handler;
   dgs_fatal_handler = de3_default_fatal_handler;
 
-  EditorMainWindow mainWindow(appManager);
-  mainWindow.run("DaEditorX", "RES_DE_ICON",
-    [&appManager](const dag::Vector<String> &files) -> bool { return appManager.onDropFiles(files); });
+  IWndManager *wndManager = IWndManager::createManager(&appManager);
+  wndManager->run(1024, 768, "DaEditorX", "RES_DE_ICON", WSI_MAXIMIZED);
 
+  delete wndManager;
   return 0;
 }
 
@@ -305,9 +296,3 @@ void DagorWinMainInit(int, bool)
   else if (minimize_dabuild_usage)
     debug("dabuild-cache is minimized (build only textures that are not scanned from *.dxp.bin; all resources are read from *.grp)");
 }
-
-#if _TARGET_STATIC_LIB
-void daeditor3_init_globals(IDagorEd2Engine &) {}
-String editorcore_extapi::make_full_start_path(const char *rel_path) { return ::make_full_path(sgg::get_exe_path(), rel_path); }
-#include <namedPtr.cpp>
-#endif

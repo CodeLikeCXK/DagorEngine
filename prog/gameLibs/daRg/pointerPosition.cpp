@@ -1,8 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "pointerPosition.h"
 
-#include <drv/hid/dag_hiPointing.h>
+#include <humanInput/dag_hiPointing.h>
 #include <startup/dag_inpDevClsDrv.h>
 #include <startup/dag_globalSettings.h>
 #include <gui/dag_stdGuiRender.h>

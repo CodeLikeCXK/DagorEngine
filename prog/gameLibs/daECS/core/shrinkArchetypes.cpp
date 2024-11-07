@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 // #include <perfMon/dag_perfTimer.h>
 #include <daECS/core/entityManager.h>
 #include <memory/dag_framemem.h>

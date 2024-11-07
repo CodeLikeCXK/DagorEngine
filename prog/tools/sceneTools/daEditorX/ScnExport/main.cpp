@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "scnExportPlugin.h"
 #include <debug/dag_debug.h>
 
@@ -12,7 +10,7 @@ void init_plugin_scn_export()
 {
   if (!DAGORED2->checkVersion())
   {
-    DEBUG_CTX("Incorrect version!");
+    debug_ctx("Incorrect version!");
     return;
   }
 

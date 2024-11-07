@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -27,11 +28,7 @@ inline int floorPhysicsTickNumber(float time, float fixed_dt)
 }
 inline int nearestPhysicsTickNumber(float time, float fixed_dt)
 {
-#if _TARGET_SIMD_SSE > 0
-  return _mm_cvtss_si32(_mm_set_ss(time / fixed_dt));
-#else
-  return int(time / fixed_dt + 0.5f);
-#endif
+  return int(time / fixed_dt + 0.5f); // conversion to int always truncates (round-to-zero)
 }
 inline int ceilPhysicsTickNumber(float time, float fixed_dt)
 {

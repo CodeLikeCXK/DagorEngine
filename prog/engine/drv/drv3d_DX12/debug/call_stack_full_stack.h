@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <osApiWrappers/dag_stackHlp.h>
@@ -12,7 +11,13 @@
 
 class DataBlock;
 
-namespace drv3d_dx12::debug::call_stack::full_stack
+namespace drv3d_dx12
+{
+namespace debug
+{
+namespace call_stack
+{
+namespace full_stack
 {
 inline constexpr uint32_t max_call_stack_depth = 32;
 using CallStack = eastl::array<void *, max_call_stack_depth>;
@@ -58,7 +63,7 @@ class Generator
   eastl::hash_set<CallStack, CallStackHasher> callstacks;
 
 public:
-  constexpr void configure(const DataBlock *) {}
+  void configure(const DataBlock *) {}
   const CallStack *captureCallStack(uint32_t offset)
   {
     CallStack callstack;
@@ -112,4 +117,7 @@ public:
 
   eastl::string_view resolve(const CommandData &data) { return doResolve(data); }
 };
-} // namespace drv3d_dx12::debug::call_stack::full_stack
+} // namespace full_stack
+} // namespace call_stack
+} // namespace debug
+} // namespace drv3d_dx12

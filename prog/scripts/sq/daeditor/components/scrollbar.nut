@@ -1,4 +1,4 @@
-from "%darg/ui_imports.nut" import *
+from "daRg" import *
 from "%sqstd/frp.nut" import *
 
 function Bar(has_scroll) {

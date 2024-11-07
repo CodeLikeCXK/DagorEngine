@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -73,7 +74,7 @@ public:
   }
   bool cmpEq(const FastIntList &l) const { return list.size() == l.list.size() && mem_eq(list, l.list.data()); }
 
-  void reserve(int capacity) { list.reserve(capacity); }
+
   void reset(bool clr = false) { clr ? clear_and_shrink(list) : list.clear(); }
   dag::ConstSpan<int> getList() const { return list; }
 

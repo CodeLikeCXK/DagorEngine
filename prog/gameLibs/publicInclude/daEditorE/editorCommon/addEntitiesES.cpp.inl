@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <daEditorE/editorCommon/entityEditor.h>
 #include <daEditorE/de_objCreator.h>
 #include <daECS/core/entityManager.h>

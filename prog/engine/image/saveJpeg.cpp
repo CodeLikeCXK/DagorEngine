@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>

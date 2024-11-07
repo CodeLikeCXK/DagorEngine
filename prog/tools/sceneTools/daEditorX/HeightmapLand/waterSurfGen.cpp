@@ -1,11 +1,9 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "hmlPlugin.h"
 #include "hmlSplineObject.h"
 #include <de3_interface.h>
 #include <de3_genObjUtil.h>
 #include <de3_rasterizePoly.h>
-#include <EditorCore/ec_IEditorCore.h>
+#include <dllPluginCore/core.h>
 #include <libTools/staticGeom/matFlags.h>
 #include <libTools/staticGeom/geomObject.h>
 #include <libTools/staticGeom/staticGeometryContainer.h>
@@ -26,9 +24,6 @@
 #include <math/misc/polyLineReduction.h>
 #include <math/dag_math2d.h>
 #include <algorithm>
-
-using editorcore_extapi::dagGeom;
-using editorcore_extapi::dagTools;
 
 extern bool allow_debug_bitmap_dump;
 
@@ -934,7 +929,7 @@ void HmapLandPlugin::rebuildWaterSurface(Tab<Point3> *p_loft_pt, Tab<Point3> *p_
         }
         if (!ClipperLib::Orientation(poly))
         {
-          DEBUG_CP();
+          debug_cp();
           reverse(poly.begin(), poly.end());
         }
         clpr.AddPolygon(poly, type);
@@ -1062,7 +1057,7 @@ void HmapLandPlugin::rebuildWaterSurface(Tab<Point3> *p_loft_pt, Tab<Point3> *p_
 
     m_water.vert.reserve(tin.verts.size());
     m_water.face.reserve(tin.triangles.size() / 3);
-    DEBUG_CP();
+    debug_cp();
     for (int i = 0; i < tin.triangles.size(); i += 3)
     {
       ctl::Point centroid(

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <openssl/evp.h>
 #include <openssl/pem.h>
 #include <digitalSignature/digitalSignatureCheck.h>

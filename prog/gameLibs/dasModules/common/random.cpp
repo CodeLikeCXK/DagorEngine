@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <dasModules/dasModulesCommon.h>
 #include <math/random/dag_random.h>
 namespace bind_dascript

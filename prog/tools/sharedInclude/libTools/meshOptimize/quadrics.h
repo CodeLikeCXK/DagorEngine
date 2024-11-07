@@ -1,5 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-#pragma once
+#ifndef _QUADRICS_H_
+#define _QUADRICS_H_
 
 #include <generic/dag_tab.h>
 
@@ -38,3 +38,5 @@ bool make_vsplits(const uint8_t *face_indices, int stride, bool short_indices, i
 int progressive_optimize(Mesh &mesh, const Vsplit *vsplits, int vcnt, bool update_existing);
 
 } // namespace meshopt
+
+#endif

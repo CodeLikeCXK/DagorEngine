@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <ecs/game/generic/keyTrackAnim.h>
 #include <sqrat.h>
 #include <quirrel/bindQuirrelEx/autoBind.h>

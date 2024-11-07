@@ -1,4 +1,6 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright 2023 by Gaijin Games KFT, All rights reserved.
+#ifndef _GAIJIN_DAGOR_DYNSCENERESSRC_H
+#define _GAIJIN_DAGOR_DYNSCENERESSRC_H
 #pragma once
 
 #include <libTools/shaderResBuilder/meshDataSave.h>
@@ -152,3 +154,5 @@ private:
 DAG_DECLARE_RELOCATABLE(DynamicRenderableSceneLodsResSrc::Lod);
 DAG_DECLARE_RELOCATABLE(DynamicRenderableSceneLodsResSrc::SkinnedObj);
 DAG_DECLARE_RELOCATABLE(DynamicRenderableSceneLodsResSrc::RigidObj);
+
+#endif

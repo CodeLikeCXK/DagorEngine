@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <render/heatHazeRenderer.h>
 #include <shaders/dag_shaders.h>
 #include <shaders/dag_overrideStates.h>
@@ -7,11 +5,9 @@
 #include <shaders/dag_postFxRenderer.h>
 #include <startup/dag_globalSettings.h>
 #include <ioSys/dag_dataBlock.h>
-#include <drv/3d/dag_viewScissor.h>
-#include <drv/3d/dag_renderTarget.h>
-#include <drv/3d/dag_driver.h>
-#include <drv/3d/dag_lock.h>
-#include <drv/3d/dag_tex3d.h>
+#include <3d/dag_drv3d.h>
+#include <3d/dag_drv3dCmd.h>
+#include <3d/dag_tex3d.h>
 #include <math/dag_color.h>
 #include <gameRes/dag_gameResSystem.h>
 #include <perfMon/dag_statDrv.h>
@@ -31,7 +27,10 @@ static int haze_scene_depth_tex_lodVarId = -1;
 static int rendering_distortion_colorVarId = -1;
 static int inv_distortion_resolutionVarId = -1;
 
-static inline Color4 texsz_consts(0.5f, -0.5f, 0.5f, 0.5f);
+static inline Color4 calc_texsz_consts(int w, int h)
+{
+  return Color4(0.5f, -0.5f, 0.5f + HALF_TEXEL_OFSF / w, 0.5f + HALF_TEXEL_OFSF / h);
+}
 
 HeatHazeRenderer::HeatHazeRenderer(int haze_resolution_divisor) : hazeNoiseTexId(BAD_TEXTUREID) { setUp(haze_resolution_divisor); }
 
@@ -92,11 +91,6 @@ void HeatHazeRenderer::setUp(int haze_resolution_divisor)
     hazeFxRenderer = eastl::make_unique<PostFxRenderer>();
     hazeFxRenderer->init("apply_haze");
   }
-  d3d::SamplerInfo smpInfo;
-  smpInfo.address_mode_u = smpInfo.address_mode_v = smpInfo.address_mode_w = d3d::AddressMode::Clamp;
-  smpInfo.filter_mode = d3d::FilterMode::Point;
-  ShaderGlobal::set_sampler(get_shader_variable_id("haze_scene_depth_tex_samplerstate", true), d3d::request_sampler(smpInfo));
-  ShaderGlobal::set_sampler(get_shader_variable_id("haze_noise_tex_samplerstate", true), d3d::request_sampler({}));
 }
 
 void HeatHazeRenderer::tearDown()
@@ -110,7 +104,8 @@ void HeatHazeRenderer::tearDown()
 }
 
 void HeatHazeRenderer::renderHazeParticles(Texture *haze_depth, Texture *haze_offset, TEXTUREID depth_tex_id, int depth_tex_lod,
-  RenderHazeParticlesCallback render_haze_particles, RenderCustomHazeCallback render_ri_haze)
+  RenderHazeParticlesCallback render_haze_particles, RenderCustomHazeCallback render_custom_haze,
+  RenderCustomHazeCallback render_ri_haze)
 {
   if (!areShadersValid())
     return;
@@ -128,6 +123,9 @@ void HeatHazeRenderer::renderHazeParticles(Texture *haze_depth, Texture *haze_of
   ShaderGlobal::set_texture(haze_scene_depth_texVarId, depth_tex_id);
   ShaderGlobal::set_real(haze_scene_depth_tex_lodVarId, depth_tex_lod);
 
+  if (render_custom_haze)
+    render_custom_haze();
+
   ShaderGlobal::setBlock(global_frame_block_id, ShaderGlobal::LAYER_FRAME);
   shaders::overrides::set(zFuncAlwaysStateId);
 
@@ -144,13 +142,17 @@ void HeatHazeRenderer::renderHazeParticles(Texture *haze_depth, Texture *haze_of
 }
 
 void HeatHazeRenderer::renderColorHaze(Texture *haze_color, RenderHazeParticlesCallback render_haze_particles,
-  RenderCustomHazeCallback render_ri_haze)
+  RenderCustomHazeCallback render_custom_haze, RenderCustomHazeCallback render_ri_haze)
 {
   SCOPE_RENDER_TARGET;
 
   d3d::set_render_target({nullptr, 0, 0}, DepthAccess::RW, {{haze_color, 0, 0}});
 
   ShaderGlobal::set_int(rendering_distortion_colorVarId, 1);
+
+  if (render_custom_haze)
+    render_custom_haze();
+
   ShaderGlobal::setBlock(global_frame_block_id, ShaderGlobal::LAYER_FRAME);
   shaders::overrides::set(zDisabledBlendMinStateId);
 
@@ -189,7 +191,7 @@ void HeatHazeRenderer::applyHaze(double total_time, Texture *back_buffer, const 
       APPLY_HAZE_DOWNSCALE
     };
 
-    hazeFxRenderer->getMat()->set_color4_param(texsz_consts_id, texsz_consts);
+    hazeFxRenderer->getMat()->set_color4_param(texsz_consts_id, calc_texsz_consts(back_buffer_resolution.x, back_buffer_resolution.y));
 
     Point4 uvt = Point4(1, 1, 0, 0);
     if (back_buffer_area)
@@ -219,7 +221,7 @@ void HeatHazeRenderer::applyHaze(double total_time, Texture *back_buffer, const 
     }
 
     haze_temp->texaddr(TEXADDR_CLAMP);
-    haze_temp->texfilter(TEXFILTER_LINEAR);
+    haze_temp->texfilter(TEXFILTER_SMOOTH);
     ShaderGlobal::set_texture(source_texVarId, haze_temp_id);
 
     ShaderGlobal::set_color4(haze_paramsVarId,
@@ -230,8 +232,8 @@ void HeatHazeRenderer::applyHaze(double total_time, Texture *back_buffer, const 
 }
 
 void HeatHazeRenderer::render(double total_time, const RenderTargets &targets, const IPoint2 &back_buffer_resolution,
-  int depth_tex_lod, RenderHazeParticlesCallback render_haze_particles, RenderCustomHazeCallback render_ri_haze,
-  BeforeApplyHazeCallback before_apply_haze, AfterApplyHazeCallback after_apply_haze)
+  int depth_tex_lod, RenderHazeParticlesCallback render_haze_particles, RenderCustomHazeCallback render_custom_haze,
+  RenderCustomHazeCallback render_ri_haze, BeforeApplyHazeCallback before_apply_haze, AfterApplyHazeCallback after_apply_haze)
 {
   if (!areShadersValid())
     return;
@@ -239,7 +241,8 @@ void HeatHazeRenderer::render(double total_time, const RenderTargets &targets, c
   if (!hazeFxRenderer)
     clearTargets(targets.hazeColor, targets.hazeOffset, targets.hazeDepth);
 
-  renderHazeParticles(targets.hazeDepth, targets.hazeOffset, targets.depthId, depth_tex_lod, render_haze_particles, render_ri_haze);
+  renderHazeParticles(targets.hazeDepth, targets.hazeOffset, targets.depthId, depth_tex_lod, render_haze_particles, render_custom_haze,
+    render_ri_haze);
 
   d3d::resource_barrier({targets.hazeOffset, RB_RO_SRV | RB_STAGE_PIXEL, 0, 0});
   d3d::resource_barrier({targets.hazeDepth, RB_RO_SRV | RB_STAGE_PIXEL, 0, 0});
@@ -247,7 +250,7 @@ void HeatHazeRenderer::render(double total_time, const RenderTargets &targets, c
   // Render second pass. If there is support for colored haze, render haze color
   if (targets.hazeColor)
   {
-    renderColorHaze(targets.hazeColor, render_haze_particles, render_ri_haze);
+    renderColorHaze(targets.hazeColor, render_haze_particles, render_custom_haze, render_ri_haze);
     d3d::resource_barrier({targets.hazeColor, RB_RO_SRV | RB_STAGE_PIXEL, 0, 0});
   }
 
@@ -268,13 +271,18 @@ void HeatHazeRenderer::clearTargets(Texture *haze_color, Texture *haze_offset, T
 {
   TIME_D3D_PROFILE(renderHazeClear);
 
+  SCOPE_RENDER_TARGET;
+
   if (haze_color)
   {
-    d3d::clear_rt({haze_color}, make_clear_value(1.0f, 1.0f, 1.0f, 1.0f));
+    d3d::set_render_target(haze_color, 0);
+    d3d::clearview(CLEAR_TARGET, E3DCOLOR_MAKE(0xFF, 0xFF, 0xFF, 0xFF), 0.f, 0);
     d3d::resource_barrier({haze_color, RB_RO_SRV | RB_STAGE_PIXEL, 0, 0});
   }
-  d3d::clear_rt({haze_offset});
-  d3d::clear_rt({haze_depth});
+
+  d3d::set_render_target(haze_offset, 0);
+  d3d::set_depth(haze_depth, DepthAccess::RW);
+  d3d::clearview(CLEAR_TARGET | CLEAR_ZBUFFER, E3DCOLOR_MAKE(0x00, 0x00, 0x00, 0x00), 0.f, 0);
   d3d::resource_barrier({haze_offset, RB_RO_SRV | RB_STAGE_PIXEL, 0, 0});
   d3d::resource_barrier({haze_depth, RB_RO_SRV | RB_STAGE_PIXEL, 0, 0});
 }

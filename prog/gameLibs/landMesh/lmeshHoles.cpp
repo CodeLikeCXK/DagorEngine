@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <landMesh/lmeshHoles.h>
 #include <heightmap/heightmapHandler.h>
 

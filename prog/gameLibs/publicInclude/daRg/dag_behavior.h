@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -9,7 +10,7 @@
 #include <debug/dag_assert.h>
 #include <debug/dag_debug.h>
 #include <generic/dag_tab.h>
-#include <drv/hid/dag_hiPointingData.h>
+#include <humanInput/dag_hiPointingData.h>
 
 
 namespace HumanInput

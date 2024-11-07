@@ -1,4 +1,0 @@
-if $(HaveRenderer) = yes {
-  gamePulls += framework_force_dome_pull ;
-  UseProgLibs += daNetGameLibs/force_dome ;
-}

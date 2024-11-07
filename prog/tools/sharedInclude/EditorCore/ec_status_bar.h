@@ -1,4 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+#ifndef __GAIJIN_EDITORCORE_EC_STATUS_BAR_H__
+#define __GAIJIN_EDITORCORE_EC_STATUS_BAR_H__
 #pragma once
 
 #include <math/dag_math3d.h>
@@ -67,7 +68,7 @@ public:
   //@}
 
   /// Editor should call onChange in toolbar collback
-  bool onChange(int pcb_id, PropPanel::ContainerPropertyControl *panel);
+  bool onChange(int pcb_id, PropertyContainerControlBase *panel);
 
 protected:
   int tbId;
@@ -121,3 +122,5 @@ protected:
   Point3 getClientGizmoValue();
   void setGizmoToToolbar(Point3 value);
 };
+
+#endif

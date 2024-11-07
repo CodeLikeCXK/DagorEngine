@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <gamePhys/phys/physVars.h>
 #include <debug/dag_assert.h>
 

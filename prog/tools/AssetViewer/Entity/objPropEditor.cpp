@@ -1,9 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "objPropEditor.h"
 #include <osApiWrappers/dag_direct.h>
-#include <propPanel/commonWindow/dialogWindow.h>
-#include <propPanel/control/container.h>
+#include <propPanel2/c_panel_base.h>
+#include <propPanel2/comWnd/dialog_window.h>
 #include <winGuiWrapper/wgw_input.h>
 #include <winGuiWrapper/wgw_dialogs.h>
 #include "objPropDlg.h"
@@ -18,7 +16,7 @@ void ObjectPropertyEditor::begin(DagorAsset *asset, IObjEntity *asset_entity)
   entity = asset_entity;
 }
 
-void ObjectPropertyEditor::fillPropPanel(int pid, PropPanel::ContainerPropertyControl &panel)
+void ObjectPropertyEditor::fillPropPanel(int pid, PropertyContainerControlBase &panel)
 {
   panel.createButton(pid, "Object properties");
 }
@@ -68,15 +66,15 @@ void ObjectPropertyEditor::onClick()
   Tab<String> nodes, props;
   getData(nodes, props);
   ObjPropDialog dlg("Object properties", hdpi::_pxScaled(300), hdpi::_pxScaled(450), nodes, props);
-  int dialogResult = PropPanel::DIALOG_ID_CANCEL;
-  while (dialogResult == PropPanel::DIALOG_ID_CANCEL)
+  int dialogResult = DIALOG_ID_CANCEL;
+  while (dialogResult == DIALOG_ID_CANCEL)
   {
-    if (dlg.showDialog() == PropPanel::DIALOG_ID_OK)
+    if (dlg.showDialog() == DIALOG_ID_OK)
     {
       dialogResult = wingw::message_box(wingw::MBS_QUEST | wingw::MBS_YESNOCANCEL, "Object properties",
         "You have changed Object properties. Do you want to save the "
         "changes to the physical DAGs?");
-      if (dialogResult == PropPanel::DIALOG_ID_YES)
+      if (dialogResult == DIALOG_ID_YES)
         saveChanges(dlg.getScripts());
     }
     else

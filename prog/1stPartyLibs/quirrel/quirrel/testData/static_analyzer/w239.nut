@@ -1,6 +1,6 @@
 //expect:w239
 
-function isLoggedIn() { //-declared-never-used
+let function isLoggedIn() { //-declared-never-used
   if (::userName == "")
     return false;
 

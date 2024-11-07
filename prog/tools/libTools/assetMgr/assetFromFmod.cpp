@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <assets/assetMgr.h>
 #if _TARGET_PC_WIN
 #include <assets/asset.h>

@@ -1,6 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-#pragma once
-
 #import <QuartzCore/CAMetalLayer.h>
 #import <Metal/Metal.h>
 
@@ -34,12 +31,13 @@
 - (void)setVSync:(bool)enable;
 - (void)setWidth:(int)scr_wd setHeight:(int)scr_ht;
 
-- (id<MTLTexture>)getBackBuffer;
-- (id<MTLTexture>)getsRGBBackBuffer;
+- (id<MTLTexture>)getBackBuffer:(bool)msaa;
+- (id<MTLTexture>)getsRGBBackBuffer:(bool)msaa;
+- (id<MTLTexture>)getDepthBuffer;
 
 - (id<MTLTexture>)getSavedBackBuffer;
 
-- (void)acquireDrawable;
+- (void)aquareDrawable;
 - (void)presentDrawable:(id<MTLCommandBuffer>)commandBuffer;
 
 - (MTLPixelFormat)getLayerPixelFormat;

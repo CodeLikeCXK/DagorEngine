@@ -1,7 +1,6 @@
 
 #define NOP
 #define _HARDWARE_DX11 1
-#define _HARDWARE_JUST_DX11 1
 
 struct TextureSampler
 {

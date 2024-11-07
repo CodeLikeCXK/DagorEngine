@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -14,7 +15,7 @@
 class WaterRipples
 {
 public:
-  WaterRipples(float world_size, int simulation_tex_size, float water_displacement_max = 0.125f, bool use_flowmap = false);
+  WaterRipples(float world_size, int tex_size);
   ~WaterRipples();
 
   void placeDrop(const Point2 &pos, float strength, float radius);
@@ -36,33 +37,15 @@ private:
   void clearRts();
 
   int waterRipplesOnVarId;
-  int waterRipplesDropCountVarId;
-  int waterRipplesOriginVarId;
-  int waterRipplesOriginDeltaVarId;
-  int waterRipplesDisplaceMaxVarId;
-  int waterRipplesT1VarId;
-  int waterRipplesT1_samplerstateVarId;
-  int waterRipplesT2VarId;
-  int waterRipplesT2_samplerstateVarId;
-  int waterRipplesDropsVarId;
-  int waterRipplesFrameNoVarId;
-  int waterRipplesFlowmapVarId;
-  int waterRipplesFlowmapFrameCountVarId;
-
-  int frameNo = 0;
-  int flowmapFrameCount = 120;
-
   bool firstStep = true;
   int curBuffer = 0;
   Tab<Point4> drops;
   Tab<int> dropsInst;
   float dropsAliveTime = 0.0f;
   bool inSleep = true;
-  bool useFlowmap = false;
-  carray<Point2, 2> lastStepOrigin;
+  Point2 lastStepOrigin = Point2(0, 0);
   float worldSize;
   int texSize;
-  float texelSize;
 
   int curNumSteps = 1;
   int nextNumSteps = 0;
@@ -70,11 +53,7 @@ private:
   int curStepNo = 0;
   carray<float, 30> steps;
 
-  carray<UniqueTex, 3> texBuffers;
-  UniqueTexHolder heightNormalTexture;
+  carray<UniqueTex, 2> texBuffers;
+  UniqueTexHolder normalTexture;
   PostFxRenderer updateRenderer;
-  PostFxRenderer resolveRenderer;
-  UniqueBuf dropsBuf;
-  d3d::SamplerHandle waterRipplesLinearSampler;
-  d3d::SamplerHandle waterRipplesPointSampler;
 };

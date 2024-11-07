@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #pragma comment(lib, "comctl32.lib")
 #include <generic/dag_tab.h>
 #include <coolConsole/coolConsole.h>
@@ -468,12 +466,6 @@ void CoolConsole::addMessageFmt(MessageType type, const char *fmt, const DagorSa
   if (!fmt || !*fmt)
     return;
 
-  // Prevent logmessage_fmt to be redirected here.
-  static bool entranceGuard = false;
-  if (entranceGuard)
-    return;
-  entranceGuard = true;
-
   unsigned color = 0;
   String con_fmt(0, "CON: %s", fmt);
 
@@ -514,9 +506,6 @@ void CoolConsole::addMessageFmt(MessageType type, const char *fmt, const DagorSa
       if (isCountMessages())
         ++notesCnt;
   }
-
-  entranceGuard = false;
-
   if (!is_main_thread())
     return;
 

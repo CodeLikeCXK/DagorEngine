@@ -4,7 +4,6 @@ from   bpy.utils        import user_resource
 from ..helpers.texts    import get_text
 from ..helpers.basename import basename
 from ..settings         import upd_project
-from ..helpers.version  import get_blender_version
 
 
 def check_remap(name):
@@ -83,21 +82,7 @@ def get_node_group(group_name):
                 node_group = bpy.data.node_groups.get('default')
     if start_mode == 'EDIT_MESH':
         bpy.ops.object.editmode_toggle()
-    hide_world_node()
     return node_group
-
-def hide_world_node():
-    try:
-        world_node = bpy.context.scene.objects.get('world')
-        if world_node is None:
-            return
-        if world_node.type != 'EMPTY':
-            return
-        bpy.context.scene.collection.objects.unlink(world_node)
-        bpy.data.scenes['TECH_STUFF'].collection.objects.link(world_node)
-    except:
-        pass
-    return
 
 def buildMaterial(mat):
     mat.use_nodes = True
@@ -191,23 +176,18 @@ def buildMaterial(mat):
 
 #TRANSPARENSY
     mode = shader_node.inputs['blend'].default_value.upper()
-    if get_blender_version() <= 4.1:
-        try:
-            mat.blend_method = mode
-            if mode not in ['OPAQUE', 'CLIP']:
-                mat.shadow_method = 'NONE'
-            else:
-                mat.shadow_method = mode
-                #shaders with atest is always 'CLIP', even when it turned off (100% white alpha)
-        except:
-            pass
-        backface = shader_node.inputs.get('show_backface')
-        if backface is not None:
-            mat.show_transparent_back = backface.default_value
-
-    else:  # Blender 4.2+
-        mat.surface_render_method = 'DITHERED' if mode in ['OPAQUE', 'CLIP'] else 'BLENDED'
-        mat.use_transparency_overlap = True if mode == 'BLENDED' else False
+    try:
+        mat.blend_method = mode
+        if mode not in ['OPAQUE', 'CLIP']:
+            mat.shadow_method = 'NONE'
+        else:
+            mat.shadow_method = mode
+            #shaders with atest is always 'CLIP', even when it turned off (100% white alpha)
+    except:
+        pass
+    backface = shader_node.inputs.get('show_backface')
+    if backface is not None:
+        mat.show_transparent_back = backface.default_value
 
 
 #BACKFACE_CULLING

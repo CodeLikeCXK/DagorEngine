@@ -1,9 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <workCycle/dag_startupModules.h>
 #include <startup/dag_restart.h>
-#include <drv/hid/dag_hiCreate.h>
-#include <drv/hid/dag_hiJoystick.h>
+#include <humanInput/dag_hiCreate.h>
+#include <humanInput/dag_hiJoystick.h>
 #include <startup/dag_inpDevClsDrv.h>
 #include <generic/dag_initOnDemand.h>
 

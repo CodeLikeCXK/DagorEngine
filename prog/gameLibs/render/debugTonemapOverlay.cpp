@@ -1,8 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <render/debugTonemapOverlay.h>
-#include <drv/3d/dag_viewScissor.h>
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
 #include <shaders/dag_shaders.h>
 #include <shaders/dag_overrideStates.h>
 #include <EASTL/string.h>

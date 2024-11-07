@@ -28,7 +28,8 @@
 
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT, substantial rework and amendments
+// Copyright (C) 2023  Gaijin Games KFT, substantial rework and amendments
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 

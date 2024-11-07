@@ -1,33 +1,23 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-#pragma once
+// Copyright 2023 by Gaijin Games KFT, All rights reserved.
+#ifndef __GAIJIN_EDITORCORE_EC_VIEWPORTWINDOW_H__
+#define __GAIJIN_EDITORCORE_EC_VIEWPORTWINDOW_H__
 
-#include <propPanel/messageQueue.h>
 #include <sepGui/wndEmbeddedWindow.h>
 #include <sepGui/wndMenuInterface.h>
 #include <EditorCore/ec_decl.h>
 #include <EditorCore/ec_interface.h>
 #include <EditorCore/ec_rect.h>
-#include <EditorCore/ec_viewportAxisId.h>
 #include <EditorCore/ec_window.h>
 #include <EditorCore/ec_camera_elem.h>
 
-#include <3d/dag_textureIDHolder.h>
 #include <util/dag_simpleString.h>
 #include <util/dag_stdint.h>
 #include <dag/dag_vector.h>
-#include <math/dag_Quat.h>
-#include <gui/dag_stdGuiRenderEx.h>
 
 
 // forward declarations for external classes
-namespace PropPanel
-{
-class IMenu;
-}
-class GridEditDialog;
 class RenderViewport;
 class IMenu;
-class IWndManager;
 class ViewportWindowStatSettingsDialog;
 
 struct ViewportParams
@@ -40,7 +30,7 @@ struct ViewportParams
 /// @ingroup EditorCore
 /// @ingroup EditorBaseClasses
 /// @ingroup ViewPort
-class ViewportWindow : public IGenViewportWnd, public IMenuEventHandler, public PropPanel::IDelayedCallbackHandler
+class ViewportWindow : public IGenViewportWnd, public EcWindow, public IWndEmbeddedWindow, public IMenuEventHandler
 {
 public:
   static bool showDagorUiCursor;
@@ -56,8 +46,12 @@ public:
   /// Destructor.
   ~ViewportWindow();
 
+  /// Get pointer to underlying of viewport.
+  /// @return pointer to EcWindow of viewport
+  virtual EcWindow *getEcWindow() { return this; }
+
   /// Initialize viewport
-  virtual void init(IGenEventHandler *eh);
+  virtual void init(IMenu *menu, IGenEventHandler *eh);
 
   /// Event handler of CTL window of viewport.
   /// @param[in] id - message id
@@ -190,25 +184,15 @@ public:
   /// Get top-left menu area size
   void getMenuAreaSize(hdpi::Px &w, hdpi::Px &h);
 
-  // It always returns true, just like EcWindow did.
-  bool isVisible() const { return true; }
-
-  int getW() const;
-  int getH() const;
-  void getClientRect(EcRect &clientRect) const;
-
-  virtual void captureMouse() override;
-  virtual void releaseMouse() override;
-
   //*******************************************************
   ///@name Viewport activity.
   //@{
   /// Activate viewport.
-  virtual void activate() override;
+  virtual void activate();
 
   /// Tests whether viewport is active.
   /// @return @b true if viewport is active, @b false in other case
-  virtual bool isActive() override;
+  virtual bool isActive() { return EcWindow::isActive(); }
   //@}
 
 
@@ -294,7 +278,7 @@ public:
   ///@name Process custom cameras (if they exist).
   //@{
   /// For internal use in EditorCore.
-  void act(real dt);
+  void act();
 
   /// Set custom camera in viewport.
   /// @param[in] in_customCameras - pointer to custom camera (see ICustomCameras).
@@ -313,23 +297,17 @@ public:
   void drawStat3d();
   //@}
 
-  /// Draw statistics/debug texts in the viewport area.
-  virtual void drawText(int x, int y, const String &text);
-
   bool wireframeOverlayEnabled() const { return wireframeOverlay; }
 
   /// Render viewport gui
   virtual void paint(int w, int h);
 
-  // Called by the main window when the user drag and drops a file into the application.
-  // Return true if it has been handled.
-  virtual bool onDropFiles(const dag::Vector<String> &files);
+  void setDragAcceptFiles(bool accept = true);
 
-  void showGridSettingsDialog();
   void showStatSettingsDialog();
 
   /// ViewportWindowStatSettingsDialog uses this to forward its onChange notification.
-  virtual void handleStatSettingsDialogChange(int pcb_id, bool value);
+  virtual void handleStatSettingsDialogChange(int pcb_id);
 
   static unsigned restoreFlags;
   static Tab<ViewportParams> viewportsParams;
@@ -337,34 +315,15 @@ public:
   TMatrix getViewTm() const;
   TMatrix4 getProjTm() const;
 
-  struct Input
-  {
-    int mouseX = 0;
-    int mouseY = 0;
-    bool lmbPressed = false;
-    bool rmbPressed = false;
-  };
-
-  const Input &getInput() const { return input; }
-
-  void registerViewportAccelerators(IWndManager &wnd_manager);
-
-  // Returns with true if the command has been handled.
-  bool handleViewportAcceleratorCommand(unsigned id);
-
-  bool isViewportTextureReady() const;
-  void copyTextureToViewportTexture(BaseTexture &source_texture, int source_width, int source_height);
-
-  void updateImgui(const Point2 &size, float item_spacing, bool vr_mode = false);
-
 protected:
   // IWndEmbeddedWindow
   virtual void onWmEmbeddedResize(int width, int height);
   virtual bool onWmEmbeddedMakingMovable(int &w, int &h) { return true; }
 
-  virtual void fillStatSettingsDialog(ViewportWindowStatSettingsDialog &dialog);
+  // Return true if it has been handled.
+  virtual bool onDropFiles(const dag::Vector<String> &files);
 
-  virtual void onImguiDelayedCallback(void *user_data) override;
+  virtual void fillStatSettingsDialog(PropertyContainerControlBase &tab_panel);
 
   class ViewportClippingDlg;
 
@@ -382,16 +341,8 @@ protected:
   unsigned int currentProjection;
   bool updatePluginCamera;
   ICustomCameras *customCameras;
-  PropPanel::IMenu *popupMenu;
+  IMenu *popupMenu;
   bool wireframeOverlay;
-  bool showViewportAxis;
-  ViewportAxisId highlightedViewportAxisId;
-  ViewportAxisId mouseDownOnViewportAxis;
-  TMatrix cameraTransitionLastViewMatrix;
-  Quat cameraTransitionStartQuaternion;
-  Quat cameraTransitionEndQuaternion;
-  float cameraTransitionElapsedTime;
-  bool cameraTransitioning = false;
 
   bool hidePopupMenu;
 
@@ -420,8 +371,6 @@ protected:
   int restoreCursorAtX;
   int restoreCursorAtY;
 
-  Input input;
-
   void drawText(hdpi::Px x, hdpi::Px y, const String &text);
 
   void paintRect();
@@ -436,56 +385,21 @@ protected:
   void OnCameraChanged();
   void setCameraViewText();
 
+  /// processing WM_PAINT message
+  void handleWindowPaint();
+
   const char *viewportCommandToName(int id) const;
   int viewportNameToCommand(const char *name);
   void clientToZeroLevelPlane(int x, int y, Point3 &world);
 
-  virtual void fillPopupMenu(PropPanel::IMenu &menu);
-  void fillStat3dStatSettings(ViewportWindowStatSettingsDialog &dialog);
-  void handleStat3dStatSettingsDialogChange(int pcb_id, bool value);
-
-  bool canInteractWithViewportAxis();
-  void handleViewportAxisMouseLButtonDown();
-  void handleViewportAxisMouseLButtonUp();
-  void processViewportAxisCameraRotation(TEcLParam l_param);
-  void setViewportAxisTransitionEndDirection(const Point3 &forward, const Point3 &up);
+  virtual void fillPopupMenu(IMenu &menu);
+  void fillStat3dStatSettings(PropertyContainerControlBase &tab_panel);
+  void handleStat3dStatSettingsDialogChange(int pcb_id);
 
   void processCameraEvents(CCameraElem *camera_elem, unsigned msg, TEcWParam w_param, TEcLParam l_param);
 
   void processHotKeys(unsigned key_code);
-
-  void *getMainHwnd();
-
-  void resizeViewportTexture();
-
-  struct DelayedMouseEvent
-  {
-    int x;
-    int y;
-    bool inside;
-    int buttons;
-    int modifierKeys;
-  };
-
   bool mIsCursorVisible;
-  bool active = false;
-
-  TextureIDHolder viewportTexture;
-  IPoint2 viewportTextureSize = IPoint2(0, 0);
-  IPoint2 requestedViewportTextureSize = IPoint2(0, 0);
-
-  static const int keysDownArraySize = 154;
-  bool keysDown[keysDownArraySize];
-
-  static const int mouseButtonDownArraySize = 5;
-  bool mouseButtonDown[mouseButtonDownArraySize];
-
-  IPoint2 lastMousePosition = IPoint2(0, 0);
-
-  // Grid settings are shared among the viewports, so do not allow multiple dialogs.
-  static GridEditDialog *gridSettingsDialog;
-
-  dag::Vector<DelayedMouseEvent *> delayedMouseEvents;
 };
 
 
@@ -502,3 +416,5 @@ void load_camera_objects(const DataBlock &blk);
 /// @param[in] parent - pointer to parent window
 void show_camera_objects_config_dialog(void *parent);
 //@}
+
+#endif

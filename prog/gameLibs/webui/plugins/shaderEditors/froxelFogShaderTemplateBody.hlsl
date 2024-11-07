@@ -6,7 +6,7 @@ void node_based_volumetric_fog_cs(uint3 dtId : SV_DispatchThreadID)
   BRANCH
   if (is_voxel_id_occluded(dtId))
   {
-    volfog_ff_initial_media[dtId] = 0;
+    initial_media[dtId] = 0;
     return;
   }
   MRTOutput result;
@@ -28,5 +28,5 @@ void node_based_volumetric_fog_cs(uint3 dtId : SV_DispatchThreadID)
 #if DEBUG_DISTANT_FOG_MEDIA_EXTRA_MUL
   result.col0 *= volfog_media_fog_input_mul;
 #endif
-  volfog_ff_initial_media[dtId] = result.col0;
+  initial_media[dtId] = result.col0;
 }

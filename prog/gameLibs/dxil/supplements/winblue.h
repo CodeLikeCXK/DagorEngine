@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 typedef enum D3D_PRIMITIVE_TOPOLOGY

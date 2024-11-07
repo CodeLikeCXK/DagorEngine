@@ -1,14 +1,15 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
 #include <osApiWrappers/dag_threads.h>
 
-#include <supp/dag_define_KRNLIMP.h>
+#include <supp/dag_define_COREIMP.h>
 KRNLIMP extern void (*dgs_lag_handler)(const char *marker_name, float time_ms);
-#include <supp/dag_undef_KRNLIMP.h>
+#include <supp/dag_undef_COREIMP.h>
 
 #if DAGOR_DBGLEVEL < 1 && !DAGOR_FORCE_LOGS
 #define BEGIN_LAG(name) ((void)(0))
@@ -64,9 +65,7 @@ public:
   volatile int stopWaitMs;
   bool printStack;
 
-  LagTestThread() :
-    DaThread("LagTestThread", DEFAULT_STACK_SZ, 0, WORKER_THREADS_AFFINITY_MASK), startWaitMs(-1), stopWaitMs(-1), printStack(false)
-  {}
+  LagTestThread() : DaThread("LagTestThread"), startWaitMs(-1), stopWaitMs(-1), printStack(false) {}
 
   void begin(int wait_ms, bool print_stack = false);
   int end(bool print_time = true);

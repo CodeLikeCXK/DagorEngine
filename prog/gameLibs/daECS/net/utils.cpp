@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "utils.h"
 #include <string.h>
 #include <limits.h>

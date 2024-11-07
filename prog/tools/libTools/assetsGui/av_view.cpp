@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <assetsGui/av_view.h>
 #include <assets/asset.h>
 #include <assets/assetMgr.h>
@@ -9,11 +7,8 @@
 #include <libTools/util/strUtil.h>
 #include <debug/dag_debug.h>
 #include <osApiWrappers/dag_direct.h>
-#include <propPanel/control/listBoxInterface.h>
-#include <propPanel/control/menu.h>
 #include <sepGui/wndMenuInterface.h>
 
-using PropPanel::TLeafHandle;
 
 //==============================================================================
 // AssetBaseView
@@ -28,12 +23,14 @@ AssetBaseView::AssetBaseView(IAssetBaseViewClient *client, IMenuEventHandler *me
   canNotifySelChange(true),
   doShowEmptyGroups(true)
 {
-  mSelBuf[0] = 0;
-  mTreeList = new PropPanel::TreeListWindow(this, handle, l, t, hdpi::_pxActual(w), hdpi::_pxActual(h), "");
+  mTreeList = new TreeListWindow(this, handle, l, t, hdpi::_pxActual(w), hdpi::_pxActual(h), "");
 }
 
 
 AssetBaseView::~AssetBaseView() { del_it(mTreeList); }
+
+
+void AssetBaseView::resize(unsigned w, unsigned h) { mTreeList->resize(w, h); }
 
 
 //==============================================================================
@@ -44,11 +41,8 @@ void AssetBaseView::connectToAssetBase(DagorAssetMgr *mgr)
 
   // asset types filter
   Tab<String> vals(midmem);
-  if (mgr)
-  {
-    for (int i = 0; i < filter.size(); ++i)
-      vals.push_back() = mgr->getAssetTypeName(filter[i]);
-  }
+  for (int i = 0; i < filter.size(); ++i)
+    vals.push_back() = mgr->getAssetTypeName(filter[i]);
   mTreeList->setFilterAssetNames(vals);
   curFilter = filter;
 
@@ -56,7 +50,7 @@ void AssetBaseView::connectToAssetBase(DagorAssetMgr *mgr)
   {
     fill(filter);
 
-    PropPanel::TLeafHandle _sel = mTreeList->getSelectedItem();
+    TLeafHandle _sel = mTreeList->getSelectedItem();
 
     if (_sel && eh)
       eh->onAvSelectFolder(mTreeList->getItemName(_sel).str());
@@ -186,9 +180,9 @@ void AssetBaseView::fillObjects(TLeafHandle parent)
   {
     const DagorAsset &a = curMgr->getAsset(a_idx[i]);
     if (curMgr->isAssetNameUnique(a, curFilter))
-      mTreeList->addChildName(a.getName(), parent);
+      mTreeList->addChild(a.getName(), parent);
     else
-      mTreeList->addChildName(a.getNameTypified(), parent);
+      mTreeList->addChild(a.getNameTypified(), parent);
   }
 
   // libObjects->sort(&items_compare, true);
@@ -196,17 +190,17 @@ void AssetBaseView::fillObjects(TLeafHandle parent)
 }
 
 
-void AssetBaseView::onTvSelectionChange(PropPanel::TreeBaseWindow &tree, TLeafHandle new_sel)
+void AssetBaseView::onTvSelectionChange(TreeBaseWindow &tree, TLeafHandle new_sel)
 {
   mTreeList->setListSelIndex(0);
   onTvListSelection(tree, 0);
 }
 
-void AssetBaseView::onTvListSelection(PropPanel::TreeBaseWindow &tree, int index) { eh->onAvSelectAsset(getSelObjName()); }
+void AssetBaseView::onTvListSelection(TreeBaseWindow &tree, int index) { eh->onAvSelectAsset(getSelObjName()); }
 
-void AssetBaseView::onTvListDClick(PropPanel::TreeBaseWindow &tree, int index) { eh->onAvAssetDblClick(getSelObjName()); }
+void AssetBaseView::onTvListDClick(TreeBaseWindow &tree, int index) { eh->onAvAssetDblClick(getSelObjName()); }
 
-void AssetBaseView::onTvAssetTypeChange(PropPanel::TreeBaseWindow &tree, const Tab<String> &vals)
+void AssetBaseView::onTvAssetTypeChange(TreeBaseWindow &tree, const Tab<String> &vals)
 {
   String objName(getSelObjName());
 
@@ -318,24 +312,21 @@ void AssetBaseView::setTreeNodesExpand(dag::ConstSpan<bool> exps)
 }
 
 
-void AssetBaseView::addCommonMenuItems(PropPanel::IMenu &menu)
+void AssetBaseView::addCommonMenuItems(IMenu &menu)
 {
   menu.addSeparator(ROOT_MENU_ITEM);
   menu.addSubMenu(ROOT_MENU_ITEM, AssetsGuiIds::CopyMenuItem, "Copy");
-  menu.addItem(AssetsGuiIds::CopyMenuItem, AssetsGuiIds::CopyAssetFilePathMenuItem, "File path");
-  menu.addItem(AssetsGuiIds::CopyMenuItem, AssetsGuiIds::CopyAssetFolderPathMenuItem, "Folder path");
-  menu.addItem(AssetsGuiIds::CopyMenuItem, AssetsGuiIds::CopyAssetNameMenuItem, "Name");
+  menu.addItem(AssetsGuiIds::CopyMenuItem, AssetsGuiIds::CopyAssetFilePathMenuItem, "Asset file path to clipboard");
+  menu.addItem(AssetsGuiIds::CopyMenuItem, AssetsGuiIds::CopyAssetFolderPathMenuItem, "Asset folder path to clipboard");
+  menu.addItem(AssetsGuiIds::CopyMenuItem, AssetsGuiIds::CopyAssetNameMenuItem, "Asset name to clipboard");
   menu.addItem(ROOT_MENU_ITEM, AssetsGuiIds::RevealInExplorerMenuItem, "Reveal in Explorer");
 }
 
 
-bool AssetBaseView::onTvListContextMenu(PropPanel::TreeBaseWindow &tree, PropPanel::IListBoxInterface &list_box)
+bool AssetBaseView::onTvListContextMenu(TreeBaseWindow &tree, int index, IMenu &menu)
 {
-  PropPanel::IMenu &menu = list_box.createContextMenu();
   menu.setEventHandler(menuEventHandler);
   menu.addItem(ROOT_MENU_ITEM, AssetsGuiIds::AddToFavoritesMenuItem, "Add to favorites");
   addCommonMenuItems(menu);
   return true;
 }
-
-void AssetBaseView::updateImgui(float control_height) { mTreeList->updateImgui(control_height); }

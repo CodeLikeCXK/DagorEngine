@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <ioSys/dag_dataBlock.h>
 #include <coolConsole/coolConsole.h>
 
@@ -26,7 +24,7 @@ IvyGenPlugin::~IvyGenPlugin() { self = NULL; }
 //==============================================================================
 bool IvyGenPlugin::begin(int toolbar_id, unsigned menu_id)
 {
-  PropPanel::ContainerPropertyControl *toolbar = DAGORED2->getCustomPanel(toolbar_id);
+  PropertyContainerControlBase *toolbar = DAGORED2->getCustomPanel(toolbar_id);
   G_ASSERT(toolbar);
   objEd.initUi(toolbar_id);
 
@@ -104,12 +102,4 @@ void *IvyGenPlugin::queryInterfacePtr(unsigned huid)
 {
   RETURN_INTERFACE(huid, IGatherStaticGeometry);
   return NULL;
-}
-
-void IvyGenPlugin::handleViewportAcceleratorCommand(unsigned id) { objEd.onClick(id, nullptr); }
-
-void IvyGenPlugin::registerMenuAccelerators()
-{
-  IWndManager &wndManager = *DAGORED2->getWndManager();
-  objEd.registerViewportAccelerators(wndManager);
 }

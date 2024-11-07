@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <shaders/dag_dynSceneRes.h>
 #include <shaders/dag_dynSceneWithTreeRes.h>
 #include <ioSys/dag_genIo.h>

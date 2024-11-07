@@ -1,9 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
-#include <drv/3d/dag_vertexIndexBuffer.h>
-#include <drv/3d/dag_driver.h>
-#include <drv/3d/dag_buffers.h>
-#include <drv/3d/dag_info.h>
+#include <3d/dag_drv3d.h>
 #include <osApiWrappers/dag_atomic.h>
 #include <osApiWrappers/dag_spinlock.h>
 
@@ -263,5 +258,5 @@ void reset_buffers(bool)
 }
 } // namespace index_buffer
 
-#include <drv/3d/dag_resetDevice.h>
+#include <3d/dag_drv3dReset.h>
 REGISTER_D3D_AFTER_RESET_FUNC(index_buffer::reset_buffers);

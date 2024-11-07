@@ -752,10 +752,6 @@ week_day returns int
 
 
 Returns week day for given date.
-dayOfWeek for 1700/1/1 = 5, Friday
-partial sum of days betweem current date and 1700/1/1
-leap year correction
-sum monthly and day offsets
 
 .. _function-_at_faker_c__c_week_day_Ci_Ci_Ci:
 
@@ -775,10 +771,6 @@ week_day returns int
 
 
 Returns week day for given date.
-dayOfWeek for 1700/1/1 = 5, Friday
-partial sum of days betweem current date and 1700/1/1
-leap year correction
-sum monthly and day offsets
 
 .. _function-_at_faker_c__c_date_S_ls_faker_c__c_Faker_gr_:
 

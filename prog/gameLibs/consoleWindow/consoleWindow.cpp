@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <consoleWindow/dag_consoleWindow.h>
 
 #include <EASTL/string.h>
@@ -72,7 +70,7 @@ static void execute_console_command(const char *command, EchoMode echo, HistoryM
   console::command(command);
 }
 
-static void console_output_listener(const char *message, console::LineType)
+static void console_output_listener(const char *message)
 {
   if (!console_output_text.empty())
     console_output_text += '\n';
@@ -251,8 +249,7 @@ static void console_favourites(eastl::vector<eastl::string> &favourite_commands,
       else
         ImGui::TextUnformatted(cmd.c_str());
 
-      const float windowContentRegionWidth = ImGui::GetContentRegionAvail().x;
-      ImGui::SameLine(windowContentRegionWidth - 215); // Align buttons to the right
+      ImGui::SameLine(ImGui::GetWindowContentRegionWidth() - 215); // Align buttons to the right
       uniqueLabel.sprintf("Run##fav%d", i);
       if (ImGui::Button(uniqueLabel.c_str()))
         execute_console_command(cmd.c_str(), ECHO, ADD_TO_HISTORY);
@@ -304,8 +301,7 @@ static void console_history(eastl::vector<eastl::string> &favourite_commands, bo
     {
       const SimpleString &cmd = console::get_command_history()[i];
       ImGui::TextUnformatted(cmd.c_str());
-      const float windowContentRegionWidth = ImGui::GetContentRegionAvail().x;
-      ImGui::SameLine(windowContentRegionWidth - 65); // Align buttons to the right
+      ImGui::SameLine(ImGui::GetWindowContentRegionWidth() - 65); // Align buttons to the right
       uniqueLabel.sprintf("Run##hist%d", i);
       if (ImGui::Button(uniqueLabel.c_str()))
         execute_console_command(cmd.c_str(), ECHO, DONT_ADD_TO_HISTORY);
@@ -407,8 +403,7 @@ static void convar_favourites(eastl::vector<eastl::string> &favourite_convars, b
             swap_favourites(favourite_convars, i, i + 1, nullptr, favourites_changed);
 
           ImGui::SameLine();
-          const float contentRegionMaxX = ImGui::GetContentRegionAvail().x + ImGui::GetCursorScreenPos().x - ImGui::GetWindowPos().x;
-          ImGui::SetNextItemWidth(contentRegionMaxX * 0.6f - ImGui::GetCursorPosX());
+          ImGui::SetNextItemWidth(ImGui::GetContentRegionMax().x * 0.6f - ImGui::GetCursorPosX());
           uniqueLabel.sprintf("%s##fav", cv->getName());
           cv->imguiWidget(uniqueLabel.c_str());
 
@@ -461,8 +456,7 @@ static void convar_all(eastl::vector<eastl::string> &favourite_convars, bool &fa
           cv->revert();
 
         ImGui::SameLine();
-        const float contentRegionMaxX = ImGui::GetContentRegionAvail().x + ImGui::GetCursorScreenPos().x - ImGui::GetWindowPos().x;
-        ImGui::SetNextItemWidth(contentRegionMaxX * 0.6f - ImGui::GetCursorPosX());
+        ImGui::SetNextItemWidth(ImGui::GetContentRegionMax().x * 0.6f - ImGui::GetCursorPosX());
         uniqueLabel.sprintf("%s##all", cv->getName());
         cv->imguiWidget(uniqueLabel.c_str());
       }
@@ -575,8 +569,7 @@ static void shadervar_favourites(eastl::vector<eastl::string> &favourite_shvars,
         swap_favourites(favourite_shvars, i, i + 1, nullptr, favourites_changed);
 
       ImGui::SameLine();
-      const float contentRegionMaxX = ImGui::GetContentRegionAvail().x + ImGui::GetCursorScreenPos().x - ImGui::GetWindowPos().x;
-      ImGui::SetNextItemWidth(contentRegionMaxX * 0.6f - ImGui::GetCursorPosX());
+      ImGui::SetNextItemWidth(ImGui::GetContentRegionMax().x * 0.6f - ImGui::GetCursorPosX());
       uniqueLabel.sprintf("%s##fav", favourite_shvars[i].c_str());
       shadervar_widget(favourite_shvars[i].c_str(), uniqueLabel.c_str());
     }
@@ -604,13 +597,12 @@ static void shadervar_all(eastl::vector<eastl::string> &favourite_shvars, bool &
 
     ImGui::BeginChild("AllShaderVarPanel");
 
-    for (int i = 0, ie = VariableMap::getGlobalVariablesCount(); i < ie; i++)
+    for (int id = 0, ie = VariableMap::getGlobalVariablesCount(); id < ie; id++)
     {
-      const char *varName = VariableMap::getGlobalVariableName(i);
+      const char *varName = VariableMap::getGlobalVariableName(id);
       if (!varName || !strstr(varName, shaderVarSearchText.c_str()))
         continue;
 
-      int id = VariableMap::getVariableId(varName);
       uniqueLabel.sprintf("Pin##%d", id);
       if (ImGui::Button(uniqueLabel.c_str()))
       {
@@ -622,8 +614,7 @@ static void shadervar_all(eastl::vector<eastl::string> &favourite_shvars, bool &
       }
 
       ImGui::SameLine();
-      const float contentRegionMaxX = ImGui::GetContentRegionAvail().x + ImGui::GetCursorScreenPos().x - ImGui::GetWindowPos().x;
-      ImGui::SetNextItemWidth(contentRegionMaxX * 0.6f - ImGui::GetCursorPosX());
+      ImGui::SetNextItemWidth(ImGui::GetContentRegionMax().x * 0.6f - ImGui::GetCursorPosX());
       uniqueLabel.sprintf("%s##all", varName);
       shadervar_widget(varName, uniqueLabel.c_str());
     }

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "guiScene.h"
 #include <daRg/dag_element.h>
 #include <daRg/dag_stringKeys.h>

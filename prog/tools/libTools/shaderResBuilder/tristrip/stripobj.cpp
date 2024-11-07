@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <assert.h>
 #include <set>
 #include "stripobj.h"

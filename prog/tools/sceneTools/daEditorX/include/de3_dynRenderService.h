@@ -1,10 +1,11 @@
 //
 // DaEditorX
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
-#include <drv/3d/dag_resId.h>
+#include <3d/dag_resId.h>
 #include <3d/dag_resPtr.h>
 #include <generic/dag_tabFwd.h>
 
@@ -30,7 +31,6 @@ public:
   {
     ROPT_SHADOWS,
     ROPT_SHADOWS_VSM,
-    ROPT_SHADOWS_FOM,
     ROPT_WATER_REFL,
     ROPT_ENVI_ORDER,
     ROPT_SSAO,
@@ -101,6 +101,4 @@ public:
   virtual BaseTexture *getDepthBuffer() = 0;
   virtual D3DRESID getDepthBufferId() = 0;
   virtual const ManagedTex &getDownsampledFarDepth() = 0;
-
-  virtual void toggleVrMode(){};
 };

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "vulkan_loader.h"
 #include "os.h"
 #include <osApiWrappers/dag_dynLib.h>

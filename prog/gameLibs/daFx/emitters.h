@@ -1,6 +1,4 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
-
 #include "common.h"
 #include <EASTL/queue.h>
 
@@ -65,7 +63,8 @@ inline void reset_emitter_state(EmitterState &state)
   state.garbageTick = 0;
   state.generation = 0;
   state.lastEmittedPosValid = false;
-  state.timeStamps.get_container().clear();
+  while (!state.timeStamps.empty())
+    state.timeStamps.pop();
 }
 
 void create_emitter_state(EmitterState &state, const EmitterData &data, unsigned int elem_limit, float emission_factor);

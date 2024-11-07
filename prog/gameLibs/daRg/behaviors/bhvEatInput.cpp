@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "bhvEatInput.h"
 
 #include <daRg/dag_element.h>
@@ -20,7 +18,7 @@ int BhvEatInput::touchEvent(ElementTree *, Element *elem, InputEvent event, Huma
 
   if (elem->hitTest(touch.x, touch.y))
   {
-    return R_PROCESSED | R_STOPPED;
+    return R_PROCESSED;
   }
   return 0;
 }
@@ -34,7 +32,7 @@ int BhvEatInput::mouseEvent(ElementTree *, Element *elem, InputDevice, InputEven
 
   if (elem->hitTest(mx, my))
   {
-    return R_PROCESSED | R_STOPPED;
+    return R_PROCESSED;
   }
   return 0;
 }

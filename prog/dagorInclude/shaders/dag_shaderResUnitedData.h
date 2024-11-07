@@ -1,10 +1,11 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
 #include <generic/dag_staticTab.h>
 #include <generic/dag_ptrTab.h>
 #include <generic/dag_tab.h>
@@ -34,8 +35,6 @@ struct BufConfig
   unsigned ibMinAdd, vbMinAdd;
   unsigned ibMaxAdd, vbMaxAdd;
   unsigned ibAddPromille, vbAddPromille;
-  bool exactSize = false;
-  bool dumpResListOnAddResFail = true;
 };
 
 struct BufChunk
@@ -81,10 +80,9 @@ struct BufPool
   Tab<BufChunk> freeChunks[MAX_CHUNK_CNT];
   int maxVbSize = 64 << 20;
   bool allowRebuild = true, allowDelRes = false;
-  char nameChar;
   std::mutex updateMutex;
 
-  BufPool(char nc) : nameChar(nc) { sbuf.push_back(nullptr); } // pre-alloc for IB
+  BufPool() { sbuf.push_back(nullptr); } // pre-alloc for IB
   BufChunk allocChunkForStride(int stride, int req_avail_sz, const BufConfig &hints);
   bool arrangeVdata(dag::ConstSpan<Ptr<ShaderMatVdata>> smvd_list, BufChunkTab &out_c, Sbuffer *ib, bool can_fail,
     const BufConfig &hints, int *vbShortage = nullptr, int *ibShortage = nullptr);
@@ -102,8 +100,8 @@ struct BufPool
   }
   static const char *calcUsedSizeStr(dag::ConstSpan<BufChunk> ctab, String &stor);
 
-  bool allocateBuffer(int idx, size_t size, const char *name_fmt = "%cunited_%cb#%x");
-  bool allocatePool(int idx, size_t hint_sz, const BufConfig &hints);
+  bool allocateBuffer(int idx, size_t size, const char *name);
+  bool allocatePool(int idx, size_t hint_sz);
   bool createSbuffers(const BufConfig &hints, bool tight = false);
   void clear();
 
@@ -119,7 +117,7 @@ class ShaderResUnitedVdata
 public:
   using ResType = RES;
 
-  ShaderResUnitedVdata();
+  ShaderResUnitedVdata(const char *job_mgr_name) : jobMgrName(job_mgr_name) {}
 
   void setMaxVbSize(int max_sz);
   void setDelResAllowed(bool allow);
@@ -155,12 +153,7 @@ public:
 
   int getResCount() const { return resList.size(); }
 
-  void buildStatusStrNoLock(String &out_str, bool full_res_list, bool (*resolve_res_name)(String &nm, const RES *r) = nullptr);
-  void buildStatusStr(String &out_str, bool full_res_list, bool (*resolve_res_name)(String &nm, const RES *r) = nullptr)
-  {
-    std::lock_guard<std::mutex> scopedLock(appendMutex);
-    buildStatusStrNoLock(out_str, full_res_list, resolve_res_name);
-  }
+  void buildStatusStr(String &out_str, bool full_res_list, bool (*resolve_res_name)(String &nm, RES *r) = nullptr);
   void dumpMemBlocks(String *out_str_summary = nullptr);
   int getPendingReloadResCount() const { return interlocked_acquire_load(pendingVdataReloadResCount); }
   int getFailedReloadResCount() const { return failedVdataReloadResList.size(); }
@@ -169,16 +162,12 @@ public:
   // This even is triggered whenever a resource was changed due to
   // vertex buffer defrag and things like RElem::bv and RElem::si are no
   // longer the same as before.
-  inline static MulticastEvent<void(const RES *, bool)> on_mesh_relems_updated;
-
-  typedef void (*enumRElemFct)(const RES *);
-  void enumRElems(enumRElemFct enum_cb);
-
-  inline int getRequestLodsByDistanceFrames() const { return requestLodsByDistanceFrames; }
+  inline static MulticastEvent<void(const RES *)> on_mesh_relems_updated;
 
 protected:
   unitedvdata::BufPool buf;
   PtrTab<RES> resList;
+  const char *jobMgrName;
   std::mutex appendMutex;
   bool allowSepTightVdata = false;
   volatile int pendingRebuildCount = 0;
@@ -191,9 +180,6 @@ protected:
   volatile int pendingVdataReloadResCount = 0;
   unitedvdata::BufConfig hints;
   mutable std::mutex hintsMutex;
-  int noDiscardFrames = 120;
-  int keepIfNeedLodFrames = 600;
-  int requestLodsByDistanceFrames = 60;
 
   unitedvdata::BufConfig getHints() const;
 

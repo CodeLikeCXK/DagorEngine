@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <gameRes/dag_gameResSystem.h>
 #include <gameRes/dag_stdGameRes.h>
 #include <gameRes/dag_dumpResRefCountImpl.h>
@@ -8,7 +6,7 @@
 #include <shaders/dag_shaderResUnitedData.h>
 #include <3d/fileTexFactory.h>
 #include <3d/dag_texMgrTags.h>
-#include <drv/3d/dag_resetDevice.h>
+#include <3d/dag_drv3dReset.h>
 #include <ioSys/dag_dataBlock.h>
 #include <util/dag_delayedAction.h>
 #include <debug/dag_log.h>
@@ -18,9 +16,8 @@
 #include <perfMon/dag_perfTimer.h>
 
 
-ShaderResUnitedVdata<DynamicRenderableSceneLodsResource> unitedvdata::dmUnitedVdata;
+ShaderResUnitedVdata<DynamicRenderableSceneLodsResource> unitedvdata::dmUnitedVdata("DynModelReloadVdata");
 int unitedvdata::dmUnitedVdataUsed = 0;
-static constexpr unsigned VDATA_MT_DYNMODEL = 1;
 
 using unitedvdata::dmUnitedVdata;
 using unitedvdata::dmUnitedVdataUsed;
@@ -40,7 +37,6 @@ public:
   Tab<GameRes> gameRes;
   PtrTab<DynamicRenderableSceneLodsResource> obsoleteRes;
 
-  bool makeBuffersBindable = false;
 
   int findGameRes(int res_id);
   int findGameRes(DynamicRenderableSceneLodsResource *res);
@@ -252,8 +248,6 @@ void DynModelGameResFactory::loadGameResourceData(int res_id, IGenLoad &cb)
     dagor_set_sm_tex_load_ctx_name(name);
   textag_mark_begin(TEXTAG_DYNMODEL);
   int flags = (dmUnitedVdataUsed ? SRLOAD_SRC_ONLY : 0) | SRLOAD_NO_TEX_REF;
-  if (makeBuffersBindable)
-    flags |= SRLOAD_BIND_SHADER_RES;
   Ptr<DynamicRenderableSceneLodsResource> srcRes =
     DynamicRenderableSceneLodsResource::loadResource(cb, flags, -1, gameres_dynmodel_desc.getBlockByName(name));
   if (srcRes && dmUnitedVdataUsed)
@@ -302,9 +296,7 @@ struct MeshStreamingStat
 
   void reset()
   {
-    const unsigned frame_no = dagor_frame_no();
-    interlocked_release_store(start_frame_no, frame_no);
-    interlocked_release_store(end_frame_no, frame_no);
+    start_frame_no = end_frame_no = dagor_frame_no();
     brr_usec.reset();
     brr_rcnt.reset();
     ohlr_usec.reset();
@@ -319,14 +311,10 @@ struct MeshStreamingStat
   }
 };
 static MeshStreamingStat mss;
-
-static ShaderMatVdata::ModelLoadStats last_reported_mls;
-static int64_t last_reported_mls_reft = 0;
 } // namespace
 
 static void batch_reload_res(void *)
 {
-  TIME_PROFILE(batch_reload_res_dynm);
   int rcnt = 0;
 #if DAGOR_DBGLEVEL > 0
   int64_t reft = profile_ref_ticks();
@@ -341,36 +329,10 @@ static void batch_reload_res(void *)
     pendingReloadResList.clear();
   }
 
-  const auto &mt_stats = ShaderMatVdata::get_model_load_stats(VDATA_MT_DYNMODEL);
-  if (interlocked_acquire_load(mt_stats.reloadDataCount) == last_reported_mls.reloadDataCount)
-    last_reported_mls_reft = profile_ref_ticks();
-  else if (profile_time_usec(last_reported_mls_reft) > 2 * 1000000)
-  {
-    ShaderMatVdata::ModelLoadStats diff_mls;
-#define COPY_STAT(X)                               \
-  {                                                \
-    auto x = interlocked_acquire_load(mt_stats.X); \
-    diff_mls.X = x - last_reported_mls.X;          \
-    last_reported_mls.X = x;                       \
-  }
-    COPY_STAT(reloadTimeMsec);
-    COPY_STAT(reloadDataSizeKb);
-    COPY_STAT(reloadDataCount);
-#undef COPY_STAT
-    String status_str;
-    dmUnitedVdata.buildStatusStr(status_str, false);
-    debug("unitedVdata<%s>: reloaded %u models (%uK for %u msec) during last %u msec [total reloaded %uK of %u models]\n\n%s\n",
-      DynamicRenderableSceneLodsResource::getStaticClassName(), diff_mls.reloadDataCount, diff_mls.reloadDataSizeKb,
-      diff_mls.reloadTimeMsec, profile_time_usec(last_reported_mls_reft) / 1000, last_reported_mls.reloadDataSizeKb,
-      last_reported_mls.reloadDataCount, status_str);
-    last_reported_mls_reft = profile_ref_ticks();
-  }
 #if DAGOR_DBGLEVEL > 0
-  const unsigned end_frame_no = interlocked_acquire_load(mss.end_frame_no);
-  const unsigned start_frame_no = interlocked_acquire_load(mss.start_frame_no);
-  if (dagor_frame_no() > end_frame_no + 16 || end_frame_no > start_frame_no + 600)
+  if (dagor_frame_no() > mss.end_frame_no + 16 || mss.end_frame_no > mss.start_frame_no + 600)
     mss.reset();
-  interlocked_release_store(mss.end_frame_no, dagor_frame_no());
+  mss.end_frame_no = dagor_frame_no();
   mss.brr_usec.add(profile_time_usec(reft));
   mss.brr_rcnt.add(rcnt);
   mss.pendint_cnt.add(dmUnitedVdata.getPendingReloadResCount());
@@ -379,7 +341,7 @@ static void batch_reload_res(void *)
 }
 static void on_higher_lod_required(DynamicRenderableSceneLodsResource *res, unsigned req_lod, unsigned /*cur_lod*/)
 {
-  interlocked_release_store(mss.end_frame_no, dagor_frame_no());
+  interlocked_exchange(mss.end_frame_no, dagor_frame_no());
   mss.ohlr_call.add(1);
   int64_t reft = profile_ref_ticks();
   if (req_lod >= res->getQlBestLod())
@@ -414,7 +376,6 @@ void register_dynmodel_gameres_factory(bool use_united_vdata, bool allow_united_
   }
 
   dynmodel_factory.demandInit();
-  dynmodel_factory->makeBuffersBindable = ::dgs_get_settings()->getBlockByNameEx("graphics")->getBool("enableBVH", false);
   ::add_factory(dynmodel_factory);
 }
 
@@ -433,7 +394,7 @@ REGISTER_D3D_BEFORE_RESET_FUNC(before_reset_dynmodel_buffers);
 REGISTER_D3D_AFTER_RESET_FUNC(reset_dynmodel_buffers);
 
 using namespace console;
-static bool resolve_res_name(String &nm, const DynamicRenderableSceneLodsResource *r)
+static bool resolve_res_name(String &nm, DynamicRenderableSceneLodsResource *r)
 {
   if (!dynmodel_factory.get())
     return false;
@@ -508,5 +469,3 @@ static bool dmUnitedVdata_console_handler(const char *argv[], int argc)
 }
 
 REGISTER_CONSOLE_HANDLER(dmUnitedVdata_console_handler);
-
-bool resolve_game_resource_name(String &name, const DynamicRenderableSceneLodsResource *r) { return resolve_res_name(name, r); }

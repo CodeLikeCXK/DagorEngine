@@ -160,7 +160,7 @@ def test_strings
     debug_dump()
     before_gc()
     unsafe
-        heap_collect(true)
+        string_heap_collect()
     after_gc()
     debug_dump()
     var j = 0

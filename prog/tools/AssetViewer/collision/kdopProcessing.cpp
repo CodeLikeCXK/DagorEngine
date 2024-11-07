@@ -1,12 +1,10 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "kdopProcessing.h"
 #include "propPanelPids.h"
 #include "collisionUtils.h"
 #include <debug/dag_debug3d.h>
 #include <gui/dag_stdGuiRenderEx.h>
 
-void KdopProcessing::init(CollisionResource *collision_res, PropPanel::ContainerPropertyControl *prop_panel)
+void KdopProcessing::init(CollisionResource *collision_res, PropertyContainerControlBase *prop_panel)
 {
   collisionRes = collision_res;
   panel = prop_panel;
@@ -188,7 +186,7 @@ static void fill_preset_names(Tab<String> &preset_names)
 
 void KdopProcessing::fillKdopPanel()
 {
-  PropPanel::ContainerPropertyControl &kdopGroup = *panel->createGroup(PID_KDOP_GROUP, "k-dop options");
+  PropertyContainerControlBase &kdopGroup = *panel->createGroup(PID_KDOP_GROUP, "k-dop options");
   kdopGroup.createCheckBox(PID_SHOW_KDOP, "Show k-dop", showKdop);
   kdopGroup.createCheckBox(PID_SHOW_KDOP_FACES, "Show k-dop faces", showKdopFaces);
   kdopGroup.createCheckBox(PID_SHOW_KDOP_DIRS, "Show k-dop directions", showKdopDirs);

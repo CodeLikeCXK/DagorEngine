@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "fs_utils.h"
 
 #ifdef _WIN32

@@ -1,12 +1,13 @@
 //
 // Dagor Engine 6.5
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
 #include <ioSys/dag_genIo.h>
 
-#include <supp/dag_define_KRNLIMP.h>
+#include <supp/dag_define_COREIMP.h>
 
 class OodleLoadCB : public IGenLoad
 {
@@ -92,4 +93,4 @@ KRNLIMP int oodle_decompress_data(IGenSave &dest, IGenLoad &src, int compr_sz, i
 KRNLIMP size_t oodle_compress(void *dst, size_t maxDstSize, const void *src, size_t srcSize, int compressionLevel = 19);
 KRNLIMP size_t oodle_decompress(void *dst, size_t maxOriginalSize, const void *src, size_t compressedSize);
 
-#include <supp/dag_undef_KRNLIMP.h>
+#include <supp/dag_undef_COREIMP.h>

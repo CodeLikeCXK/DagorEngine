@@ -1,8 +1,5 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <daECS/scene/scene.h>
 #include <daECS/io/blk.h>
-#include <daECS/core/entityManager.h>
 #include <memory/dag_framemem.h>
 #include <ioSys/dag_dataBlock.h>
 
@@ -28,7 +25,7 @@ void SceneManager::loadScene(const DataBlock &blk, const char *path)
     import_depth += (begin ? 1 : -1);
     G_ASSERTF(import_depth >= 0, "unbalanced begin/end?");
   };
-  create_entities_blk(*g_entity_mgr, blk, path, onSceneEntityCreated, onSceneImportBeginEnd);
+  create_entities_blk(blk, path, onSceneEntityCreated, onSceneImportBeginEnd);
 }
 
 } // namespace ecs

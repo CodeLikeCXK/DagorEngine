@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -71,28 +72,9 @@ protected:
   real absMax = MAX_REAL;
 };
 
-union LodGridPatchParams
-{
-  struct
-  {
-    float size;
-    uint32_t tess;
-    float originX, originY;
-  };
-  Point4 params;
-
-  LodGridPatchParams(float _size, uint32_t _tess, float origin_x, float origin_y)
-  {
-    size = _size;
-    tess = _tess;
-    originX = origin_x;
-    originY = origin_y;
-  }
-};
-
 struct LodGridCullData
 {
-  Tab<LodGridPatchParams> patches;
+  Tab<Point4> patches;
   int startFlipped = 1000000;      // starting from startFlipped, patches triangulation is flipped
   Point2 originPos = Point2::ZERO; // just in case
   float scaleX = 1;
@@ -112,6 +94,6 @@ class HMapTesselationData;
 
 void cull_lod_grid(const LodGrid &lodGrid, int max_lod, float originPosX, float originPosY, float scaleX, float scaleY, float alignX,
   float alignY, float hMin, float hMax, const Frustum *frustum, const BBox2 *clip, LodGridCullData &cull_data,
-  const Occlusion *occlusion, float &out_lod0_area_radius, int hmap_tess_factorVarId = -1, int dim = default_patch_dim,
-  bool fight_t_junctions = true, const HeightmapHeightCulling *handler = NULL, const HMapTesselationData *hmap_tdata = NULL,
-  BBox2 *lodsRegion = nullptr, float waterLevel = HeightmapHeightCulling::NO_WATER_ON_LEVEL, const Point3 *viewPos = nullptr);
+  const Occlusion *occlusion, float &out_lod0_area_radius, int dim = default_patch_dim, bool fight_t_junctions = true,
+  const HeightmapHeightCulling *handler = NULL, const HMapTesselationData *hmap_tdata = NULL, BBox2 *lodsRegion = nullptr,
+  float waterLevel = HeightmapHeightCulling::NO_WATER_ON_LEVEL, const Point3 *viewPos = nullptr);

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <de3_interface.h>
 #include <de3_landMeshData.h>
 #include <de3_hmapService.h>
@@ -24,18 +22,9 @@
 #include <heightmap/lodGrid.h>
 #include <render/grassTranslucency.h>
 #include <scene/dag_physMat.h>
-#include <scene/dag_physMatId.h>
 
-#include <drv/3d/dag_renderStates.h>
-#include <drv/3d/dag_viewScissor.h>
-#include <drv/3d/dag_renderTarget.h>
-#include <drv/3d/dag_vertexIndexBuffer.h>
-#include <drv/3d/dag_matricesAndPerspective.h>
-#include <drv/3d/dag_shader.h>
-#include <drv/3d/dag_platform_pc.h>
+#include <3d/dag_drv3d_pc.h>
 #include <3d/dag_render.h>
-#include <drv/3d/dag_lock.h>
-#include <drv/3d/dag_info.h>
 #include <render/dag_cur_view.h>
 #include <util/dag_bitArray.h>
 #include <libTools/util/progressInd.h>
@@ -52,7 +41,8 @@
 #include <debug/dag_debug.h>
 #include <assets/asset.h>
 #include <math/dag_mesh.h>
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
+#include <3d/dag_drv3dCmd.h>
 #include <3d/dag_texPackMgr2.h>
 #include <coolConsole/coolConsole.h>
 #include <perfMon/dag_cpuFreq.h>
@@ -68,16 +58,13 @@
 #include <sceneBuilder/nsb_LightmappedScene.h>
 #include <sceneBuilder/nsb_LightingProvider.h>
 #include <sceneBuilder/nsb_StdTonemapper.h>
-#include <EditorCore/ec_IEditorCore.h>
+#include <dllPluginCore/core.h>
 #include <ctype.h>
 #include <debug/dag_debug3d.h>
 #include <render/toroidalHeightmap.h>
-#include <render/toroidalPuddlemap.h>
 #include <3d/dag_resPtr.h>
 #include <de3_editorEvents.h>
 #include <de3_splineGenSrv.h>
-#include <physMap/physMatSwRendererRT.h>
-#include <landMesh/biomeQuery.h>
 
 /*#include "detailRenderData.h"
 Tab<DetailRenderData::TexturePingPong> DetailRenderData::colorMapTexArr;
@@ -105,7 +92,6 @@ static const char *vs_hlsl11 =
   "return output;\n"
   "}\n";*/
 
-using editorcore_extapi::dagTools;
 
 extern const char *filter_class_name;
 static void optimizeMesh(Mesh &m);
@@ -115,8 +101,6 @@ extern TEXTUREID load_land_micro_details(const DataBlock &blk);
 
 
 static int hmap_stor_mismatch_cnt = 0;
-
-static RenderDecalMaterialsWithRT<256, 256> decalRenderer;
 
 enum
 {
@@ -299,7 +283,7 @@ class GenericHeightMapService : public IHmapService
         delete[] data;
         modifications++;
       }
-      DAGOR_CATCH(const IGenSave::SaveException &)
+      DAGOR_CATCH(IGenSave::SaveException)
       {
         DAEDITOR3.conError("error while saving %s", workFn);
         ::df_close(fileHandle);
@@ -350,7 +334,7 @@ class GenericHeightMapService : public IHmapService
         crd.readInt(mapSizeY);
         crd.readInt(elemSize);
       }
-      DAGOR_CATCH(const IGenLoad::LoadException &)
+      DAGOR_CATCH(IGenLoad::LoadException)
       {
         DAEDITOR3.conError("error while loading %s", workFn);
         ::df_close(fileHandle);
@@ -442,7 +426,7 @@ class GenericHeightMapService : public IHmapService
           modifications++;
         }
       }
-      DAGOR_CATCH(const IGenSave::SaveException &)
+      DAGOR_CATCH(IGenSave::SaveException)
       {
         DAEDITOR3.conError("error while flushing %s", mainFn);
         ret = false;
@@ -470,7 +454,7 @@ class GenericHeightMapService : public IHmapService
         e->allocate(elemSize, dag::get_allocator(elems));
         crd.read(e->data, esize);
       }
-      DAGOR_CATCH(const IGenLoad::LoadException &)
+      DAGOR_CATCH(IGenLoad::LoadException)
       {
         DAEDITOR3.conError("error while loading element of %s", mainFn);
         e = NULL;
@@ -651,7 +635,7 @@ class GenericHeightMapService : public IHmapService
         crd.readInt(mapSizeY);
         crd.readInt(elemSize);
       }
-      DAGOR_CATCH(const IGenLoad::LoadException &)
+      DAGOR_CATCH(IGenLoad::LoadException)
       {
         DAEDITOR3.conError("%s: exception <%s> during decompression (old file)", mainFn);
         ::df_close(fileHandle);
@@ -901,24 +885,24 @@ class GenericHeightMapService : public IHmapService
 
           if (!name)
           {
-            DEBUG_CTX("unnamed layer, skipped");
+            debug_ctx("unnamed layer, skipped");
             continue;
           }
 
           int id = layerNames.getNameId(name);
           if (id != -1)
           {
-            DEBUG_CTX("duplicate layer: %s, skipped", name);
+            debug_ctx("duplicate layer: %s, skipped", name);
             continue;
           }
           if (bits <= 0 || bits > 32)
           {
-            DEBUG_CTX("invalid layer bit width: %s - %d bits, skipped", name, bits);
+            debug_ctx("invalid layer bit width: %s - %d bits, skipped", name, bits);
             continue;
           }
           if (total_bits + bits > 32)
           {
-            DEBUG_CTX("too big layer: %s - %d bits, previous layers already use %d bits, skipped", name, bits, total_bits);
+            debug_ctx("too big layer: %s - %d bits, previous layers already use %d bits, skipped", name, bits, total_bits);
             continue;
           }
 
@@ -938,7 +922,7 @@ class GenericHeightMapService : public IHmapService
               int attr_id = attrNames.addNameId(attr_name);
               if (attr_id >= 32)
               {
-                DEBUG_CTX("too many (max=32) different attributes; %s skipped", attr_name);
+                debug_ctx("too many (max=32) different attributes; %s skipped", attr_name);
                 continue;
               }
               attr |= 1U << attr_id;
@@ -971,7 +955,6 @@ class GenericHeightMapService : public IHmapService
 
   int lastClipTexSz;
   UniqueTexHolder last_clip;
-  d3d::SamplerInfo last_clip_sampler;
   bool rebuilLastClip;
   bool preparingClipmap;
 
@@ -991,13 +974,6 @@ class GenericHeightMapService : public IHmapService
 
   GrassTranslucency *grassTranslucency;
   float grassTranslucencyHalfSize;
-
-  float puddlesPowerScale = 1.0f;
-  float puddlesNoiseInfluence = 1.0f;
-  float puddlesSeed = 0.0f;
-
-  int biomeQuery = -1;
-  int biomeQueryResult = -1;
 
 public:
   GenericHeightMapService()
@@ -1042,7 +1018,7 @@ public:
     if (hm2_mat)
     {
       hm2.lodGrid.init(8, 1, 0, 1);
-      hm2.rend.init("heightmap", "", "hmap_tess_factor", true);
+      hm2.rend.init("heightmap", "", true);
     }
 
     /*static VSDTYPE dcl[] = { VSD_STREAM(0), VSD_REG(VSDR_POS, VSDT_FLOAT2), VSD_END };
@@ -1086,6 +1062,7 @@ public:
   ~GenericHeightMapService()
   {
     del_it(clipmap);
+    del_it(toroidalHeightmap);
     closeFixedClip();
     del_it(grassTranslucency);
   }
@@ -1128,20 +1105,14 @@ public:
     int buf_cnt = clipBlk->getInt("bufferCnt", 0);
 
     bool useToroidalHeightmap = clipBlk->getBool("useToroidalHeightmap", false);
-    bool useToroidalPuddles = clipBlk->getBool("useToroidalPuddles", false);
 
-    clipmap = new Clipmap(clipBlk->getBool("useUAVFeedback", false));
-    clipmap->init(texel_sz, Clipmap::CPU_HW_FEEDBACK, Clipmap::getDefaultFeedbackProperties(), clipBlk->getInt("texMips", 6));
+    clipmap = new Clipmap(NULL, clipBlk->getBool("useUAVFeedback", false));
+    clipmap->init(texel_sz, Clipmap::CPU_HW_FEEDBACK, clipBlk->getInt("texMips", 6));
     clipmap->initVirtualTexture(clipBlk->getInt("cacheWidth", 4096), clipBlk->getInt("cacheHeight", 8192), float(2 * 1920 * 1080));
     if (useToroidalHeightmap)
     {
-      toroidalHeightmap.reset(new ToroidalHeightmap());
-      toroidalHeightmap->init(2048, 64.0f, 256.0f, TEXFMT_R8, 128);
-    }
-    if (useToroidalPuddles)
-    {
-      toroidalPuddles.reset(new ToroidalPuddles());
-      toroidalPuddles->init(1024, 64.0f, 256.0f, 128);
+      toroidalHeightmap = new ToroidalHeightmap;
+      toroidalHeightmap->init(2048, 32.0f, 96.0f, TEXFMT_L8, 128);
     }
     heightmapPatchesRenderer.reset(new HeightmapPatchesRenderer(1024));
 
@@ -1491,30 +1462,6 @@ public:
 
   virtual const char *getLandPhysMatName(int pmatId) { return pmatId >= 0 ? PhysMat::getMaterial(pmatId).name.str() : NULL; }
 
-  virtual int getPhysMatId(const char *name) { return PhysMat::getMaterialId(name); }
-
-  virtual void beforeRender() { biome_query::update(); }
-
-  virtual int getBiomeIndices(const Point3 &p)
-  {
-    d3d::GpuAutoLock lock;
-    if (biomeQuery == -1)
-    {
-      biomeQuery = biome_query::query(p, 10.);
-      return biomeQueryResult;
-    }
-    BiomeQueryResult queryResult;
-    if (biome_query::get_query_result(biomeQuery, queryResult) == GpuReadbackResultState::SUCCEEDED)
-    {
-      if (queryResult.mostFrequentBiomeGroupWeight > queryResult.secondMostFrequentBiomeGroupWeight)
-        biomeQueryResult = queryResult.mostFrequentBiomeGroupIndex | (queryResult.secondMostFrequentBiomeGroupIndex << 8);
-      else
-        biomeQueryResult = (queryResult.mostFrequentBiomeGroupIndex << 8) | queryResult.secondMostFrequentBiomeGroupIndex;
-      biomeQuery = -1;
-    }
-    return biomeQueryResult;
-  }
-
   virtual bool getIsSolidByPhysMatName(const char *name)
   {
     int pmatId = PhysMat::getMaterialId(name);
@@ -1597,7 +1544,6 @@ public:
 
     TextureInfo ti;
     Color4 tisz(1.0f / 4096, 1.0f / 4096, 1.0f / 4096, 1.0f / 4096);
-    Color4 noHmapMapping(Color4(10e+3, 10e+3, 10e+10, 10e+10)); // 1mm^2 at (-10000Km, -10000Km)
     if (htTexMain)
     {
       if (!htTexMain->getinfo(ti))
@@ -1610,11 +1556,6 @@ public:
       hm2.bboxMain[0].y = my0;
       hm2.bboxMain[1].x = mx0 + mw;
       hm2.bboxMain[1].y = my0 + mh;
-    }
-    else
-    {
-      ShaderGlobal::set_texture_fast(tex_main_gvid, BAD_TEXTUREID);
-      ShaderGlobal::set_color4_fast(w2hm_main_gvid, noHmapMapping);
     }
 
     if (htTexDet)
@@ -1638,11 +1579,13 @@ public:
       hm2.bboxDet[1].y = dy0 + dh;
     }
     else
-    {
-      ShaderGlobal::set_texture_fast(tex_det_gvid, BAD_TEXTUREID);
-      ShaderGlobal::set_color4_fast(w2hm_det_gvid, noHmapMapping);
-    }
+      ShaderGlobal::set_color4_fast(w2hm_det_gvid, Color4(0, 0, -1, -1));
 
+    if (!htTexMain && !htTexDet)
+    {
+      ShaderGlobal::set_texture_fast(tex_main_gvid, BAD_TEXTUREID);
+      ShaderGlobal::set_texture_fast(tex_det_gvid, BAD_TEXTUREID);
+    }
     ShaderGlobal::set_color4_fast(tex_hmap_inv_sizes_gvid, tisz);
   }
 
@@ -1680,7 +1623,14 @@ public:
       oldMode = set_lmesh_rendering_mode(RENDERING_HEIGHTMAP);
 
     d3d::settm(TM_WORLD, TMatrix::IDENT);
+    static int heightmap_vs_texture_noVarId = get_shader_variable_id("heightmap_vs_texture_no", true);
+    static int heightmap_vs_high_texture_noVarId = get_shader_variable_id("heightmap_vs_high_texture_no", true);
 
+    static int hmapLdetailVarId = get_shader_variable_id("hmap_ldetail", true);
+    static int hmapHdetailVarId = get_shader_variable_id("hmap_hdetail", true);
+
+    ShaderGlobal::set_texture(hmapLdetailVarId, hm2.texMainId != BAD_TEXTUREID ? hm2.texMainId : hm2.texDetId);
+    ShaderGlobal::set_texture(hmapHdetailVarId, hm2.texDetId != BAD_TEXTUREID ? hm2.texDetId : hm2.texMainId);
     const BBox2 *clip = hm2.texMainId != BAD_TEXTUREID ? (infinite ? NULL : &hm2.bboxMain) : &hm2.bboxDet;
     hm2.rend.setRenderClip(clip);
     static LodGridCullData cullData;
@@ -1702,8 +1652,10 @@ public:
     Point2 cellSize(hm2.sx * lodScale, hm2.sy * lodScale);
     float lod0AreaSize = 0.f;
     cull_lod_grid(hm2.lodGrid, hm2.lodGrid.lodsCount - lod, clippedVpos.x, clippedVpos.y, cellSize.x, cellSize.y, hm2.ax * lodScale,
-      hm2.ay * lodScale, -10000, 10000, &frustum, clip, cullData, NULL, lod0AreaSize, hm2.rend.get_hmap_tess_factorVarId());
+      hm2.ay * lodScale, -10000, 10000, &frustum, clip, cullData, NULL, lod0AreaSize);
     hm2.rend.render(hm2.lodGrid, cullData);
+    ShaderGlobal::set_texture(hmapLdetailVarId, BAD_TEXTUREID);
+    ShaderGlobal::set_texture(hmapHdetailVarId, BAD_TEXTUREID);
 
     if (render_hm)
       set_lmesh_rendering_mode(oldMode);
@@ -1817,7 +1769,7 @@ public:
       hmapPatchesDepthTex->texfilter(TEXFILTER_POINT);
       hmapPatchesTex = dag::create_tex(NULL, texSize, texSize, TEXCF_RTARGET | TEXFMT_L16, 1, "hmap_patches_tex");
       hmapPatchesTex->texaddr(TEXADDR_WRAP);
-      hmapPatchesTex->texfilter(TEXFILTER_LINEAR);
+      hmapPatchesTex->texfilter(TEXFILTER_SMOOTH);
       processHmapPatchesDepth.init("process_hmap_patches_depth");
       hmapPatchesData.curOrigin = IPoint2(-1000000, 1000000);
       hmapPatchesData.texSize = texSize;
@@ -1871,7 +1823,7 @@ public:
       }
     }
   };
-  class LandmeshCMRenderer : public ClipmapRenderer, public ToroidalHeightmapRenderer, public ToroidalPuddlesRenderer
+  class LandmeshCMRenderer : public ClipmapRenderer, public ToroidalHeightmapRenderer
   {
   public:
     LandMeshRenderer &renderer;
@@ -1949,25 +1901,6 @@ public:
         BBox3(Point3(region[0].x, landBox[0].y - 10, region[0].y), Point3(region[1].x, landBox[1].y + 10, region[1].y)));
       renderer.render(provider, renderer.RENDER_CLIPMAP, ::grs_cur_view.pos);
       render_decals_to_clipmap(hmap, rendSrv, old_st_mask, new_st_mask);
-      if (renderer.physMap)
-      {
-        Driver3dRenderTarget curRt;
-        d3d::get_render_target(curRt);
-
-        int x, y, w, h;
-        float minz, maxz;
-        d3d::getview(x, y, w, h, minz, maxz);
-
-        RectInt destRect;
-        destRect.left = x;
-        destRect.top = y;
-        destRect.right = x + w;
-        destRect.bottom = y + h;
-
-        decalRenderer.renderPhysMap(*renderer.physMap, region, true);
-        decalRenderer.updateRT(*renderer.physMap, true);
-        d3d::stretch_rect(decalRenderer.getRT(), curRt.getColor(0).tex, NULL, &destRect);
-      }
     }
     virtual void renderFeedback(const TMatrix4 &globtm)
     {
@@ -1996,8 +1929,7 @@ public:
   };
 
   Clipmap *clipmap;
-  eastl::unique_ptr<ToroidalHeightmap> toroidalHeightmap;
-  eastl::unique_ptr<ToroidalPuddles> toroidalPuddles;
+  ToroidalHeightmap *toroidalHeightmap;
   eastl::unique_ptr<HeightmapPatchesRenderer> heightmapPatchesRenderer;
   bool shouldUseClipmap;
   shaders::UniqueOverrideStateId flipCullStateId;
@@ -2008,15 +1940,11 @@ public:
   {
     LandMeshManager *p = new LandMeshManager(true);
     p->setGrassMaskBlk(grassBlk);
-    biome_query::init();
     if (p->loadDump(crd))
       return p;
     delete p;
     return NULL;
   }
-
-  virtual PhysMap *loadPhysMap(LandMeshManager *landMeshManager, IGenLoad &crd) { return landMeshManager->loadPhysMap(crd, true); }
-
   virtual void destroyLandMeshManager(LandMeshManager *&p) const
   {
     if (!p)
@@ -2043,8 +1971,6 @@ public:
     del_it(r);
   }
 
-  virtual BBox3 getBBoxWithHMapWBBox(LandMeshManager &p) const { return p.getBBoxWithHMapWBBox(); }
-
   virtual void prepareLandMesh(LandMeshRenderer &r, LandMeshManager &p, const Point3 &pos) const { r.prepare(p, pos, pos.y); }
 
   virtual void invalidateClipmap(bool force_redraw, bool rebuild_last_clip)
@@ -2055,8 +1981,6 @@ public:
 
     if (toroidalHeightmap)
       toroidalHeightmap->invalidate();
-    if (toroidalPuddles)
-      toroidalPuddles->invalidate();
     if (rebuild_last_clip)
       rebuilLastClip = true;
     if (heightmapPatchesRenderer)
@@ -2098,14 +2022,14 @@ public:
       d3d::setwire(0);
     ShaderGlobal::set_int_fast(render_with_normalmapVarId, 1);
     landmeshCMRenderer.startRender();
+    // clipmap->prepareFeedback(landmeshCMRenderer, ::grs_cur_view.pos, gtm, ht_rel+ht_rel, 0.f);
     clipmap->finalizeFeedback();
 
     int w, h;
     d3d::get_target_size(w, h);
     clipmap->setTargetSize(w, h, 0.f);
     clipmap->prepareRender(landmeshCMRenderer);
-    clipmap->prepareFeedback(::grs_cur_view.pos, ::grs_cur_view.itm, gtm, ht_rel + ht_rel, 0.f);
-    clipmap->renderFallbackFeedback(landmeshCMRenderer, gtm);
+    clipmap->prepareFeedback(landmeshCMRenderer, ::grs_cur_view.pos, ::grs_cur_view.itm, gtm, ht_rel + ht_rel, 0.f);
 
     ShaderGlobal::set_int_fast(render_with_normalmapVarId, 2);
     if (toroidalHeightmap != NULL)
@@ -2113,18 +2037,6 @@ public:
       // render with parallax
       toroidalHeightmap->updateHeightmap(landmeshCMRenderer, ::grs_cur_view.pos, 0.0f, 0.5f);
     }
-
-    if (toroidalPuddles != NULL)
-    {
-      static int displacement_output_typeVarId = ::get_shader_glob_var_id("displacement_output_type", true);
-      ShaderGlobal::set_int_fast(displacement_output_typeVarId, 1);
-      toroidalPuddles->updatePuddles(landmeshCMRenderer, ::grs_cur_view.pos, 0.5f);
-      ShaderGlobal::set_int_fast(displacement_output_typeVarId, 0);
-
-      static int heightmap_puddlesVarId = ::get_shader_glob_var_id("heightmap_puddles", true);
-      ShaderGlobal::set_int_fast(heightmap_puddlesVarId, 1);
-    }
-
     heightmapPatchesRenderer->render(p, ::grs_cur_view.pos, 16.0f);
 
     preparingClipmap = false;
@@ -2174,7 +2086,7 @@ public:
     int oldm = ShaderGlobal::get_int_fast(lmesh_rendering_mode_glob_varId);
     ShaderGlobal::enableAutoBlockChange(false);
 
-    prepare_fixed_clip(last_clip, last_clip_sampler, data, false, ::grs_cur_view.pos);
+    prepare_fixed_clip(last_clip, data, false, ::grs_cur_view.pos);
     ::set_lmesh_rendering_mode(oldm);
     ShaderGlobal::enableAutoBlockChange(true);
 
@@ -2366,17 +2278,6 @@ public:
         DAEDITOR3.conError("land_translucency is <%s> and should be one of: grassy, some, no", translucencyStr);
       grassTranslucency->setGrassAmount(grassAmount);
     }
-
-    puddlesPowerScale = level_blk.getReal("puddlesPowerScale", 0.0f);
-    puddlesNoiseInfluence = level_blk.getReal("puddlesNoiseInfluence", 1.0f);
-    puddlesSeed = level_blk.getReal("puddlesSeed", 0.0f);
-  }
-
-  virtual void getPuddlesParams(float &power_scale, float &seed, float &noise_influence)
-  {
-    power_scale = puddlesPowerScale;
-    seed = puddlesSeed;
-    noise_influence = puddlesNoiseInfluence;
   }
 
   virtual void resetTexturesLandMesh(LandMeshRenderer &r) const { r.resetTextures(); }
@@ -2785,7 +2686,6 @@ public:
     texD->texfilter(TEXFILTER_POINT);
 
     {
-      d3d::GpuAutoLock gpuLock;
       ScopeRenderTarget prevRt;
       ViewProjMatrixContainer prevViewProj;
 
@@ -2838,7 +2738,6 @@ public:
     Texture *texH = d3d::create_tex(NULL, tex_sz, tex_sz, TEXFMT_L16 | TEXCF_RTARGET, 1);
     if (texH)
     {
-      d3d::GpuAutoLock gpuLock;
       d3d::stretch_rect(texD, texH);
       del_d3dres(texD);
       save_tex_as_ddsx(texH, fn_ht);

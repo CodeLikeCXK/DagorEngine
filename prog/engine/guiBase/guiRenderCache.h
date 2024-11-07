@@ -1,9 +1,9 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-#pragma once
-
 /************************************************************************
   GUI rendering cache
 ************************************************************************/
+// Copyright 2023 by Gaijin Games KFT, All rights reserved.
+#ifndef __GUIRENDERCACHE_H
+#define __GUIRENDERCACHE_H
 
 #include <gui/dag_stdGuiRender.h>
 #include <3d/dag_texMgr.h>
@@ -15,7 +15,6 @@
 #include <generic/dag_carray.h>
 #include <EASTL/unique_ptr.h>
 #include <EASTL/fixed_vector.h>
-#include <drv/3d/dag_vertexIndexBuffer.h>
 
 #define LOG_CACHE 0
 #define LOG_DRAWS 0
@@ -59,11 +58,9 @@ typedef Tab<CachedBBox2> BoxList;
 // unbuffered linear VB/IB buffer
 struct GuiVertexData
 {
-  dag::Vector<char> verticesTmpStorage;
-  dag::Vector<IndexType> indicesTmpStorage;
+  char *vertices;
+  IndexType *indices;
 
-  int currLockedVertex;
-  int currLockedIndex;
   int currVertex;
   int currIndex;
 
@@ -87,13 +84,11 @@ struct GuiVertexData
     channels(midmem_ptr()),
     stride(0),
     logFrame(0),
+    vertices(NULL),
+    indices(NULL),
     verticesTotal(0),
-    indicesTotal(0),
-    currLockedVertex(0),
-    currLockedIndex(0)
+    indicesTotal(0)
   {
-    verticesTmpStorage.clear();
-    indicesTmpStorage.clear();
     reset();
   }
 
@@ -114,20 +109,8 @@ struct GuiVertexData
   size_t elemSize() const { return stride; }
   size_t indexSize() const { return sizeof(IndexType); }
 
-  void fillVertexData(int amount, const void *src)
-  {
-    int lockOffset = currVertex - currLockedVertex;
-    verticesTmpStorage.resize((lockOffset + amount) * stride);
-    memcpy(&verticesTmpStorage[lockOffset * stride], src, amount * stride);
-    currVertex += amount;
-  }
-  void fillIndexData(int amount, const IndexType *src)
-  {
-    int lockOffset = currIndex - currLockedIndex;
-    indicesTmpStorage.resize(lockOffset + amount);
-    memcpy(&indicesTmpStorage[lockOffset], src, amount * sizeof(IndexType));
-    currIndex += amount;
-  }
+  char *currVertexPtr() const { return &vertices[currVertex * stride]; }
+  IndexType *currIndexPtr() const { return &indices[currIndex]; }
 
   bool hasSpace(int num_vert, int num_ind) const
   {
@@ -141,17 +124,32 @@ struct GuiVertexData
       return hasSpace(num_quads * 4, num_quads * 6);
   }
 
-  void fillQuadIB(int vertex)
+  void advance(int num_vertices, int num_indices)
   {
-    IndexType data[6] = {vertex + 0, vertex + 1, vertex + 2, vertex + 3, vertex + 0, vertex + 2};
-    fillIndexData(6, &data[0]);
+    currVertex += num_vertices;
+    currIndex += num_indices;
   }
 
-  void updateQuadIB(int idx)
+  void fillQuadIB(int dst_index, int vertex)
+  {
+    IndexType *data = &indices[dst_index];
+    data[0] = vertex + 0;
+    data[1] = vertex + 1;
+    data[2] = vertex + 2;
+    data[3] = vertex + 3;
+    data[4] = vertex + 0;
+    data[5] = vertex + 2;
+  }
+
+  void updateQuadIB()
   {
     if (!D3D_HAS_QUADS)
+    {
       // indexed TRILIST
-      fillQuadIB(idx);
+      fillQuadIB(currIndex, currVertex);
+      currIndex += 6;
+    }
+    currVertex += 4;
   }
 
   // make sure VB has space
@@ -159,13 +157,9 @@ struct GuiVertexData
 
   void appendQuadsUnsafe(const void *__restrict src, int num_quads)
   {
-    int vtx = currVertex;
-    fillVertexData(num_quads * 4, src);
+    memcpy(currVertexPtr(), src, num_quads * 4 * stride);
     for (int i = 0; i < num_quads; i++)
-    {
-      updateQuadIB(vtx);
-      vtx += 4;
-    }
+      updateQuadIB();
   }
   bool appendQuads(const void *__restrict src, int num_quads)
   {
@@ -175,14 +169,19 @@ struct GuiVertexData
       return false;
     }
 
+    if (!vertices || (!D3D_HAS_QUADS && !indices))
+      return false;
+
     appendQuadsUnsafe(src, num_quads);
     return true;
   }
 
   void appendFacesUnsafe(const void *__restrict vsrc, int num_verts, const IndexType *isrc, int num_indices)
   {
-    fillVertexData(num_verts, vsrc);
-    fillIndexData(num_indices, isrc);
+    memcpy(currVertexPtr(), vsrc, num_verts * stride);
+    memcpy(currIndexPtr(), isrc, num_indices * sizeof(IndexType));
+    currVertex += num_verts;
+    currIndex += num_indices;
   }
   bool appendFaces(const void *__restrict vsrc, int num_verts, const IndexType *isrc, int num_indices)
   {
@@ -191,6 +190,9 @@ struct GuiVertexData
       logOverflow(num_verts, num_indices);
       return false;
     }
+
+    if (!vertices || !indices)
+      return false;
 
     appendFacesUnsafe(vsrc, num_verts, isrc, num_indices);
     return true;
@@ -424,3 +426,6 @@ struct BufferedRenderer
   void resetBuffers();
 };
 } // namespace StdGuiRender
+
+
+#endif //__GUIRENDERCACHE_H

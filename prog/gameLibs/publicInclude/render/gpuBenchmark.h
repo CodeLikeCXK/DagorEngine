@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -33,8 +34,6 @@ private:
   DynamicShaderHelper benchShader;
   SbufferIDHolder vb;
   UniqueTexHolder randomTex;
-  UniqueTex benchmarkDepthTex;
-
   int gpu_benchmark_hmapVarId;
 
   constexpr static int GPU_TIMESTAMP_LATENCY = 5;

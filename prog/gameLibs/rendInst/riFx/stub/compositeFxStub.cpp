@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <rendInst/rendInstFx.h>
 #include <rendInst/rendInstFxDetail.h>
 

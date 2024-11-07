@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 static int p_precomputed[] = {
   0,
   1,

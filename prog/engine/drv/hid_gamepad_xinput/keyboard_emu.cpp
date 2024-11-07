@@ -1,9 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
-#include <drv/hid/dag_hiKeyboard.h>
-#include <drv/hid/dag_hiGlobals.h>
-#include <drv/hid/dag_hiCreate.h>
-#include <drv/hid/dag_hiKeybIds.h>
+#include <humanInput/dag_hiKeyboard.h>
+#include <humanInput/dag_hiGlobals.h>
+#include <humanInput/dag_hiCreate.h>
+#include <humanInput/dag_hiKeybIds.h>
 #include <osApiWrappers/dag_miscApi.h>
 #include "emu_hooks.h"
 #include <string.h>

@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -38,14 +39,17 @@ public:
   ~HeatHazeRenderer();
 
   void renderHazeParticles(Texture *haze_depth, Texture *haze_offset, TEXTUREID depth_tex_id, int depth_tex_lod,
-    RenderHazeParticlesCallback render_haze_particles, RenderCustomHazeCallback render_ri_haze);
-  void renderColorHaze(Texture *haze_color, RenderCustomHazeCallback render_haze_particles, RenderCustomHazeCallback render_ri_haze);
+    RenderHazeParticlesCallback render_haze_particles, RenderCustomHazeCallback render_custom_haze,
+    RenderCustomHazeCallback render_ri_haze);
+  void renderColorHaze(Texture *haze_color, RenderCustomHazeCallback render_haze_particles,
+    RenderCustomHazeCallback render_custom_haze, RenderCustomHazeCallback render_ri_haze);
   void applyHaze(double total_time, Texture *back_buffer, const RectInt *back_buffer_area, TEXTUREID back_buffer_id,
     TEXTUREID resolve_depth_tex_id, Texture *haze_temp, TEXTUREID haze_temp_id, const IPoint2 &back_buffer_resolution);
 
   void render(double total_time, const RenderTargets &targets, const IPoint2 &back_buffer_resolution, int depth_tex_lod,
-    RenderHazeParticlesCallback render_haze_particles, RenderCustomHazeCallback render_ri_haze,
-    BeforeApplyHazeCallback before_apply_haze = nullptr, AfterApplyHazeCallback after_apply_haze = nullptr);
+    RenderHazeParticlesCallback render_haze_particles, RenderCustomHazeCallback render_custom_haze,
+    RenderCustomHazeCallback render_ri_haze, BeforeApplyHazeCallback before_apply_haze = nullptr,
+    AfterApplyHazeCallback after_apply_haze = nullptr);
 
   void clearTargets(Texture *haze_color, Texture *haze_offset, Texture *haze_depth);
   int getHazeResolutionDivisor() const { return hazeResolutionDivisor; }

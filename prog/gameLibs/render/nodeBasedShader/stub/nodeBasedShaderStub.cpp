@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <render/nodeBasedShader.h>
 #include <nodeBasedShaderManager/nodeBasedShaderManager.h>
 

@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <max.h>
 #include <stdmat.h>
 #include <utilapi.h>
@@ -349,11 +347,7 @@ void MatConvUtil::convertNodes(int type, int lighting)
       for (int i = 0; i < num; ++i)
       {
         Mtl *sm = mat->GetSubMtl(i);
-#if defined(MAX_RELEASE_R27) && MAX_RELEASE >= MAX_RELEASE_R27
-        if (sm && convertMat(sm, type, lighting, mat->GetSubMtlSlotName(i, false).data()))
-#else
         if (sm && convertMat(sm, type, lighting, mat->GetSubMtlSlotName(i)))
-#endif
         {
           mat->SetSubMtl(i, sm);
           changed = true;

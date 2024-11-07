@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "sceneStatus.h"
 #include <gui/dag_visualLog.h>
 #include <gui/dag_stdGuiRender.h>
@@ -89,7 +87,7 @@ void SceneStatus::renderError(StdGuiRender::GuiContext *guiContext)
     case SEI_WARNING_ICON:
     {
       guiContext->set_color(220, 0, 0, 255);
-      guiContext->reset_textures();
+      guiContext->set_texture(BAD_TEXTUREID);
       guiContext->render_rect(guiContext->screen_width() - 8, 0, guiContext->screen_width(), 8);
 
       int t = get_time_msec() - errorBeginRenderTimeMsec;
@@ -109,7 +107,7 @@ void SceneStatus::renderError(StdGuiRender::GuiContext *guiContext)
       int ascent = StdGuiRender::get_font_ascent(0);
 
       guiContext->set_color(80, 0, 0, 200);
-      guiContext->reset_textures();
+      guiContext->set_texture(BAD_TEXTUREID);
       guiContext->render_rect(0, 0, guiContext->screen_width(), ascent + 10);
 
       guiContext->set_color(255, 255, 255);
@@ -124,7 +122,7 @@ void SceneStatus::renderError(StdGuiRender::GuiContext *guiContext)
       int ascent = StdGuiRender::get_font_ascent(0);
 
       guiContext->set_color(80, 0, 0, 200);
-      guiContext->reset_textures();
+      guiContext->set_texture(BAD_TEXTUREID);
       guiContext->render_rect(0, 0, guiContext->screen_width(), 20 + ascent * 3);
 
       guiContext->set_color(255, 255, 255);
@@ -138,7 +136,7 @@ void SceneStatus::renderError(StdGuiRender::GuiContext *guiContext)
     case SEI_STOP_AND_SHOW_FULL_INFO:
     {
       guiContext->set_color(0, 20, 80, 80);
-      guiContext->reset_textures();
+      guiContext->set_texture(BAD_TEXTUREID);
       guiContext->render_rect(0, 0, guiContext->screen_width(), guiContext->screen_height());
 
       guiContext->set_color(255, 255, 200);
@@ -159,7 +157,7 @@ void SceneStatus::renderError(StdGuiRender::GuiContext *guiContext)
 
           int ascent = StdGuiRender::get_font_ascent(block->fontId);
           guiContext->goto_xy(left + block->position.x, top + block->position.y + ascent);
-          guiContext->draw_str(block->text.c_str(), block->text.length());
+          guiContext->draw_str(block->text, block->text.length());
         }
       }
     }

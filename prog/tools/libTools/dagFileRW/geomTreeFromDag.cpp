@@ -1,5 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <libTools/dagFileRW/nodeTreeBuilder.h>
 #include <osApiWrappers/dag_direct.h>
 #include <libTools/dagFileRW/dagFileNode.h>

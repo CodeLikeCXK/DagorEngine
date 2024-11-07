@@ -1,9 +1,7 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include <shaders/dag_renderScene.h>
 #include <shaders/dag_shaderMeshTexLoadCtrl.h>
 #include <3d/dag_texMgr.h>
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
 #include <image/dag_tga.h>
 #include <image/dag_texPixel.h>
 #include <generic/dag_ptrTab.h>
@@ -19,7 +17,6 @@
 
 #define DUMP_GEOM_STATS 0
 
-bool RenderScene::useSRVBuffers = false;
 
 void RenderScene::loadBinary(IGenLoad &crd, dag::ConstSpan<TEXTUREID> texMap, bool use_vis)
 {
@@ -88,7 +85,7 @@ void RenderScene::loadBinary(IGenLoad &crd, dag::ConstSpan<TEXTUREID> texMap, bo
     G_ASSERT(sHdr.ltmapNum == 0);
 
     // read lightmaps catalog (offsets to data)
-    smvd->loadMatVdata(String(200, "%s ldBin", crd.getTargetName()).str(), cb, useSRVBuffers ? VDATA_BIND_SHADER_RES : 0);
+    smvd->loadMatVdata(String(200, "%s ldBin", crd.getTargetName()).str(), cb, 0);
     dagor_reset_sm_tex_load_ctx();
 
     STARTUP_POINT(String(100, "mats %d, vdata %d", sHdr.matNum, sHdr.vdataNum));
@@ -244,7 +241,7 @@ void RenderScene::loadBinary(IGenLoad &crd, dag::ConstSpan<TEXTUREID> texMap, bo
     df_close(geomDumpFile);
 #endif // DUMP_GEOM_STATS
   }
-  DAGOR_CATCH(const IGenLoad::LoadException &e)
+  DAGOR_CATCH(IGenLoad::LoadException e)
   {
 #if _TARGET_PC && !_TARGET_STATIC_LIB
     logwarn("can't load binary scene: %s, %s", e.excDesc, DAGOR_EXC_STACK_STR(e));
@@ -262,7 +259,7 @@ void RenderScene::loadBinary(IGenLoad &crd, dag::ConstSpan<TEXTUREID> texMap, bo
 
   ShaderMaterial::setLoadingString(NULL);
   if (obj.empty())
-    DEBUG_CTX("empty RenderScene loaded");
+    debug_ctx("empty RenderScene loaded");
   if (RenderScene::should_build_optscene_data && obj.size())
     buildOptSceneData(); //== temporary, until new layout will be built by daEditorX
 

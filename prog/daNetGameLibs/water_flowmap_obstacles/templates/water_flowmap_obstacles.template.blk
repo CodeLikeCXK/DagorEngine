@@ -1,5 +1,0 @@
-water_flowmap_obstacles {
-  _tags:t="render"
-  _singleton:b=true
-  "water_flowmap_obstacles:WaterFlowmapObstacles"{}
-}

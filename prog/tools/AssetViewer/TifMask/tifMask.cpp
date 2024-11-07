@@ -1,20 +1,17 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "../av_plugin.h"
 #include <assets/asset.h>
 #include <libTools/renderUtil/dynRenderBuf.h>
-#include <drv/3d/dag_texture.h>
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
 #include <image/dag_texPixel.h>
 #include <de3_bitMaskMgr.h>
 #include <generic/dag_initOnDemand.h>
 #include <debug/dag_debug.h>
 
-#include <propPanel/control/container.h>
-#include <propPanel/c_control_event_handler.h>
+#include <propPanel2/c_panel_base.h>
+#include <propPanel2/c_control_event_handler.h>
 
 
-class TifMaskViewPlugin : public IGenEditorPlugin, public PropPanel::ControlEventHandler
+class TifMaskViewPlugin : public IGenEditorPlugin, public ControlEventHandler
 {
 public:
   TifMaskViewPlugin() : tex(NULL) { texId = register_managed_tex(":av_tif", NULL); }
@@ -128,7 +125,7 @@ public:
 
   virtual bool supportAssetType(const DagorAsset &asset) const { return strcmp(asset.getTypeStr(), "tifMask") == 0; }
 
-  virtual void fillPropPanel(PropPanel::ContainerPropertyControl &panel) { panel.setEventHandler(this); }
+  virtual void fillPropPanel(PropertyContainerControlBase &panel) { panel.setEventHandler(this); }
   virtual void postFillPropPanel() {}
 
 private:

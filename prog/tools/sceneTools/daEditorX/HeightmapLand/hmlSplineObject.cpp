@@ -1,16 +1,13 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "hmlSplineObject.h"
 #include "hmlSplinePoint.h"
 #include "roadUtil.h"
 #include <de3_entityFilter.h>
 
-#include <drv/3d/dag_matricesAndPerspective.h>
-#include <drv/3d/dag_driver.h>
+#include <3d/dag_drv3d.h>
 #include <3d/dag_render.h>
 #include <render/dag_cur_view.h>
 #include <generic/dag_sort.h>
-#include <EditorCore/ec_IEditorCore.h>
+#include <dllPluginCore/core.h>
 #include <debug/dag_debug.h>
 #include <EditorCore/ec_ObjectEditor.h>
 #include <math/dag_math2d.h>
@@ -26,23 +23,17 @@
 #include <de3_splineClassData.h>
 #include <de3_hmapService.h>
 // #include <util/dag_hierBitMap2d.h>
+#include <dllPluginCore/core.h>
 #include <libTools/dagFileRW/splineShape.h>
 #include <math/dag_sphereVis.h>
 #include <util/dag_fastIntList.h>
 
 #include "hmlSplineUndoRedo.h"
 
-#include <propPanel/control/container.h>
-#include <propPanel/control/panelWindow.h>
+#include <propPanel2/c_panel_base.h>
 
 #include <stdlib.h>
 #include <shaders/dag_overrideStates.h>
-
-#include <assets/asset.h>
-#include <obsolete/dag_cfg.h>
-
-using editorcore_extapi::dagGeom;
-using editorcore_extapi::dagRender;
 
 #define RENDER_SPLINE_POINTS              1000
 #define RENDER_SPLINE_POINTS_MIN          10
@@ -106,17 +97,7 @@ enum
   PID_NAVMESH_STRIPE_WIDTH,
 
   PID_PERINST_SEED,
-  PID_PER_MATERIAL_CONTROLS_BEGIN,
 };
-
-enum
-{
-  MATERIAL_PID_GROUP,
-  MATERIAL_PID_COLOR,
-  MATERIAL_PID_SAVEMAT_BTN,
-  MATERIAL_PID_COUNT
-};
-
 #define DEF_USE_FOR_NAVMESH      false
 #define DEF_NAVMESH_STRIPE_WIDTH 20.0f
 
@@ -173,7 +154,6 @@ SplineObject::SplineObject(bool make_poly) : points(tmpmem), poly(make_poly), la
   props.scaleTcAlong = 1;
   props.useForNavMesh = DEF_USE_FOR_NAVMESH;
   props.navMeshStripeWidth = DEF_NAVMESH_STRIPE_WIDTH;
-  props.navmeshIdx = -1;
 
   firstApply = true;
   flattenBySpline = NULL;
@@ -251,7 +231,7 @@ void SplineObject::resetSplineClass() { del_it(landClass); }
 //==================================================================================================
 void SplineObject::getSpline()
 {
-  PropPanel::ContainerPropertyControl *pw = ((HmapLandObjectEditor *)getObjEditor())->getCurrentPanelFor(this);
+  PropPanel2 *pw = ((HmapLandObjectEditor *)getObjEditor())->getCurrentPanelFor(this);
   if (!points.size())
   {
     const char *str = "Length: 0.0 m";
@@ -632,7 +612,7 @@ void SplineObject::render(DynRenderBuffer *db, const TMatrix4 &gtm, const Point2
 }
 
 
-void SplineObject::fillProps(PropPanel::ContainerPropertyControl &op, DClassID for_class_id,
+void SplineObject::fillProps(PropertyContainerControlBase &op, DClassID for_class_id,
   dag::ConstSpan<RenderableEditableObject *> objects)
 {
   bool one_type = true;
@@ -701,15 +681,13 @@ void SplineObject::fillProps(PropPanel::ContainerPropertyControl &op, DClassID f
     if (objects.size() == 1)
       op.createTrackInt(PID_PERINST_SEED, "Per-instance seed", props.perInstSeed, 0, 32767, 1);
 
-    createMaterialControls(op);
-
-    PropPanel::ContainerPropertyControl &cornerGrp = *op.createRadioGroup(PID_CORNER_TYPE, "Spline knots corner type");
+    PropertyContainerControlBase &cornerGrp = *op.createRadioGroup(PID_CORNER_TYPE, "Spline knots corner type");
     cornerGrp.createRadio(-1, "Corner");
     cornerGrp.createRadio(0, "Smooth tangent");
     cornerGrp.createRadio(1, "Smooth curvature");
     op.setInt(PID_CORNER_TYPE, props.cornerType);
 
-    PropPanel::ContainerPropertyControl *modGroup = op.createGroup(PID_MODIF_GRP, "Modify");
+    PropertyContainerControlBase *modGroup = op.createGroup(PID_MODIF_GRP, "Modify");
 
     if (!poly)
     {
@@ -762,7 +740,7 @@ void SplineObject::fillProps(PropPanel::ContainerPropertyControl &op, DClassID f
 
     if (poly)
     {
-      PropPanel::ContainerPropertyControl *flGroup = op.createGroup(PID_FLATTEN_SPLINE_GROUP, "Flatten by spline");
+      PropertyContainerControlBase *flGroup = op.createGroup(PID_FLATTEN_SPLINE_GROUP, "Flatten by spline");
       Tab<SplineObject *> spls(tmpmem);
 
       for (int i = 0; i < ((HmapLandObjectEditor *)getObjEditor())->splinesCount(); i++)
@@ -835,8 +813,7 @@ void SplineObject::onLayerOrderChanged()
       gen->splineLayer = props.layerOrder;
 }
 
-void SplineObject::onPPChange(int pid, bool edit_finished, PropPanel::ContainerPropertyControl &panel,
-  dag::ConstSpan<RenderableEditableObject *> objects)
+void SplineObject::onPPChange(int pid, bool edit_finished, PropPanel2 &panel, dag::ConstSpan<RenderableEditableObject *> objects)
 {
   if (!edit_finished)
     return;
@@ -890,77 +867,6 @@ void SplineObject::onPPChange(int pid, bool edit_finished, PropPanel::ContainerP
   {
     CHANGE_VAL_FUNC(int, props.perInstSeed, getInt, regenerateObjects())
     DAGORED2->repaint();
-  }
-
-  if (pid > PID_PER_MATERIAL_CONTROLS_BEGIN)
-  {
-    int materialPid = (pid - PID_PER_MATERIAL_CONTROLS_BEGIN) % MATERIAL_PID_COUNT;
-    int materialIdx = (pid - PID_PER_MATERIAL_CONTROLS_BEGIN) / MATERIAL_PID_COUNT;
-
-    if (materialPid == MATERIAL_PID_COLOR)
-    {
-      DagorAsset *materialAsset = getMaterialAsset(materialIdx);
-      if (!materialAsset)
-        return;
-
-      E3DCOLOR color = panel.getColor(pid);
-      if (materialAsset->props.paramExists("script"))
-      {
-        const char *matScript = materialAsset->props.getStr("script");
-
-        char colorString[128];
-        sprintf(colorString, "%hhu,%hhu,%hhu,%hhu", color.r, color.g, color.b, color.a);
-
-        CfgReader c;
-        c.getdiv_text(String(128, "[q]\r\n%s\r\n", matScript), "q");
-
-        bool colorWritten = false;
-
-        String newMatScript;
-        for (int i = 0; i < c.div[c.curdiv].var.size(); i++)
-        {
-          CfgVar &var = c.div[c.curdiv].var[i];
-
-          char *currentVal = var.val;
-          if (strcmp(var.id, "color_mul_add") == 0)
-          {
-            currentVal = colorString;
-            colorWritten = true;
-          }
-          newMatScript += String(128, "%s=%s%s", var.id, currentVal, i == c.div[c.curdiv].var.size() - 1 ? "" : "\r\n");
-        }
-
-        if (!colorWritten)
-        {
-          newMatScript += String(128, "\r\ncolor_mul_add=%s", colorString);
-        }
-
-        materialAsset->props.setStr("script", newMatScript.c_str());
-      }
-      else
-      {
-        materialAsset->props.setStr("script",
-          String(128, "color_mul_add=%hhu,%hhu,%hhu,%hhu\r\n", color.r, color.g, color.b, color.a).c_str());
-      }
-
-      // udpate splines that use this material
-      const int splineCount = ((HmapLandObjectEditor *)getObjEditor())->splinesCount();
-      for (int iSpline = 0; iSpline < splineCount; iSpline++)
-      {
-        SplineObject *spline = ((HmapLandObjectEditor *)getObjEditor())->getSpline(iSpline);
-        if (!spline)
-          continue;
-
-        if (spline->isUsingMaterial(materialAsset->getName()))
-        {
-          for (int iPoint = 0; iPoint < spline->points.size(); iPoint++)
-          {
-            spline->points[iPoint]->resetSplineClass();
-            spline->markAssetChanged(iPoint);
-          }
-        }
-      }
-    }
   }
 
   if (pid == PID_MODIFTYPE_S || pid == PID_MODIFTYPE_P)
@@ -1124,43 +1030,28 @@ void SplineObject::changeAsset(const char *asset_name, bool _undo)
     del_it(landClass);
 
   markAssetChanged(0);
-  on_object_entity_name_changed(*this);
 }
 
-void SplineObject::changeAsset(ObjectEditor &object_editor, dag::ConstSpan<RenderableEditableObject *> objects,
-  const char *initially_selected_asset_name, bool is_poly)
-{
-  const char *asset_name = DAEDITOR3.selectAssetX(initially_selected_asset_name, is_poly ? "Select landclass" : "Select splineclass",
-    is_poly ? "land" : "spline");
-
-  object_editor.getUndoSystem()->begin();
-
-  for (int i = 0; i < objects.size(); i++)
-  {
-    SplineObject *o = RTTI_cast<SplineObject>(objects[i]);
-    if (!o)
-      continue;
-    o->changeAsset(asset_name, true);
-  }
-
-  object_editor.getUndoSystem()->accept("Change entity");
-
-  PropPanel::ContainerPropertyControl *pw = static_cast<HmapLandObjectEditor &>(object_editor).getObjectPropertiesPanel();
-  if (pw)
-    pw->setText(PID_GENBLKNAME, asset_name);
-
-  IEditorCoreEngine::get()->invalidateViewportCache();
-}
-
-void SplineObject::onPPBtnPressed(int pid, PropPanel::ContainerPropertyControl &panel,
-  dag::ConstSpan<RenderableEditableObject *> objects)
+void SplineObject::onPPBtnPressed(int pid, PropPanel2 &panel, dag::ConstSpan<RenderableEditableObject *> objects)
 {
   if (!points.size())
     return;
 
   if (pid == PID_GENBLKNAME)
   {
-    changeAsset(*objEditor, objects, props.blkGenName, poly);
+    const char *asset_name =
+      DAEDITOR3.selectAssetX(props.blkGenName, poly ? "Select landclass" : "Select splineclass", poly ? "land" : "spline");
+
+    for (int i = 0; i < objects.size(); i++)
+    {
+      SplineObject *o = RTTI_cast<SplineObject>(objects[i]);
+      if (!o)
+        continue;
+      o->changeAsset(asset_name, true);
+    }
+
+    panel.setText(pid, asset_name);
+    IEditorCoreEngine::get()->invalidateViewportCache();
   }
   else if (pid == PID_GENBLKNAME2)
   {
@@ -1375,19 +1266,6 @@ void SplineObject::onPPBtnPressed(int pid, PropPanel::ContainerPropertyControl &
         o->getSpline();
       }
     getObjEditor()->getUndoSystem()->accept("Generate opacity in points");
-  }
-  else if (pid > PID_PER_MATERIAL_CONTROLS_BEGIN)
-  {
-    int materialPid = (pid - PID_PER_MATERIAL_CONTROLS_BEGIN) % MATERIAL_PID_COUNT;
-    int materialIdx = (pid - PID_PER_MATERIAL_CONTROLS_BEGIN) / MATERIAL_PID_COUNT;
-
-    if (materialPid == MATERIAL_PID_SAVEMAT_BTN)
-    {
-      DagorAsset *materialAsset = getMaterialAsset(materialIdx);
-      if (!materialAsset)
-        return;
-      materialAsset->props.saveToTextFile(materialAsset->getTargetFilePath());
-    }
   }
 }
 
@@ -1620,8 +1498,6 @@ void SplineObject::save(DataBlock &blk)
     sblk->setBool("useForNavMesh", props.useForNavMesh);
   if (props.navMeshStripeWidth != DEF_NAVMESH_STRIPE_WIDTH)
     sblk->setReal("navMeshStripeWidth", props.navMeshStripeWidth);
-  if (props.navmeshIdx >= 0)
-    sblk->setInt("navmeshIdx", props.navmeshIdx);
   if (polyGeom.altGeom)
   {
     sblk->setBool("altGeom", polyGeom.altGeom);
@@ -1689,7 +1565,6 @@ void SplineObject::load(const DataBlock &blk, bool use_undo)
   props.cornerType = blk.getInt("cornerType", 0);
   props.useForNavMesh = blk.getBool("useForNavMesh", DEF_USE_FOR_NAVMESH);
   props.navMeshStripeWidth = blk.getReal("navMeshStripeWidth", DEF_NAVMESH_STRIPE_WIDTH);
-  props.navmeshIdx = blk.getInt("navmeshIdx", -1);
 
   polyGeom.altGeom = blk.getBool("altGeom", false);
   polyGeom.bboxAlignStep = blk.getReal("bboxAlignStep", blk.getReal("minGridStep", 1.0f));
@@ -2111,46 +1986,6 @@ void SplineObject::putObjTransformUndo()
   getObjEditor()->getUndoSystem()->put(new ObjTransformUndo(this));
 }
 
-void SplineObject::createMaterialControls(PropPanel::ContainerPropertyControl &op)
-{
-  if (points.size() == 0)
-    return;
-
-  ISplineGenObj *gen = points[0]->getSplineGen();
-  if (!gen || !gen->splineClass || !gen->splineClass->genGeom)
-    return;
-
-  int matGroupIdx = 0;
-  for (int iLoft = 0; iLoft < gen->splineClass->genGeom->loft.size(); iLoft++)
-  {
-    auto &loft = gen->splineClass->genGeom->loft[iLoft];
-    for (int iMat = 0; iMat < loft.matNames.size(); iMat++, matGroupIdx++)
-    {
-      const SimpleString &matName = loft.matNames[iMat];
-      DagorAsset *materialAsset = DAEDITOR3.getAssetByName(matName.c_str(), DAEDITOR3.getAssetTypeId("mat"));
-      if (!materialAsset)
-        continue;
-
-      int pidBase = PID_PER_MATERIAL_CONTROLS_BEGIN + matGroupIdx * MATERIAL_PID_COUNT;
-      PropPanel::ContainerPropertyControl &materialGroup =
-        *op.createGroup(pidBase + MATERIAL_PID_GROUP, String(128, "Loft #%d / Mat (%s)", iLoft, matName.c_str()));
-
-      E3DCOLOR color(255, 255, 255, 0);
-      if (materialAsset->props.paramExists("script"))
-      {
-        const char *matScript = materialAsset->props.getStr("script");
-
-        CfgReader c;
-        c.getdiv_text(String(128, "[q]\r\n%s\r\n", matScript), "q");
-        color = c.gete3dcolor("color_mul_add", color);
-      }
-
-      materialGroup.createColorBox(pidBase + MATERIAL_PID_COLOR, "Material color mul:", color);
-      materialGroup.createButton(pidBase + MATERIAL_PID_SAVEMAT_BTN, "Save mat.blk");
-    }
-  }
-}
-
 void SplineObject::placeObjectsInsidePolygon()
 {
   // lines.clear();
@@ -2254,16 +2089,6 @@ void SplineObject::gatherStaticGeomLayered(StaticGeometryContainer &cont, const 
       cont.addNode(n);
     }
   }
-}
-
-bool SplineObject::setName(const char *nm)
-{
-  const bool result = RenderableEditableObject::setName(nm);
-
-  if (getObjEditor())
-    getObjEd(getObjEditor()).onRegisteredObjectNameChanged(*this);
-
-  return result;
 }
 
 void SplineObject::moveObject(const Point3 &delta, IEditorCoreEngine::BasisType basis)
@@ -2967,50 +2792,6 @@ void SplineObject::attachTo(SplineObject *s, int to_idx)
   s->prepareSplineClassInPoints();
   s->pointChanged(-1);
   s->getSpline();
-}
-
-DagorAsset *SplineObject::getMaterialAsset(int idx) const
-{
-  if (points.size() == 0)
-    return nullptr;
-
-  ISplineGenObj *gen = points[0]->getSplineGen();
-  if (!gen || !gen->splineClass || !gen->splineClass->genGeom)
-    return nullptr;
-
-  for (const splineclass::LoftGeomGenData::Loft &loft : gen->splineClass->genGeom->loft)
-  {
-    if (idx < loft.matNames.size())
-    {
-      const SimpleString &matName = loft.matNames[idx];
-      DagorAsset *a = DAEDITOR3.getAssetByName(matName.c_str(), DAEDITOR3.getAssetTypeId("mat"));
-      return a;
-    }
-    idx -= loft.matNames.size();
-  }
-
-  return nullptr;
-}
-
-bool SplineObject::isUsingMaterial(const char *mat_name_to_find) const
-{
-  if (points.size() == 0)
-    return false;
-
-  ISplineGenObj *gen = points[0]->getSplineGen();
-  if (!gen || !gen->splineClass || !gen->splineClass->genGeom)
-    return false;
-
-  for (const auto &loft : gen->splineClass->genGeom->loft)
-  {
-    for (const auto &matName : loft.matNames)
-    {
-      if (strcmp(matName.c_str(), mat_name_to_find) == 0)
-        return true;
-    }
-  }
-
-  return false;
 }
 
 void SplineObject::makeMonoUp()

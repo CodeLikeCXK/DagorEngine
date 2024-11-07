@@ -1,5 +1,8 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright 2023 by Gaijin Games KFT, All rights reserved.
+#ifndef _GAIJIN_SHADERS_SHSTATEBLK_H
+#define _GAIJIN_SHADERS_SHSTATEBLK_H
 #pragma once
+
 
 #include <shaders/dag_shaders.h>
 #include <ska_hash_map/flat_hash_map2.hpp>
@@ -61,3 +64,6 @@ inline bool check_var_nan(float v, int variable_id)
   return true;
 }
 }; // namespace shaders_internal
+
+
+#endif

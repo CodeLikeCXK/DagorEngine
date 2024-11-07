@@ -1,6 +1,7 @@
 //
 // Dagor Engine 6.5 - Game Libraries
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
+// Copyright (C) 2023  Gaijin Games KFT.  All rights reserved
+// (for conditions of use see prog/license.txt)
 //
 #pragma once
 
@@ -124,7 +125,7 @@ public:
 
   virtual void renameObject(EditableObject *obj, const char *new_name, bool use_undo = true);
   virtual void invalidateObjectProps();
-  virtual void updateObjectProps() {}
+  virtual void updateObjectProps();
 
   virtual void setCreateMode(IObjectCreator *creator = NULL);
   virtual void setCreateBySampleMode(EditableObject *sample = NULL);
@@ -177,6 +178,7 @@ protected:
 
   EditableObject *sample = nullptr;
   IObjectCreator *creator = nullptr;
+  // ObjectEditorPropPanelBar *objectPropBar;
 
   bool cloneMode = false;
   Point3 cloneDelta = ZERO<Point3>();

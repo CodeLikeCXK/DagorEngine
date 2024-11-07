@@ -1,10 +1,8 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
-
 #include "sceneConfig.h"
 #include "hotkeys.h"
 #include "guiScene.h"
 
-#include <drv/hid/dag_hiXInputMappings.h>
+#include <humanInput/dag_hiXInputMappings.h>
 
 namespace darg
 {

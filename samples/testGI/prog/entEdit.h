@@ -1,4 +1,3 @@
-// Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
 #include <daEditorE/de_objEditor.h>
@@ -25,6 +24,8 @@ public:
 
   virtual bool isValid() const { return true; }
 
+  // EntityObj *clone();
+
   virtual void update(float) {}
   virtual void beforeRender() {}
   virtual void render() { renderBox(getLbb()); }
@@ -38,6 +39,18 @@ public:
     return true;
   }
   BBox3 getLbb() const { return BBox3(Point3(-0.5, 0, -0.5), Point3(0.5, 1, 0.5)); }
+
+  /*
+    virtual void fillProps(PropPanel2 &panel,
+      DClassID for_class_id, dag::ConstSpan<EditableObject*> objects);
+
+    virtual void onPPChange(int pid, bool edit_finished,
+      PropPanel2 &panel,
+      dag::ConstSpan<EditableObject*> objects);
+
+    virtual void onPPBtnPressed(int pid, PropPanel2 &panel,
+      dag::ConstSpan<EditableObject*> objects);
+  */
 
   virtual bool mayRename() { return true; }
   virtual bool mayDelete() { return true; }
