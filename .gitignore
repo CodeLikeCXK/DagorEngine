@@ -16,3 +16,9 @@
 *.das.inl
 *.dshl.log
 ShaderLog-*
+
+# gemini-cli settings
+.gemini/
+
+# GitHub App credentials
+gha-creds-*.json
