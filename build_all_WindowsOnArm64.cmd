@@ -13,7 +13,7 @@ pause
 popd
 
 pushd prog\tools\dargbox
-call create_vfsroms_WoA64.bat
+call create_vfsroms.bat
 cd shaders
 call compile_shaders_pc11.bat
 call compile_shaders_metal.bat
@@ -24,21 +24,21 @@ pushd prog\samples\physTest
 jam -sPlatformArch=arm64 
 jam -sPlatformArch=arm64  -f jamfile-test-jolt
 cd shaders
-call compile_game_shaders-dx11_WOA.bat
+call compile_game_shaders-dx11.bat
 popd
 
 pushd samples\skiesSample\prog
 jam -sPlatformArch=arm64 
 cd shaders
-call compile_shaders_dx12_WOA.bat
-call compile_shaders_dx11_WOA.bat
+call compile_shaders_dx12.bat -cppStcodeArch=arm64
+call compile_shaders_dx11.bat -cppStcodeArch=arm64
 popd
 
 pushd samples\testGI\prog
 jam -sPlatformArch=arm64
 cd shaders
-call compile_shaders_dx12_WOA.bat
-call compile_shaders_dx11_WOA.bat
+call compile_shaders_dx12.bat
+call compile_shaders_dx11.bat
 popd
 
 pushd outerSpace\prog
@@ -48,8 +48,8 @@ jam -sNeedDasAotCompile=yes -sDedicated=yes
 jam -f jamfile-decrypt
 call compile_all_prog_vromfs_arm64.cmd
 cd shaders
-call compile_shaders_dx11_WOA.bat
-call compile_shaders_tools_WOA.bat
+call compile_shaders_dx11.bat
+call compile_shaders_tools.bat
 cd ..\..\develop\gui
 call build_ui.cmd
 popd
