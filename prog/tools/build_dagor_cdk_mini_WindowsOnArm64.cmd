@@ -55,7 +55,7 @@ jam -sPlatformArch=arm64 -s Root=../.. -f shaderInfo/jamfile
 
 rem common minimal gui shaders for tools
 pushd sceneTools\guiShaders_commonData
-call compile_gui_shaders_dx11_WOA.cmd
+call compile_gui_shaders_dx11.cmd
 popd
 
 rem utils
