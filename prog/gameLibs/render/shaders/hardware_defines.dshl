@@ -1340,9 +1340,9 @@ hlsl
       return uint2(1 + ((rate >> 2) & 0x3), 1 + ((rate >> 0) & 0x3));
     }
 
-    #define HW_USE_READ_SHADING_RATE , uint shading_rate : SV_ShadingRate
+    #define HW_USE_READ_SHADING_RATE
     #define D3D12_SHADING_RATE_MAX 0xa // max value of enum D3D12_SHADING_RATE, equal to D3D12_SHADING_RATE_4X4.
-    #define GET_SHADING_RATE decode_vrs_rate(shading_rate <= D3D12_SHADING_RATE_MAX ? shading_rate : 0) // GTX 10** GPUs don't support VRS and
+    #define GET_SHADING_RATE uint2(1, 1) // GTX 10** GPUs don't support VRS and
                                                                                                         // they return SV_ShadingRate = (uint)(-1).
     #define SUPPORTS_VRS 1
   ##else

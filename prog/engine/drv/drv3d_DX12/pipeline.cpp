@@ -4698,6 +4698,7 @@ void ShaderDeviceRequirementChecker::init(ID3D12Device *device, const HLSLVendor
   // NOTE: seems like even without T2 VRS using SV_ShadingRate is OK and it
   // simply turns into 1x1 rate where VRS isn't supported. Probably.
   // if (D3D12_VARIABLE_SHADING_RATE_TIER_2 <= op6.VariableShadingRateTier)
+  if (shading_model >= 6.4_sm)
   {
     combinedFlags |= D3D_SHADER_REQUIRES_SHADING_RATE;
   }

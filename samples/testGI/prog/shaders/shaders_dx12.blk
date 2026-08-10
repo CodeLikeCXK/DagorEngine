@@ -17,18 +17,18 @@ include "shaders_dx11.blk"
 "@override:Compile" {
   "@override:fsh":t="5.0"
   "@override:assume_vars" {
-    "@delete:supports_sh_6_1":i = 0
-    "@delete:use_hw_rt_gi":i = 0
-    "@delete:render_inline_raytracing":i=0
     "@delete:dagi_warp64_irradiance":i=0
-    "@delete:swrt_use_hw_rt":i = 0
      gi_voxelize_use_multidraw:i=1
      // the sample never denoises with NRD checkerboard depth; pinning the
      // interval skips compiling that variant (broken upstream in the RTR
      // half-res motion store), which the sample build would otherwise hit
      rtr_depth_mode:i=0
+	hardware_raytracing:i=0     // Exclude hardware raytracing variants
+     rtsm_enabled:i=0            // Exclude ray-traced shadow map variants
+     vrs_enabled:i=0             // Exclude SV_ShadingRate to keep target SM at 6.0/6.2
   }
 }
+
 
 incDir:t="../../../../prog/gameLibs/bvh/shaders"
 incDir:t="../../../../prog/gameLibs/render/shaders/NRD"
