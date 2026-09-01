@@ -7,6 +7,7 @@
 #include <math/dag_TMatrix.h>
 #include <shaders/dag_shaders.h>
 #include <drv/3d/dag_driver.h>
+#include <drv/3d/dag_driverDesc.h>
 #include <drv/3d/dag_tex3d.h>
 #include <3d/dag_resPtr.h>
 #include <drv/3d/dag_info.h>
@@ -69,6 +70,14 @@ void RenderSWRT::init()
   close();
   init_and_get_blue_noise();
   inited = true;
+
+  // On DX12 SM6.2+ the shader compiler activates _HARDWARE_FSH_6_2, which forces
+  // BLAS_VERT_FP16 to 0 in swBLAS.dshl (see the guard added there). Mirror that on the
+  // CPU side so the vertex buffer layout matches what the shader decodes. On SM < 6.2 the
+  // 8-byte FP16 layout remains enabled (blasVertsFp16 defaults to true via the field init).
+  if (d3d::get_driver_code() == d3d::dx12 && d3d::get_driver_desc().shaderModel >= 6.2_sm)
+    blasVertsFp16 = false;
+
 #define CS(a) a = new_compute_shader(#a)
   CS(checkerboard_shadows_swrt_cs);
   CS(shadows_swrt_cs);
@@ -78,6 +87,7 @@ void RenderSWRT::init()
   bool optionalDebug = d3d::get_driver_code() == d3d::dx11; // dx11 shader compiler is failing on debug shader: draw_collision_swrt
   rt.init("draw_collision_swrt", optionalDebug);
 }
+
 
 void RenderSWRT::drawRT()
 {

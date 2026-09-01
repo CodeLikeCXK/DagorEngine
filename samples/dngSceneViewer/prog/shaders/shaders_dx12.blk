@@ -1,3 +1,18 @@
 include "../../../../prog/daNetGame/shaders/_build/shaders_dx12.blk"
 include "game_common_override.blk"
 "@override:outDumpName":t="../../viewer/compiledShaders/gameDX12"
+"@override:Compile" {
+  "@override:fsh":t="5.0"
+  "@override:assume_vars" {
+    "@delete:dagi_warp64_irradiance":i=0
+     gi_voxelize_use_multidraw:i=1
+     world_sdf_support_uav_load:i=0
+     // the sample never denoises with NRD checkerboard depth; pinning the
+     // interval skips compiling that variant (broken upstream in the RTR
+     // half-res motion store), which the sample build would otherwise hit
+     rtr_depth_mode:i=0
+	hardware_raytracing:i=0     // Exclude hardware raytracing variants
+     rtsm_enabled:i=0            // Exclude ray-traced shadow map variants
+     vrs_enabled:i=0             // Exclude SV_ShadingRate to keep target SM at 6.0/6.2
+  }
+}

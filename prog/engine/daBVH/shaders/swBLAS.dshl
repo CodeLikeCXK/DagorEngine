@@ -42,6 +42,18 @@ hlsl(code) {
   #ifndef BLAS_VERT_FP16
     #define BLAS_VERT_FP16 1
   #endif
+  // On SM6.2+ (Adreno/ARM64) the DXIL compiler maps `half` to native float16_t.
+  // The BLAS_VERT_FP16 decode mixes f16tof32 (bit-reinterpretation of a uint as FP16)
+  // with native FP16 arithmetic in the same shader body, which mis-compiles on the
+  // Qualcomm Adreno D3D12 driver (8cx Gen3 / Windows ARM64), causing a GPU hang.
+  // Force the safe 12-byte float3 vertex layout on that path. The CPU side
+  // (RenderSWRT::blasVertsFp16) mirrors this flag at upload time so the buffer
+  // layout always matches what the shader expects.
+  #if BLAS_VERT_FP16 && _HARDWARE_FSH_6_2
+    #undef  BLAS_VERT_FP16
+    #define BLAS_VERT_FP16 0
+  #endif
+
   #if BLAS_VERT_FP16
     #define BLAS_GPU_VERT_STRIDE 8
   #else

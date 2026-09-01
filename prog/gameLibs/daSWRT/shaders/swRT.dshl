@@ -427,6 +427,25 @@ shader shadows_swrt_cs, checkerboard_shadows_swrt_cs
   }
 
   hlsl(cs) {
+    // On SM6.2+ the shader compiler maps `half` to native float16_t (see
+    // _HARDWARE_FSH_6_2 in hardware_defines.dshl). The SW BVH traversal mixes
+    // f16tof32 bit-reinterpretation with arithmetic on the same value, which
+    // mis-compiles on Adreno D3D12 (8cx Gen3) under DX12 SM6.2, causing a GPU
+    // hang. Force half back to float so the BLAS vertex decode stays in 32-bit
+    // arithmetic on that path. The `float` fallback is used on any target where
+    // native FP16 is not safe here (same precision, no perf regression on SW RT).
+    #if _HARDWARE_FSH_6_2
+      #undef half
+      #undef half1
+      #undef half2
+      #undef half3
+      #undef half4
+      #define half  float
+      #define half1 float1
+      #define half2 float2
+      #define half3 float3
+      #define half4 float4
+    #endif
     #pragma hlsl2021
     ##if (swrt_use_hw_rt == off)
 ##if shader == checkerboard_shadows_swrt_cs && (hardware.scarlett || hardware.ps5)
@@ -564,6 +583,13 @@ shader shadows_swrt_cs, checkerboard_shadows_swrt_cs
     compile("cs_6_5_half", "calc_trace_shadows_cs");
   } else
   {
+    // On SM6.2 (hardware.fsh_6_2) the native-FP16 half type is active in the
+    // HLSL body above, but we've already forced it back to float via the
+    // `#undef half` / `#define half float` block. Use `target_cs` so the
+    // shader-model is picked up from the project's configured fsh version
+    // (resolves to cs_6_0 for SM6.2 via hwSemantic.cpp, no _half suffix so
+    // SHADER_COMPILER_FP16_ENABLED is NOT set, keeping DXIL emission in
+    // 32-bit mode). This is safe and correct on all other targets too.
     compile("target_cs", "calc_trace_shadows_cs");
   }
 }

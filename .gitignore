@@ -22,3 +22,6 @@ ShaderLog-*
 
 # GitHub App credentials
 gha-creds-*.json
+
+/devtools/
+

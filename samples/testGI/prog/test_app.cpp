@@ -1139,9 +1139,9 @@ public:
 
                 static const float dimAsBoxMin = 2.f, dimAsBoxMax = 16.f;
                 daSWRT::BuiltBLAS built = m.wide ? RenderSWRT::buildBLAS(m.indices32.data(), (int)m.indices32.size(), verts4.data(),
-                                                     (int)verts4.size(), dimAsBoxMax)
+                                                     (int)verts4.size(), dimAsBoxMax, swrt.blasVertsFp16)
                                                  : RenderSWRT::buildBLAS(m.indices.data(), (int)m.indices.size(), verts4.data(),
-                                                     (int)verts4.size(), dimAsBoxMax);
+                                                     (int)verts4.size(), dimAsBoxMax, swrt.blasVertsFp16);
 
                 // Score box-resemblance on the SWRT BuiltBLAS itself (FP16-encoded tree).
                 // `isBox()` meshes are already perfect boxes; skip and count separately.
