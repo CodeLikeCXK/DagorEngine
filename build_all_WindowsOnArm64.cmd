@@ -1,3 +1,8 @@
+@echo off
+set Platform=windows
+set PlatformArch=arm64
+set PlatformSpec=vc17
+
 pushd prog\tools
 call build_dagor_cdk_mini_WindowsOnArm64.cmd
 if errorlevel 1 (

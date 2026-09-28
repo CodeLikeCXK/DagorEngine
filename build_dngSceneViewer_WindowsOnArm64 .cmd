@@ -1,3 +1,8 @@
+@echo off
+set Platform=windows
+set PlatformArch=arm64
+set PlatformSpec=vc17
+
 pushd samples\dngSceneViewer\prog
 jam -sPlatformArch=arm64
 pause
