@@ -12,10 +12,7 @@ goto EOF
 
 :on_error
 echo [1;31m ERROR [0m
-if [%BUILD_URL%]==[] pause > nul
-pause
-exit
+exit /b 1
 
 :EOF
 verify > nul
-pause

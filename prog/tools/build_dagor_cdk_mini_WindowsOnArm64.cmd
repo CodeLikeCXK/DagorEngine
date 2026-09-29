@@ -4,7 +4,7 @@ set PlatformArch=arm64
 set PlatformSpec=vc17
 if not "%1" == "" set PlatformArch=%1
 
-set JAM=jam -sPlatform=windows -sPlatformArch=%PlatformArch% -sPlatformSpec=%PlatformSpec% -s Root=../..
+set JAM=jam -sPlatform=windows -sPlatformArch=%PlatformArch% -sPlatformSpec=%PlatformSpec% -sPlatformSpec_windows=%PlatformSpec% -s Root=../..
 
 rem DaEditorX
 %JAM% -f sceneTools/daEditorX/jamfile-editor
@@ -127,7 +127,6 @@ goto EOF
 
 echo.
 echo An error occured
-pause
 exit /b 1
 
 :EOF
