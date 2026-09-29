@@ -1,4 +1,5 @@
 @echo off
+setlocal
 set Platform=windows
 set PlatformArch=arm64
 set PlatformSpec=vc17
@@ -105,7 +106,7 @@ rem GUI tools
 
 rem Blender plugin
 pushd dag4blend
-__build_pack.py FINAL
+python __build_pack.py FINAL
 popd
 
 rem 3ds Max plugins, we don't care if these plugins fail to compile (this could happen due to missing SDK or compiler)
@@ -127,7 +128,9 @@ goto EOF
 
 echo.
 echo An error occured
+endlocal
 exit /b 1
 
 :EOF
+endlocal
 exit /b 0

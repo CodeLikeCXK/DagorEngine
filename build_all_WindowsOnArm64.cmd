@@ -74,7 +74,7 @@ popd
 
 echo --- Building physTest ---
 pushd prog\samples\physTest
-%JAM%
+%JAM% -f jamfile-test-bullet
 if errorlevel 1 ( popd & exit /b 1 )
 %JAM% -f jamfile-test-jolt
 if errorlevel 1 ( popd & exit /b 1 )
