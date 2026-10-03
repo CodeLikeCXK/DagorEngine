@@ -848,7 +848,7 @@ bool RenderableInstanceLodsResSrc::buildVoxelMips(const DataBlock &blk, const Da
             // check neighbor voxels in normal directions to avoid holes in thin walls
             if (cover.x > 0 and cover.x < srcPerVoxelSq)
             {
-              for (int dn = -srcPerVoxel; dn <= int(srcPerVoxel); dn += srcPerVoxel * 2)
+              for (int dn = -int(srcPerVoxel); dn <= int(srcPerVoxel); dn += srcPerVoxel * 2)
                 for (uint32_t fy = 0; fy < srcPerVoxel; fy++)
                   for (uint32_t fz = 0; fz < srcPerVoxel; fz++)
                     for (uint32_t fx = 0; fx < srcPerVoxel; fx++)
@@ -859,7 +859,7 @@ bool RenderableInstanceLodsResSrc::buildVoxelMips(const DataBlock &blk, const Da
 
             if (cover.y > 0 and cover.y < srcPerVoxelSq)
             {
-              for (int dn = -srcPerVoxel; dn <= int(srcPerVoxel); dn += srcPerVoxel * 2)
+              for (int dn = -int(srcPerVoxel); dn <= int(srcPerVoxel); dn += srcPerVoxel * 2)
                 for (uint32_t fy = 0; fy < srcPerVoxel; fy++)
                   for (uint32_t fz = 0; fz < srcPerVoxel; fz++)
                     for (uint32_t fx = 0; fx < srcPerVoxel; fx++)
@@ -870,7 +870,7 @@ bool RenderableInstanceLodsResSrc::buildVoxelMips(const DataBlock &blk, const Da
 
             if (cover.z > 0 and cover.z < srcPerVoxelSq)
             {
-              for (int dn = -srcPerVoxel; dn <= int(srcPerVoxel); dn += srcPerVoxel * 2)
+              for (int dn = -int(srcPerVoxel); dn <= int(srcPerVoxel); dn += srcPerVoxel * 2)
                 for (uint32_t fy = 0; fy < srcPerVoxel; fy++)
                   for (uint32_t fz = 0; fz < srcPerVoxel; fz++)
                     for (uint32_t fx = 0; fx < srcPerVoxel; fx++)

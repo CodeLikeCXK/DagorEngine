@@ -53,7 +53,7 @@ U &resolve(T &, U &u)
   {                                                                                             \
     ctx.popProfileMarker();                                                                     \
   }
-#define DX12_PROFILE_MARKER_TAG(...) DA_PROFILE_TAG(__VA_ARGS__)
+#define DX12_PROFILE_MARKER_TAG DA_PROFILE_TAG
 #else
 #define DX12_PROFILE_MARKER(name, is_enabled)
 #define DX12_PROFILE_MARKER_TAG(...)

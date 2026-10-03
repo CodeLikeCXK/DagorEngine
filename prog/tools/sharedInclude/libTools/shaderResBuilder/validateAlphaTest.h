@@ -9,7 +9,7 @@ class MaterialData;
 class ShaderMaterial;
 class ILogWriter;
 class DagorAssetMgr;
-class TexImage32;
+struct TexImage32;
 class IMemAlloc;
 
 namespace AlphaTestValidation

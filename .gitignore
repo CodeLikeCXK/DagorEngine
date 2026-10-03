@@ -25,4 +25,4 @@ ShaderLog-*
 gha-creds-*.json
 
 /devtools/
-
+/pix/

@@ -443,10 +443,10 @@ template <class T> __forceinline void _msvc_arm_atomic_exchange__ATOMIC_ACQ_REL(
 // NOTE: MSVC does not provide enough intrinsics to implement CAS optimally for ARM64.
 // If we care about performance, we should use inline assembly instead.
 
-#define CAS_IMPL(msvc_cas, msvc_type)                                                                              \
-  msvc_type const observed = msvc_cas((msvc_type volatile *)ptr, *(msvc_type *) desired, *(msvc_type *) expected); \
-  const bool success = *(msvc_type *) expected == *(msvc_type *) observed;                                         \
-  *(msvc_type *) expected = *(msvc_type *) observed;                                                               \
+#define CAS_IMPL(msvc_cas, msvc_type)                                                                                  \
+  msvc_type const observed = msvc_cas((msvc_type volatile *)ptr, *(msvc_type *) desired, *(msvc_type *) expected);     \
+  const bool success = *(msvc_type *) expected == observed;                                                            \
+  *(msvc_type *) expected = observed;                                                                                  \
   return success;
 
 template <class T> __forceinline bool _msvc_arm_atomic_compare_exchange__ATOMIC_SEQ_CST__ATOMIC_SEQ_CST(T volatile *ptr, T *expected, const T *desired) requires (sizeof(T) == 1) { CAS_IMPL(_InterlockedCompareExchange8     , char     ) }

@@ -1049,8 +1049,9 @@ static __forceinline bool trace_local_bbox(vec3f from, vec3f to, vec3f dir, cons
   const int side = v_segment_box_intersection_side(from, to, vbox, atMin, atMaxUnused);
   if (side < 0)
     return false;
-  vec4f_const BOX_SIDE_NORMALS[6] = {{-1.f, 0.f, 0.f, 0.f}, {0.f, -1.f, 0.f, 0.f}, {0.f, 0.f, -1.f, 0.f}, {1.f, 0.f, 0.f, 0.f},
-    {0.f, 1.f, 0.f, 0.f}, {0.f, 0.f, 1.f, 0.f}};
+  vec4f_const BOX_SIDE_NORMALS[6] = {DECL_VECFLOAT4(-1.f, 0.f, 0.f, 0.f), DECL_VECFLOAT4(0.f, -1.f, 0.f, 0.f),
+    DECL_VECFLOAT4(0.f, 0.f, -1.f, 0.f), DECL_VECFLOAT4(1.f, 0.f, 0.f, 0.f), DECL_VECFLOAT4(0.f, 1.f, 0.f, 0.f),
+    DECL_VECFLOAT4(0.f, 0.f, 1.f, 0.f)};
   in_out_t *= atMin;
   out_norm = BOX_SIDE_NORMALS[side];
   return true;

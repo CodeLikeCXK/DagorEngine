@@ -38,7 +38,7 @@ struct ShaderMatChannels
 
 struct PerInstRenderData
 {
-  vec4f basePosAndHash = {0.f, 0.f, 0.f, 0.f};
+  vec4f basePosAndHash = {};
   bool operator==(const PerInstRenderData &rhs) const { return memcmp(this, &rhs, sizeof(PerInstRenderData)) == 0; }
 };
 

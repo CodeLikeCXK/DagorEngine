@@ -993,7 +993,8 @@ static void dumpCurrentShaders(const char *single_shader, shaderbindump::DumpDet
             sVar.dynVariants.enumerateCodesForVariant(di, [&](uint32_t d_code) {
               eastl::string name;
               shader_name_format::compile_human_readable_variant_name(name,
-                shader_name_format::VariantIdentifierRef{.shClassName = cls.name.data(), .stVarCode = s_code, .dynVarCode = d_code},
+                shader_name_format::VariantIdentifierRef{
+                  .shClassName = cls.name.data(), .stVarCode = int(s_code), .dynVarCode = int(d_code)},
                 shBinDump(), *shBinDumpOwner().getDumpV2());
 
               if (fm)
