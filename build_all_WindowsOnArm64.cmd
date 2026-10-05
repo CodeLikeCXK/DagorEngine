@@ -92,6 +92,12 @@ pushd samples\testGI\prog
 if errorlevel 1 ( popd & exit /b 1 )
 popd
 
+echo --- Building dngSceneViewer ---
+pushd samples\dngSceneViewer\prog
+%JAM%
+if errorlevel 1 ( popd & exit /b 1 )
+popd
+
 echo --- Building outerSpace ---
 pushd outerSpace\prog
 call build_aot_compiler_arm64.cmd
@@ -133,6 +139,11 @@ call compile_shaders_dx12.bat
 call compile_shaders_dx11.bat
 popd
 
+pushd samples\dngSceneViewer\prog\shaders
+call compile_shaders_dx11_WOA.bat
+call compile_shaders_dx12_WOA.bat
+popd
+
 pushd outerSpace\prog\shaders
 call compile_shaders_dx11.bat
 call compile_shaders_dx12.bat
@@ -163,6 +174,10 @@ popd
 
 pushd outerSpace\prog\utils\dev_launcher
 call create_vfsroms.bat
+popd
+
+pushd samples\dngSceneViewer\prog
+call compile_all_prog_vromfs-WOA.bat
 popd
 
 echo VROMFS and UI build complete.

@@ -1957,7 +1957,8 @@ void Device::adjustCaps([[maybe_unused]] const DeviceCapsOverrides &overrides, [
     logwarn("DX12: AMD device, assuming broken draw id in amplification shaders");
   }
 
-  bool disableRayTracing = overrides.forceOffRayTracing;
+  bool disableRayTracing = overrides.forceOffRayTracing ||
+    dgs_get_settings()->getBlockByNameEx("dx12")->getBool("disableRayTracing", false);
   if (D3D12_RAYTRACING_TIER_1_0 <= op5.RaytracingTier)
   {
     bool isSoftwareRT = deviceUsesSoftwareRaytracing(op5);

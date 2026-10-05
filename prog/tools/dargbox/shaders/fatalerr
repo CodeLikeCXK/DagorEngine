@@ -1,0 +1,69 @@
+[F]  Exception occured. Game will be closed!
+
+Exception details: C0000005 at 7FF61E3F0390: access violation
+  attempt to read memory at 00000000
+Exception record: .exr 000000F238EFE110 (for full dump)
+
+   PC:    7FF61E3F0390  SP:      F238EFE200
+
+[F]  Call stack (48 frames, imgbase: 7FF61E370000, reloc delta +0):
+  7FF61E3F0390 dsc2-spirv-dev! shc::try_lock_shutdown  +32/52
+    C:\DagorEngine\prog\tools\ShaderCompiler2\shCompiler.cpp(97)  +24
+  7FF61E4C2F00 dsc2-spirv-dev! proc::execute  +80/1920
+    C:\DagorEngine\prog\tools\ShaderCompiler2\processes.cpp(147)  +4
+  7FF61E37EFA0 dsc2-spirv-dev! doCompileModulesAsync  +2432/2792
+    C:\DagorEngine\prog\tools\ShaderCompiler2\main.cpp(331)  +0
+  7FF61E3805A4 dsc2-spirv-dev! compile  +4204/5760
+    C:\DagorEngine\prog\tools\ShaderCompiler2\main.cpp(696)  +0
+  7FF61E385260 dsc2-spirv-dev! DagorWinMain  +14032/15692
+    C:\DagorEngine\prog\tools\ShaderCompiler2\main.cpp(1901)  +188
+  7FF61E37BA80 dsc2-spirv-dev! dagor_program_exec  +664/700
+    startup\dag_mainCon.inc.cpp(157)  +12
+  7FF61E37BCC8 dsc2-spirv-dev! main  +544/700
+    startup\dag_mainCon.inc.cpp(98)  +16
+  7FF61E74E23C dsc2-spirv-dev! __scrt_common_main_seh  +284/412
+    D:\a\_work\1\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288)  +36
+  7FF61E74E2D4 dsc2-spirv-dev! mainCRTStartup  +20/32
+    D:\a\_work\1\s\src\vctools\crt\vcstartup\src\startup\exe_main.cpp(16)  +8
+  7FFBEDC08740 kernel32! BaseThreadInitThunk  +64/128
+  7FFBF0B054D4 ntdll! RtlUserThreadStart  +68/19472
+  8         ?
+  7FFBF0DC4000 ntdll! NlsMbCodePageTag  +17040/120672
+  0         ?
+  F238EFD998  ?
+  2A        ?
+  F238EFCA70  ?
+  D35B7FFBF0B0D8F8  ?
+  86        ?
+  88        ?
+  0         ?
+  FFFF9D6400500090  ?
+  3F3124AEC80  ?
+  F238EFE808  ?
+  F200000043  ?
+  0         ?
+  7E        ?
+  0         ?
+  0         ?
+  7FFBF0D67B48 ntdll! RtlNtdllName  +6232/338248
+  2         ?
+  F238EFC860  ?
+  F238EFCA70  ?
+  166BFFFBF0B0D910  ?
+  7E00000000  ?
+  24ECC128058  ?
+  F238EFC860  ?
+  22002000000005  ?
+  7E        ?
+  7FF61E4D2784 dsc2-spirv-dev! __crt_stdio_output::output_processor<char,__crt_stdio_output::string_output_adapter<char>,__crt_stdio_output::standard_base<char,__crt_stdio_output::string_output_adapter<char> > >::write_stored_string_tchar  +172/200
+    C:\DagorEngine\prog\tools\minkernel\crts\ucrt\inc\corecrt_internal_stdio_output.h(2707)  +0
+  208007E   ?
+  F238EFC860  ?
+  F238EFCBC0  ?
+  0         ?
+  3F312310F00  ?
+  72006F00670061  ?
+  69006700000000  ?
+  0         ?
+
+[F]  setupCrashDumpFileName dbgCrashDumpPath = 'ShaderLog-SPIRV-22.09.15.dmp'

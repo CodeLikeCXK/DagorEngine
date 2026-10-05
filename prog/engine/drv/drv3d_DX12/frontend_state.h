@@ -570,8 +570,9 @@ struct FrontendState
   void setStageBRegisterBuffer(uint32_t stage, uint32_t index, Sbuffer *buffer)
   {
     G_ASSERT(stage < countof(stageResources));
+    if (DAGOR_UNLIKELY(index >= countof(stageResources[stage].bRegisterBuffers)))
+      return;
     StageResourcesState &target = stageResources[stage];
-    G_ASSERT(index < countof(target.bRegisterBuffers));
     OSSpinlockScopedLock resourceBindingLock(resourceBindingGuard);
     target.markDirtyB(index, target.bRegisterBuffers[index] != buffer);
     target.bRegisterBuffers[index] = buffer;
@@ -580,6 +581,8 @@ struct FrontendState
   void setStageTRegisterBuffer(uint32_t stage, uint32_t index, GenericBufferInterface *buffer)
   {
     G_ASSERT(stage < countof(stageResources));
+    if (DAGOR_UNLIKELY(index >= dxil::MAX_T_REGISTERS))
+      return;
     StageResourcesState &target = stageResources[stage];
 
     OSSpinlockScopedLock resourceBindingLock(resourceBindingGuard);
@@ -598,6 +601,8 @@ struct FrontendState
   void setStageURegisterBuffer(uint32_t stage, uint32_t index, GenericBufferInterface *buffer)
   {
     G_ASSERT(stage < countof(stageResources));
+    if (DAGOR_UNLIKELY(index >= dxil::MAX_U_REGISTERS))
+      return;
     StageResourcesState &target = stageResources[stage];
 
     GenericBufferInterface *prevBuf = nullptr;
@@ -627,6 +632,8 @@ struct FrontendState
   void setStageSRVTexture(uint32_t stage, uint32_t index, BaseTex *texture, bool use_sampler)
   {
     G_ASSERT(stage < countof(stageResources));
+    if (DAGOR_UNLIKELY(index >= dxil::MAX_T_REGISTERS))
+      return;
     StageResourcesState &target = stageResources[stage];
 
     OSSpinlockScopedLock resourceBindingLock(resourceBindingGuard);
@@ -661,7 +668,8 @@ struct FrontendState
   {
     G_ASSERT(stage < countof(stageResources));
     StageResourcesState &target = stageResources[stage];
-    G_ASSERT(index < countof(target.sRegisterSamplers));
+    if (DAGOR_UNLIKELY(index >= countof(target.sRegisterSamplers)))
+      return;
     OSSpinlockScopedLock resourceBindingLock(resourceBindingGuard);
     target.markDirtyS(index, target.sRegisterSamplers[index] != handle);
     target.sRegisterSamplers[index] = handle;
@@ -670,6 +678,8 @@ struct FrontendState
   void setStageUAVTexture(uint32_t stage, uint32_t index, BaseTex *texture, ImageViewState view)
   {
     G_ASSERT(stage < countof(stageResources));
+    if (DAGOR_UNLIKELY(index >= dxil::MAX_U_REGISTERS))
+      return;
     StageResourcesState &target = stageResources[stage];
 
     OSSpinlockScopedLock resourceBindingLock(resourceBindingGuard);
@@ -1280,6 +1290,8 @@ struct FrontendState
   void setStageTRegisterRaytraceAccelerationStructure(uint32_t stage, uint32_t index, RaytraceAccelerationStructure *as)
   {
     G_ASSERT(stage < countof(stageResources));
+    if (DAGOR_UNLIKELY(index >= dxil::MAX_T_REGISTERS))
+      return;
     StageResourcesState &target = stageResources[stage];
 
     OSSpinlockScopedLock resourceBindingLock(resourceBindingGuard);

@@ -360,8 +360,9 @@ static DriverCode detect_driver()
                 crash_fallback_helper->setSettingToAuto();
               if (!::dgs_execute_quiet)
               {
-                drv_message_box(get_localized_text("video/d3d12_not_full_support_text"),
-                  get_localized_text("video/d3d12_not_full_support_caption"), GUI_MB_OK);
+                drv_message_box(get_localized_text("video/d3d12_not_full_support_text",
+                                  "DirectX 12 is not fully supported on this device; some graphics features may be unavailable."),
+                  get_localized_text("video/d3d12_not_full_support_caption", "DirectX 12 Not Fully Supported"), GUI_MB_OK);
               }
             }
             break;

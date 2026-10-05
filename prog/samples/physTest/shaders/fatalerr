@@ -1,0 +1,70 @@
+[F]  Exception occured. Game will be closed!
+
+Exception details: C0000005 at 7FF7B35BF270: access violation
+  attempt to read memory at 00000000
+Exception record: .exr 000000E940B7F250 (for full dump)
+
+   PC:    7FF7B35BF270  SP:      E940B7F320
+
+[F]  Call stack (48 frames, imgbase: 7FF7B3540000, reloc delta +0):
+  7FF7B35BF270 dsc2-hlsl11-dev! shc::try_enter_shutdown  +32/52
+    C:\DagorEngine\prog\tools\ShaderCompiler2\shCompiler.cpp(88)  +24
+  7FF7B3554D2C dsc2-hlsl11-dev! DagorWinMain  +14612/14748
+    C:\DagorEngine\prog\tools\ShaderCompiler2\main.cpp(1964)  +8
+  7FF7B354B6F0 dsc2-hlsl11-dev! dagor_program_exec  +664/700
+    startup\dag_mainCon.inc.cpp(157)  +12
+  7FF7B354B938 dsc2-hlsl11-dev! main  +544/700
+    startup\dag_mainCon.inc.cpp(98)  +16
+  7FF7B376E0B4 dsc2-hlsl11-dev! __scrt_common_main_seh  +284/412
+    D:\a\_work\1\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288)  +36
+  7FF7B376E14C dsc2-hlsl11-dev! mainCRTStartup  +20/32
+    D:\a\_work\1\s\src\vctools\crt\vcstartup\src\startup\exe_main.cpp(16)  +8
+  7FFBEDC08740 kernel32! BaseThreadInitThunk  +64/128
+  7FFBF0B054D4 ntdll! RtlUserThreadStart  +68/19472
+  0         ?
+  0         ?
+  E940B7D8B0  ?
+  7FF7B36DC728 dsc2-hlsl11-dev! fp_format_f_internal  +48/440
+    C:\DagorEngine\prog\tools\minkernel\crts\ucrt\src\appcrt\convert\cvt.cpp(592)  +0
+  E940B7DAF8  ?
+  7FF7B3703098 dsc2-hlsl11-dev! should_round_up  +56/224
+    C:\DagorEngine\prog\tools\minkernel\crts\ucrt\src\appcrt\convert\_fptostr.cpp(56)  +0
+  E940B7D910  ?
+  7FF7B36DC988 dsc2-hlsl11-dev! fp_format_g  +216/280
+    C:\DagorEngine\prog\tools\minkernel\crts\ucrt\src\appcrt\convert\cvt.cpp(769)  +28
+  E940B7DAF8  ?
+  52A5C110780  ?
+  52A5C030000  ?
+  0         ?
+  E940B7DAF8  ?
+  E940B7DAF8  ?
+  6         ?
+  200       ?
+  0         ?
+  0         ?
+  E940B7D980  ?
+  7FF7B36DBE0C dsc2-hlsl11-dev! __acrt_fp_format  +356/540
+    C:\DagorEngine\prog\tools\minkernel\crts\ucrt\src\appcrt\convert\cvt.cpp(846)  +40
+  100000020  ?
+  E940B7DCF8  ?
+  E940B7DAF8  ?
+  200       ?
+  6         ?
+  1         ?
+  0         ?
+  E940B7DF98  ?
+  2         ?
+  1         ?
+  E940B7D9D0  ?
+  7FF7B36A12EC dsc2-hlsl11-dev! __crt_stdio_output::output_processor<char,__crt_stdio_output::string_output_adapter<char>,__crt_stdio_output::standard_base<char,__crt_stdio_output::string_output_adapter<char> > >::write_stored_string_tchar  +172/200
+    C:\DagorEngine\prog\tools\minkernel\crts\ucrt\inc\corecrt_internal_stdio_output.h(2707)  +0
+  E940B7DAA0  ?
+  FFFFFFFB  ?
+  0         ?
+  25        ?
+  0         ?
+  1         ?
+  52A5C09A150  ?
+  25        ?
+
+[F]  setupCrashDumpFileName dbgCrashDumpPath = 'ShaderLog-DX11-22.25.51.dmp'

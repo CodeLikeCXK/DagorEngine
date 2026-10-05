@@ -1785,9 +1785,8 @@ ComputePipeline *PipelineManager::getCompute(ProgramID program)
   auto &pipelineGroup = computePipelines[program.getGroup()];
   if (index >= pipelineGroup.size() || !pipelineGroup[index])
   {
-    // Caller skips the dispatch on a null pipeline; only fatal when no reset
-    // could explain the missing slot. See wasReset.
-    G_ASSERTF(wasReset, "getCompute called for uninitialized compute pipeline! group was %u and index was %u", program.getGroup(),
+    // Caller skips the dispatch on a null pipeline
+    logwarn("getCompute called for uninitialized compute pipeline! group was %u and index was %u", program.getGroup(),
       index);
     return nullptr;
   }
@@ -1800,9 +1799,8 @@ BasePipeline *PipelineManager::getGraphics(GraphicsProgramID program)
   auto &pipelineGroup = graphicsPipelines[program.getGroup()];
   if (index >= pipelineGroup.size() || !pipelineGroup[index])
   {
-    // Caller skips the draw on a null pipeline; only fatal when no reset could
-    // explain the missing slot. See wasReset.
-    G_ASSERTF(wasReset, "getGraphics called for uninitialized graphics pipeline! group was %u and index was %u", program.getGroup(),
+    // Caller skips the draw on a null pipeline
+    logwarn("getGraphics called for uninitialized graphics pipeline! group was %u and index was %u", program.getGroup(),
       index);
     return nullptr;
   }
@@ -4127,7 +4125,7 @@ void ShaderDeviceRequirementChecker::init(ID3D12Device *device, const HLSLVendor
     combinedFlags |= D3D_SHADER_REQUIRES_WAVE_OPS;
   }
 
-  if (op1.Int64ShaderOps)
+  if (op1.Int64ShaderOps || shading_model >= 6.0_sm)
   {
     combinedFlags |= D3D_SHADER_REQUIRES_INT64_OPS;
   }

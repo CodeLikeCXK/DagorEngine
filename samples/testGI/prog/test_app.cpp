@@ -475,6 +475,8 @@ CONSOLE_FLOAT_VAL_MINMAX("render", world_sdf_rasterize_supersample, 1, 1, 4);
 
 static bool screenshotRequested = false;
 static String screenshotFilename;
+static int screenshotDelayFrames = 0;
+static bool screenshotQuitAfter = false;
 static bool verifyCaptureRequested = false; // app.save_verify_capture: giVerifier replay input
 static String verifyCaptureDir;
 
@@ -1874,6 +1876,12 @@ public:
     if (useShaderAsserts)
       shader_assert::readback();
 
+    if (screenshotDelayFrames > 0)
+    {
+      screenshotDelayFrames--;
+      if (screenshotDelayFrames == 0)
+        screenshotRequested = true;
+    }
     if (screenshotRequested)
     {
       screenshotRequested = false;
@@ -1897,6 +1905,8 @@ public:
       }
       else
         console::print_d("screenshot: failed to capture screen");
+      if (screenshotQuitAfter)
+        quit_game(0);
     }
   }
 
@@ -2334,7 +2344,7 @@ public:
     TIME_D3D_PROFILE(level);
     binScene->render(visibilityFinder, (StrmSceneHolder::Hmap)hmap, (StrmSceneHolder::Lmesh)(hmap && land_panel.lmesh), v.proj);
   }
-  void renderPrepass()
+  void renderPrepass(const ViewLodSelect &v, mat44f_cref culling, bool change_frustum = true)
   {
     if (!land_panel.prepass) //! land_panel.trees ||
       return;
@@ -2343,8 +2353,20 @@ public:
     d3d::get_render_target(prevRT);
     d3d::set_render_target({target->getDepth(), 0, 0}, DepthAccess::RW, {});
     renderTrees();
-    renderLevel(true, ViewLodSelect{});
     renderDynamicSpheres();
+    Frustum frustum = visibilityFinder.getFrustum();
+    vec3f saved = visibilityFinder.getViewerPos();
+    if (change_frustum)
+    {
+      visibilityFinder.setFrustum(Frustum(culling));
+      visibilityFinder.setViewerPos(v.vp);
+    }
+    renderLevel(true, v);
+    if (change_frustum)
+    {
+      visibilityFinder.setFrustum(frustum);
+      visibilityFinder.setViewerPos(saved);
+    }
     d3d::set_render_target(prevRT);
   }
   enum class RenderHmap
@@ -2705,10 +2727,10 @@ public:
     ShaderGlobal::setBlock(-1, ShaderGlobal::LAYER_FRAME);
     {
       TIME_D3D_PROFILE(scene)
-      renderPrepass();
       static mat44f gtm;
       if (!stop_camera)
         gtm = globtm;
+      renderPrepass(current, gtm, true);
       renderOpaque(current, gtm, true, true);
       renderDebugHmapTrace();
     }
@@ -3841,11 +3863,14 @@ bool TestConsole::processCommand(const char *argv[], int argc)
   int found = 0;
   CONSOLE_CHECK_NAME("app", "quit", 1, 1) { quit_game(0); }
   CONSOLE_CHECK_NAME("app", "exit", 1, 1) { quit_game(0); }
-  CONSOLE_CHECK_NAME("app", "screenshot", 1, 2)
+  CONSOLE_CHECK_NAME("app", "screenshot", 1, 4)
   {
-    screenshotRequested = true;
     screenshotFilename = argc > 1 ? argv[1] : "";
-    console::print_d("screenshot: will capture next frame");
+    screenshotDelayFrames = argc > 2 ? atoi(argv[2]) : 0;
+    screenshotQuitAfter = argc > 3 ? (atoi(argv[3]) != 0) : false;
+    if (screenshotDelayFrames == 0)
+      screenshotRequested = true;
+    console::print_d("screenshot: will capture after %d frames", screenshotDelayFrames);
   }
   CONSOLE_CHECK_NAME("app", "save_verify_capture", 1, 2)
   {
