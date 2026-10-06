@@ -261,6 +261,10 @@ void apply_fsr(Texture *in_color, Texture *depth_tex, const ApplyContext &apply_
 bool try_init_xess(IPoint2 postfx_resolution, IPoint2 &rendering_resolution, const char *input_name = nullptr,
   const char *depth_name = nullptr);
 void apply_xess(Texture *in_color, Texture *depth_tex, const ApplyContext &apply_context, Texture *target);
+bool try_init_sgsr(IPoint2 postfx_resolution, IPoint2 &rendering_resolution, const char *input_name = nullptr);
+void apply_sgsr(Texture *in_color, Texture *target);
+bool try_init_sgsr2(IPoint2 postfx_resolution, IPoint2 &rendering_resolution, const char *input_name = nullptr);
+void apply_sgsr2(Texture *in_color, Texture *target, bool reset);
 #if _TARGET_C2
 
 

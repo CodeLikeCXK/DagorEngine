@@ -6,6 +6,7 @@ Target      = gameLibs/render/antialiasing.lib ;
 
 AddIncludes =
   $(Root)/prog/gameLibs/publicInclude
+  $(Root)/prog/3rdPartyLibs
 ;
 
 UseMobileAA ?= no ;

@@ -1,6 +1,7 @@
 mountPoint:t=".."
 incDir:t="../../../prog/daNetGameLibs"
 incDir:t="../../../prog/gameLibs"
+incDir:t="../../../prog/3rdPartyLibs"
 
 "@override:source" {
   file:t = "loading/watery.dshl"
@@ -15,6 +16,8 @@ incDir:t="../../../prog/gameLibs"
   file:t = "gpu_objects_volume_placer.dshl"
   file:t = "gpu_objects_prefix_sum.dshl"
   file:t = "antialiasing_fxaa.dshl"
+  file:t = "SnapdragonSuperResolution/shaders/SnapdragonSuperResolution.dshl"
+  file:t = "SnapdragonSuperResolution/shaders/SnapdragonSuperResolution2.dshl"
 }
 
 "@override:Compile" {

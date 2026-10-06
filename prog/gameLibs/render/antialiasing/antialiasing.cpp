@@ -36,12 +36,13 @@
 #endif
 #include <fast_float/fast_float.h>
 
-#if MOBILE_ANTIALIASING && !_TARGET_IOS
+#if (MOBILE_ANTIALIASING && !_TARGET_IOS) || _TARGET_PC_WIN
 #define HAS_SGSR 1
 #endif
 
 #if HAS_SGSR
 #include <SnapdragonSuperResolution/SnapdragonSuperResolution.h>
+#include <SnapdragonSuperResolution/SnapdragonSuperResolution2.h>
 #endif
 
 static constexpr bool dlss_without_streamline()
@@ -541,6 +542,9 @@ struct Context
       auto isResolutionScalingMethod = [](AntialiasingMethod m) {
         return m == AntialiasingMethod::DLSS || m == AntialiasingMethod::XeSS || m == AntialiasingMethod::MSAA ||
                m == AntialiasingMethod::TSR || m == AntialiasingMethod::TAA || m == AntialiasingMethod::FSR
+#if HAS_SGSR
+               || m == AntialiasingMethod::SGSR || m == AntialiasingMethod::SGSR2
+#endif
 #if _TARGET_C2
 
 #endif
@@ -1294,13 +1298,49 @@ struct Context
   }
 
 #if HAS_SGSR
-  bool tryInitSgsr(const IPoint2 &inputResolution)
+  bool tryInitSgsr(const IPoint2 &outputResolution, IPoint2 &inputResolution, const char *input_name = nullptr)
   {
     if (method != AntialiasingMethod::SGSR)
       return false;
 
+    float resolutionScale = 1.0f;
+    if (percentage > 0)
+      resolutionScale = percentage;
+    else
+      switch (quality)
+      {
+        case UpscalingQuality::Native: resolutionScale = 1.0f; break;
+        case UpscalingQuality::UltraQualityPlus:
+        case UpscalingQuality::UltraQuality: resolutionScale = 1.3f; break;
+        case UpscalingQuality::Quality: resolutionScale = 1.5f; break;
+        case UpscalingQuality::Balanced: resolutionScale = 1.7f; break;
+        case UpscalingQuality::Performance: resolutionScale = 2.0f; break;
+        case UpscalingQuality::UltraPerformance: resolutionScale = 3.0f; break;
+        default: resolutionScale = 1.0f; break;
+      }
+
+    inputResolution.x = round(outputResolution.x / resolutionScale);
+    inputResolution.y = round(outputResolution.y / resolutionScale);
+
+    if (inputResolution.x < 32 || inputResolution.y < 32)
+      return false;
+
     sgsr = eastl::make_unique<SnapdragonSuperResolution>();
     sgsr->SetViewport(inputResolution.x, inputResolution.y);
+
+    if (input_name)
+    {
+      aaApplyNode = dafg::register_node("sgsr", DAFG_PP_NODE_SRC, [this, outputResolution, input_name](dafg::Registry registry) {
+        textureFlg = TEXFMT_A16B16G16R16F;
+        auto antialiasedHndl = registry.createTexture2d("frame_after_aa", {textureFlg | TEXCF_RTARGET, outputResolution})
+                                 .atStage(dafg::Stage::PS_OR_CS)
+                                 .useAs(dafg::Usage::COLOR_ATTACHMENT)
+                                 .handle();
+        auto frameHndl =
+          registry.read(input_name).texture().atStage(dafg::Stage::PS_OR_CS).useAs(dafg::Usage::SHADER_RESOURCE).handle();
+        return [this, frameHndl, antialiasedHndl] { applySgsr(frameHndl.get(), antialiasedHndl.get()); };
+      });
+    }
 
     return true;
   }
@@ -1317,12 +1357,56 @@ struct Context
     ShaderGlobal::setBlock(global_frameBlockId, ShaderGlobal::LAYER_FRAME);
   }
 
-  bool tryInitSgsr2(const IPoint2 &outputResolution, IPoint2 &inputResolution)
+  bool tryInitSgsr2(const IPoint2 &outputResolution, IPoint2 &inputResolution, const char *input_name = nullptr)
   {
     if (method != AntialiasingMethod::SGSR2)
       return false;
-    sgsr2.reset(app_glue()->createSGSR2(inputResolution, outputResolution));
+
+    float resolutionScale = 1.0f;
+    if (percentage > 0)
+      resolutionScale = percentage;
+    else
+      switch (quality)
+      {
+        case UpscalingQuality::Native: resolutionScale = 1.0f; break;
+        case UpscalingQuality::UltraQualityPlus:
+        case UpscalingQuality::UltraQuality: resolutionScale = 1.3f; break;
+        case UpscalingQuality::Quality: resolutionScale = 1.5f; break;
+        case UpscalingQuality::Balanced: resolutionScale = 1.7f; break;
+        case UpscalingQuality::Performance: resolutionScale = 2.0f; break;
+        case UpscalingQuality::UltraPerformance: resolutionScale = 3.0f; break;
+        default: resolutionScale = 1.0f; break;
+      }
+
+    inputResolution.x = round(outputResolution.x / resolutionScale);
+    inputResolution.y = round(outputResolution.y / resolutionScale);
+
+    if (inputResolution.x < 32 || inputResolution.y < 32)
+      return false;
+
+    auto *iface = app_glue()->createSGSR2(inputResolution, outputResolution);
+    if (!iface)
+      iface = new SnapdragonSuperResolution2(inputResolution, outputResolution);
+    sgsr2.reset(iface);
     mipBias = sgsr2->getLodBias();
+
+    if (input_name)
+    {
+      aaApplyNode = dafg::register_node("sgsr2", DAFG_PP_NODE_SRC, [this, outputResolution, input_name](dafg::Registry registry) {
+        textureFlg = TEXFMT_A16B16G16R16F;
+        auto antialiasedHndl = registry.createTexture2d("frame_after_aa", {textureFlg | TEXCF_RTARGET, outputResolution})
+                                 .atStage(dafg::Stage::PS_OR_CS)
+                                 .useAs(dafg::Usage::COLOR_ATTACHMENT)
+                                 .handle();
+        auto frameHndl =
+          registry.read(input_name).texture().atStage(dafg::Stage::PS_OR_CS).useAs(dafg::Usage::SHADER_RESOURCE).handle();
+        auto applyCtxHndl = registry.readBlob<ApplyContext>("aa_apply_context").handle();
+        return [this, frameHndl, antialiasedHndl, applyCtxHndl] {
+          applySgsr2(frameHndl.get(), antialiasedHndl.get(), applyCtxHndl.ref().resetHistory);
+        };
+      });
+    }
+
     return true;
   }
 
@@ -2065,13 +2149,11 @@ void recreate(const IPoint2 &display_resolution, const IPoint2 &postfx_resolutio
       break;
 #if HAS_SGSR
     case AntialiasingMethod::SGSR:
-      rendering_resolution = postfx_resolution;
-      if (!g_ctx->tryInitSgsr(postfx_resolution))
+      if (!g_ctx->tryInitSgsr(postfx_resolution, rendering_resolution, input_name))
         fallbackToNone();
       break;
     case AntialiasingMethod::SGSR2:
-      rendering_resolution = postfx_resolution;
-      if (!g_ctx->tryInitSgsr2(display_resolution, rendering_resolution))
+      if (!g_ctx->tryInitSgsr2(postfx_resolution, rendering_resolution, input_name))
         fallbackToNone();
       break;
     case AntialiasingMethod::ARM_ASR:
@@ -2492,6 +2574,13 @@ const char *get_available_methods(bool is_vr, bool names_only)
     if (app_glue()->hasMinimumRenderFeatures())
       aaOptions += ";tsr";
 
+#if HAS_SGSR
+    if (shader_exists("SnapdragonSuperResolution"))
+      aaOptions += ";sgsr";
+    if (shader_exists("sgsr2_2pass_upscale_ps"))
+      aaOptions += ";sgsr2";
+#endif
+
 #if _TARGET_C2
 
 
@@ -2570,7 +2659,7 @@ const char *get_available_upscaling_options(const char *method)
       if (is_xess_quality_available_at_resolution(int(Mode::ULTRA_PERFORMANCE), res.x, res.y))
         names += convert(UpscalingQuality::UltraPerformance, true);
     }
-    else if (stricmp(method, "fsr") == 0)
+    else if (stricmp(method, "fsr") == 0 || stricmp(method, "sgsr") == 0 || stricmp(method, "sgsr2") == 0)
     {
       names.clear();
 
@@ -2903,5 +2992,51 @@ void apply_xess(Texture *in_color, Texture *depth_tex, const ApplyContext &apply
 
 #endif
 
+bool try_init_sgsr(IPoint2 output_resolution, IPoint2 &rendering_resolution, const char *input_name)
+{
+#if HAS_SGSR
+  return g_ctx && g_ctx->tryInitSgsr(output_resolution, rendering_resolution, input_name);
+#else
+  G_UNUSED(output_resolution);
+  G_UNUSED(rendering_resolution);
+  G_UNUSED(input_name);
+  return false;
+#endif
+}
+
+void apply_sgsr(Texture *in_color, Texture *target)
+{
+#if HAS_SGSR
+  if (g_ctx)
+    g_ctx->applySgsr(in_color, target);
+#else
+  G_UNUSED(in_color);
+  G_UNUSED(target);
+#endif
+}
+
+bool try_init_sgsr2(IPoint2 output_resolution, IPoint2 &rendering_resolution, const char *input_name)
+{
+#if HAS_SGSR
+  return g_ctx && g_ctx->tryInitSgsr2(output_resolution, rendering_resolution, input_name);
+#else
+  G_UNUSED(output_resolution);
+  G_UNUSED(rendering_resolution);
+  G_UNUSED(input_name);
+  return false;
+#endif
+}
+
+void apply_sgsr2(Texture *in_color, Texture *target, bool reset)
+{
+#if HAS_SGSR
+  if (g_ctx)
+    g_ctx->applySgsr2(in_color, target, reset);
+#else
+  G_UNUSED(in_color);
+  G_UNUSED(target);
+  G_UNUSED(reset);
+#endif
+}
 
 } // namespace render::antialiasing

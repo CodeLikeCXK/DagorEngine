@@ -76,6 +76,17 @@ shader sgsr2_2pass_convert_ps
   INIT_ZNZFAR()
 
   hlsl(ps) {
+    #undef half
+    #undef half1
+    #undef half2
+    #undef half3
+    #undef half4
+    #define half float
+    #define half1 float
+    #define half2 float2
+    #define half3 float3
+    #define half4 float4
+
     float2 decodeVelocityFromTexture(float2 ev) {
       const float inv_div = 1.0f / (0.499f * 0.5f);
       float2 dv;
@@ -160,7 +171,7 @@ shader sgsr2_2pass_convert_ps
       return float4(motion, depthclip, 0.0);
     }
   }
-  compile("target_ps_half", "main_ps");
+  compile("target_ps", "main_ps");
 }
 
 shader sgsr2_2pass_upscale_ps
@@ -196,6 +207,17 @@ shader sgsr2_2pass_upscale_ps
   INIT_ZNZFAR()
 
   hlsl(ps) {
+    #undef half
+    #undef half1
+    #undef half2
+    #undef half3
+    #undef half4
+    #define half float
+    #define half1 float
+    #define half2 float2
+    #define half3 float3
+    #define half4 float4
+
     float FastLanczos(float base)
     {
       float y = base - 1.0f;
@@ -457,7 +479,7 @@ shader sgsr2_2pass_upscale_ps
       return ret;
     }
   }
-  compile("target_ps_half", "main_ps");
+  compile("target_ps", "main_ps");
 }
 
 
@@ -485,6 +507,17 @@ shader sgsr2_2pass_convert_cs
 
   hlsl(cs)
   {
+    #undef half
+    #undef half1
+    #undef half2
+    #undef half3
+    #undef half4
+    #define half float
+    #define half1 float
+    #define half2 float2
+    #define half3 float3
+    #define half4 float4
+
     float2 decodeVelocityFromTexture(float2 ev) {
       const float inv_div = 1.0f / (0.499f * 0.5f);
       float2 dv;
@@ -591,7 +624,7 @@ shader sgsr2_2pass_convert_cs
       MotionDepthClipAlphaBuffer[dtId.xy] = float4(motion, depthclip, ColorMax);
     }
   }
-  compile("target_cs_half", "main_cs");
+  compile("target_cs", "main_cs");
 }
 
 shader sgsr2_2pass_upscale_cs
@@ -622,6 +655,17 @@ shader sgsr2_2pass_upscale_cs
 
   hlsl(cs)
   {
+    #undef half
+    #undef half1
+    #undef half2
+    #undef half3
+    #undef half4
+    #define half float
+    #define half1 float
+    #define half2 float2
+    #define half3 float3
+    #define half4 float4
+
     float FastLanczos(float base)
     {
       float y = base - 1.0f;
@@ -923,5 +967,5 @@ shader sgsr2_2pass_upscale_cs
       SceneColorOutput[dtId.xy] = float4(Upsampledcw.xyz * scale, 1);
     }
   }
-  compile("target_cs_half", "main_cs");
+  compile("target_cs", "main_cs");
 }
