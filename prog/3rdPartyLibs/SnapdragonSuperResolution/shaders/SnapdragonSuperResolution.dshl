@@ -21,6 +21,7 @@
 include "shader_global.dshl"
 
 float4 snapdragon_super_resolution_ViewportInfo;
+float snapdragon_super_resolution_hdr = 0;
 texture snapdragon_super_resolution_input;
 
 shader SnapdragonSuperResolution
@@ -54,23 +55,56 @@ shader SnapdragonSuperResolution
 	(ps)
 	{
 		ViewportInfo@f4 = snapdragon_super_resolution_ViewportInfo;
+		HdrMode@f1 = snapdragon_super_resolution_hdr;
 		snapdragon_super_resolution_input@smp2d = snapdragon_super_resolution_input;
 	}
 
 	hlsl(ps) {
+		#undef half
+		#undef half1
+		#undef half2
+		#undef half3
+		#undef half4
+		#define half float
+		#define half1 float
+		#define half2 float2
+		#define half3 float3
+		#define half4 float4
+
+		// Optional HDR support: scene-referred linear input is Reinhard-encoded to [0,1) before filtering
+		// and decoded back in the end (HdrMode > 0.5), so the filter's saturate() doesn't clip highlights.
+		float4 sgsrEncode(float4 c)
+		{
+			if (HdrMode > 0.5)
+			{
+				c = max(c, 0.0);
+				return c / (1.0 + c);
+			}
+			return c;
+		}
+		float3 sgsrDecode(float3 c)
+		{
+			if (HdrMode > 0.5)
+			{
+				c = min(c, 0.99995);
+				return c / (1.0 - c);
+			}
+			return c;
+		}
+
 		half4 SGSRRH(float2 p)
 		{
-			half4 res = snapdragon_super_resolution_input.GatherRed(snapdragon_super_resolution_input_samplerstate, p);
+			half4 res = sgsrEncode(snapdragon_super_resolution_input.GatherRed(snapdragon_super_resolution_input_samplerstate, p));
 			return res;
 		}
 		half4 SGSRGH(float2 p)
 		{
-			half4 res = snapdragon_super_resolution_input.GatherGreen(snapdragon_super_resolution_input_samplerstate, p);
+			half4 res = sgsrEncode(snapdragon_super_resolution_input.GatherGreen(snapdragon_super_resolution_input_samplerstate, p));
 			return res;
 		}
 		half4 SGSRBH(float2 p)
 		{
-			half4 res = snapdragon_super_resolution_input.GatherBlue(snapdragon_super_resolution_input_samplerstate, p);
+			half4 res = sgsrEncode(snapdragon_super_resolution_input.GatherBlue(snapdragon_super_resolution_input_samplerstate, p));
 			return res;
 		}
 		half4 SGSRAH(float2 p)
@@ -80,7 +114,7 @@ shader SnapdragonSuperResolution
 		}
 		half4 SGSRRGBH(float2 p)
 		{
-			half4 res = snapdragon_super_resolution_input.SampleLevel(snapdragon_super_resolution_input_samplerstate, p, 0);
+			half4 res = sgsrEncode(snapdragon_super_resolution_input.SampleLevel(snapdragon_super_resolution_input_samplerstate, p, 0));
 			return res;
 		}
 
@@ -212,6 +246,7 @@ shader SnapdragonSuperResolution
 		{
 			half4 OutColor = half4(0, 0, 0, 1);
 			SgsrYuvH(OutColor, input.texcoord, ViewportInfo);
+			OutColor.xyz = sgsrDecode(OutColor.xyz);
 			return OutColor;
 		}
 	}

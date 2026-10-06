@@ -127,6 +127,8 @@
 #include <render/XeSuperSampling.h>
 #include <render/FSR.h>
 #include <render/temporalSuperResolution.h>
+#include <render/SGSR.h>
+#include <render/SGSR2.h>
 #if _TARGET_C2
 
 #endif
@@ -280,12 +282,12 @@ static AntiAliasingMode convertAntialiasingMethod(render::antialiasing::Antialia
     case AntialiasingMethod::DLSS: return AntiAliasingMode::DLSS;
     case AntialiasingMethod::XeSS: return AntiAliasingMode::XESS;
     case AntialiasingMethod::FSR: return AntiAliasingMode::FSR;
+    case AntialiasingMethod::SGSR: return AntiAliasingMode::SGSR;
+    case AntialiasingMethod::SGSR2: return AntiAliasingMode::SGSR2;
     case AntialiasingMethod::TSR:
     case AntialiasingMethod::TAA:
     case AntialiasingMethod::MobileTAA:
     case AntialiasingMethod::MobileTAALow:
-    case AntialiasingMethod::SGSR:
-    case AntialiasingMethod::SGSR2:
     case AntialiasingMethod::ARM_ASR:
     case AntialiasingMethod::METALFX:
     case AntialiasingMethod::METALFX_TEMPORAL: return AntiAliasingMode::TSR;
@@ -2004,7 +2006,8 @@ void WorldRenderer::getPostFxInternalResolution(int &w, int &h) const
 #endif
 
   if (currentAntiAliasingMode == AntiAliasingMode::DLSS || currentAntiAliasingMode == AntiAliasingMode::XESS ||
-      currentAntiAliasingMode == AntiAliasingMode::FSR
+      currentAntiAliasingMode == AntiAliasingMode::FSR || currentAntiAliasingMode == AntiAliasingMode::SGSR ||
+      currentAntiAliasingMode == AntiAliasingMode::SGSR2
 #if _TARGET_C2
 
 #endif
@@ -2105,6 +2108,14 @@ void WorldRenderer::setAntialiasing()
       break;
     case AntiAliasingMode::FSR:
       antiAliasing = eastl::make_unique<FSR>(postFxResolution);
+      ShaderGlobal::set_int(antialiasing_typeVarId, AntiAliasingType::TEMPORAL);
+      break;
+    case AntiAliasingMode::SGSR:
+      antiAliasing = eastl::make_unique<SGSR>(postFxResolution);
+      ShaderGlobal::set_int(antialiasing_typeVarId, AntiAliasingType::NON_TEMPORAL);
+      break;
+    case AntiAliasingMode::SGSR2:
+      antiAliasing = eastl::make_unique<SGSR2>(postFxResolution);
       ShaderGlobal::set_int(antialiasing_typeVarId, AntiAliasingType::TEMPORAL);
       break;
     case AntiAliasingMode::FXAA:

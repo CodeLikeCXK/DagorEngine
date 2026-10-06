@@ -121,6 +121,8 @@ public:
     logdbg("[AMDFSR] Creating upscaling FSRD3D12...");
 
     fsrModule.reset(os_dll_load("amd_fidelityfx_loader_dx12.dll"));
+    if (!fsrModule)
+      fsrModule.reset(os_dll_load("amd_fidelityfx_dx12.dll"));
 
     if (fsrModule)
     {

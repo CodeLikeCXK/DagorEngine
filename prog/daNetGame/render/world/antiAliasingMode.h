@@ -10,6 +10,8 @@ enum class AntiAliasingMode
   XESS,
   FSR,
   SSAA,
+  SGSR,
+  SGSR2,
 #if _TARGET_C2
 
 #endif

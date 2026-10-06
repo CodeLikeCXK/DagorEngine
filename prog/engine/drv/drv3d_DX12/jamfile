@@ -153,7 +153,7 @@ if $(Platform) in windows {
 }
 
 # Upscalers: each has a stub implementation for the platforms without its SDK.
-if $(Platform)-$(PlatformArch) = windows-x86_64 {
+if $(Platform) in windows && $(PlatformArch) in x86_64 arm64 {
   local FidelityFXSDKDir = $(_DEVTOOL)/FidelityFX-SDK-$(FidelityFXVer) ;
 
   if ! [ GLOB $(FidelityFXSDKDir) : * ] { exit FATAL\: \"$(FidelityFXSDKDir)\" not found!  Please, update DEVTOOLS ; }
