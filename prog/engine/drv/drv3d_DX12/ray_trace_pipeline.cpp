@@ -870,8 +870,8 @@ struct PipelineBuilder : AutoLifetimeTimer<AFP_MSEC>
     {
       auto &exports = exportDescs.emplace_back();
       exports.reserve(import.exportNames.size());
-      for (const auto &name : import.exportNames)
-        exports.push_back({name.c_str(), nullptr, D3D12_EXPORT_FLAG_NONE});
+      for (const auto &exportName : import.exportNames)
+        exports.push_back({exportName.c_str(), nullptr, D3D12_EXPORT_FLAG_NONE});
       auto &desc = collectionDescs.emplace_back();
       desc.pExistingCollection = import.collection.Get();
       desc.NumExports = exports.size();

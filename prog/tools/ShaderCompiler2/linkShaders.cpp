@@ -1477,7 +1477,7 @@ void save_scripted_shaders(const char *filename, dag::ConstSpan<SimpleString> fi
   {
     ctx.refinedBlockLayout().forEachVar([&](int, const shc::RefinedBlockVar &var) {
       RefinedBlockLayoutBindumpEntry entry;
-      entry.varName = var.varName;
+      entry.varName = var.varName.c_str();
       entry.cbufOffset = var.cbufOffset.value_or(-1);
       entry.slotCount = semantic::vt_is_numeric(var.varType) ? semantic::vt_float_size(var.varType) : 1;
       entry.space = (var.space != HLSL_RSPACE_INVALID) ? var.space : -1;
