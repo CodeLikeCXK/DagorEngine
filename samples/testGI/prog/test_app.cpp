@@ -1147,156 +1147,10 @@ public:
     const int loadUsec = get_time_usec(loadRef);
     if (level.resourceCount())
     {
-      FullFileLoadCB riCollision(dgs_get_settings()->getStr("ri_collisions", "ri_collisions.bin"));
-      if (riCollision.fileHandle)
-        lruColl.load(riCollision);
-    }
-    {
-      int64_t reft = ref_time_ticks();
-      FullFileLoadCB riCollision(dgs_get_settings()->getStr("ri_collisions", "ri_collisions.bin"));
-      if (riCollision.fileHandle)
-      {
-        swrt.init();
-        struct Mesh
-        {
-          dag::Vector<uint16_t> indices;   // non-wide records
-          dag::Vector<uint32_t> indices32; // wide (>65535 vert) records
-          dag::Vector<Point3> vertices;
-          int lruIdx = 0;
-          int instCount = 0;
-          bool wide = false;
-        };
-        dag::Vector<Mesh> meshes;
-        meshes.reserve(lruColl.count);
-        swrt.reserveAddInstances(lruColl.count);
-
-        // Instance transforms were already read by lruColl.load above, so skip
-        // their payload here and just keep the per-record count in lockstep.
-        struct SwrtHandler
-        {
-          dag::Vector<Mesh> &meshes;
-          const LRUCollision &lruColl;
-          Mesh *cur = nullptr;
-          bool wantMesh(int recordIdx, bool wide)
-          {
-            cur = &meshes.push_back();
-            cur->lruIdx = recordIdx;
-            cur->wide = wide;
-            return true;
-          }
-          void *indexBuffer(int count, bool wide)
-          {
-            if (wide)
-            {
-              cur->indices32.resize(count);
-              return cur->indices32.data();
-            }
-            cur->indices.resize(count);
-            return cur->indices.data();
-          }
-          Point3 *vertexBuffer(int count)
-          {
-            cur->vertices.resize(count);
-            return cur->vertices.data();
-          }
-          mat43f *instanceBuffer(int count)
-          {
-            cur->instCount = count;
-            return nullptr;
-          }
-          void endMesh(int recordIdx, bool, int, int, int)
-          {
-            G_ASSERT(lruColl.instances.size() > recordIdx && lruColl.instances[recordIdx].size() == cur->instCount);
-            G_UNUSED(recordIdx);
-          }
-        } handler{meshes, lruColl};
-        const bool dumpOk = read_ri_collision_dump(riCollision, handler);
-        if (!dumpOk)
-          logerr("ri_collisions: corrupt or truncated collision dump; skipping SWRT build");
-
-        // modelIndex is record-parallel (one slot per lruColl record, -1 == no SWRT model):
-        // remakeSWRTInstances indexes it by record, and dropped records stay -1.
-        modelIndex.assign(lruColl.instances.size(), -1);
-
-        if (dumpOk)
-        {
-          // File I/O was sequential; BLAS build dispatches across workers. Per-worker
-          // RenderSWRT::buildBLAS does not touch shared SWRT state, only the addBuiltModel +
-          // addInstance handoff runs under the spinlock.
-          WinCritSec addLock;
-
-          // Default threadpool size is ~N_cores-3 (61 on this box); at that many workers
-          // the single addBuiltModel critical section starves the builders. Cap at 32: a
-          // sweep on this 7815-mesh scene is flat from ~16..48 once the per-worker
-          // transient allocations go through framemem, so 32 is just a picked round.
-          threadpool::parallel_for_inline(
-            0, (uint32_t)meshes.size(), 64,
-            [&](uint32_t tbegin, uint32_t tend, uint32_t worker_id) {
-              Tab<Point3_vec4> verts4(framemem_ptr());
-              for (uint32_t mi = tbegin; mi < tend; ++mi)
-              {
-                const Mesh &m = meshes[mi];
-                bool anyQualifying = false;
-                for (int j = 0; j < m.instCount; ++j)
-                  if (v_extract_w(lruColl.instancesSph[m.lruIdx][j]) >= minSWRTRadius)
-                  {
-                    anyQualifying = true;
-                    break;
-                  }
-                if (!anyQualifying)
-                  continue;
-
-                verts4.resize(m.vertices.size());
-                for (int j = 0, n = (int)m.vertices.size(); j < n; ++j)
-                  verts4[j] = m.vertices[j];
-
-                static const float dimAsBoxMin = 2.f, dimAsBoxMax = 16.f;
-                daSWRT::BuiltBLAS built = m.wide ? RenderSWRT::buildBLAS(m.indices32.data(), (int)m.indices32.size(), verts4.data(),
-                                                     (int)verts4.size(), dimAsBoxMax, swrt.blasVertsFp16)
-                                                 : RenderSWRT::buildBLAS(m.indices.data(), (int)m.indices.size(), verts4.data(),
-                                                     (int)verts4.size(), dimAsBoxMax, swrt.blasVertsFp16);
-
-                // Score box-resemblance on the SWRT BuiltBLAS itself (FP16-encoded tree).
-                // `isBox()` meshes are already perfect boxes; skip and count separately.
-                if (!built.isBox())
-                {
-                  float boxLike = daSWRT::computeBlasBoxResemblanceVoxel(built.data.data(), 0, (int)built.treeBytes, built.box,
-                    daSWRT::BlasBoxEncoding::Fp16);
-                  // Empirical calibration toward MC-yaw (fitted on this scene, 111 meshes).
-                  // Pow law is the only single-param family that pins (0,0) and (1,1).
-                  boxLike = powf(boxLike, 1.5f);
-                  built.dimAsBoxDist = lerp(dimAsBoxMax, dimAsBoxMin, boxLike);
-                }
-
-                WinAutoLock lk(addLock);
-                modelIndex[m.lruIdx] = swrt.addBuiltModel(eastl::move(built));
-              }
-            },
-            32);
-
-          // Merge per-worker stats and log a single summary line.
-          for (uint32_t mi = 0; mi < meshes.size(); ++mi)
-          {
-            const Mesh &m = meshes[mi];
-            const int modelId = modelIndex[m.lruIdx];
-            if (modelId < 0)
-              continue;
-            for (int j = 0; j < m.instCount; ++j)
-              if (v_extract_w(lruColl.instancesSph[m.lruIdx][j]) >= minSWRTRadius)
-                swrt.addInstance(modelId, lruColl.instances[m.lruIdx][j]);
-          }
-          swrt.copyToGPUAndDestroy(swrt.buildBottomLevelStructures());
-          swrt.clearBLASSourceData();
-          swrt.copyToGPUAndDestroy(swrt.buildTopLevelStructures());
-          swrt.clearTLASSourceData();
-        }
-      }
-      else
-      {
-        debug("missing ri_collisions.bin");
-      }
-      debug("full SWRT in %dus", get_time_usec(reft));
-
+      const int trees = buildSwrt();
+      const int allUsec = get_time_usec(loadRef);
+      debug("level SWRT: %d BLASes, %d with a tree, built in %dus; the load and the SWRT in %dus", swrt.getBLASCount(), trees,
+        allUsec - loadUsec, allUsec);
     }
     daGI2.reset(create_dagi());
 
@@ -2484,31 +2338,16 @@ public:
     TIME_D3D_PROFILE(level);
     geom.level->render(view, hmap, (StrmSceneHolder::Lmesh)(hmap == StrmSceneHolder::Hmap::On && geom.lmesh), v.lmesh);
   }
-  void renderPrepass(const ViewLodSelect &v, mat44f_cref culling, bool change_frustum = true)
-
+  void renderPrepass(const Geometry &geom, const RenderView &view)
   {
     if (!land_panel.prepass) //! land_panel.trees ||
       return;
     TIME_D3D_PROFILE(testScenePrepass);
     SCOPE_RENDER_TARGET;
     d3d::set_render_target({target->getDepth(), 0, 0}, DepthAccess::RW, {});
-    renderTrees();
-    renderDynamicSpheres();
-    Frustum frustum = visibilityFinder.getFrustum();
-    vec3f saved = visibilityFinder.getViewerPos();
-    if (change_frustum)
-    {
-      visibilityFinder.setFrustum(Frustum(culling));
-      visibilityFinder.setViewerPos(v.vp);
-    }
-    renderLevel(true, v);
-    if (change_frustum)
-    {
-      visibilityFinder.setFrustum(frustum);
-      visibilityFinder.setViewerPos(saved);
-    }
-    d3d::set_render_target(prevRT);
-
+    renderTreesCulled(geom, view);
+    renderLevel(geom, view, StrmSceneHolder::Hmap::On, {});
+    renderDynamicSpheres(geom, view);
   }
   static void renderOpaque(const Geometry &geom, const RenderView &view, bool depth,
     StrmSceneHolder::Hmap render_hmap = StrmSceneHolder::Hmap::On, const ViewLodSelect &v = {})
@@ -2828,11 +2667,9 @@ public:
     ShaderGlobal::setBlock(-1, ShaderGlobal::LAYER_FRAME);
     {
       TIME_D3D_PROFILE(scene)
-      static mat44f gtm;
-      if (!stop_camera)
-        gtm = globtm;
-      renderPrepass(current, gtm, true);
-      renderOpaque(current, gtm, true, true);
+      renderPrepass(geom, geometry_view);
+      renderOpaque(geom, geometry_view, false);
+      frame_view.bind();
 
       renderDebugHmapTrace();
     }
