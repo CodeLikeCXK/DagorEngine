@@ -1,3 +1,11 @@
 include "../../../prog/daNetGame/shaders/_build/shaders_dx12.blk"
 include "game_common_override.blk"
 include "loading_screens.blk"
+
+"@override:Compile" {
+  "@override:assume_vars" {
+    hardware_raytracing:i=0
+    rtsm_enabled:i=0
+    vrs_enabled:i=0
+  }
+}

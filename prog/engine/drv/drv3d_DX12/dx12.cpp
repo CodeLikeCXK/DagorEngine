@@ -575,7 +575,11 @@ APISupport check_device_features(const ComPtr<D3DDevice> &device)
     return APISupport::NO_DEVICE_FOUND;
   }
 
+#if defined(_M_ARM64) || defined(__aarch64__)
+  const auto minSmValue = ::dgs_get_settings()->getBlockByNameEx("dx12")->getInt("minShaderModel", D3D_SHADER_MODEL_6_0);
+#else
   const auto minSmValue = ::dgs_get_settings()->getBlockByNameEx("dx12")->getInt("minShaderModel", D3D_SHADER_MODEL_6_5);
+#endif
 
   if (sm.HighestShaderModel < minSmValue)
   {

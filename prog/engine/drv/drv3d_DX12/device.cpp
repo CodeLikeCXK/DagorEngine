@@ -1966,7 +1966,13 @@ void Device::adjustCaps([[maybe_unused]] const DeviceCapsOverrides &overrides, [
   }
 
   bool disableRayTracing = overrides.forceOffRayTracing ||
-    dgs_get_settings()->getBlockByNameEx("dx12")->getBool("disableRayTracing", false);
+    dgs_get_settings()->getBlockByNameEx("dx12")->getBool("disableRayTracing",
+#if defined(_M_ARM64) || defined(__aarch64__)
+      true
+#else
+      false
+#endif
+    );
   if (D3D12_RAYTRACING_TIER_1_0 <= op5.RaytracingTier)
   {
     bool isSoftwareRT = deviceUsesSoftwareRaytracing(op5);

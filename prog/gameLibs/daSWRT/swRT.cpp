@@ -71,13 +71,6 @@ void RenderSWRT::init()
   init_and_get_blue_noise();
   inited = true;
 
-  // On DX12 SM6.2+ the shader compiler activates _HARDWARE_FSH_6_2, which forces
-  // BLAS_VERT_FP16 to 0 in swBLAS.dshl (see the guard added there). Mirror that on the
-  // CPU side so the vertex buffer layout matches what the shader decodes. On SM < 6.2 the
-  // 8-byte FP16 layout remains enabled (blasVertsFp16 defaults to true via the field init).
-  if (d3d::get_driver_code() == d3d::dx12 && d3d::get_driver_desc().shaderModel >= 6.2_sm)
-    blasVertsFp16 = false;
-
 #define CS(a) a = new_compute_shader(#a)
   CS(checkerboard_shadows_swrt_cs);
   CS(shadows_swrt_cs);
