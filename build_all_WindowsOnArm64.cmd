@@ -130,8 +130,8 @@ call compile_game_shaders-dx11.bat
 popd
 
 pushd samples\skiesSample\prog\shaders
-call compile_shaders_dx12.bat -cppStcodeArch=arm64
-call compile_shaders_dx11.bat -cppStcodeArch=arm64
+call compile_shaders_dx12.bat 
+call compile_shaders_dx11.bat 
 popd
 
 pushd samples\testGI\prog\shaders

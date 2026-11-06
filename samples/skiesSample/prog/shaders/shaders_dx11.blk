@@ -1,7 +1,7 @@
 	shader_root_dir:t="."
 outDumpName:t="../../game/compiledShaders/game"
 engineRootDir:t="../../../.."
-compileCppStcode:b=yes
+compileCppStcode:b=no
 
 include common_inc_dirs.blk
 source
