@@ -4698,7 +4698,8 @@ void WorldRenderer::debugDraw()
   if (activeGISystem == GISystem::PRTGI && prtGI)
   {
     prtGI->drawDebugOverlay();
-    prtGI->debugRender();
+    Point3 camPos = Point3::xyz(currentFrameCamera.cameraWorldPos);
+    prtGI->debugRender(&camPos);
   }
 }
 

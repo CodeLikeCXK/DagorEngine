@@ -755,10 +755,67 @@ static bool prtgi_console_handler(const char *argv[], int argc)
     if (wr && wr->getPRTGI())
     {
       auto *prt = wr->getPRTGI();
-      bool enable = (argc > 1) ? console::to_bool(argv[1]) : !prt->getSettings().debugOverlay;
-      prt->setDebugOverlay(enable);
-      console::print_d("PRTGI Debug Overlay: %s", enable ? "ON" : "OFF");
-      visuallog::logmsg(String(0, "PRTGI Debug Overlay: %s", enable ? "ON" : "OFF").c_str(), E3DCOLOR(100, 220, 255), 5);
+      const auto &settings = prt->getSettings();
+
+      if (argc == 1)
+      {
+        // Toggle both HUD and 3D Probe spheres
+        bool enable = !(settings.debugOverlay && settings.debugDraw != daprtgi::DebugVisualMode::None);
+        prt->setDebugOverlay(enable);
+        prt->setDebugDrawMode(enable ? daprtgi::DebugVisualMode::Probes : daprtgi::DebugVisualMode::None);
+
+        console::print_d("PRTGI Debug: %s (HUD & Probes)", enable ? "ON" : "OFF");
+        visuallog::logmsg(String(0, "PRTGI Debug: %s (HUD & Probes)", enable ? "ON" : "OFF").c_str(),
+          enable ? E3DCOLOR(100, 255, 100) : E3DCOLOR(255, 120, 100), 5);
+      }
+      else
+      {
+        const char *arg = argv[1];
+        if (stricmp(arg, "0") == 0 || stricmp(arg, "off") == 0 || stricmp(arg, "no") == 0)
+        {
+          prt->setDebugOverlay(false);
+          prt->setDebugDrawMode(daprtgi::DebugVisualMode::None);
+          console::print_d("PRTGI Debug: OFF");
+          visuallog::logmsg("PRTGI Debug: OFF", E3DCOLOR(255, 120, 100), 5);
+        }
+        else if (stricmp(arg, "probes") == 0)
+        {
+          prt->setDebugOverlay(true);
+          prt->setDebugDrawMode(daprtgi::DebugVisualMode::Probes);
+          console::print_d("PRTGI Debug: Probes Wireframe Visual Mode ON");
+          visuallog::logmsg("PRTGI Debug: Probes Mode ON", E3DCOLOR(100, 255, 100), 5);
+        }
+        else if (stricmp(arg, "validity") == 0)
+        {
+          prt->setDebugOverlay(true);
+          prt->setDebugDrawMode(daprtgi::DebugVisualMode::ValidityMask);
+          console::print_d("PRTGI Debug: Validity Mask Mode (Green=Active, Cyan=Sky, Red=Solid)");
+          visuallog::logmsg("PRTGI Debug: Validity Mask ON", E3DCOLOR(100, 255, 100), 5);
+        }
+        else if (stricmp(arg, "sectors") == 0)
+        {
+          prt->setDebugOverlay(true);
+          prt->setDebugDrawMode(daprtgi::DebugVisualMode::Sectors);
+          console::print_d("PRTGI Debug: Sector BBoxes Mode ON");
+          visuallog::logmsg("PRTGI Debug: Sector BBoxes ON", E3DCOLOR(100, 255, 100), 5);
+        }
+        else if (stricmp(arg, "hud") == 0)
+        {
+          bool hudState = !settings.debugOverlay;
+          prt->setDebugOverlay(hudState);
+          console::print_d("PRTGI Debug HUD: %s", hudState ? "ON" : "OFF");
+          visuallog::logmsg(String(0, "PRTGI Debug HUD: %s", hudState ? "ON" : "OFF").c_str(), E3DCOLOR(100, 220, 255), 5);
+        }
+        else
+        {
+          bool enable = console::to_bool(arg);
+          prt->setDebugOverlay(enable);
+          prt->setDebugDrawMode(enable ? daprtgi::DebugVisualMode::Probes : daprtgi::DebugVisualMode::None);
+          console::print_d("PRTGI Debug: %s (HUD & Probes)", enable ? "ON" : "OFF");
+          visuallog::logmsg(String(0, "PRTGI Debug: %s (HUD & Probes)", enable ? "ON" : "OFF").c_str(),
+            enable ? E3DCOLOR(100, 255, 100) : E3DCOLOR(255, 120, 100), 5);
+        }
+      }
     }
     return true;
   }

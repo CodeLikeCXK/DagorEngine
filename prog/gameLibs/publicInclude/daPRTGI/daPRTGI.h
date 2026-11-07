@@ -97,7 +97,7 @@ public:
   virtual void afterReset() = 0;
 
   // Debugging & HUD
-  virtual void debugRender() = 0;
+  virtual void debugRender(const Point3 *camera_pos = nullptr) = 0;
   virtual void drawDebugOverlay() = 0;
   virtual void drawImGuiWindow() = 0;
   virtual void setDebugOverlay(bool enabled) = 0;

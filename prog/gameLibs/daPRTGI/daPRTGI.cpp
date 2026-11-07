@@ -199,6 +199,8 @@ public:
     if (!ready || !currentSettings.enabled)
       return;
 
+    lastCameraPos = camera_pos;
+
     // Schedule sectors according to camera position and budget
     activeRequestedSectors = scheduler.select(camera_pos, currentSettings.updateBudget);
     stats.currentNearSector = scheduler.getNearSector();
@@ -210,6 +212,8 @@ public:
   {
     if (!ready || !currentSettings.enabled)
       return;
+
+    lastCameraPos = camera_pos;
 
     int64_t tStart = profile_ref_ticks();
 
@@ -239,10 +243,11 @@ public:
     }
   }
 
-  void debugRender() override
+  void debugRender(const Point3 *camera_pos = nullptr) override
   {
     if (!ready) return;
-    debugRenderer.drawWorldDebug(asset, residency, currentSettings.debugDraw, lastCameraPos);
+    Point3 camPos = camera_pos ? *camera_pos : lastCameraPos;
+    debugRenderer.drawWorldDebug(asset, residency, currentSettings.debugDraw, camPos);
   }
 
   void drawDebugOverlay() override

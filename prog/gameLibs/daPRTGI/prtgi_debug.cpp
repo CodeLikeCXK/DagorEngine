@@ -36,8 +36,11 @@ void PRTGIDebugRenderer::drawWorldDebug(const PRTAsset &asset, const PRTSectorRe
   if (mode == DebugVisualMode::Probes || mode == DebugVisualMode::ValidityMask)
   {
     float drawRadius = asset.grid.spacing * 0.12f;
-    float maxDistSq = 16.0f * 16.0f; // only draw probes near camera (16m)
-    int maxSpheresToDraw = 256;      // Hard safety cap to avoid frame rate collapse
+    float maxDist = 24.0f; // only draw probes near camera (24m)
+    float maxDistSq = maxDist * maxDist;
+    BBox3 camBox(camera_pos - Point3(maxDist, maxDist, maxDist), camera_pos + Point3(maxDist, maxDist, maxDist));
+
+    int maxSpheresToDraw = 2048; // Increased cap to avoid frame rate collapse while giving full coverage
     int drawnSpheres = 0;
 
     for (const auto &sec : asset.sectors)
@@ -45,8 +48,18 @@ void PRTGIDebugRenderer::drawWorldDebug(const PRTAsset &asset, const PRTSectorRe
       if (drawnSpheres >= maxSpheresToDraw)
         break;
 
+      // Fast AABB check: skip distant sectors completely
+      if (!(sec.bounds & camBox))
+        continue;
+
       for (size_t i = 0; i < sec.probeIds.size(); ++i)
       {
+        const PRTProbeData &pData = sec.probeData[i];
+
+        // In normal Probes mode, hide buried solid probes so they don't clutter the scene
+        if (mode == DebugVisualMode::Probes && pData.validity == 0)
+          continue;
+
         uint32_t pIdx = sec.probeIds[i];
         IPoint3 coord = asset.grid.getProbeCoord(pIdx);
         Point3 pos = asset.grid.getProbeWorldPos(coord);
@@ -55,11 +68,15 @@ void PRTGIDebugRenderer::drawWorldDebug(const PRTAsset &asset, const PRTSectorRe
         if (distSq > maxDistSq)
           continue;
 
-        const PRTProbeData &pData = sec.probeData[i];
-        E3DCOLOR color = E3DCOLOR(255, 200, 50, 255);
+        E3DCOLOR color = E3DCOLOR(255, 200, 50, 255); // Default gold probe
         if (mode == DebugVisualMode::ValidityMask)
         {
-          color = (pData.validity != 0) ? E3DCOLOR(0, 255, 0, 255) : E3DCOLOR(255, 0, 0, 255);
+          if (pData.validity == 0)
+            color = E3DCOLOR(255, 40, 40, 255);       // Red: buried solid / culled
+          else if (pData.factorCount == 0)
+            color = E3DCOLOR(60, 160, 255, 255);      // Blue/Cyan: pure sky probe
+          else
+            color = E3DCOLOR(50, 255, 80, 255);       // Green: active surface probe
         }
 
         draw_cached_debug_sphere(pos, drawRadius, color, 8);
