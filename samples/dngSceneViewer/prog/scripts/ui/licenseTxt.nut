@@ -57,8 +57,8 @@ function formatLicenseTxt(text){
   return "\n".join(ret)
 }
 
-let showLicense_def = !(dgs_get_settings()?["disableMenu"] ?? false) || !(dgs_get_settings()?["licenseAccepted"] ?? false)
-let showLicense = mkWatched(persist, "showLicense", showLicense_def)
+let showLicense_def = false
+let showLicense = mkWatched(persist, "showLicense", false)
 
 const licenseTxtFname = "LICENSE.txt"
 const acceptKey = "Accept"

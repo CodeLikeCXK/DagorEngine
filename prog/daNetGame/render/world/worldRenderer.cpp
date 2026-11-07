@@ -4694,6 +4694,12 @@ void WorldRenderer::debugDraw()
   draw_rtr_validation();
   draw_ptgi_validation();
   shadowsManager.debugRenderVoxelShadows();
+
+  if (activeGISystem == GISystem::PRTGI && prtGI)
+  {
+    prtGI->drawDebugOverlay();
+    prtGI->debugRender();
+  }
 }
 
 void WorldRenderer::getSunSph0Color(float /*height*/, Color3 &oSun, Color3 &sph0)
@@ -6607,6 +6613,8 @@ WorldRenderer::GiQuality WorldRenderer::getGiQuality() const
     if (algorithm == eastl::string_view("off"))
       return GiAlgorithm::OFF;
 #endif
+    if (algorithm == eastl::string_view("prtgi"))
+      return GiAlgorithm::LOW;
     if (algorithm == eastl::string_view("low"))
       return GiAlgorithm::LOW;
     if (algorithm == eastl::string_view("medium"))

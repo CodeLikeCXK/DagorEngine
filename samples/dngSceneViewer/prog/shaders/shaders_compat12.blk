@@ -1,0 +1,14 @@
+include "../../../../prog/daNetGame/shaders/_build/shaders_compat12.blk"
+include "game_common_override.blk"
+
+"@override:outDumpName":t="../../viewer/compiledShaders/compatPC/gameDX12"
+"@override:Compile" {
+  "@override:fsh":t="5.0"
+  "@override:assume_vars" {
+    hardware_raytracing:i=0
+    rtsm_enabled:i=0
+    vrs_enabled:i=0
+    rtr_depth_mode:i=0
+  }
+}
+

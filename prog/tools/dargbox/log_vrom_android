@@ -47,6 +47,8 @@ DST: samples_prog/_basic/behaviors/pannable.ui.nut
 DST: samples_prog/_basic/behaviors/pannable2touch_2_scrolls.ui.nut
 DST: samples_prog/_basic/behaviors/pannable_2_scrolls.ui.nut
 DST: samples_prog/_basic/behaviors/process_gesture.ui.nut
+DST: samples_prog/_basic/behaviors/process_gesture_2_areas.ui.nut
+DST: samples_prog/_basic/behaviors/process_gesture_touch_pad.ui.nut
 DST: samples_prog/_basic/behaviors/process_pointing_input.ui.nut
 DST: samples_prog/_basic/behaviors/resize_move_scroll.ui.nut
 DST: samples_prog/_basic/behaviors/simple_counter.ui.nut
@@ -56,6 +58,7 @@ DST: samples_prog/_basic/behaviors/tabs.ui.nut
 DST: samples_prog/_basic/behaviors/textarea.ui.nut
 DST: samples_prog/_basic/behaviors/textarea_edit.ui.nut
 DST: samples_prog/_basic/behaviors/textarea_embed.ui.nut
+DST: samples_prog/_basic/behaviors/textarea_long_words.ui.nut
 DST: samples_prog/_basic/behaviors/textarea_preformatted.ui.nut
 DST: samples_prog/_basic/behaviors/textinput.ui.nut
 DST: samples_prog/_basic/behaviors/touch_scroll_container.ui.nut
@@ -66,6 +69,8 @@ DST: samples_prog/_basic/components/combobox.nut
 DST: samples_prog/_basic/components/combobox.style.nut
 DST: samples_prog/_basic/components/combobox.ui.nut
 DST: samples_prog/_basic/components/contextmenu.nut
+DST: samples_prog/_basic/components/holdablebutton.nut
+DST: samples_prog/_basic/components/holdablebutton.ui.nut
 DST: samples_prog/_basic/components/modalwindows.nut
 DST: samples_prog/_basic/components/modalwindows.ui.nut
 DST: samples_prog/_basic/components/multiselect.nut
@@ -92,10 +97,12 @@ DST: samples_prog/_basic/goodies/lens_flare.nut
 DST: samples_prog/_basic/goodies/lens_flare.ui.nut
 DST: samples_prog/_basic/goodies/mk_poly.ui.nut
 DST: samples_prog/_basic/goodies/msgbox.nut
+DST: samples_prog/_basic/goodies/planar_gradients.ui.nut
 DST: samples_prog/_basic/goodies/radial_gradient.nut
 DST: samples_prog/_basic/goodies/radial_gradient.ui.nut
 DST: samples_prog/_basic/goodies/rumble.ui.nut
 DST: samples_prog/_basic/goodies/sounds.ui.nut
+DST: samples_prog/_basic/goodies/stateful_comp.ui.nut
 DST: samples_prog/_basic/goodies/webvideo_datacache.ui.nut
 DST: samples_prog/_basic/goodies/xmb.ui.nut
 DST: samples_prog/_basic/layout/basic_layout.ui.nut
@@ -127,6 +134,7 @@ DST: samples_prog/_basic/render/image_render_modifiers.ui.nut
 DST: samples_prog/_basic/render/images_advanced.ui.nut
 DST: samples_prog/_basic/render/mask.ui.nut
 DST: samples_prog/_basic/render/parent_transparency.ui.nut
+DST: samples_prog/_basic/render/progress_ring.ui.nut
 DST: samples_prog/_basic/render/robj_shader.ui.nut
 DST: samples_prog/_basic/render/robj_worldblur.ui.nut
 DST: samples_prog/_basic/render/svg.ui.nut
@@ -147,6 +155,7 @@ DST: samples_prog/_cursors.nut
 DST: samples_prog/advanced/async.ui.nut
 DST: samples_prog/advanced/button_adv.ui.nut
 DST: samples_prog/advanced/calc_comp_size.ui.nut
+DST: samples_prog/advanced/calc_content_size.ui.nut
 DST: samples_prog/advanced/coloring.ui.nut
 DST: samples_prog/advanced/computedcomponents.ui.nut
 DST: samples_prog/advanced/computedsubscribers.ui.nut
@@ -171,9 +180,17 @@ DST: samples_prog/benchmarks/bench_list_update.ui.nut
 DST: samples_prog/benchmarks/bench_static.ui.nut
 DST: samples_prog/benchmarks/bench_stats.nut
 DST: samples_prog/benchmarks/bench_text_heavy.ui.nut
+DST: samples_prog/benchmarks/bench_virtual_common.nut
+DST: samples_prog/benchmarks/bench_virtual_list.ui.nut
+DST: samples_prog/benchmarks/bench_virtual_list_off.ui.nut
 DST: samples_prog/benchmarks/benchmark.ui.nut
 DST: samples_prog/benchmarks/benchmark1.ui.nut
 DST: samples_prog/benchmarks/research_tree.ui.nut
+DST: samples_prog/benchmarks/test_touch_pad_gestures.ui.nut
+DST: samples_prog/benchmarks/test_virtual_list_focus.ui.nut
+DST: samples_prog/benchmarks/test_virtual_list_horiz.ui.nut
+DST: samples_prog/benchmarks/test_virtual_list_keepfocus.ui.nut
+DST: samples_prog/benchmarks/test_virtual_list_padding.ui.nut
 DST: samples_prog/captcha/captcha.ui.nut
 DST: samples_prog/darg_panels/pie_menu.ui.nut
 DST: samples_prog/darg_panels/scrollable_panel.ui.nut
@@ -250,12 +267,12 @@ DST: samples_prog/zbugs/dnd_pass_through_stopmouse.ui.nut
 DST: samples_prog/zbugs/errors_handling.ui.nut
 DST: samples_prog/zbugs/flex_children_more_parent.ui.nut
 DST: samples_prog/zbugs/float_margin_padding.ui.nut
+DST: samples_prog/zbugs/flow_vs_pos.ui.nut
 DST: samples_prog/zbugs/fontfx_affects_size_when_rotate.ui.nut
 DST: samples_prog/zbugs/fonttexnotfullheight.ui.nut
 DST: samples_prog/zbugs/function_null.ui.nut
 DST: samples_prog/zbugs/maxheight_with_null_child.ui.nut
 DST: samples_prog/zbugs/onattach.ui.nut
-DST: samples_prog/zbugs/static_reload.ui.nut
 DST: samples_prog/zbugs/too_much_rebuilds.ui.nut
 DST: samples_prog/zbugs/vert_flex_layout.ui.nut
 DST: samples_prog/zbugs/wrong_svg_texture_stretching.ui.nut
@@ -335,6 +352,8 @@ SRC: gamebase/samples_prog/_basic/behaviors/pannable.ui.nut
 SRC: gamebase/samples_prog/_basic/behaviors/pannable2touch_2_scrolls.ui.nut
 SRC: gamebase/samples_prog/_basic/behaviors/pannable_2_scrolls.ui.nut
 SRC: gamebase/samples_prog/_basic/behaviors/process_gesture.ui.nut
+SRC: gamebase/samples_prog/_basic/behaviors/process_gesture_2_areas.ui.nut
+SRC: gamebase/samples_prog/_basic/behaviors/process_gesture_touch_pad.ui.nut
 SRC: gamebase/samples_prog/_basic/behaviors/process_pointing_input.ui.nut
 SRC: gamebase/samples_prog/_basic/behaviors/resize_move_scroll.ui.nut
 SRC: gamebase/samples_prog/_basic/behaviors/simple_counter.ui.nut
@@ -344,6 +363,7 @@ SRC: gamebase/samples_prog/_basic/behaviors/tabs.ui.nut
 SRC: gamebase/samples_prog/_basic/behaviors/textarea.ui.nut
 SRC: gamebase/samples_prog/_basic/behaviors/textarea_edit.ui.nut
 SRC: gamebase/samples_prog/_basic/behaviors/textarea_embed.ui.nut
+SRC: gamebase/samples_prog/_basic/behaviors/textarea_long_words.ui.nut
 SRC: gamebase/samples_prog/_basic/behaviors/textarea_preformatted.ui.nut
 SRC: gamebase/samples_prog/_basic/behaviors/textInput.ui.nut
 SRC: gamebase/samples_prog/_basic/behaviors/touch_scroll_container.ui.nut
@@ -354,6 +374,8 @@ SRC: gamebase/samples_prog/_basic/components/combobox.nut
 SRC: gamebase/samples_prog/_basic/components/combobox.style.nut
 SRC: gamebase/samples_prog/_basic/components/combobox.ui.nut
 SRC: gamebase/samples_prog/_basic/components/contextMenu.nut
+SRC: gamebase/samples_prog/_basic/components/holdableButton.nut
+SRC: gamebase/samples_prog/_basic/components/holdableButton.ui.nut
 SRC: gamebase/samples_prog/_basic/components/modalWindows.nut
 SRC: gamebase/samples_prog/_basic/components/modalWindows.ui.nut
 SRC: gamebase/samples_prog/_basic/components/multiselect.nut
@@ -380,10 +402,12 @@ SRC: gamebase/samples_prog/_basic/goodies/lens_flare.nut
 SRC: gamebase/samples_prog/_basic/goodies/lens_flare.ui.nut
 SRC: gamebase/samples_prog/_basic/goodies/mk_poly.ui.nut
 SRC: gamebase/samples_prog/_basic/goodies/msgbox.nut
+SRC: gamebase/samples_prog/_basic/goodies/planar_gradients.ui.nut
 SRC: gamebase/samples_prog/_basic/goodies/radial_gradient.nut
 SRC: gamebase/samples_prog/_basic/goodies/radial_gradient.ui.nut
 SRC: gamebase/samples_prog/_basic/goodies/rumble.ui.nut
 SRC: gamebase/samples_prog/_basic/goodies/sounds.ui.nut
+SRC: gamebase/samples_prog/_basic/goodies/stateful_comp.ui.nut
 SRC: gamebase/samples_prog/_basic/goodies/webvideo_datacache.ui.nut
 SRC: gamebase/samples_prog/_basic/goodies/xmb.ui.nut
 SRC: gamebase/samples_prog/_basic/layout/basic_layout.ui.nut
@@ -415,6 +439,7 @@ SRC: gamebase/samples_prog/_basic/render/image_render_modifiers.ui.nut
 SRC: gamebase/samples_prog/_basic/render/images_advanced.ui.nut
 SRC: gamebase/samples_prog/_basic/render/mask.ui.nut
 SRC: gamebase/samples_prog/_basic/render/parent_transparency.ui.nut
+SRC: gamebase/samples_prog/_basic/render/progress_ring.ui.nut
 SRC: gamebase/samples_prog/_basic/render/robj_shader.ui.nut
 SRC: gamebase/samples_prog/_basic/render/robj_worldblur.ui.nut
 SRC: gamebase/samples_prog/_basic/render/svg.ui.nut
@@ -435,6 +460,7 @@ SRC: gamebase/samples_prog/_cursors.nut
 SRC: gamebase/samples_prog/advanced/async.ui.nut
 SRC: gamebase/samples_prog/advanced/button_adv.ui.nut
 SRC: gamebase/samples_prog/advanced/calc_comp_size.ui.nut
+SRC: gamebase/samples_prog/advanced/calc_content_size.ui.nut
 SRC: gamebase/samples_prog/advanced/coloring.ui.nut
 SRC: gamebase/samples_prog/advanced/computedComponents.ui.nut
 SRC: gamebase/samples_prog/advanced/computedSubscribers.ui.nut
@@ -459,9 +485,17 @@ SRC: gamebase/samples_prog/benchmarks/bench_list_update.ui.nut
 SRC: gamebase/samples_prog/benchmarks/bench_static.ui.nut
 SRC: gamebase/samples_prog/benchmarks/bench_stats.nut
 SRC: gamebase/samples_prog/benchmarks/bench_text_heavy.ui.nut
+SRC: gamebase/samples_prog/benchmarks/bench_virtual_common.nut
+SRC: gamebase/samples_prog/benchmarks/bench_virtual_list.ui.nut
+SRC: gamebase/samples_prog/benchmarks/bench_virtual_list_off.ui.nut
 SRC: gamebase/samples_prog/benchmarks/benchmark.ui.nut
 SRC: gamebase/samples_prog/benchmarks/benchmark1.ui.nut
 SRC: gamebase/samples_prog/benchmarks/research_tree.ui.nut
+SRC: gamebase/samples_prog/benchmarks/test_touch_pad_gestures.ui.nut
+SRC: gamebase/samples_prog/benchmarks/test_virtual_list_focus.ui.nut
+SRC: gamebase/samples_prog/benchmarks/test_virtual_list_horiz.ui.nut
+SRC: gamebase/samples_prog/benchmarks/test_virtual_list_keepfocus.ui.nut
+SRC: gamebase/samples_prog/benchmarks/test_virtual_list_padding.ui.nut
 SRC: gamebase/samples_prog/captcha/captcha.ui.nut
 SRC: gamebase/samples_prog/darg_panels/pie_menu.ui.nut
 SRC: gamebase/samples_prog/darg_panels/scrollable_panel.ui.nut
@@ -538,12 +572,12 @@ SRC: gamebase/samples_prog/zbugs/dnd_pass_through_stopmouse.ui.nut
 SRC: gamebase/samples_prog/zbugs/errors_handling.ui.nut
 SRC: gamebase/samples_prog/zbugs/flex_children_more_parent.ui.nut
 SRC: gamebase/samples_prog/zbugs/float_margin_padding.ui.nut
+SRC: gamebase/samples_prog/zbugs/flow_vs_pos.ui.nut
 SRC: gamebase/samples_prog/zbugs/fontfx_affects_size_when_rotate.ui.nut
 SRC: gamebase/samples_prog/zbugs/fontTexNotFullHeight.ui.nut
 SRC: gamebase/samples_prog/zbugs/function_null.ui.nut
 SRC: gamebase/samples_prog/zbugs/maxHeight_with_null_child.ui.nut
 SRC: gamebase/samples_prog/zbugs/onAttach.ui.nut
-SRC: gamebase/samples_prog/zbugs/static_reload.ui.nut
 SRC: gamebase/samples_prog/zbugs/too_much_rebuilds.ui.nut
 SRC: gamebase/samples_prog/zbugs/vert_flex_layout.ui.nut
 SRC: gamebase/samples_prog/zbugs/wrong_svg_texture_stretching.ui.nut
@@ -578,4 +612,4 @@ SRC: ../../../tools/dargbox/ui/round_border.svg
 SRC: ../../../tools/dargbox/ui/tiger.svg
 SRC: ../../../tools/dargbox/ui/white_circle.png
 SRC: ../../../tools/dargbox/ui/white_circle.tga
-packed 288 files (total size=24936432) into vromfs binary dump ../../../tools/dargbox/android.vromfs.bin, packed size=18093121 [for 5.618 sec]
+packed 305 files (total size=25003536) into vromfs binary dump ../../../tools/dargbox/android.vromfs.bin, packed size=18108039 [for 7.643 sec]

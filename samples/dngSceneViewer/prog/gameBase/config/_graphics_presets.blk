@@ -1,8 +1,12 @@
 low {
   graphics {
+    fullDeferred:b=no
+    gi {
+      system:t="prtgi"
+    }
     shadowsQuality:t="low"
     dynamicShadowsQuality:t="low"
-    giAlgorithm:t="medium"
+    giAlgorithm:t="low"
     giAlgorithmQuality:r=0.5
     skiesQuality:t="medium"
     aoQuality:t="low"

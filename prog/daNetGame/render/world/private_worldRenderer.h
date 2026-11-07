@@ -48,6 +48,7 @@
 #include <render/resourceSlot/nodeHandleWithSlotsAccess.h>
 #include <render/motionVectorAccess.h>
 #include <render/heroData.h>
+#include <daPRTGI/daPRTGI.h>
 #include "satelliteRenderer.h"
 
 #include "antiAliasingMode.h"
@@ -224,6 +225,15 @@ public:
   WorldRenderer();
   WorldRenderer(const WorldRenderer &) = delete;
   ~WorldRenderer();
+
+  enum class GISystem
+  {
+    DAGI2,
+    PRTGI
+  };
+  GISystem activeGISystem = GISystem::DAGI2;
+  void switchGISystem(GISystem sys);
+  daprtgi::IDaPRTGI *getPRTGI() { return prtGI.get(); }
 
   // IRenderWorld
   virtual void update(float dt, float real_dt, const TMatrix &itm); // can be called independent on draw
@@ -1152,6 +1162,7 @@ private:
   bool legacyGPUObjectsVisibilityInitialized = false;
   void clearLegacyGPUObjectsVisibility();
   DaGI *daGI2 = 0;
+  eastl::unique_ptr<daprtgi::IDaPRTGI> prtGI;
   RendInstMediaVolumes mediaVolumes;
   eastl::unique_ptr<GIWindows> giWindows;
   float giDynamicQuality = 1;

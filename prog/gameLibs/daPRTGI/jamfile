@@ -1,0 +1,31 @@
+Root    ?= ../../.. ;
+StrictCompile = yes ;
+include $(Root)/prog/_jBuild/defaults.jam ;
+
+Location = prog/gameLibs/daPRTGI ;
+
+TargetType  = lib ;
+Target      = gameLibs/daPRTGI.lib ;
+
+AddIncludes =
+  $(Root)/prog/gameLibs/publicInclude
+  $(Root)/$(Location)
+  $(Root)/$(Location)/shaders
+  $(Root)/prog/engine/sharedInclude
+  $(Root)/prog/3rdPartyLibs
+;
+
+local AllSources = [ GLOB $(Root)/$(Location) : *.cpp ] ;
+Sources = $(AllSources:D=) ;
+
+UseProgLibs +=
+  engine/lib3d
+  engine/kernel
+  engine/ioSys
+  engine/perfMon
+  engine/imgui
+;
+
+include $(Root)/prog/3rdPartyLibs/phys/setup-phys.jam ;
+include $(Root)/prog/_jBuild/build.jam ;
+

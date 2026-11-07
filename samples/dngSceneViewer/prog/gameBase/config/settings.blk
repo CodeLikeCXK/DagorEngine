@@ -1,3 +1,5 @@
+licenseAccepted:b=yes
+disableMenu:b=yes
 log_lut:b= yes
 loadingScreen{
   default:t="watery"
@@ -13,6 +15,17 @@ graphics{
   dafx:t="cpu"
   screenEffect:b=no
   forceEnableMotionVectors:b=yes
+
+  prtgi {
+    enabled:b = yes          // Enable PRTGI subsystem
+    debug:b = yes            // PRTGI Debug toggle: Displays on-screen build & runtime HUD overlay upon startup
+    bakingMode:t = "auto"    // "auto" (load cache or bake on load), "offline", "force_bake"
+    gridSpacing:r = 2.0      // Spacing between probes in meters
+    sectorSize:i = 32        // Sector size in grid probes along X and Z
+    updateBudget:i = 2       // Number of sectors to relight per frame
+    debugDrawProbes:b = no   // Visualize 3D probe spheres in scene
+    cacheFolder:t = "prtgi"  // Unified storage for bake assets and logs
+  }
 }
 
 vromList {

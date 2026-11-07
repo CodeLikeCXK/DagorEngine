@@ -1,0 +1,5 @@
+include "../../../../prog/daNetGame/shaders/_build/shaders_compat11_pc.blk"
+include "game_common_override.blk"
+
+"@override:outDumpName":t="../../viewer/compiledShaders/compatPC/game"
+

@@ -1,0 +1,104 @@
+include "shader_global.dshl"
+
+int _prtProbeCount;
+float _prtEnvironmentIntensity;
+
+buffer _prtProbeData;
+buffer _factors;
+buffer _prtSkyVisibility;
+buffer _prtCommittedSH;
+
+int4 _prtSlotCount;
+texture _coefficientVoxel3DRW;
+
+shader prt_probe_relight_cs
+{
+  supports global_frame;
+
+  (cs) {
+    _prtProbeCount@i1 = _prtProbeCount;
+    _prtEnvironmentIntensity@f1 = _prtEnvironmentIntensity;
+    _prtProbeData@buf = _prtProbeData hlsl {
+      #include "prtgi_common.hlsli"
+      StructuredBuffer<PRTProbeData> _prtProbeData@buf;
+    };
+    _factors@buf = _factors hlsl { StructuredBuffer<BrickFactor> _factors@buf; };
+    _prtSkyVisibility@buf = _prtSkyVisibility hlsl { StructuredBuffer<uint> _prtSkyVisibility@buf; };
+    _prtCommittedSH@uav = _prtCommittedSH hlsl { RWStructuredBuffer<float4> _prtCommittedSH@uav; };
+  }
+
+  hlsl(cs) {
+    #define PROBE_THREADS 64
+    [numthreads(PROBE_THREADS, 1, 1)]
+    void cs_main(uint3 id : SV_DispatchThreadID)
+    {
+      uint probeIdx = id.x;
+      if (probeIdx >= (uint)_prtProbeCount)
+        return;
+
+      PRTProbeData probe = _prtProbeData[probeIdx];
+      float3 coefficients[9];
+      for (int i = 0; i < 9; ++i)
+        coefficients[i] = 0;
+
+      // Accumulate brick factors
+      for (int edge = 0; edge < probe.factorCount; ++edge)
+      {
+        BrickFactor factor = _factors[probe.factorStart + edge];
+        float sh[9];
+        prt_factor_sh(factor, sh);
+        float3 radiance = float3(0.5, 0.5, 0.5); // Simplified brick radiance reference
+
+        for (int c = 0; c < 9; ++c)
+          coefficients[c] += radiance * sh[c];
+      }
+
+      // Add sky visibility
+      uint skyVis = _prtSkyVisibility[probeIdx];
+      float3 skyRadiance = float3(0.3, 0.45, 0.7) * _prtEnvironmentIntensity;
+      float skyFactor = (float)countbits(skyVis) / 32.0f;
+      coefficients[0] += skyRadiance * skyFactor * 3.54f;
+
+      // Store SH9 coefficients (9 x float4)
+      for (int c = 0; c < 9; ++c)
+      {
+        _prtCommittedSH[probeIdx * 9u + c] = float4(coefficients[c], 1.0f);
+      }
+    }
+  }
+
+  compile("cs_5_0", "cs_main");
+}
+
+shader prt_publish_cs
+{
+  supports global_frame;
+
+  (cs) {
+    _prtSlotCount@i4 = _prtSlotCount;
+    _coefficientVoxel3DRW@uav = _coefficientVoxel3DRW hlsl { RWTexture3D<float4> _coefficientVoxel3DRW@uav; };
+  }
+
+  hlsl(cs) {
+    #include "prtgi_common.hlsli"
+
+    [numthreads(8, 4, 8)]
+    void cs_publish(uint3 id : SV_DispatchThreadID)
+    {
+      if (any(id >= uint3(_prtSlotCount.xyz)))
+        return;
+
+      int3 slot = int3(id);
+      // Publish ambient / SH0 coefficient slice
+      for (uint c = 0; c < 9u; ++c)
+      {
+        int3 texCoord = prt_texture_coordinate(slot, 0, c, _prtSlotCount);
+        // Default published ambient baseline
+        _coefficientVoxel3DRW[texCoord] = (c == 0) ? float4(0.2, 0.25, 0.35, 1.0) : float4(0, 0, 0, 1.0);
+      }
+    }
+  }
+
+  compile("cs_5_0", "cs_publish");
+}
+

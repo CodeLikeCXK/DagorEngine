@@ -1,0 +1,58 @@
+#ifndef PRTGI_SAMPLE_DSHL
+#define PRTGI_SAMPLE_DSHL
+
+float4 _prtGridOrigin;
+int4 _prtGridMin;
+int4 _prtGridCount;
+int4 _prtSlotCount;
+float _prtGridSpacing;
+int _prtCascadeCount;
+int _prtVolumeEnabled;
+texture _coefficientVoxel3D;
+
+macro PRTGI_PROBE_VOLUME_SAMPLE_INIT(stage)
+  (stage) {
+    _prtGridOrigin@f4 = _prtGridOrigin;
+    _prtGridMin@i4 = _prtGridMin;
+    _prtGridCount@i4 = _prtGridCount;
+    _prtSlotCount@i4 = _prtSlotCount;
+    _prtGridSpacing@f1 = _prtGridSpacing;
+    _prtCascadeCount@i1 = _prtCascadeCount;
+    _prtVolumeEnabled@i1 = _prtVolumeEnabled;
+    _coefficientVoxel3D@tex = _coefficientVoxel3D hlsl { Texture3D<float4> _coefficientVoxel3D@tex; };
+  }
+endmacro
+
+macro PRTGI_PROBE_VOLUME_SAMPLE_USE(stage)
+  hlsl(stage) {
+    #include "prtgi_common.hlsli"
+
+    float3 sample_prtgi_irradiance(float3 worldPos, float3 normal)
+    {
+      if (_prtVolumeEnabled == 0 || _prtGridSpacing <= 0.0f)
+        return float3(0.08, 0.08, 0.1); // Fallback ambient
+
+      float3 localPos = (worldPos - _prtGridOrigin.xyz) / _prtGridSpacing;
+      int3 probeNode = int3(floor(localPos));
+
+      // Wrap horizontal coordinates toroidally
+      int3 slot = prt_publication_slot(probeNode, 0, _prtSlotCount, int4(0, 0, 0, 0));
+      int3 texCoord = prt_texture_coordinate(slot, 0, 0, _prtSlotCount);
+
+      // Fetch L0 ambient coefficient from 3D texture
+      float4 sh0 = _coefficientVoxel3D.Load(int4(texCoord, 0));
+
+      // Approximate diffuse irradiance: SH0 * 0.282 + directional normal contribution
+      float3 irradiance = sh0.rgb * 3.54f * max(0.2f, normal.y * 0.3f + 0.7f);
+      return max(float3(0.01, 0.01, 0.01), irradiance);
+    }
+  }
+endmacro
+
+macro PRTGI_PROBE_VOLUME_SAMPLE(stage)
+  PRTGI_PROBE_VOLUME_SAMPLE_INIT(stage)
+  PRTGI_PROBE_VOLUME_SAMPLE_USE(stage)
+endmacro
+
+#endif
+

@@ -46,6 +46,7 @@
 #include <util/dag_string.h>
 
 #include <gui/dag_visualLog.h>
+#include <gui/dag_imgui.h>
 #include <shaders/dag_shaderDbg.h>
 #include <util/dag_delayedAction.h>
 
@@ -686,8 +687,120 @@ bool RendererConsole::processCommand(const char *argv[], int argc)
   }
   CONSOLE_CHECK_NAME("biome_query", "queryPos", 1, 5) { biome_query::console_query_pos(argv, argc); }
   CONSOLE_CHECK_NAME("biome_query", "queryCameraPos", 1, 2) { biome_query::console_query_camera_pos(argv, argc, ::grs_cur_view.itm); }
+
   return found;
 }
 
 void init_renderer_console() { add_con_proc(&renderer_console); }
 void close_renderer_console() { del_con_proc(&renderer_console); }
+
+static bool prtgi_console_handler(const char *argv[], int argc)
+{
+  if (argc < 1)
+    return false;
+  int found = 0;
+  WorldRenderer *wr = (WorldRenderer *)get_world_renderer();
+
+  CONSOLE_CHECK_NAME("prtgi", "bake", 1, 3)
+  {
+    if (!wr || !wr->getPRTGI())
+    {
+      console::print_d("PRTGI is not initialized!");
+      visuallog::logmsg("PRTGI is not initialized!", E3DCOLOR(255, 80, 80), 5);
+      return true;
+    }
+    auto *prt = wr->getPRTGI();
+    float spacing = argc > 1 ? (float)atof(argv[1]) : prt->getSettings().gridSpacing;
+    auto s = prt->getSettings();
+    s.gridSpacing = spacing;
+    prt->setSettings(s);
+    console::print_d("PRTGI: Baking scene (spacing=%.2f)...", spacing);
+    visuallog::logmsg(String(0, "PRTGI: Baking scene (spacing=%.2f)...", spacing).c_str(), E3DCOLOR(100, 220, 255), 5);
+    prt->loadOrBakeScene("console_bake", true);
+    console::print_d("PRTGI: Bake completed!");
+    visuallog::logmsg("PRTGI: Bake completed!", E3DCOLOR(100, 255, 100), 5);
+    return true;
+  }
+  CONSOLE_CHECK_NAME("prtgi", "save", 1, 2)
+  {
+    if (wr && wr->getPRTGI())
+    {
+      const char *name = argc > 1 ? argv[1] : "manual_save";
+      wr->getPRTGI()->saveScene(name);
+      console::print_d("PRTGI: Saved scene as %s", name);
+      visuallog::logmsg(String(0, "PRTGI: Saved scene as %s", name).c_str(), E3DCOLOR(100, 255, 100), 5);
+    }
+    return true;
+  }
+  CONSOLE_CHECK_NAME("prtgi", "switch", 1, 2)
+  {
+    if (argc > 1 && wr)
+    {
+      if (stricmp(argv[1], "dagi2") == 0)
+        wr->switchGISystem(WorldRenderer::GISystem::DAGI2);
+      else if (stricmp(argv[1], "prtgi") == 0)
+        wr->switchGISystem(WorldRenderer::GISystem::PRTGI);
+      else
+        console::print_d("Unknown GI system: %s (choose 'dagi2' or 'prtgi')", argv[1]);
+    }
+    else if (wr)
+    {
+      console::print_d("Current GI System: %s", wr->activeGISystem == WorldRenderer::GISystem::DAGI2 ? "daGI2" : "PRTGI");
+      visuallog::logmsg(String(0, "Current GI System: %s", wr->activeGISystem == WorldRenderer::GISystem::DAGI2 ? "daGI2" : "PRTGI").c_str(), E3DCOLOR(100, 220, 255), 5);
+    }
+    return true;
+  }
+  CONSOLE_CHECK_NAME("prtgi", "debug", 1, 2)
+  {
+    if (wr && wr->getPRTGI())
+    {
+      auto *prt = wr->getPRTGI();
+      bool enable = (argc > 1) ? console::to_bool(argv[1]) : !prt->getSettings().debugOverlay;
+      prt->setDebugOverlay(enable);
+      console::print_d("PRTGI Debug Overlay: %s", enable ? "ON" : "OFF");
+      visuallog::logmsg(String(0, "PRTGI Debug Overlay: %s", enable ? "ON" : "OFF").c_str(), E3DCOLOR(100, 220, 255), 5);
+    }
+    return true;
+  }
+  CONSOLE_CHECK_NAME("prtgi", "budget", 2, 2)
+  {
+    if (wr && wr->getPRTGI())
+    {
+      auto *prt = wr->getPRTGI();
+      int budget = console::to_int(argv[1]);
+      auto s = prt->getSettings();
+      s.updateBudget = budget;
+      prt->setSettings(s);
+      console::print_d("PRTGI Update Budget set to: %d sectors/frame", budget);
+      visuallog::logmsg(String(0, "PRTGI Budget: %d sectors/frame", budget).c_str(), E3DCOLOR(100, 220, 255), 5);
+    }
+    return true;
+  }
+  CONSOLE_CHECK_NAME("prtgi", "stats", 1, 1)
+  {
+    if (wr && wr->getPRTGI())
+    {
+      const auto &st = wr->getPRTGI()->getStats();
+      console::print_d("=== PRTGI Stats ===");
+      console::print_d("Status: %s", st.bakingStatus);
+      console::print_d("Probes: %u | Sectors: %u (Resident: %u)", st.totalProbes, st.totalSectors, st.residentSectors);
+      console::print_d("Surfels: %u | Bricks: %u", st.totalSurfels, st.totalBricks);
+      console::print_d("Factors VRAM: %.2f MB", (double)st.factorsMemoryBytes / (1024.0 * 1024.0));
+      console::print_d("Relight Time: %.3f ms", st.lastRelightDurationMs);
+
+      visuallog::logmsg(String(0, "[PRTGI Stats] Probes: %u | Sectors: %u (Res: %u) | Relight: %.2fms",
+        st.totalProbes, st.totalSectors, st.residentSectors, st.lastRelightDurationMs).c_str(), E3DCOLOR(100, 255, 100), 7);
+    }
+    return true;
+  }
+  return found;
+}
+REGISTER_CONSOLE_HANDLER(prtgi_console_handler);
+
+static void prtgi_imgui_window()
+{
+  WorldRenderer *wr = (WorldRenderer *)get_world_renderer();
+  if (wr && wr->getPRTGI())
+    wr->getPRTGI()->drawImGuiWindow();
+}
+REGISTER_IMGUI_WINDOW("Render", "PRTGI Global Illumination", prtgi_imgui_window);

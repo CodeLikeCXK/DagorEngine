@@ -8,6 +8,7 @@
 #include <daECS/core/entitySystem.h>
 #include <ecs/phys/physEvents.h>
 
+#include <gui/dag_visualLog.h>
 #include <memory/dag_framemem.h>
 #include <gameRes/dag_collisionResource.h>
 #include <gamePhys/collision/collisionLib.h>
@@ -400,6 +401,19 @@ DaGISettings WorldRenderer::getGISettings() const
 
 void WorldRenderer::giBeforeRender()
 {
+  if (activeGISystem == GISystem::PRTGI)
+  {
+    if (prtGI && !gi_enabled.get())
+      closeGI();
+
+    if (!prtGI && gi_enabled.get())
+      initGI();
+
+    if (prtGI)
+      prtGI->updateConstants();
+    return;
+  }
+
   if (daGI2 && !gi_enabled.get())
     closeGI();
 
@@ -486,6 +500,9 @@ void WorldRenderer::giBeforeRender()
       ru = DaGI::RadianceUpdate::Off;
   }
 
+  if (!daGI2)
+    return;
+
   daGI2->beforeRender(w, h, maxW, maxH, currentFrameCamera.viewItm, currentFrameCamera.jitterProjTm,
     currentFrameCamera.noJitterPersp.zn, currentFrameCamera.noJitterPersp.zf, ru);
 
@@ -514,6 +531,8 @@ void WorldRenderer::renderGiCollision(const TMatrix &view_itm, const Frustum &)
 
 bool WorldRenderer::requiresGIUpdate() const
 {
+  if (activeGISystem == GISystem::PRTGI)
+    return prtGI && prtGI->isReady();
   if (!daGI2)
     return false;
   return daGI2->requiresUpdate();
@@ -521,6 +540,17 @@ bool WorldRenderer::requiresGIUpdate() const
 
 void WorldRenderer::updateGIPos(const Point3 &pos, const TMatrix &view_itm, float hmin, float hmax)
 {
+  if (activeGISystem == GISystem::PRTGI)
+  {
+    if (prtGI)
+    {
+      prtGI->update(pos);
+      prtGI->relight(pos);
+      prtGI->updateConstants();
+    }
+    return;
+  }
+
   if (daGI2 && !gi_enabled.get())
     closeGI();
 
@@ -699,6 +729,26 @@ void WorldRenderer::initGIWindows(eastl::unique_ptr<scene::TiledScene> &&windows
   giWindows->init(eastl::move(windows));
 }
 
+void WorldRenderer::switchGISystem(GISystem sys)
+{
+  if (activeGISystem == sys)
+    return;
+
+  const bool compatibilityMode = !hasFeature(FeatureRenderFlags::FULL_DEFERRED);
+  if (compatibilityMode && sys == GISystem::DAGI2)
+  {
+    logwarn("Cannot switch to daGI2 in mobile/compatibility mode (only PRTGI is supported)!");
+    visuallog::logmsg("Cannot switch to daGI2 in mobile/compatibility mode!", E3DCOLOR(255, 100, 100), 5);
+    return;
+  }
+
+  activeGISystem = sys;
+  initGI();
+  debug("GI: Switched active GI system to %s", activeGISystem == GISystem::DAGI2 ? "daGI2" : "PRTGI");
+  visuallog::logmsg(String(0, "[GI System] Switched active GI to: %s", activeGISystem == GISystem::DAGI2 ? "daGI2 (Dynamic Voxel GI)" : "PRTGI (Static Probe GI)").c_str(),
+    activeGISystem == GISystem::PRTGI ? E3DCOLOR(50, 255, 100) : E3DCOLOR(255, 200, 50), 5);
+}
+
 void WorldRenderer::initGI()
 {
   requestFgRecreation("initGI");
@@ -710,29 +760,68 @@ void WorldRenderer::initGI()
     return;
   }
 
-  staticSceneCollisionResource = dacoll::get_static_collision_resource();
-  if (staticSceneCollisionResource)
+  const bool compatibilityMode = !hasFeature(FeatureRenderFlags::FULL_DEFERRED);
+  const DataBlock *graphicsGI = dgs_get_settings()->getBlockByNameEx("graphics")->getBlockByNameEx("gi");
+  const DataBlock *prtBlk = dgs_get_settings()->getBlockByNameEx("graphics")->getBlockByNameEx("prtgi");
+
+  bool preferPrtgi = compatibilityMode || prtBlk->getBool("enabled", false) ||
+                     (strcmp(graphicsGI->getStr("system", "dagi2"), "prtgi") == 0);
+
+  if (preferPrtgi || compatibilityMode)
+    activeGISystem = GISystem::PRTGI;
+  else
+    activeGISystem = GISystem::DAGI2;
+
+  debug("GI: Initializing GI subsystem... Active system = %s (compatibilityMode=%d)",
+    activeGISystem == GISystem::PRTGI ? "PRTGI" : "daGI2", compatibilityMode ? 1 : 0);
+
+  visuallog::logmsg(String(0, "[GI Subsystem] Active: %s (Pipeline: %s)",
+    activeGISystem == GISystem::PRTGI ? "PRTGI (Static Precomputed GI)" : "daGI2 (Dynamic Voxel GI)",
+    compatibilityMode ? "Mobile/Low-End" : "Desktop Deferred").c_str(),
+    activeGISystem == GISystem::PRTGI ? E3DCOLOR(50, 255, 100) : E3DCOLOR(255, 200, 50), 8);
+
+  // Initialize PRTGI
+  prtGI.reset(daprtgi::create_prtgi());
+  if (prtGI)
   {
-    const uint32_t faceCnt = (uint32_t)staticSceneCollisionResource->getTrianglesCount(CollisionNode::TRACEABLE);
-    if (faceCnt > LRURendinstCollision::MAX_VOXELIZATION_TRIS)
-      logerr("static scene collision has %u faces, over the %u GI voxelization limit; SDF gets no static scene", faceCnt,
-        LRURendinstCollision::MAX_VOXELIZATION_TRIS);
-    if (!faceCnt || faceCnt > LRURendinstCollision::MAX_VOXELIZATION_TRIS)
-      staticSceneCollisionResource = nullptr;
+    prtGI->init(dgs_get_settings()->getBlockByNameEx("graphics"));
+    const char *lvlName = getLevelSettings() ? getLevelSettings()->getStr("levelName", nullptr) : nullptr;
+    if (!lvlName || !lvlName[0])
+      lvlName = dgs_get_settings()->getStr("scene", "east_district_demo");
+    prtGI->loadOrBakeScene(lvlName);
   }
 
-  daGI2 = create_dagi();
-  init_voxelization();
-  voxelizeCollision = new LRUCollisionVoxelization;
-  voxelizeCollision->init();
-  // const DataBlock *graphics = dgs_get_settings()->getBlockByNameEx("graphics");
-  // const DataBlock *graphicsGI = graphics->getBlockByNameEx("gi");
+  if (activeGISystem == GISystem::DAGI2 && !compatibilityMode)
+  {
+    staticSceneCollisionResource = dacoll::get_static_collision_resource();
+    if (staticSceneCollisionResource)
+    {
+      const uint32_t faceCnt = (uint32_t)staticSceneCollisionResource->getTrianglesCount(CollisionNode::TRACEABLE);
+      if (faceCnt > LRURendinstCollision::MAX_VOXELIZATION_TRIS)
+        logerr("static scene collision has %u faces, over the %u GI voxelization limit; SDF gets no static scene", faceCnt,
+          LRURendinstCollision::MAX_VOXELIZATION_TRIS);
+      if (!faceCnt || faceCnt > LRURendinstCollision::MAX_VOXELIZATION_TRIS)
+        staticSceneCollisionResource = nullptr;
+    }
 
-  lruCollision.reset();
-  lruCollision = LRURendinstCollision::acquire();
+    daGI2 = create_dagi();
+    init_voxelization();
+    voxelizeCollision = new LRUCollisionVoxelization;
+    voxelizeCollision->init();
+    // const DataBlock *graphics = dgs_get_settings()->getBlockByNameEx("graphics");
+    // const DataBlock *graphicsGI = graphics->getBlockByNameEx("gi");
 
-  rendinst_voxelize_visibility = rendinst::createRIGenVisibility(midmem);
-  rendinst::setRIGenVisibilityMinLod(rendinst_voxelize_visibility, 0, 2);
+    lruCollision.reset();
+    lruCollision = LRURendinstCollision::acquire();
+
+    rendinst_voxelize_visibility = rendinst::createRIGenVisibility(midmem);
+    rendinst::setRIGenVisibilityMinLod(rendinst_voxelize_visibility, 0, 2);
+  }
+  else
+  {
+    daGI2 = nullptr;
+    voxelizeCollision = nullptr;
+  }
 
   createGiNodes();
 
@@ -745,6 +834,8 @@ void WorldRenderer::resetGI()
     lruCollision->reset();
   if (daGI2)
     daGI2->afterReset();
+  if (prtGI)
+    prtGI->afterReset();
   mediaVolumes.afterReset(); // the atlas content did not survive the device reset, rebake all types
   if (giWindows)
     giWindows->afterReset();
@@ -762,6 +853,11 @@ void WorldRenderer::closeGI()
     close_voxelization();
   del_it(daGI2);
   del_it(voxelizeCollision);
+
+  if (prtGI)
+    prtGI->close();
+  prtGI.reset();
+
   createGiNodes();
 
   mediaVolumes.clear();

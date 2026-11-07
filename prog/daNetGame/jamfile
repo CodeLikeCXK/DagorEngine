@@ -567,6 +567,7 @@ if $(HaveRenderer) = yes {
     gameLibs/render/voxelizationTarget
     gameLibs/GIWindows
     gameLibs/daGI2
+    gameLibs/daPRTGI
     gameLibs/voxelizedMedia
     gameLibs/ecs/render
     gameLibs/ecs/render/weather_effects

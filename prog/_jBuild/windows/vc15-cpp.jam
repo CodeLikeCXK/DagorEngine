@@ -152,7 +152,13 @@ rule ProcessCompileTarget
   }
 
   if $(MSVectorcall) = yes { _CONFIG_OPT += /Gv ; }
-  if $(BuildDagorEngineIndependentCode) != yes && $(CheckOnly) != yes { _CONFIG_OPT += /Zi ; }
+  if $(BuildDagorEngineIndependentCode) != yes && $(CheckOnly) != yes {
+    if $(PlatformArch) in arm64 arm64ec {
+      _CONFIG_OPT += /Z7 ;
+    } else {
+      _CONFIG_OPT += /Zi ;
+    }
+  }
   if $(StackProtection) = no { _CONFIG_OPT += /GS- ; }
 
   #optimize compilation ~5%
@@ -181,7 +187,9 @@ rule ProcessCompileTarget
   if $(BuildDagorEngineIndependentCode) != yes && $(KernelLinkage) = static { _CONFIG_OPT += -D_TARGET_STATIC_LIB ; }
   if $(UseWholeOpt) = yes      { _CONFIG_OPT += /GL ; }
 
-  _CONFIG_OPT += /FS ;         # Force Synchronous PDB Writes.
+  if ! $(PlatformArch) in arm64 arm64ec {
+    _CONFIG_OPT += /FS ;         # Force Synchronous PDB Writes.
+  }
 
   _CPP_OPT = -I$(AddIncludes) $(_CONFIG_OPT) $(_SUPPRESS_OPT) $(CPPopt) $(GlobalCPPopt) ;
 

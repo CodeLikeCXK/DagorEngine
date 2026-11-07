@@ -1,0 +1,79 @@
+include "shader_global.dshl"
+
+int _brickCount;
+float4 _surfelBoundsMin;
+float4 _surfelBoundsSize;
+
+buffer _brickInfo;
+buffer _surfels;
+buffer _brickRadiance;
+
+shader prt_brick_relight_cs
+{
+  supports global_frame;
+
+  (cs) {
+    _brickCount@i1 = _brickCount;
+    _surfelBoundsMin@f3 = _surfelBoundsMin;
+    _surfelBoundsSize@f3 = _surfelBoundsSize;
+    _brickInfo@buf = _brickInfo hlsl {
+      #include "prtgi_common.hlsli"
+      StructuredBuffer<SurfelIndices> _brickInfo@buf;
+    };
+    _surfels@buf = _surfels hlsl { StructuredBuffer<Surfel> _surfels@buf; };
+    _brickRadiance@uav = _brickRadiance hlsl { RWStructuredBuffer<float4> _brickRadiance@uav; };
+  }
+
+  hlsl(cs) {
+    #define BRICK_THREADS 32
+    groupshared float3 _brickSums[BRICK_THREADS];
+
+    [numthreads(BRICK_THREADS, 1, 1)]
+    void cs_main(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
+    {
+      uint brick = group.x;
+      if (brick >= (uint)_brickCount)
+        return;
+
+      SurfelIndices range = _brickInfo[brick];
+      float3 radiance = 0;
+
+      for (uint offset = thread; offset < range.surfelCount; offset += BRICK_THREADS)
+      {
+        uint index = range.surfelStart + offset;
+        Surfel surfel = _surfels[index];
+        float3 normal = prt_surfel_normal(surfel);
+        float3 position = prt_surfel_position(surfel, _surfelBoundsMin.xyz, _surfelBoundsSize.xyz);
+
+        // Simple direct directional sun evaluation
+        float3 sunDir = -from_sun_direction.xyz;
+        float NdotL = max(0.0f, dot(normal, sunDir));
+        float3 direct = sun_color_0.rgb * NdotL;
+
+        // Ambient sky contribution
+        float3 ambient = float3(0.08, 0.1, 0.14);
+
+        radiance += prt_surfel_albedo(surfel) * (direct + ambient);
+      }
+
+      _brickSums[thread] = radiance;
+      GroupMemoryBarrierWithGroupSync();
+
+      [unroll]
+      for (uint stride = BRICK_THREADS / 2; stride > 0; stride >>= 1)
+      {
+        if (thread < stride)
+          _brickSums[thread] += _brickSums[thread + stride];
+        GroupMemoryBarrierWithGroupSync();
+      }
+
+      if (thread == 0)
+      {
+        _brickRadiance[brick] = float4(range.surfelCount > 0 ? _brickSums[0] / float(range.surfelCount) : 0, 0);
+      }
+    }
+  }
+
+  compile("cs_5_0", "cs_main");
+}
+
