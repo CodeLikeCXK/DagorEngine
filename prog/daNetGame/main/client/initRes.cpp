@@ -46,7 +46,11 @@ void init_shaders()
   if (strcmp(::dgs_get_settings()->getBlockByNameEx("graphics")->getStr("consolePreset", "HighFPS"), "bareMinimum") == 0)
     sh_bindump_prefix = "compiledShaders/compatPC/game";
 #elif _TARGET_PC || _TARGET_APPLE
-  if (strcmp(::dgs_get_settings()->getBlockByNameEx("graphics")->getStr("preset", "medium"), "bareMinimum") == 0)
+  // Same resolution as the runtime feature flags (graphics/fullDeferred overrides renderFeatures),
+  // otherwise deferred features run on compat shaders or vice versa.
+  const bool isFullDeferred =
+    load_render_features(::dgs_get_settings()->getBlockByNameEx("renderFeatures")).test(FeatureRenderFlags::FULL_DEFERRED);
+  if (strcmp(::dgs_get_settings()->getBlockByNameEx("graphics")->getStr("preset", "medium"), "bareMinimum") == 0 || !isFullDeferred)
     sh_bindump_prefix = "compiledShaders/compatPC/game";
 #endif
 

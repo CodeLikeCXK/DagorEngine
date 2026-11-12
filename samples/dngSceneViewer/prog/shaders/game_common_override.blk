@@ -1,6 +1,7 @@
 mountPoint:t=".."
 incDir:t="../../../prog/daNetGameLibs"
 incDir:t="../../../prog/gameLibs"
+incDir:t="../../../prog/gameLibs/daPRTGI/shaders"
 incDir:t="../../../prog/3rdPartyLibs"
 
 "@override:source" {

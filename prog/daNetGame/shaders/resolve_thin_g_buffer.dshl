@@ -13,6 +13,7 @@ include "clusteredViewLights.dshl"
 include "depth_above.dshl"
 include "sq_clouds_shadow.dshl"
 include "resolve_thin_g_buffer_inc.dshl"
+include "prtgi_sample.dshl"
 
 float csm_distance = 1000;
 int thin_gbuf_resolve = 0;
@@ -83,6 +84,12 @@ shader thin_g_resolve, deferred_shadow_bare_minimum
   color_write = rgb;
 
   COMMON_RESOLVE()//should be BEFORE READ_GBUFFER!
+  PRTGI_PROBE_VOLUME_SAMPLE(ps)
+  (ps) {
+    thin_enviSPH0 @f4 = (enviSPH0*skylight_params.y);
+    thin_enviSPH1 @f4 = (enviSPH1*skylight_params.y);
+    thin_enviSPH2 @f4 = (enviSPH2*skylight_params.y);
+  }
   if (shader == thin_g_resolve)
   {
     INIT_LOAD_THIN_GBUFFER()
@@ -176,6 +183,7 @@ shader thin_g_resolve, deferred_shadow_bare_minimum
   USE_BLURRED_DEPTH_ABOVE(ps)
 
   hlsl(ps) {
+    #include <sh3_function.hlsl>
     float get_depth_above_ao(float3 worldPos)
     {
       float vignetteEffect;
@@ -296,11 +304,12 @@ shader thin_g_resolve, deferred_shadow_bare_minimum
       float4 screenpos = GET_SCREEN_POS(input.pos);
 
       float rawDepth = loadGbufferDepth(screenpos.xy);
-      #if NO_DEPTH_BOUNDS
-        BRANCH
-        if (rawDepth == 0)
-          return 0;
-      #endif
+      // Sky rejection must not depend on the NO_DEPTH_BOUNDS variant: the depth-slab variants
+      // (the ones actually rendered) cover the far plane too, so without this every sky pixel
+      // pays the full resolve cost, including a complete PRT probe sample that is then overdrawn.
+      BRANCH
+      if (rawDepth == 0)
+        return 0;
       float w = linearize_z(rawDepth, zn_zfar.zw);
 
       float3 viewVect = input.viewVect;
@@ -334,7 +343,70 @@ shader thin_g_resolve, deferred_shadow_bare_minimum
       ##endif
       shadow *= ssao.CONTACT_SHADOWS_ATTR;
 
-      half3 result = gbuf.sunLight.xyz * shadow + gbuf.ambientLight.xyz * calc_compatibility_ao(ssao);
+      float3 ambientTerm = 0;
+      BRANCH
+      if (_prtVolumeEnabled != 0)
+      {
+        ##if shader == deferred_shadow_bare_minimum
+          float3 geomNormal = gbuffer.normal;
+        ##else
+          // Accurate depth-based normal reconstruction using smallest-difference one-sided
+          // taps instead of 2x2 quad ddx/ddy, which produced impulse noise on foliage/wire
+          // silhouettes and visible triangle faceting across depth discontinuities.
+          int2 pix = int2(screenpos.xy);
+          int2 maxPix = int2(screen_size.xy) - 1;
+          float wL = linearize_z(loadGbufferDepth(max(pix + int2(-1, 0), 0)), zn_zfar.zw);
+          float wR = linearize_z(loadGbufferDepth(min(pix + int2( 1, 0), maxPix)), zn_zfar.zw);
+          float wU = linearize_z(loadGbufferDepth(max(pix + int2(0, -1), 0)), zn_zfar.zw);
+          float wD = linearize_z(loadGbufferDepth(min(pix + int2(0,  1), maxPix)), zn_zfar.zw);
+
+          float3 ddxV = ddx(viewVect);
+          float3 ddyV = ddy(viewVect);
+          bool useL = abs(w - wL) < abs(wR - w);
+          bool useU = abs(w - wU) < abs(wD - w);
+          float3 pX = useL ? ((viewVect - ddxV) * wL - viewVect * w)
+                           : (viewVect * w - (viewVect + ddxV) * wR);
+          float3 pY = useU ? ((viewVect - ddyV) * wU - viewVect * w)
+                           : (viewVect * w - (viewVect + ddyV) * wD);
+
+          float3 crossN = cross(pY, pX);
+          float lenSq = dot(crossN, crossN);
+          float3 geomNormal = lenSq > 1e-10 ? crossN * rsqrt(lenSq) : view;
+          if (dot(geomNormal, view) < 0.0)
+            geomNormal = -geomNormal;
+
+          // At silhouettes / foliage cards where both one-sided depth jumps are large,
+          // blend the reconstructed normal toward the view vector so noisy edge normals
+          // cannot flip the hemisphere test and cause dark/bright outline pixels.
+          float depthJump = max(min(abs(w - wL), abs(wR - w)), min(abs(w - wU), abs(wD - w)));
+          float edgeFactor = saturate(depthJump / max(w * 0.03f, 0.02f));
+          geomNormal = normalize(lerp(geomNormal, view, edgeFactor * 0.65f));
+        ##endif
+
+        float skyVis = 1.0;
+        float3 bounceIrr = sample_prtgi_gi(worldPos.xyz, geomNormal, skyVis);
+        if (_prtDebugSkyVis != 0)
+          return float3(skyVis, skyVis, skyVis);
+
+        // In Thin G-Buffer: gbuf.ambientLight pre-bakes unoccluded outdoor sky diffuse + outdoor specular.
+        // By scaling gbuf.ambientLight by (totalIrr / outdoorSky), we transfer the pre-baked diffuse to true PRTGI irradiance.
+        // Under roofs (skyVis = 0), unoccluded outdoor sky and cubemap specular are crushed to pure bounce level.
+        // No saturate and no bounce-based cap: occluded sky must not be re-admitted through bright bounce.
+        float3 outdoorSky = GetSHFunctionValueSimple(geomNormal, thin_enviSPH0, thin_enviSPH1, thin_enviSPH2);
+        float3 totalIrr = bounceIrr + outdoorSky * skyVis;
+        float outdoorLum = max(dot(outdoorSky, float3(0.333f, 0.333f, 0.333f)), 0.01f);
+        float giScale = clamp(dot(totalIrr, float3(0.333f, 0.333f, 0.333f)) / outdoorLum, 0.0f, 4.0f);
+
+        ambientTerm = gbuf.ambientLight.xyz * (calc_compatibility_ao(ssao) * giScale);
+      }
+      else
+      {
+        if (_prtDebugSkyVis != 0)
+          return float3(1, 0, 1); // PRT volume is not active in this pass.
+        ambientTerm = gbuf.ambientLight.xyz * calc_compatibility_ao(ssao);
+      }
+
+      half3 result = gbuf.sunLight.xyz * shadow + ambientTerm;
 
       ##if shader == deferred_shadow_bare_minimum && dynamic_lights_count != lights_off
         float NdotV = dot(gbuffer.normal, view);

@@ -1,6 +1,3 @@
-#ifndef PRTGI_SAMPLE_DSHL
-#define PRTGI_SAMPLE_DSHL
-
 float4 _prtGridOrigin;
 int4 _prtGridMin;
 int4 _prtGridCount;
@@ -8,7 +5,11 @@ int4 _prtSlotCount;
 float _prtGridSpacing;
 int _prtCascadeCount;
 int _prtVolumeEnabled;
+int _prtDebugSkyVis;
+int _prtQuality;
 texture _coefficientVoxel3D;
+buffer _prtProbeInfo;
+buffer _prtProbeDepth;
 
 macro PRTGI_PROBE_VOLUME_SAMPLE_INIT(stage)
   (stage) {
@@ -19,7 +20,14 @@ macro PRTGI_PROBE_VOLUME_SAMPLE_INIT(stage)
     _prtGridSpacing@f1 = _prtGridSpacing;
     _prtCascadeCount@i1 = _prtCascadeCount;
     _prtVolumeEnabled@i1 = _prtVolumeEnabled;
-    _coefficientVoxel3D@tex = _coefficientVoxel3D hlsl { Texture3D<float4> _coefficientVoxel3D@tex; };
+    _prtDebugSkyVis@i1 = _prtDebugSkyVis;
+    _prtQuality@i1 = _prtQuality;
+    _coefficientVoxel3D@tex3d = _coefficientVoxel3D;
+    // One record per slot: .xy = 6-axis sky cube, .z = validity bit + relocation offset.
+    // Interleaved so a probe corner costs a single random read instead of two.
+    _prtProbeInfo@buf = _prtProbeInfo hlsl { StructuredBuffer<uint4> _prtProbeInfo@buf; };
+    // Per-slot octahedral depth moments (PRT_DEPTH_TEXELS x (unorm16 mean, unorm16 mean^2)).
+    _prtProbeDepth@buf = _prtProbeDepth hlsl { StructuredBuffer<uint> _prtProbeDepth@buf; };
   }
 endmacro
 
@@ -27,25 +35,278 @@ macro PRTGI_PROBE_VOLUME_SAMPLE_USE(stage)
   hlsl(stage) {
     #include "prtgi_common.hlsli"
 
+    #ifndef SAMPLE_PRTGI_IRRADIANCE_DEFINED
+    #define SAMPLE_PRTGI_IRRADIANCE_DEFINED
+
+    // Surface bias in grid-spacing units (pure normal offset to prevent view-dependent swimming).
+    // 0.2 spacing is 0.4 m at 2 m spacing, which pushed samples through thin walls and leaked.
+    #define PRT_SURFACE_BIAS 0.08f
+    // Variance floor in normalized depth units, avoids hard Chebyshev edges on 6x6 octahedral depth maps.
+    #define PRT_MIN_VARIANCE 5e-4f
+    // Chebyshev depth bias (normalized) and light-bleeding floor, see prt_probe_visibility().
+    // 0.03 * 6 m = 18 cm of slack in front of a blocker, far too much for interior walls.
+    #define PRT_VIS_DEPTH_BIAS 0.012f
+    #define PRT_LIGHT_BLEED_MIN 0.2f
+    // Back-facing probes only contribute through their visibility term.
+    #define PRT_BACKFACE_FLOOR 0.05f
+    // Visible trilinear ratio range over which the sample fades from enclosed (0) to probe-lit (1).
+    #define PRT_VIS_FADE_MIN 0.1f
+    #define PRT_VIS_FADE_MAX 0.5f
+
+    float2 prt_load_depth_texel(uint probe_index, int2 t)
+    {
+      t = prt_oct_wrap(t);
+      uint v = _prtProbeDepth[probe_index * PRT_DEPTH_TEXELS + (uint)(t.y * PRT_DEPTH_RES + t.x)];
+      return float2(v & 0xFFFFu, v >> 16) * (1.0f / 65535.0f);
+    }
+
+    // Bilinear (mean, mean^2) of the probe->surface distance, normalized by grid spacing * PRT_DEPTH_RANGE.
+    float2 prt_probe_depth_moments(uint probe_index, float3 dir)
+    {
+      float2 uv = prt_oct_encode(dir) * PRT_DEPTH_RES - 0.5f;
+      float2 fl = floor(uv);
+      int2 i0 = int2(fl);
+      float2 f = uv - fl;
+      float2 m00 = prt_load_depth_texel(probe_index, i0);
+      float2 m10 = prt_load_depth_texel(probe_index, i0 + int2(1, 0));
+      float2 m01 = prt_load_depth_texel(probe_index, i0 + int2(0, 1));
+      float2 m11 = prt_load_depth_texel(probe_index, i0 + int2(1, 1));
+      return lerp(lerp(m00, m10, f.x), lerp(m01, m11, f.x), f.y);
+    }
+
+    // Single-texel moments: the nearest octahedral texel, no bilinear taps.
+    float2 prt_probe_depth_nearest(uint probe_index, float3 dir)
+    {
+      int2 t = int2(prt_oct_encode(dir) * (float)PRT_DEPTH_RES);
+      return prt_load_depth_texel(probe_index, clamp(t, int2(0, 0), int2(PRT_DEPTH_RES - 1, PRT_DEPTH_RES - 1)));
+    }
+
+    // Chebyshev visibility of a point at normalized distance dn along dir from the probe.
+    // Returns 1 when the probe has no blocker in that direction within range.
+    // Two-stage: the nearest texel settles the common "nothing in the way" case with one read;
+    // the 4-tap bilinear refinement only runs when the coarse test says the point may be occluded.
+    float prt_probe_visibility(uint probe_index, float3 dir, float dn)
+    {
+      float2 nearest = prt_probe_depth_nearest(probe_index, dir);
+      // Shortcut only on a clear miss. A single texel can be far more open than the cos^6 lobe
+      // average, and treating that as "fully visible" leaked light straight through walls.
+      if (nearest.x >= 0.99f)
+        return 1.0f;
+
+      float2 moments = prt_probe_depth_moments(probe_index, dir);
+      float dd = dn - moments.x - PRT_VIS_DEPTH_BIAS;
+      if (dd <= 0.0f || moments.x >= 0.99f)
+        return 1.0f;
+      float variance = max(abs(moments.y - moments.x * moments.x), PRT_MIN_VARIANCE);
+      float p = variance / (variance + dd * dd);
+      return saturate((p - PRT_LIGHT_BLEED_MIN) * (1.0f / (1.0f - PRT_LIGHT_BLEED_MIN)));
+    }
+
+    // Single-texel variant for the Low tier: one fetch per corner instead of four, but it still
+    // rejects probes on the far side of a wall/ceiling, which the ambient cube alone cannot do.
+    float prt_probe_visibility_fast(uint probe_index, float3 dir, float dn)
+    {
+      float2 m = prt_probe_depth_nearest(probe_index, dir);
+      if (m.x >= 0.99f)
+        return 1.0f;
+      float dd = dn - m.x - PRT_VIS_DEPTH_BIAS;
+      if (dd <= 0.0f)
+        return 1.0f;
+      float variance = max(abs(m.y - m.x * m.x), PRT_MIN_VARIANCE);
+      float p = variance / (variance + dd * dd);
+      return saturate((p - PRT_LIGHT_BLEED_MIN) * (1.0f / (1.0f - PRT_LIGHT_BLEED_MIN)));
+    }
+
+    float prt_visibility_fade(float visibleRatio)
+    {
+      return smoothstep(PRT_VIS_FADE_MIN, PRT_VIS_FADE_MAX, visibleRatio);
+    }
+
+    float3 sample_prtgi_gi_internal(float3 worldPos, float3 visibilityNormal, float3 irradianceNormal,
+      out float out_sky_vis)
+    {
+      out_sky_vis = 1.0f;
+      if (_prtVolumeEnabled == 0 || _prtGridSpacing <= 0.0f)
+        return float3(0, 0, 0);
+
+      // Pure geometric normal bias: keeps cell selection, trilinear weights, and probe
+      // visibility lookup directions 100% view-independent (no dark spots moving with camera).
+      float3 biasedPos = worldPos + visibilityNormal * (_prtGridSpacing * PRT_SURFACE_BIAS);
+
+      // Low tier samples every second probe on each axis: effective 4 m cells at 2 m bake spacing.
+      // The touched probe working set drops to ~1/8 (~1.6 MB), which fits in the L2 of a low-end
+      // SoC; the previous 13 MB set missed cache on essentially every fetch. Diffuse GI is low
+      // frequency, so the resolution loss is not visible, and every sample is still baked data.
+      const int sampleStride = (_prtQuality == 0) ? 1 : 2;
+      const float sampleSpacing = _prtGridSpacing * (float)sampleStride;
+
+      float3 localPos = (biasedPos - _prtGridOrigin.xyz) / sampleSpacing;
+      int3 baseCoord = int3(floor(localPos));
+      float3 alpha = saturate(localPos - float3(baseCoord));
+      float3 maxCoord = max((float3(_prtGridCount.xyz) - 1.0f) / (float)sampleStride, float3(1.0f, 1.0f, 1.0f));
+      float3 distToBorder = min(localPos, maxCoord - localPos);
+      float minBorderDist = min(distToBorder.x, min(distToBorder.y, distToBorder.z));
+      float gridFade = saturate(minBorderDist * 0.5f);
+      float invMaxDepth = 1.0f / (_prtGridSpacing * PRT_DEPTH_RANGE);
+
+      float3 accumIrradiance = 0;
+      float accumRadWeight = 0;
+      float accumRadVisTri = 0;
+      float accumSkyVis = 0;
+      float accumSkyWeight = 0;
+      float accumSkyVisTri = 0;
+      float accumValidTri = 0;
+
+      // Corner set. High tier uses the full 8-point trilinear cell because its per-corner Chebyshev
+      // test needs every corner. Low tier has no per-corner test (occlusion is a scalar gate), so it
+      // uses a single tetrahedron: 4 corners instead of 8, half the fetches, same C0 continuity.
+      int3 cornerD[8];
+      float cornerW[8];
+      if (_prtQuality == 0)
+      {
+        [unroll]
+        for (int i = 0; i < 8; ++i)
+        {
+          int3 d = int3(i & 1, (i >> 1) & 1, (i >> 2) & 1);
+          float3 tri = lerp(1.0f - alpha, alpha, float3(d));
+          cornerD[i] = d;
+          cornerW[i] = tri.x * tri.y * tri.z;
+        }
+      }
+      else
+      {
+        int3 c1, c2, c3;
+        if (alpha.x > alpha.y)
+        {
+          if (alpha.y > alpha.z)      { c1 = int3(1, 0, 0); c2 = int3(1, 1, 0); c3 = int3(1, 1, 1); }
+          else if (alpha.x > alpha.z) { c1 = int3(1, 0, 0); c2 = int3(1, 0, 1); c3 = int3(1, 1, 1); }
+          else                        { c1 = int3(0, 0, 1); c2 = int3(1, 0, 1); c3 = int3(1, 1, 1); }
+        }
+        else
+        {
+          if (alpha.x > alpha.z)      { c1 = int3(0, 1, 0); c2 = int3(1, 1, 0); c3 = int3(1, 1, 1); }
+          else if (alpha.y > alpha.z) { c1 = int3(0, 1, 0); c2 = int3(0, 1, 1); c3 = int3(1, 1, 1); }
+          else                        { c1 = int3(0, 0, 1); c2 = int3(0, 1, 1); c3 = int3(1, 1, 1); }
+        }
+        const float aMax = max(alpha.x, max(alpha.y, alpha.z));
+        const float aMin = min(alpha.x, min(alpha.y, alpha.z));
+        const float aMid = alpha.x + alpha.y + alpha.z - aMax - aMin;
+        cornerD[0] = int3(0, 0, 0); cornerW[0] = 1.0f - aMax;
+        cornerD[1] = c1;            cornerW[1] = aMax - aMid;
+        cornerD[2] = c2;            cornerW[2] = aMid - aMin;
+        cornerD[3] = c3;            cornerW[3] = aMin;
+        // Keep the loop bound and indices compile-time constant (dynamic array indexing would spill
+        // to local memory); the unused slots simply carry zero weight.
+        cornerD[4] = c3; cornerD[5] = c3; cornerD[6] = c3; cornerD[7] = c3;
+        cornerW[4] = cornerW[5] = cornerW[6] = cornerW[7] = 0.0f;
+      }
+
+      // Each corner is weighted by its interpolation weight, backface (wrap) and (High only)
+      // Chebyshev visibility. Occluded corners lose weight instead of being renormalized away.
+      [unroll]
+      for (int i = 0; i < 8; ++i)
+      {
+        int3 d = cornerD[i];
+        float triWeight = cornerW[i];
+        if (triWeight < 1e-4f)
+          continue;
+        // Coarse cell index back to the fine probe grid the data was baked on.
+        int3 node = (baseCoord + d) * sampleStride;
+        if (any(node < 0) || any(node >= _prtGridCount.xyz))
+          continue;
+        int3 slot = prt_publication_slot(node, 0, _prtSlotCount, int4(0, 0, 0, 0));
+        if (slot.y < 0 || slot.y >= _prtSlotCount.y)
+          continue;
+
+        uint probeIndex = prt_sky_mask_index(slot, _prtSlotCount);
+        uint4 probeInfo = _prtProbeInfo[probeIndex];
+        uint probeBits = probeInfo.z;
+        if (!prt_probe_valid(probeBits))
+          continue;
+
+        float3 probePos = _prtGridOrigin.xyz + (float3(node) + prt_probe_offset(probeBits)) * _prtGridSpacing;
+
+        // Smooth backface term
+        float3 toProbe = probePos - worldPos;
+        float toProbeLen = length(toProbe);
+        float3 dirToProbe = toProbeLen > 1e-4f ? toProbe / toProbeLen : visibilityNormal;
+        float wrapShading = (dot(dirToProbe, visibilityNormal) + 1.0f) * 0.5f;
+        float wrapWeight = wrapShading * wrapShading + PRT_BACKFACE_FLOOR;
+
+        // Corner sky visibility is needed in both tiers, and doubles as the cheap occlusion proxy below.
+        float cornerSky = prt_sky_vis_sh(probeInfo.xy, visibilityNormal);
+
+        // High tier: per-corner Chebyshev against the probe depth moments.
+        // Low/Baked tier: no depth buffer at all; the probe's baked ambient cube is the occlusion proxy,
+        // which keeps directional L1 radiance (no collapse to AO-only) at a fraction of the traffic.
+        float3 probeToPoint = biasedPos - probePos;
+        float distToPoint = length(probeToPoint);
+        float3 lookupDir = distToPoint > 1e-4f ? probeToPoint / distToPoint : -dirToProbe;
+        const float dn = distToPoint * invMaxDepth;
+        // High: bilinear moments with a clear-miss shortcut. Low: single-texel moments.
+        float vis = (_prtQuality == 0) ? prt_probe_visibility(probeIndex, lookupDir, dn)
+                                       : prt_probe_visibility_fast(probeIndex, lookupDir, dn);
+
+        // Occlusion weights the sample; it is never folded into the interpolation weight, otherwise
+        // the most open probe of the cell would dominate and re-leak outdoor sky indoors.
+        float weight = triWeight * wrapWeight * vis;
+        float visTri = triWeight * vis;
+        accumValidTri += triWeight;
+        accumSkyVisTri += visTri;
+        accumSkyVis += cornerSky * weight;
+        accumSkyWeight += weight;
+
+        // Valid but not yet relit/published probes contribute sky visibility only;
+        // they are excluded from radiance normalization instead of averaging black in.
+        float4 sh0 = _coefficientVoxel3D.Load(int4(prt_texture_coordinate(slot, 0, 0, _prtSlotCount), 0));
+        // The L0 texel alpha is the "published" flag written by the probe relight.
+        if (sh0.a > 0.5f)
+        {
+          float4 sh1 = _coefficientVoxel3D.Load(int4(prt_texture_coordinate(slot, 0, 1, _prtSlotCount), 0));
+          float4 sh2 = _coefficientVoxel3D.Load(int4(prt_texture_coordinate(slot, 0, 2, _prtSlotCount), 0));
+          float4 sh3 = _coefficientVoxel3D.Load(int4(prt_texture_coordinate(slot, 0, 3, _prtSlotCount), 0));
+          float3 irr = 0.28209479f * sh0.rgb +
+            0.325735f * (irradianceNormal.y * sh1.rgb + irradianceNormal.z * sh2.rgb + irradianceNormal.x * sh3.rgb);
+          accumIrradiance += max(0.0f, irr) * weight;
+          accumRadWeight += weight;
+          accumRadVisTri += triWeight * vis;
+        }
+      }
+
+      // Enclosed points (few visible corners) fade to no outdoor sky and no bounce.
+      // Points at the grid border fade to the outdoor fallback across the outer 2 grid cells.
+      // Both tiers now use a real per-point visibility ratio, so the same fade applies.
+      float skyFade = prt_visibility_fade(accumSkyVisTri / max(accumValidTri, 1e-6f));
+      float radFade = prt_visibility_fade(accumRadVisTri / max(accumValidTri, 1e-6f));
+
+      float probeSky = saturate(accumSkyVis / max(accumSkyWeight, 1e-6f)) * skyFade;
+      float resolvedSky = lerp(1.0f, probeSky, gridFade);
+
+      out_sky_vis = resolvedSky;
+      if (_prtDebugSkyVis != 0)
+        return float3(resolvedSky, resolvedSky, resolvedSky);
+
+      float3 radiance = accumIrradiance / max(accumRadWeight, 1e-6f) * radFade;
+      return radiance * gridFade;
+    }
+
+    float3 sample_prtgi_gi(float3 worldPos, float3 normal, out float out_sky_vis)
+    {
+      return sample_prtgi_gi_internal(worldPos, normal, normal, out_sky_vis);
+    }
+
+    float3 sample_prtgi_gi_normals(float3 worldPos, float3 visibilityNormal, float3 irradianceNormal,
+      out float out_sky_vis)
+    {
+      return sample_prtgi_gi_internal(worldPos, visibilityNormal, irradianceNormal, out_sky_vis);
+    }
+
     float3 sample_prtgi_irradiance(float3 worldPos, float3 normal)
     {
-      if (_prtVolumeEnabled == 0 || _prtGridSpacing <= 0.0f)
-        return float3(0.08, 0.08, 0.1); // Fallback ambient
-
-      float3 localPos = (worldPos - _prtGridOrigin.xyz) / _prtGridSpacing;
-      int3 probeNode = int3(floor(localPos));
-
-      // Wrap horizontal coordinates toroidally
-      int3 slot = prt_publication_slot(probeNode, 0, _prtSlotCount, int4(0, 0, 0, 0));
-      int3 texCoord = prt_texture_coordinate(slot, 0, 0, _prtSlotCount);
-
-      // Fetch L0 ambient coefficient from 3D texture
-      float4 sh0 = _coefficientVoxel3D.Load(int4(texCoord, 0));
-
-      // Approximate diffuse irradiance: SH0 * 0.282 + directional normal contribution
-      float3 irradiance = sh0.rgb * 3.54f * max(0.2f, normal.y * 0.3f + 0.7f);
-      return max(float3(0.01, 0.01, 0.01), irradiance);
+      float dummySky;
+      return sample_prtgi_gi(worldPos, normal, dummySky);
     }
+    #endif
   }
 endmacro
 
@@ -53,6 +314,3 @@ macro PRTGI_PROBE_VOLUME_SAMPLE(stage)
   PRTGI_PROBE_VOLUME_SAMPLE_INIT(stage)
   PRTGI_PROBE_VOLUME_SAMPLE_USE(stage)
 endmacro
-
-#endif
-

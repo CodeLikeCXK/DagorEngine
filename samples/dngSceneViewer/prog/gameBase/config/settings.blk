@@ -23,6 +23,7 @@ graphics{
     gridSpacing:r = 2.0      // Spacing between probes in meters
     sectorSize:i = 32        // Sector size in grid probes along X and Z
     updateBudget:i = 2       // Number of sectors to relight per frame
+    quality:t = "high"       // "Baked GI Quality": "high" (L0+L1 + depth occlusion), "low" (lightweight, ambient-cube occlusion)
     debugDrawProbes:b = no   // Visualize 3D probe spheres in scene
     cacheFolder:t = "prtgi"  // Unified storage for bake assets and logs
   }
@@ -258,6 +259,9 @@ __allowedConfigOverrides{
     __allow_all_params:b=yes
   }
   graphics{
+    __allow_all_params:b=yes
+  }
+  renderFeatures{
     __allow_all_params:b=yes
   }
   voice {__allow_all_params:b=yes;}

@@ -37,12 +37,13 @@ struct SurfelIndices
 // 9 SH coefficients packed as 16-bit half floats and brick index (Padded to 32 bytes for hardware-friendly StructuredBuffer stride)
 struct BrickFactor
 {
-  uint32_t brickSh0; // lower 16-bit: brick index, upper 16-bit: half SH0
-  uint32_t sh12;     // 16-bit half SH1, 16-bit half SH2
-  uint32_t sh34;     // 16-bit half SH3, 16-bit half SH4
-  uint32_t sh56;     // 16-bit half SH5, 16-bit half SH6
-  uint32_t sh78;     // 16-bit half SH7, 16-bit half SH8
-  uint32_t _pad[3];  // Pad to 32 bytes (multiple of 16)
+  uint32_t brickIndex; // 32-bit full brick index (supports millions of bricks per sector)
+  uint32_t sh01;       // 16-bit half SH0, 16-bit half SH1
+  uint32_t sh23;       // 16-bit half SH2, 16-bit half SH3
+  uint32_t sh45;       // 16-bit half SH4, 16-bit half SH5
+  uint32_t sh67;       // 16-bit half SH6, 16-bit half SH7
+  uint32_t sh8;        // 16-bit half SH8, 16-bit pad
+  uint32_t _pad[2];    // Pad to 32 bytes (multiple of 16)
 };
 
 struct PRTProbeData
@@ -51,9 +52,20 @@ struct PRTProbeData
   int32_t factorCount;
   Point3 captureOffset;
   uint32_t validity; // packed intensity & validity
-  uint32_t _pad[2];  // Pad to 32 bytes (multiple of 16)
+  uint32_t globalProbeIndex;
+  uint32_t _pad;     // Pad to 32 bytes (multiple of 16)
 };
 #pragma pack(pop)
+
+// Layout constants shared with prtgi_common.hlsli
+static constexpr int PRT_DEPTH_RES = 6;
+static constexpr int PRT_DEPTH_TEXELS = PRT_DEPTH_RES * PRT_DEPTH_RES; // 36
+static constexpr float PRT_DEPTH_RANGE = 3.0f; // in grid-spacing units
+static constexpr uint32_t PRT_PROBE_VALID_BIT = 0x80000000u;
+
+// Published irradiance coefficients per probe: L0 + L1 (y, z, x) RGB triples.
+// The L2 band (SH9 c4..c8) was stored but never sampled, so it is not published at all.
+static constexpr int PRT_COEFF_SLICES = 4;
 
 struct PRTGridDesc
 {
@@ -97,7 +109,8 @@ struct PRTSectorData
   eastl::vector<uint32_t> probeIds;
   eastl::vector<PRTProbeData> probeData;
   eastl::vector<BrickFactor> factors;
-  eastl::vector<uint32_t> skyVisibility; // 32 directions bitmask per probe
+  eastl::vector<uint64_t> skyVisibility; // 6-axis ambient cube sky visibility per probe
+  eastl::vector<uint32_t> probeDepth;    // PRT_DEPTH_TEXELS x (unorm16 mean, unorm16 mean^2) per probe
 
   eastl::vector<SurfelIndices> brickInfo;
   eastl::vector<Surfel> surfels;
@@ -108,7 +121,10 @@ struct PRTSectorData
 struct PRTAsset
 {
   static constexpr uint32_t ASSET_MAGIC = 0x50525447; // 'PRTG'
-  static constexpr uint32_t ASSET_VERSION = 2;
+  // Bump whenever the baked content or its meaning changes, not just its layout:
+  // 8: removed the "near probe" sky floor from surfel cone visibility (indoor leak source).
+  // 9: -Y sky-cube face is measured on the lower hemisphere instead of synthesized from +Y.
+  static constexpr uint32_t ASSET_VERSION = 9;
 
   PRTGridDesc grid;
   IPoint3 sectorGridCount = IPoint3(0, 0, 0);
@@ -124,4 +140,3 @@ struct PRTAsset
 };
 
 } // namespace daprtgi
-

@@ -21,6 +21,10 @@ public:
   void init();
   void close();
 
+  // Drops every global shader binding that points at PRT-owned resources, so nothing
+  // can sample released buffers/textures after the volume is gone.
+  void unbindShaderResources();
+
   void relightSectors(const eastl::vector<int> &selected_sectors, PRTAsset &asset,
                       PRTSectorResidency &residency, const Point3 &camera_pos,
                       float sky_intensity);
@@ -31,7 +35,6 @@ public:
 private:
   ComputeShaderElement *brickRelightCS = nullptr;
   ComputeShaderElement *probeRelightCS = nullptr;
-  ComputeShaderElement *pyramidCS = nullptr;
   ComputeShaderElement *publishCS = nullptr;
 
   int prtGridOriginVarId = -1;

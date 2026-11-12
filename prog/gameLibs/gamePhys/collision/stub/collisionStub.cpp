@@ -5,56 +5,144 @@
 #include <gamePhys/collision/collisionInstances.h>
 #include "../collisionLibPrivate.h"
 #include <gameLibs/gamePhys/bundleAllHits_api.h>
+#include <gameRes/dag_collisionResource.h>
+#include <gameRes/collisionResourceBuilder.h>
+#include <math/dag_TMatrix.h>
 
 namespace dacoll
 {
-bool traceray_normalized(const Point3 &, const Point3 &, real &, int *, Point3 *, int, rendinst::RendInstDesc *, int,
-  const TraceMeshFaces *, rendinst::riex_handle_t)
+
+static Ptr<CollisionResource> static_collision_res;
+
+bool load_static_collision(IGenLoad &crd)
 {
-  G_ASSERT_RETURN(false, false);
+  Ptr<CollisionResource> res = new CollisionResource(crd, -1, crd.getTargetName());
+  if (!res || res->getAllNodes().empty())
+    return false;
+  static_collision_res = res;
+  return true;
 }
-bool traceray_normalized_coll_type(const Point3 &, const Point3 &, real &, int *, Point3 *, int, rendinst::RendInstDesc *, int *, int,
-  const TraceMeshFaces *, rendinst::riex_handle_t)
+
+bool load_static_collision_frt(IGenLoad *crd)
 {
-  G_ASSERT_RETURN(false, false);
+  if (!crd)
+    return false;
+  CollisionResource *res = nullptr;
+  if (!load_frt_block_as_collision(*crd, res))
+    return false;
+  static_collision_res = res;
+  return true;
 }
-bool tracedown_normalized(const Point3 &, real &, int *, Point3 *, int, rendinst::RendInstDesc *, int, const TraceMeshFaces *)
+
+void set_static_collision_resource(CollisionResource *res)
 {
-  G_ASSERT_RETURN(false, false);
+  static_collision_res = res;
 }
-bool traceray_normalized_frt(const Point3 &, const Point3 &, real &, int *, Point3 *) { G_ASSERT_RETURN(false, false); }
-bool traceray_normalized_lmesh(const Point3 &, const Point3 &, real &, int *, Point3 *) { G_ASSERT_RETURN(false, false); }
-bool traceray_normalized_ri(const Point3 &, const Point3 &, real &, int *, Point3 *, rendinst::TraceFlags, rendinst::RendInstDesc *,
-  int, const TraceMeshFaces *, rendinst::riex_handle_t)
+
+CollisionResource *get_static_collision_resource()
 {
-  G_ASSERT_RETURN(false, false);
+  return static_collision_res.get();
 }
-void validate_trace_cache(const bbox3f &, const vec3f &, float, TraceMeshFaces *, float) { G_ASSERT(0); }
-bool append_static_collision_tris(bbox3f_cref, vec4f *, int &) { G_ASSERT_RETURN(false, false); }
-int resolve_static_cache_tri_mat(int) { G_ASSERT_RETURN(false, -1); }
-bool trace_game_objects(const Point3 &, const Point3 &, float &, Point3 &, int, int) { G_ASSERT_RETURN(false, false); }
+
+void destroy_static_collision()
+{
+  static_collision_res = nullptr;
+}
+
+bool traceray_normalized(const Point3 &p, const Point3 &dir, real &t, int *out_pmid, Point3 *out_norm, int flags,
+  rendinst::RendInstDesc *out_desc, int ray_mat_id, const TraceMeshFaces *handle, rendinst::riex_handle_t skip_riex_handle)
+{
+  G_UNUSED(flags);
+  G_UNUSED(out_desc);
+  G_UNUSED(ray_mat_id);
+  G_UNUSED(handle);
+  G_UNUSED(skip_riex_handle);
+
+  if (static_collision_res)
+  {
+    float inOutT = t;
+    Point3 norm(0, 1, 0);
+    int matId = -1;
+    alignas(EA_CACHE_LINE_SIZE) mat44f tm;
+    v_mat44_make_from_43cu_unsafe(tm, TMatrix::IDENT.array);
+    if (static_collision_res->traceRay(tm, p, dir, inOutT, out_norm ? &norm : nullptr, matId, -1,
+          CollisionNode::TRACEABLE | CollisionNode::PHYS_COLLIDABLE))
+    {
+      t = inOutT;
+      if (out_norm)
+        *out_norm = norm;
+      if (out_pmid)
+        *out_pmid = matId;
+      return true;
+    }
+  }
+  return false;
+}
+
+bool traceray_normalized_coll_type(const Point3 &p, const Point3 &dir, real &t, int *out_pmid, Point3 *out_norm, int flags,
+  rendinst::RendInstDesc *out_desc, int *out_coll_type, int ray_mat_id, const TraceMeshFaces *handle,
+  rendinst::riex_handle_t skip_riex_handle)
+{
+  bool hit = traceray_normalized(p, dir, t, out_pmid, out_norm, flags, out_desc, ray_mat_id, handle, skip_riex_handle);
+  if (hit && out_coll_type)
+    *out_coll_type = ETF_FRT;
+  return hit;
+}
+
+bool tracedown_normalized(const Point3 &p, real &t, int *out_pmid, Point3 *out_norm, int flags, rendinst::RendInstDesc *out_desc,
+  int ray_mat_id, const TraceMeshFaces *handle)
+{
+  return traceray_normalized(p, Point3(0, -1, 0), t, out_pmid, out_norm, flags, out_desc, ray_mat_id, handle);
+}
+
+bool traceray_normalized_frt(const Point3 &p, const Point3 &dir, real &t, int *out_pmid, Point3 *out_norm)
+{
+  return traceray_normalized(p, dir, t, out_pmid, out_norm);
+}
+
+bool traceray_normalized_lmesh(const Point3 &p, const Point3 &dir, real &t, int *out_pmid, Point3 *out_norm)
+{
+  return traceray_normalized(p, dir, t, out_pmid, out_norm);
+}
+
+bool traceray_normalized_ri(const Point3 &p, const Point3 &dir, real &t, int *out_pmid, Point3 *out_norm, rendinst::TraceFlags,
+  rendinst::RendInstDesc *out_desc, int ray_mat_id, const TraceMeshFaces *handle, rendinst::riex_handle_t skip_riex_handle)
+{
+  return traceray_normalized(p, dir, t, out_pmid, out_norm, ETF_RI, out_desc, ray_mat_id, handle, skip_riex_handle);
+}
+
+void validate_trace_cache(const bbox3f &, const vec3f &, float, TraceMeshFaces *, float) {}
+bool append_static_collision_tris(bbox3f_cref, vec4f *, int &) { return false; }
+int resolve_static_cache_tri_mat(int) { return -1; }
+bool trace_game_objects(const Point3 &, const Point3 &, float &, Point3 &, int, int) { return false; }
 bool trace_game_objects_with_grid_filter(const Point3 &, const Point3 &, float &, Point3 &, int, int, const dag::ConstSpan<uint32_t>)
 {
-  G_ASSERT_RETURN(false, false);
+  return false;
 }
-bool traceht_water(const Point3 &, float &) { G_ASSERT_RETURN(false, false); }
-float traceht_lmesh(const Point2 &) { G_ASSERT_RETURN(false, 0.f); }
-float traceht_hmap(const Point2 &) { G_ASSERT_RETURN(false, 0.f); }
-bool is_valid_heightmap_pos(const Point2 &) { G_ASSERT_RETURN(false, false); }
-bool is_valid_water_height(float) { G_ASSERT_RETURN(false, false); }
-float traceht_water_at_time(const Point3 &, float, float, bool &, float) { G_ASSERT_RETURN(false, false); }
-bool traceray_water_at_time(const Point3 &, const Point3 &, float, float &) { G_ASSERT_RETURN(false, false); }
-bool get_min_max_hmap_in_circle(const Point2 &, float, float &, float &) { G_ASSERT_RETURN(false, false); }
-void get_min_max_hmap_list_in_circle(const Point2 &, float, Tab<Point2> &) { G_ASSERT(0); };
-bool rayhit_normalized_lmesh(const Point3 &, const Point3 &, real) { G_ASSERT_RETURN(false, false); }
+bool traceht_water(const Point3 &, float &) { return false; }
+float traceht_lmesh(const Point2 &) { return 0.f; }
+float traceht_hmap(const Point2 &) { return 0.f; }
+bool is_valid_heightmap_pos(const Point2 &) { return false; }
+bool is_valid_water_height(float) { return false; }
+float traceht_water_at_time(const Point3 &, float, float, bool &, float) { return false; }
+bool traceray_water_at_time(const Point3 &, const Point3 &, float, float &) { return false; }
+bool get_min_max_hmap_in_circle(const Point2 &, float, float &, float &) { return false; }
+void get_min_max_hmap_list_in_circle(const Point2 &, float, Tab<Point2> &) {};
+bool rayhit_normalized_lmesh(const Point3 &p, const Point3 &dir, real t)
+{
+  real inOutT = t;
+  return traceray_normalized(p, dir, inOutT, nullptr, nullptr);
+}
 int trace_bundle_all_hits(dag::ConstSpan<BundleSegment>, int, int, dag::Span<BundleHit>, dag::Span<BundleRange>, uint32_t, bool)
 {
-  G_ASSERT_RETURN(false, 0);
+  return 0;
 }
-bool bundle_segment_any_hit(const Point3 &, const Point3 &, int, int) { G_ASSERT_RETURN(false, false); }
-bool rayhit_normalized(const Point3 &, const Point3 &, real, int, int, const TraceMeshFaces *, rendinst::riex_handle_t)
+bool bundle_segment_any_hit(const Point3 &, const Point3 &, int, int) { return false; }
+bool rayhit_normalized(const Point3 &p, const Point3 &dir, real t, int flags, int ray_mat_id, const TraceMeshFaces *handle,
+  rendinst::riex_handle_t skip_riex_handle)
 {
-  G_ASSERT_RETURN(false, false);
+  real inOutT = t;
+  return traceray_normalized(p, dir, inOutT, nullptr, nullptr, flags, nullptr, ray_mat_id, handle, skip_riex_handle);
 }
 bool sphere_cast(const Point3 &, const Point3 &, float, ShapeQueryOutput &, int, const TraceMeshFaces *)
 {

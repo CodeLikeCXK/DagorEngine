@@ -401,6 +401,19 @@ DaGISettings WorldRenderer::getGISettings() const
 
 void WorldRenderer::giBeforeRender()
 {
+  // Explicit GI switches are applied here, outside of UI callbacks, so GPU resources are never torn down mid-frame.
+  if (giSystemSwitchPending)
+  {
+    giSystemSwitchPending = false;
+    if (activeGISystem != giSystemUserChoice)
+    {
+      setGIQualityFromSettings();
+      debug("GI: Switched active GI system to %s", activeGISystem == GISystem::DAGI2 ? "daGI2" : "PRTGI");
+      visuallog::logmsg(String(0, "[GI System] Switched active GI to: %s", activeGISystem == GISystem::DAGI2 ? "daGI2 (Dynamic Voxel GI)" : "PRTGI (Static Probe GI)").c_str(),
+        activeGISystem == GISystem::PRTGI ? E3DCOLOR(50, 255, 100) : E3DCOLOR(255, 200, 50), 5);
+    }
+  }
+
   if (activeGISystem == GISystem::PRTGI)
   {
     if (prtGI && !gi_enabled.get())
@@ -409,8 +422,14 @@ void WorldRenderer::giBeforeRender()
     if (!prtGI && gi_enabled.get())
       initGI();
 
+    ShaderGlobal::set_int(gi_qualityVarId, -1);
+
+    const bool compatibilityMode = !hasFeature(FeatureRenderFlags::FULL_DEFERRED);
     if (prtGI)
+    {
+      prtGI->setPipelineType(compatibilityMode ? "Mobile Forward / Thin" : "Desktop Full Deferred");
       prtGI->updateConstants();
+    }
     return;
   }
 
@@ -546,7 +565,6 @@ void WorldRenderer::updateGIPos(const Point3 &pos, const TMatrix &view_itm, floa
     {
       prtGI->update(pos);
       prtGI->relight(pos);
-      prtGI->updateConstants();
     }
     return;
   }
@@ -731,9 +749,6 @@ void WorldRenderer::initGIWindows(eastl::unique_ptr<scene::TiledScene> &&windows
 
 void WorldRenderer::switchGISystem(GISystem sys)
 {
-  if (activeGISystem == sys)
-    return;
-
   const bool compatibilityMode = !hasFeature(FeatureRenderFlags::FULL_DEFERRED);
   if (compatibilityMode && sys == GISystem::DAGI2)
   {
@@ -742,11 +757,9 @@ void WorldRenderer::switchGISystem(GISystem sys)
     return;
   }
 
-  activeGISystem = sys;
-  initGI();
-  debug("GI: Switched active GI system to %s", activeGISystem == GISystem::DAGI2 ? "daGI2" : "PRTGI");
-  visuallog::logmsg(String(0, "[GI System] Switched active GI to: %s", activeGISystem == GISystem::DAGI2 ? "daGI2 (Dynamic Voxel GI)" : "PRTGI (Static Probe GI)").c_str(),
-    activeGISystem == GISystem::PRTGI ? E3DCOLOR(50, 255, 100) : E3DCOLOR(255, 200, 50), 5);
+  giSystemUserSelected = true;
+  giSystemUserChoice = sys;
+  giSystemSwitchPending = true;
 }
 
 void WorldRenderer::initGI()
@@ -764,32 +777,47 @@ void WorldRenderer::initGI()
   const DataBlock *graphicsGI = dgs_get_settings()->getBlockByNameEx("graphics")->getBlockByNameEx("gi");
   const DataBlock *prtBlk = dgs_get_settings()->getBlockByNameEx("graphics")->getBlockByNameEx("prtgi");
 
-  bool preferPrtgi = compatibilityMode || prtBlk->getBool("enabled", false) ||
-                     (strcmp(graphicsGI->getStr("system", "dagi2"), "prtgi") == 0);
+  const bool preferPrtgi = prtBlk->getBool("enabled", false) || (strcmp(graphicsGI->getStr("system", "dagi2"), "prtgi") == 0);
+  GISystem requested = preferPrtgi ? GISystem::PRTGI : GISystem::DAGI2;
+  if (giSystemUserSelected)
+    requested = giSystemUserChoice;
+  if (compatibilityMode)
+    requested = GISystem::PRTGI;
 
-  if (preferPrtgi || compatibilityMode)
-    activeGISystem = GISystem::PRTGI;
-  else
-    activeGISystem = GISystem::DAGI2;
+  activeGISystem = GISystem::DAGI2;
+  if (requested == GISystem::PRTGI)
+  {
+    prtGI.reset(daprtgi::create_prtgi());
+    if (prtGI)
+    {
+      prtGI->init(dgs_get_settings()->getBlockByNameEx("graphics"));
+      const char *lvlName = getLevelSettings() ? getLevelSettings()->getStr("levelName", nullptr) : nullptr;
+      if (!lvlName || !lvlName[0])
+        lvlName = dgs_get_settings()->getStr("scene", "east_district_demo");
+      prtGI->loadOrBakeScene(lvlName);
+    }
 
-  debug("GI: Initializing GI subsystem... Active system = %s (compatibilityMode=%d)",
-    activeGISystem == GISystem::PRTGI ? "PRTGI" : "daGI2", compatibilityMode ? 1 : 0);
+    if ((prtGI && prtGI->isReady()) || compatibilityMode)
+    {
+      activeGISystem = GISystem::PRTGI;
+    }
+    else
+    {
+      logwarn("GI: PRTGI is not ready (prtgi.enabled or scene bake unavailable), using daGI2 instead");
+      visuallog::logmsg("PRTGI is not ready, using daGI2", E3DCOLOR(255, 200, 50), 5);
+      if (prtGI)
+        prtGI->close();
+      prtGI.reset();
+    }
+  }
+
+  debug("GI: Initializing GI subsystem... Active system = %s (requested=%s, compatibilityMode=%d)",
+    activeGISystem == GISystem::PRTGI ? "PRTGI" : "daGI2", requested == GISystem::PRTGI ? "PRTGI" : "daGI2", compatibilityMode ? 1 : 0);
 
   visuallog::logmsg(String(0, "[GI Subsystem] Active: %s (Pipeline: %s)",
     activeGISystem == GISystem::PRTGI ? "PRTGI (Static Precomputed GI)" : "daGI2 (Dynamic Voxel GI)",
     compatibilityMode ? "Mobile/Low-End" : "Desktop Deferred").c_str(),
     activeGISystem == GISystem::PRTGI ? E3DCOLOR(50, 255, 100) : E3DCOLOR(255, 200, 50), 8);
-
-  // Initialize PRTGI
-  prtGI.reset(daprtgi::create_prtgi());
-  if (prtGI)
-  {
-    prtGI->init(dgs_get_settings()->getBlockByNameEx("graphics"));
-    const char *lvlName = getLevelSettings() ? getLevelSettings()->getStr("levelName", nullptr) : nullptr;
-    if (!lvlName || !lvlName[0])
-      lvlName = dgs_get_settings()->getStr("scene", "east_district_demo");
-    prtGI->loadOrBakeScene(lvlName);
-  }
 
   if (activeGISystem == GISystem::DAGI2 && !compatibilityMode)
   {
@@ -842,7 +870,7 @@ void WorldRenderer::resetGI()
   giUpdatePosFrameCounter = 0;
 }
 
-void WorldRenderer::closeGI()
+void WorldRenderer::closeGI(bool request_fg_recreation)
 {
   staticSceneCollisionResource = nullptr;
   lruCollision.reset();
@@ -858,11 +886,20 @@ void WorldRenderer::closeGI()
     prtGI->close();
   prtGI.reset();
 
+  // The PRT volume texture is released with prtGI; make sure shaders stop sampling it.
+  static int prtVolumeEnabledVarId = get_shader_variable_id("_prtVolumeEnabled", true);
+  static int prtDebugSkyVisVarId = get_shader_variable_id("_prtDebugSkyVis", true);
+  if (prtVolumeEnabledVarId >= 0)
+    ShaderGlobal::set_int(prtVolumeEnabledVarId, 0);
+  if (prtDebugSkyVisVarId >= 0)
+    ShaderGlobal::set_int(prtDebugSkyVisVarId, 0);
+
   createGiNodes();
 
   mediaVolumes.clear();
 
-  requestFgRecreation("close GI");
+  if (request_fg_recreation)
+    requestFgRecreation("close GI");
 }
 
 const scene::TiledScene *WorldRenderer::getWallsScene() const { return nullptr; }

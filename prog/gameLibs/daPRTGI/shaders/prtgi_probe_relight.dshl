@@ -1,14 +1,18 @@
 include "shader_global.dshl"
+include "skyLightBase.dshl"
 
 int _prtProbeCount;
 float _prtEnvironmentIntensity;
+int4 _prtGridMin;
+int4 _prtGridCount;
+int4 _prtSlotCount;
 
 buffer _prtProbeData;
 buffer _factors;
 buffer _prtSkyVisibility;
+buffer _brickRadiance;
 buffer _prtCommittedSH;
 
-int4 _prtSlotCount;
 texture _coefficientVoxel3DRW;
 
 shader prt_probe_relight_cs
@@ -18,17 +22,32 @@ shader prt_probe_relight_cs
   (cs) {
     _prtProbeCount@i1 = _prtProbeCount;
     _prtEnvironmentIntensity@f1 = _prtEnvironmentIntensity;
+    _prtGridMin@i4 = _prtGridMin;
+    _prtGridCount@i4 = _prtGridCount;
+    _prtSlotCount@i4 = _prtSlotCount;
+    enviSPH0@f4 = enviSPH0;
+    enviSPH1@f4 = enviSPH1;
+    enviSPH2@f4 = enviSPH2;
     _prtProbeData@buf = _prtProbeData hlsl {
       #include "prtgi_common.hlsli"
       StructuredBuffer<PRTProbeData> _prtProbeData@buf;
     };
     _factors@buf = _factors hlsl { StructuredBuffer<BrickFactor> _factors@buf; };
-    _prtSkyVisibility@buf = _prtSkyVisibility hlsl { StructuredBuffer<uint> _prtSkyVisibility@buf; };
+    _prtSkyVisibility@buf = _prtSkyVisibility hlsl { StructuredBuffer<uint2> _prtSkyVisibility@buf; };
+    _brickRadiance@buf = _brickRadiance hlsl { StructuredBuffer<float4> _brickRadiance@buf; };
     _prtCommittedSH@uav = _prtCommittedSH hlsl { RWStructuredBuffer<float4> _prtCommittedSH@uav; };
+    _coefficientVoxel3DRW@uav = _coefficientVoxel3DRW hlsl { RWTexture3D<float4> _coefficientVoxel3DRW@uav; };
   }
 
   hlsl(cs) {
     #define PROBE_THREADS 64
+    // Fraction of the new relight result blended into already-published coefficients (temporal smoothing).
+    #define PRT_RELIGHT_HISTORY 0.35f
+
+    void prt_publish_texel(int3 texCoord, float4 value, float blend)
+    {
+      _coefficientVoxel3DRW[texCoord] = lerp(_coefficientVoxel3DRW[texCoord], value, blend);
+    }
     [numthreads(PROBE_THREADS, 1, 1)]
     void cs_main(uint3 id : SV_DispatchThreadID)
     {
@@ -37,32 +56,67 @@ shader prt_probe_relight_cs
         return;
 
       PRTProbeData probe = _prtProbeData[probeIdx];
-      float3 coefficients[9];
-      for (int i = 0; i < 9; ++i)
+      // Only L0 + L1 are published, so there is no reason to accumulate the L2 band.
+      float3 coefficients[PRT_COEFF_SLICES];
+      for (int i = 0; i < PRT_COEFF_SLICES; ++i)
         coefficients[i] = 0;
 
-      // Accumulate brick factors
+      // 1. Indirect bounce from surfel bricks.
+      // Factors are the SH projection of the radiance seen from the (relocated) probe,
+      // so no sky-based attenuation is applied here: leaking is handled at sampling
+      // time by the per-probe depth visibility test, and enclosed probes keep the
+      // bounce light that genuinely enters through openings.
       for (int edge = 0; edge < probe.factorCount; ++edge)
       {
         BrickFactor factor = _factors[probe.factorStart + edge];
         float sh[9];
         prt_factor_sh(factor, sh);
-        float3 radiance = float3(0.5, 0.5, 0.5); // Simplified brick radiance reference
+        uint brick = prt_factor_brick(factor);
+        float3 radiance = _brickRadiance[brick].rgb;
 
-        for (int c = 0; c < 9; ++c)
+        for (int c = 0; c < PRT_COEFF_SLICES; ++c)
           coefficients[c] += radiance * sh[c];
       }
 
-      // Add sky visibility
-      uint skyVis = _prtSkyVisibility[probeIdx];
-      float3 skyRadiance = float3(0.3, 0.45, 0.7) * _prtEnvironmentIntensity;
-      float skyFactor = (float)countbits(skyVis) / 32.0f;
-      coefficients[0] += skyRadiance * skyFactor * 3.54f;
+      // 2. Direct sky visibility is NOT stored here anymore. The sampler reads it from the
+      // per-probe ambient cube (_prtSkyMask), which is uploaded once and costs one buffer read.
+      //
+      // In accordance with DAGI2 architecture, probe coefficients strictly represent bounced indirect GI.
+      // Direct sky irradiance is dynamically evaluated in shading passes via GetSkySHDiffuse(n) * skyVis(n),
+      // ensuring downward-facing ceilings and occluded rooms receive zero direct sky light without SH monopole leaking.
 
-      // Store SH9 coefficients (9 x float4)
-      for (int c = 0; c < 9; ++c)
+      // 3. Store the published bands (L0 + L1) in the committed buffer
+      for (int c = 0; c < PRT_COEFF_SLICES; ++c)
       {
-        _prtCommittedSH[probeIdx * 9u + c] = float4(coefficients[c], 1.0f);
+        _prtCommittedSH[probeIdx * (uint)PRT_COEFF_SLICES + (uint)c] = float4(coefficients[c], 1.0f);
+      }
+
+      // 4. Publish directly to 3D volume texture
+      uint pIdx = probe.globalProbeIndex;
+      int yz = _prtGridCount.y * _prtGridCount.z;
+      if (yz > 0)
+      {
+        int x = int(pIdx) / yz;
+        int rem = int(pIdx) % yz;
+        int y = rem / _prtGridCount.z;
+        int z = rem % _prtGridCount.z;
+        int3 coord = int3(x, y, z) + _prtGridMin.xyz;
+
+        int3 slot = prt_publication_slot(coord, 0, _prtSlotCount, int4(0, 0, 0, 0));
+        if (slot.y >= 0 && slot.y < _prtSlotCount.y)
+        {
+          // Publish only L0 + L1 (PRT_COEFF_SLICES). The alpha of the L0 texel carries the
+          // "published" flag that the sampler uses to skip probes that have no radiance yet.
+          // Blend into previously published data once the probe has history, so sector updates
+          // at different times do not pop.
+          int3 validCoord = prt_texture_coordinate(slot, 0, 0, _prtSlotCount);
+          bool hasHistory = _coefficientVoxel3DRW[validCoord].a > 0.5f && probe.validity != 0;
+          float blend = hasHistory ? PRT_RELIGHT_HISTORY : 1.0f;
+          prt_publish_texel(validCoord, float4(coefficients[0], (probe.validity == 0) ? 0.0f : 1.0f), blend);
+          prt_publish_texel(prt_texture_coordinate(slot, 0, 1, _prtSlotCount), float4(coefficients[1], 1.0f), blend);
+          prt_publish_texel(prt_texture_coordinate(slot, 0, 2, _prtSlotCount), float4(coefficients[2], 1.0f), blend);
+          prt_publish_texel(prt_texture_coordinate(slot, 0, 3, _prtSlotCount), float4(coefficients[3], 1.0f), blend);
+        }
       }
     }
   }
@@ -89,16 +143,14 @@ shader prt_publish_cs
         return;
 
       int3 slot = int3(id);
-      // Publish ambient / SH0 coefficient slice
-      for (uint c = 0; c < 9u; ++c)
+      // Clear voxel slots to 0 (darkness baseline)
+      for (uint c = 0; c < (uint)PRT_COEFF_SLICES; ++c)
       {
         int3 texCoord = prt_texture_coordinate(slot, 0, c, _prtSlotCount);
-        // Default published ambient baseline
-        _coefficientVoxel3DRW[texCoord] = (c == 0) ? float4(0.2, 0.25, 0.35, 1.0) : float4(0, 0, 0, 1.0);
+        _coefficientVoxel3DRW[texCoord] = float4(0, 0, 0, 0);
       }
     }
   }
 
   compile("cs_5_0", "cs_publish");
 }
-

@@ -870,9 +870,8 @@ void DaSkies::renderSkyWithoutOverlay(SkiesData *data, const TMatrix &view_tm, c
     ShaderGlobal::set_float4(solid_colorVarId, solidColor);
     applySolidColor.render();
   }
-  else if (panoramaEnabled())
+  else if (panoramaEnabled() && panoramaValid != PANORAMA_INVALID && panoramaValid != PANORAMA_WAIT_RESOURCES)
   {
-    G_ASSERT(panoramaValid != PANORAMA_INVALID);
     renderPanorama(origin, view_tm, proj_tm, persp);
   }
   else if (data->lowresSkies && render_prepared != RenderPrepared::Off)

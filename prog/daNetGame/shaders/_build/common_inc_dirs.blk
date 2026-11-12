@@ -50,6 +50,7 @@ incDir:t="../../../prog/3rdPartyLibs/NRD/Include"
 incDir:t="../../../prog/3rdPartyLibs/math/MathLib"
 
 incDir:t="../../../prog/gameLibs/daGI2/shaders"
+incDir:t="../../../prog/gameLibs/daPRTGI/shaders"
 incDir:t="../../../prog/gameLibs/daSDF/shaders"
 incDir:t="../../../prog/gameLibs/publicInclude/daSDF"
 incDir:t="../../../prog/gameLibs/publicInclude/daSkies2"

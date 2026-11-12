@@ -95,6 +95,8 @@ UseProgLibs =
   gameLibs/render/upscale
   gameLibs/render/heightmapShadows
   gameLibs/profileEventsGUI
+
+  gameLibs/gamePhys/collision/stub
 ;
 
 #UseRootLibs = xblades2/prog/anim ;
@@ -178,13 +180,15 @@ if $(Platform) in windows {
   Exit unsupported Platform\=$(Platform) for Target\=$(Target) ;
 }
 
-if $(Platform) in windows {
-  if ! $(Sanitize) || $(Sanitize) = disabled { UseMemoryAllocator ?= mimalloc ; }
-}
+#if $(Platform) in windows {
+#  if ! $(Sanitize) || $(Sanitize) = disabled { UseMemoryAllocator ?= mimalloc ; }
+#}
 
-if $(Platform) in windows && $(Config) != rel && $(Sanitize) != address { UseMemoryDebugLevel ?= dbg ; }
+#if $(Platform) in windows && $(Config) != rel && $(Sanitize) != address { UseMemoryDebugLevel ?= dbg ; }
 
+include $(Root)/prog/gameLibs/daPRTGI/_lib.jam ;
 include $(Root)/prog/gameLibs/render/ambientOcclusion/_lib.jam ;
 include $(Root)/prog/gameLibs/render/raytracedToroidalStaticShadow/_lib.jam ;
+include $(Root)/prog/3rdPartyLibs/phys/setup-phys.jam ;
 
 include $(Root)/prog/_jBuild/build.jam ;

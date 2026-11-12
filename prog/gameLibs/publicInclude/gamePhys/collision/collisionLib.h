@@ -88,6 +88,7 @@ bool add_static_collision_frt(const StaticSceneRayTracer *frt, const char *name,
 bool load_static_collision_frt(IGenLoad *crd);
 // False: the stream landed empty, the cause already logged.
 bool load_static_collision(IGenLoad &crd);
+void set_static_collision_resource(CollisionResource *res);
 CollisionResource *get_static_collision_resource();
 // The level's water surface, its own resource of traceable nodes. Null until a level sets one.
 CollisionResource *get_water_collision();

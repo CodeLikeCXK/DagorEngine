@@ -295,10 +295,11 @@ inline void create_gbuffer_targets(
   const auto gbufResolution = registry.getResolution<2>("main_view");
 
   const bool isThinG = !renderer_has_feature(FULL_DEFERRED);
+  const bool hasMotion = !isThinG && need_motion_vectors;
   G_ASSERTF(!(isThinG && need_motion_vectors), "Motion vectors are not supported with thin gbuffer!");
 
   dag::Span<const unsigned> gbufFmts = isThinG ? dag::Span<const unsigned>(THIN_GBUFFER_RT_FORMATS)
-                                       : need_motion_vectors
+                                       : hasMotion
                                          ? dag::Span<const unsigned>(FULL_GBUFFER_FORMATS)
                                          : dag::Span<const unsigned>(FULL_GBUFFER_FORMATS.data(), NO_MOTION_GBUFFER_RT_COUNT);
 

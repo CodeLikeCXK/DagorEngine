@@ -53,6 +53,14 @@ public:
 
       currentSettings.cacheFolder = prtBlk->getStr("cacheFolder", currentSettings.cacheFolder.c_str());
 
+      const char *qualityStr = prtBlk->getStr("quality", "high");
+      if (qualityStr && qualityStr[0])
+      {
+        const bool low = stricmp(qualityStr, "low") == 0 || stricmp(qualityStr, "baked") == 0;
+        currentSettings.quality = low ? PRTGIQuality::Low : PRTGIQuality::High;
+        currentSettings.qualityExplicit = true;
+      }
+
       if (prtBlk->getBool("debugDrawProbes", false))
         currentSettings.debugDraw = DebugVisualMode::Probes;
     }
@@ -66,6 +74,7 @@ public:
 
   void close() override
   {
+    relightPass.unbindShaderResources();
     residency.release();
     relightPass.close();
     asset.clear();
@@ -77,6 +86,7 @@ public:
   void setSettings(const PRTGISettings &s) override { currentSettings = s; }
   const PRTGISettings &getSettings() const override { return currentSettings; }
   const PRTGIStats &getStats() const override { return stats; }
+  void setPipelineType(const char *name) override { stats.pipelineTypeName = name; }
 
   bool isReady() const override { return ready; }
 
@@ -152,9 +162,22 @@ public:
       stats.lastBakeDurationSec = profile_time_usec(tStart) / 1000000.0f;
     }
 
-    // Initialize scheduler & residency
+    // Initialize scheduler & residency. The Low/Baked tier omits the per-probe depth buffer.
     scheduler.reset(&asset);
-    residency.init(asset.grid, currentSettings.cascadeCount);
+    // Depth moments are needed in both tiers; only the lookup cost differs.
+    residency.init(asset.grid, currentSettings.cascadeCount, true);
+    residency.publishSkyMasks(asset);
+
+    // Publish every sector once up front. Sectors are only kept as a small GPU working set
+    // (see the residency LRU), so without this pass the far sectors would never get relit.
+    {
+      eastl::vector<int> allSectors;
+      allSectors.reserve(asset.sectors.size());
+      for (const auto &sec : asset.sectors)
+        allSectors.push_back(sec.sectorIndex);
+      relightPass.updateGlobalShaderConstants(asset.grid, residency, Point3(0, 0, 0), currentSettings.cascadeCount);
+      relightPass.relightSectors(allSectors, asset, residency, Point3(0, 0, 0), currentSettings.skyIntensity);
+    }
 
     ready = true;
     stats.bakingStatus = loadSuccess ? "Loaded from Cache (Ready)" : "Baked & Ready";
@@ -206,6 +229,7 @@ public:
     stats.currentNearSector = scheduler.getNearSector();
     stats.currentBackgroundSector = scheduler.getBackgroundSector();
     stats.residentSectors = residency.getResidentCount();
+    stats.runtimeVramBytes = residency.getTotalVramBytes();
   }
 
   void relight(const Point3 &camera_pos) override
@@ -228,10 +252,27 @@ public:
 
   void updateConstants() override
   {
+    static int prtDebugSkyVisVarId = get_shader_variable_id("_prtDebugSkyVis", true);
     if (!ready || !currentSettings.enabled)
+    {
+      static int prtVolumeEnabledVarId = get_shader_variable_id("_prtVolumeEnabled", true);
+      if (prtVolumeEnabledVarId >= 0)
+        ShaderGlobal::set_int(prtVolumeEnabledVarId, 0);
+      if (prtDebugSkyVisVarId >= 0)
+        ShaderGlobal::set_int(prtDebugSkyVisVarId, 0);
       return;
+    }
 
     relightPass.updateGlobalShaderConstants(asset.grid, residency, Point3(0, 0, 0), currentSettings.cascadeCount);
+
+    static int prtQualityVarId = get_shader_variable_id("_prtQuality", true);
+    if (prtQualityVarId >= 0)
+      ShaderGlobal::set_int(prtQualityVarId, currentSettings.quality == PRTGIQuality::Low ? 1 : 0);
+    // Set this before the scene passes are recorded. Setting it from the ImGui
+    // draw callback is too late for the current frame and can be overwritten by
+    // the next frame's shader block setup.
+    if (prtDebugSkyVisVarId >= 0)
+      ShaderGlobal::set_int(prtDebugSkyVisVarId, currentSettings.debugOverlay && currentSettings.debugSkyVisibility ? 1 : 0);
   }
 
   void afterReset() override
@@ -239,6 +280,7 @@ public:
     if (ready)
     {
       residency.afterReset();
+      residency.publishSkyMasks(asset);
       updateConstants();
     }
   }
@@ -304,4 +346,3 @@ IDaPRTGI *create_prtgi()
 }
 
 } // namespace daprtgi
-

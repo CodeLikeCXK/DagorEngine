@@ -232,6 +232,10 @@ public:
     PRTGI
   };
   GISystem activeGISystem = GISystem::DAGI2;
+  // Explicit user choice (console / GI window). Survives preset and settings-driven GI re-inits.
+  bool giSystemUserSelected = false;
+  GISystem giSystemUserChoice = GISystem::DAGI2;
+  bool giSystemSwitchPending = false;
   void switchGISystem(GISystem sys);
   daprtgi::IDaPRTGI *getPRTGI() { return prtGI.get(); }
 
@@ -1180,7 +1184,7 @@ private:
   PostFxRenderer ambientBilateralBlur, ambientPerPixelVoxelsRT;
   eastl::unique_ptr<DataBlock> giBlk;
   void initGI();
-  void closeGI();
+  void closeGI(bool request_fg_recreation = true);
   void resetGI();
   void giBeforeRender();
   void renderGiCollision(const TMatrix &view_itm, const Frustum &);

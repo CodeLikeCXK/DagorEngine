@@ -102,7 +102,6 @@ macro WRITE_GBUFFER_THIN()
         }
       #endif
       //envi+
-      //half3 environmentAmbientUnoccludedLighting = GetSHFunctionValue(gbuffer.normal, gbuffer_enviSPH0, gbuffer_enviSPH1, gbuffer_enviSPH2, gbuffer_enviSPH3, gbuffer_enviSPH4, gbuffer_enviSPH5, gbuffer_enviSPH6);
       half3 environmentAmbientUnoccludedLighting = GetSHFunctionValueSimple(gbuffer.normal, sph0, sph1, sph2);
 ##if shader == dynamic_masked_chrome_bump
       environmentAmbientUnoccludedLighting *= (1.0 - fragmentInTankCockpit);

@@ -205,7 +205,7 @@ void DepthOfFieldPS::init(int w, int h)
   if (originalWidth == w / 2 && originalHeight == h / 2)
     return;
 
-#define VAR(a) a##VarId = get_shader_variable_id(#a);
+#define VAR(a) a##VarId = get_shader_variable_id(#a, true);
   GLOBAL_VARS_LIST
 #undef VAR
   width = w / 2;

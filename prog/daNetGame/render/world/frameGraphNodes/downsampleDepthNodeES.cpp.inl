@@ -110,7 +110,7 @@ eastl::array<dafg::NodeHandle, 4> makeDownsampleDepthNodes(const DownsampleNodeP
 
     if (params.needNormals)
     {
-      registry.readTextureHistory("downsampled_normals").atStage(dafg::Stage::PS_OR_CS).bindToShaderVar("prev_downsampled_normals");
+      registry.readTextureHistory("downsampled_normals").atStage(dafg::Stage::PS_OR_CS).bindToShaderVar("prev_downsampled_normals").optional();
       if (isNormalsPacked)
       {
         ns.read("unpacked_normals").texture().atStage(dafg::Stage::PS_OR_CS).bindToShaderVar("unpacked_normal_tex");
@@ -241,7 +241,7 @@ static void create_downsample_depth_node_es(const OnCameraNodeConstruction &evt)
   WRDispatcher::getDownsampledDepthParams(downsampledTexturesMipCount, storeDownsampledTexturesInEsram);
 
   DownsampleNodeParams nodeParams{downsampledTexturesMipCount, renderer_has_feature(UPSCALE_SAMPLING_TEX),
-    renderer_has_feature(DOWNSAMPLED_NORMALS), evt.hasMotionVectors, storeDownsampledTexturesInEsram};
+    renderer_has_feature(DOWNSAMPLED_NORMALS) && renderer_has_feature(FULL_DEFERRED), evt.hasMotionVectors, storeDownsampledTexturesInEsram};
 
   for (auto &&n : makeDownsampleDepthNodes(nodeParams))
     evt.nodes->push_back(eastl::move(n));

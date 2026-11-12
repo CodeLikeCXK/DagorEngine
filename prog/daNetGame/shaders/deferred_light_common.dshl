@@ -20,6 +20,7 @@ include "world_sdf.dshl"
 include "use_gi.dshl"
 include "reproject_gi.dshl"
 include "ibl_cube_sample.dshl"
+include "prtgi_sample.dshl"
 
 int shadow_frame = 0;
 
@@ -123,6 +124,8 @@ macro INIT_AND_USE_DEFERRED_LIGHT_COMMON(code)
     }
   }
 
+  PRTGI_PROBE_VOLUME_SAMPLE(code)
+
   hlsl(code) {
       #include <diffuse_brdf.hlsl>
       #include <specular_brdf.hlsl>
@@ -192,6 +195,10 @@ macro INIT_AND_USE_DEFERRED_LIGHT_COMMON(code)
           enviProbe = sample_envi_probe(float4(roughR, roughMip)).rgb;
         half3 environmentAmbientReflection = indoorRefl__localWeight.xyz + enviProbe * indoorRefl__localWeight.w;
 
+        // -1 means that this pass did not execute the PRT sample. It must not
+        // be confused with a valid sky visibility of zero.
+        float prtDebugSky = -1.0f;
+
         #if HAS_AMBIENT_TARGET
 
           float3 normal = gbuffer.normal;
@@ -201,36 +208,66 @@ macro INIT_AND_USE_DEFERRED_LIGHT_COMMON(code)
           half3 ambient = enviLight;
           half3 giSpecular = environmentAmbientReflection;
           {
-            ambient = enviLight;
+            BRANCH
+            if (_prtVolumeEnabled != 0)
+            {
+              float skyVis = 1.0;
+              float3 bounceIrr = sample_prtgi_gi_normals(worldPos, gbuffer.normal, enviLightingNormal, skyVis);
+              prtDebugSky = skyVis;
+              ambient = bounceIrr + enviLight * skyVis;
+
+              // Scheme 4: Treyarch harmonic specular occlusion to eliminate flat cubemap specular indoors / under arches:
+              float specOcc = smoothstep(0.05f, 0.50f, skyVis);
+              environmentAmbientReflection *= specOcc;
+              float maxSpecScale = dagi_max_specular_scale(gbuffer.linearRoughness, saturated_NdotV, 2.0, NUM_PROBE_MIPS);
+              environmentAmbientReflection = dagi_clamp_untrusted_specular(environmentAmbientReflection, ambient, maxSpecScale);
+              giSpecular = environmentAmbientReflection;
+            }
+            else
+            {
+              ambient = enviLight;
+            }
             //fixme: to be measured! we probably should not sample enviProbes at all if smoothness is < threshold (since we don't use it!)
             ##if gi_quality == screen_probes
             bool HAS_SPECULAR = true;
             {
               BRANCH
-              if (is_main_camera_view_postfx())
-                sample_bilinear_specular_irradiance_with_normal(roughR, enviLightingNormal, linearize_z(rawDepth, zn_zfar.zw), worldPos, gbuffer.normal, viewPixcoord.xy, giSpecular, ambient);
-            ##if use_camera_in_camera == yes
-              else
-                HAS_SPECULAR = sample_dagi_irradiance_grid(dist, worldPos, enviLightingNormal, view,
-                                                           gbuffer.normal, viewPixcoord, roughR, ambient, giSpecular);
-            ##endif
+              if (_prtVolumeEnabled == 0)
+              {
+                if (is_main_camera_view_postfx())
+                  sample_bilinear_specular_irradiance_with_normal(roughR, enviLightingNormal, linearize_z(rawDepth, zn_zfar.zw), worldPos, gbuffer.normal, viewPixcoord.xy, giSpecular, ambient);
+              ##if use_camera_in_camera == yes
+                else
+                  HAS_SPECULAR = sample_dagi_irradiance_grid(dist, worldPos, enviLightingNormal, view,
+                                                             gbuffer.normal, viewPixcoord, roughR, ambient, giSpecular);
+              ##endif
+              }
               #define HAS_CONST_SPECULAR 1
               #define HACK_SPECULAR_BRIGHTNESS 1
               #define HACK_ROUGH_SPECULAR_TO_IRRADIANCE 1
             }
             ##elif (gi_quality == colored)
-              bool HAS_SPECULAR = sample_dagi_irradiance_grid(dist, worldPos, enviLightingNormal, view,
+              bool HAS_SPECULAR = false;
+              BRANCH
+              if (_prtVolumeEnabled == 0)
+              {
+                HAS_SPECULAR = sample_dagi_irradiance_grid(dist, worldPos, enviLightingNormal, view,
                                                               gbuffer.normal, viewPixcoord, roughR, ambient, giSpecular);
+              }
               #define HAS_CONST_SPECULAR 1
               #define HACK_SPECULAR_BRIGHTNESS 1
               #define HACK_ROUGH_SPECULAR_TO_IRRADIANCE 1
               //ambient = volumetric_gi_calc_diffuse_uvw(input.texcoord.xy, 0.95*w, enviLightingNormal);
             ##elif (gi_quality == only_ao)
-              float ofs = max(dist*0.04, 0.25*dagi_sky_vis_probe_size(0));
-              float3 filteredWorldPos = worldPos + view*ofs;
-              float vignette;
-              float4 sh1 = dagi_get_sky_visibility_smooth_vignette(world_view_pos.xyz, filteredWorldPos, view, max(0, dist-ofs), normal, interleavedGradientNoise( viewPixcoord.xy ), vignette );
-              ambient = lerp(GetSHFunctionValueSimple(enviLightingNormal, enviSPH0*sh1.wyzx, enviSPH1*sh1.wyzx, enviSPH2*sh1.wyzx), ambient, vignette);
+              BRANCH
+              if (_prtVolumeEnabled == 0)
+              {
+                float ofs = max(dist*0.04, 0.25*dagi_sky_vis_probe_size(0));
+                float3 filteredWorldPos = worldPos + view*ofs;
+                float vignette;
+                float4 sh1 = dagi_get_sky_visibility_smooth_vignette(world_view_pos.xyz, filteredWorldPos, view, max(0, dist-ofs), normal, interleavedGradientNoise( viewPixcoord.xy ), vignette );
+                ambient = lerp(GetSHFunctionValueSimple(enviLightingNormal, enviSPH0*sh1.wyzx, enviSPH1*sh1.wyzx, enviSPH2*sh1.wyzx), ambient, vignette);
+              }
               #define HAS_SPECULAR 0
               #define HACK_SPECULAR_BRIGHTNESS 1
             ##endif
@@ -301,6 +338,19 @@ macro INIT_AND_USE_DEFERRED_LIGHT_COMMON(code)
         #else
           outAmbient = float3(0, 0, 0);
         #endif
+
+        // Full Deferred debug output must bypass the normal ambient/specular
+        // composition. Otherwise the sampled value is hidden by environment,
+        // reflection and GI post-processing.
+        if (_prtDebugSkyVis != 0)
+        {
+          float3 debugColor = prtDebugSky < 0.0f ? float3(1, 0, 1) :
+            float3(prtDebugSky, prtDebugSky, prtDebugSky);
+          outAmbient = pack_hdr(debugColor);
+          outSpecular = pack_hdr(float3(0, 0, 0));
+          outPixelAge = 0;
+          return;
+        }
 
         half3 totalReflection = environmentAmbientReflection;
 

@@ -542,7 +542,7 @@ public:
     if (!shader_var_name)
       shader_var_name = Helper<ResType>::getNameById(this->mResId);
 
-    this->setVarId(shader_var_name ? get_shader_variable_id(shader_var_name) : -1);
+    this->setVarId(shader_var_name ? get_shader_variable_id(shader_var_name, true) : -1);
     if (Helper<ResType>::can_bind(this->mResource))
       this->setVar();
   }

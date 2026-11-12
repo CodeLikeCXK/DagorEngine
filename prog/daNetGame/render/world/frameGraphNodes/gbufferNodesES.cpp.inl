@@ -130,7 +130,9 @@ static inline bool use_single_pass_shading()
 
 static inline bool use_deferred_lighting()
 {
-  return renderer_has_feature(FeatureRenderFlags::DEFERRED_LIGHT) && !use_single_pass_shading();
+  return renderer_has_feature(FeatureRenderFlags::DEFERRED_LIGHT) &&
+         renderer_has_feature(FeatureRenderFlags::FULL_DEFERRED) &&
+         !use_single_pass_shading();
 }
 
 static inline bool use_deferred_shading()

@@ -122,6 +122,9 @@
 
 #include <math/dag_hlsl_floatx.h>
 #include <daGI2/daGI2.h>
+#include <daPRTGI/daPRTGI.h>
+#include <gamePhys/collision/collisionLib.h>
+#include <gameRes/collisionResourceBuilder.h>
 #include <voxelizedMedia/voxelizedMedia.h>
 #include <voxelizedMedia/vegetationMediaVoxelizer.h>
 #include <heightmapTrace/heightmapMaxGrid.h>
@@ -663,6 +666,8 @@ public:
   {
     if (daGI2)
       daGI2->afterReset();
+    if (prtGI)
+      prtGI->afterReset();
     mediaVolumes.afterReset();
     rtss->afterDeviceReset();
     giHmapMaxGrid.close(); // constraint: the grid owner closes it after a device reset (heightmapMaxGrid.h)
@@ -676,6 +681,8 @@ public:
       d3d::GpuAutoLock gpu_al;
       daGI2->afterReset(); // the baked media bricks survive this: only giAfterDeviceReset rebakes
     }
+    if (prtGI)
+      prtGI->afterReset();
     giHmapMaxGrid.close(); // the per frame init/update recreates and refills
     validAmbientHistory = false;
     // daGI2.reset(create_dagi());
@@ -859,6 +866,7 @@ public:
   LRUCollision lruColl;
 
   eastl::unique_ptr<DaGI> daGI2;
+  eastl::unique_ptr<daprtgi::IDaPRTGI> prtGI;
   HeightmapMaxGrid giHmapMaxGrid;
   DynamicShaderHelper debugHmapTraceShader;
   // the traced heightfield into the gbuffer: correct tracing lands exactly on
@@ -1153,6 +1161,14 @@ public:
         allUsec - loadUsec, allUsec);
     }
     daGI2.reset(create_dagi());
+    prtGI.reset(daprtgi::create_prtgi());
+    if (prtGI)
+    {
+      prtGI->init(dgs_get_settings()->getBlockByNameEx("graphics"));
+      prtGI->setPipelineType("Desktop Full Deferred");
+      if (prtGI->getSettings().debugDraw == daprtgi::DebugVisualMode::Probes)
+        gi_panel.debug_draw_probes = true;
+    }
 
     setDirToSun();
     loading_job_mgr_id = cpujobs::create_virtual_job_manager(1, 2 << 20);
@@ -1272,6 +1288,10 @@ public:
     ShaderGlobal::set_texture(prev_downsampled_far_depth_texVarId, BAD_TEXTUREID);
     ShaderGlobal::set_texture(prev_downsampled_close_depth_texVarId, BAD_TEXTUREID);
     downsample_depth::close();
+
+    if (prtGI)
+      prtGI->close();
+    prtGI.reset();
 
     del_it(test);
     del_it(binScene);
@@ -1574,8 +1594,29 @@ public:
     updateRtss(itm.getcol(3), realTime);
     // todo: clamp itm.getcol(3) with shrinked sceneBox - there is nothing interesting outside scene
     updateSSGIPos(itm.getcol(3)); // constraint: after updateRtss, which moves the rtss to the camera
-    auto ru = gi_panel.update_radiance && giUpdatePosFrameCounter == 0 ? DaGI::RadianceUpdate::On : DaGI::RadianceUpdate::Off;
-    daGI2->beforeRender(sw, sh, w, h, itm, projTm, p.zn, p.zf, ru);
+
+    if (gi_panel.gi_mode == PRT_GI)
+    {
+      if (prtGI && prtGI->isReady())
+      {
+        daprtgi::PRTGISettings ps = prtGI->getSettings();
+        daprtgi::DebugVisualMode targetMode = gi_panel.debug_draw_probes ? daprtgi::DebugVisualMode::Probes : daprtgi::DebugVisualMode::None;
+        if (ps.debugDraw != targetMode)
+        {
+          ps.debugDraw = targetMode;
+          prtGI->setSettings(ps);
+        }
+        Point3 camPos = itm.getcol(3);
+        prtGI->update(camPos);
+        prtGI->relight(camPos);
+        prtGI->updateConstants();
+      }
+    }
+    else
+    {
+      auto ru = gi_panel.update_radiance && giUpdatePosFrameCounter == 0 ? DaGI::RadianceUpdate::On : DaGI::RadianceUpdate::Off;
+      daGI2->beforeRender(sw, sh, w, h, itm, projTm, p.zn, p.zf, ru);
+    }
     // media volumes own the tree canopy density: append the instances a box touches, and bake
     // a pending type through the VegetationMediaVoxelizer bake shader (see voxelizedMedia.h)
     auto gatherMediaInstances = [&](const BBox3 &box, Tab<DaGIMediaVolumeInstance> &out) {
@@ -1699,14 +1740,16 @@ public:
 
     frameView.bind();
     d3d::set_render_target({target->getDepth(), 0, 0}, DepthAccess::RW, {{frame.getTex2D(), 0, 0}});
-    daGI2->afterFrameRendered(DaGI::FrameData(DaGI::FrameHasAll));
+    if (gi_panel.gi_mode != PRT_GI)
+      daGI2->afterFrameRendered(DaGI::FrameData(DaGI::FrameHasAll));
     frameView.bind();
     d3d::set_render_target({target->getDepth(), 0, 0}, DepthAccess::SampledRO, {{frame.getTex2D(), 0, 0}});
     renderWater(frameView);
     d3d::set_render_target({target->getDepth(), 0, 0}, DepthAccess::RW, {{frame.getTex2D(), 0, 0}});
     renderTrans(frameView);
     frameView.bind();
-    daGI2->debugRenderTrans();
+    if (gi_panel.gi_mode != PRT_GI)
+      daGI2->debugRenderTrans();
     mediaVolumes.debugRender(); // the debug pass view vars are set by debugRenderTrans above
     ShaderGlobal::set_int(dynamic_lights_countVarId, 0);
 
@@ -1769,6 +1812,7 @@ public:
     else
       target->debugRender(nullptr, (int)show_gbuffer);
 
+    if (gi_panel.gi_mode != PRT_GI)
     {
       daGI2->debugRenderScreenDepth();
       daGI2->debugRenderScreen();
@@ -1780,6 +1824,12 @@ public:
 
     debugTexOverlay.render();
     de3_imgui_render();
+
+    if (gi_panel.gi_mode == PRT_GI && prtGI)
+    {
+      prtGI->drawDebugOverlay();
+      prtGI->debugRender(&itm.getcol(3));
+    }
 
     if (console::get_visual_driver())
     {
@@ -1841,6 +1891,32 @@ public:
 
   void giQualitySet()
   {
+    if (gi_panel.gi_mode == PRT_GI)
+    {
+      ShaderGlobal::set_int(get_shader_variable_id("gi_quality"), -1);
+      if (prtGI)
+      {
+        daprtgi::PRTGISettings ps = prtGI->getSettings();
+        ps.enabled = true;
+        ps.debugOverlay = true;
+        ps.debugDraw = gi_panel.debug_draw_probes ? daprtgi::DebugVisualMode::Probes : daprtgi::DebugVisualMode::None;
+        prtGI->setSettings(ps);
+        prtGI->updateConstants();
+      }
+      return;
+    }
+    else
+    {
+      if (prtGI)
+      {
+        daprtgi::PRTGISettings ps = prtGI->getSettings();
+        ps.enabled = false;
+        ps.debugOverlay = false;
+        prtGI->setSettings(ps);
+        prtGI->updateConstants();
+      }
+    }
+
     ShaderGlobal::set_int(get_shader_variable_id("gi_quality"), (int)gi_panel.gi_mode);
     auto s = daGI2->getNextSettings();
     s.voxelScene.sdfResScale = 0.5;
@@ -2039,7 +2115,7 @@ public:
     TIME_D3D_PROFILE(beforeDraw);
     preIntegratedGF.setFramesCount(gf_frames);
     preIntegratedGF.update();
-    static bool scene = false;
+    static bool scene = land_panel.level;
 
     if (scene != land_panel.level)
     {
@@ -2111,6 +2187,7 @@ public:
       sun = lerp(moon, sun, daSkies.getCurrentSunEffect());
       amb = lerp(moonamb, amb, daSkies.getCurrentSunEffect());
       ShaderGlobal::set_float4(get_shader_variable_id("sun_light_color"), color4(sun / PI, 0));
+      ShaderGlobal::set_float4(get_shader_variable_id("sun_color_0", true), color4(sun / PI, 0));
       ShaderGlobal::set_float4(get_shader_variable_id("amb_light_color", true), color4(amb, 0));
     }
     else
@@ -2491,6 +2568,197 @@ public:
     // the first collision window saw a partial level: refill it whole
     bvh::invalidate_lru_collision(bvhCtx);
     redrawSceneGpuData();
+    if (prtGI)
+    {
+      const char *lvl = dgs_get_settings()->getStr("level", "sponza");
+      char cleanNameBuf[256];
+      const char *cleanName = dd_get_fname_without_path_and_ext(cleanNameBuf, sizeof(cleanNameBuf), lvl);
+
+      if (!dacoll::get_static_collision_resource())
+      {
+        String frtCandidates[] = {
+          String(0, "levels/%s.frt.bin", cleanName),
+          String(0, "../develop/levels/%s/clipping/game_clip.uni-frt.bin", cleanName),
+          String(0, "../../develop/levels/%s/clipping/game_clip.uni-frt.bin", cleanName),
+          String(0, "levels/%s/clipping/game_clip.uni-frt.bin", cleanName),
+        };
+        for (const String &path : frtCandidates)
+        {
+          if (dd_file_exist(path.c_str()))
+          {
+            FullFileLoadCB crd(path.c_str());
+            if (crd.fileHandle && dacoll::load_static_collision_frt(&crd))
+            {
+              debug("PRTGI: Successfully loaded static collision (.frt) for '%s' from '%s'", cleanName, path.c_str());
+              break;
+            }
+          }
+        }
+      }
+      if (!dacoll::get_static_collision_resource())
+      {
+        String scolCandidates[] = {
+          String(0, "levels/%s.scol.bin", cleanName),
+          String(0, "../develop/levels/%s/clipping/game_clip.scol.bin", cleanName),
+          String(0, "../../develop/levels/%s/clipping/game_clip.scol.bin", cleanName),
+          String(0, "levels/%s/clipping/game_clip.scol.bin", cleanName),
+        };
+        for (const String &path : scolCandidates)
+        {
+          if (dd_file_exist(path.c_str()))
+          {
+            FullFileLoadCB crd(path.c_str());
+            if (crd.fileHandle && dacoll::load_static_collision(crd))
+            {
+              debug("PRTGI: Successfully loaded static collision (.scol) for '%s' from '%s'", cleanName, path.c_str());
+              break;
+            }
+          }
+        }
+      }
+
+      // Build unified static CollisionResource combining the base level static collision and
+      // lruColl.level (ri_collisions.bin) instances outside the base level bounds, with two-sided BLAS tracing.
+      static bool mergedPrtgiCollision = false;
+      if (!mergedPrtgiCollision && (dacoll::get_static_collision_resource() || lruColl.level.instanceCount() > 0))
+      {
+        BBox3 activeBox(Point3(-36.f, -3.f, -36.f), Point3(36.f, 20.f, 36.f));
+        BBox3 levelExcludeBox;
+
+        dag::Vector<Point3_vec4> mergedVerts;
+        dag::Vector<uint32_t> mergedIndices;
+
+        if (const CollisionResource *baseRes = dacoll::get_static_collision_resource())
+        {
+          levelExcludeBox = baseRes->boundingBox;
+          if (!levelExcludeBox.isempty())
+          {
+            activeBox += levelExcludeBox;
+            levelExcludeBox.inflate(2.0f);
+          }
+
+          CollisionResourceBuilder baseBuilder;
+          baseBuilder.fromResource(*baseRes);
+          for (int ni = 0; ni < (int)baseBuilder.nodes.size(); ++ni)
+          {
+            if (!baseBuilder.nodes[ni].checkBehaviorFlags(CollisionNode::TRACEABLE) || !baseBuilder.nodes[ni].hasGeometry())
+              continue;
+            baseBuilder.bakeNodeTransform(ni);
+            dag::ConstSpan<Point3_vec4> nv = baseBuilder.nodeVerts(ni);
+            dag::ConstSpan<uint32_t> nidx = baseBuilder.nodeIndices(ni);
+            for (uint32_t fi = 0; fi + 2 < (uint32_t)nidx.size(); fi += 3)
+            {
+              const Point3_vec4 &v0 = nv[nidx[fi + 0]];
+              const Point3_vec4 &v1 = nv[nidx[fi + 1]];
+              const Point3_vec4 &v2 = nv[nidx[fi + 2]];
+              BBox3 triBox((const Point3 &)v0, (const Point3 &)v0);
+              triBox += (const Point3 &)v1;
+              triBox += (const Point3 &)v2;
+              if (!(activeBox & triBox))
+                continue;
+              uint32_t bv = (uint32_t)mergedVerts.size();
+              mergedVerts.push_back(v0);
+              mergedVerts.push_back(v1);
+              mergedVerts.push_back(v2);
+              mergedIndices.push_back(bv + 0);
+              mergedIndices.push_back(bv + 1);
+              mergedIndices.push_back(bv + 2);
+            }
+          }
+        }
+
+        if (lruColl.level.instanceCount() > 0)
+        {
+          bbox3f vActiveBox = v_ldu_bbox3(activeBox);
+          dag::Vector<uint64_t> handles;
+          lruColl.level.boxCull(vActiveBox, [&](uint64_t h, mat44f_cref) { handles.push_back(h); });
+          lruColl.level.sortByPool(dag::Span<uint64_t>(handles.data(), handles.size()));
+
+          uint32_t prevRes = ~0u;
+          CollisionResourceBuilder resBuilder;
+          dag::Vector<Point3_vec4> xformVerts;
+          for (uint64_t h : handles)
+          {
+            const uint32_t r = lruColl.level.handleResource(h);
+            const uint32_t inst = lruColl.level.handleInstance(h);
+            if (r != prevRes)
+            {
+              prevRes = r;
+              resBuilder = CollisionResourceBuilder();
+              if (const CollisionResource *rRes = lruColl.level.resource(r))
+              {
+                resBuilder.fromResource(*rRes);
+                for (int ni = 0; ni < (int)resBuilder.nodes.size(); ++ni)
+                  resBuilder.bakeNodeTransform(ni);
+              }
+            }
+
+            mat44f instTm;
+            v_mat43_transpose_to_mat44(instTm, lruColl.level.transform(inst));
+            const bool flipWinding = v_extract_x(v_dot3_x(instTm.col0, v_cross3(instTm.col1, instTm.col2))) < 0.f;
+
+            for (int ni = 0; ni < (int)resBuilder.nodes.size(); ++ni)
+            {
+              if (!resBuilder.nodes[ni].checkBehaviorFlags(CollisionNode::TRACEABLE) || !resBuilder.nodes[ni].hasGeometry())
+                continue;
+              dag::ConstSpan<Point3_vec4> nv = resBuilder.nodeVerts(ni);
+              dag::ConstSpan<uint32_t> nidx = resBuilder.nodeIndices(ni);
+              xformVerts.resize(nv.size());
+              for (uint32_t vi = 0; vi < (uint32_t)nv.size(); ++vi)
+              {
+                vec4f wv = v_mat44_mul_vec3p(instTm, v_ld(&nv[vi].x));
+                v_st(&xformVerts[vi].x, v_perm_xyzd(wv, V_C_ONE));
+              }
+              for (uint32_t fi = 0; fi + 2 < (uint32_t)nidx.size(); fi += 3)
+              {
+                uint32_t idx0 = nidx[fi + 0];
+                uint32_t idx1 = nidx[fi + 1];
+                uint32_t idx2 = nidx[fi + 2];
+                if (flipWinding)
+                  eastl::swap(idx0, idx2);
+                const Point3_vec4 &v0 = xformVerts[idx0];
+                const Point3_vec4 &v1 = xformVerts[idx1];
+                const Point3_vec4 &v2 = xformVerts[idx2];
+                if (!(activeBox & (const Point3 &)v0) || !(activeBox & (const Point3 &)v1) || !(activeBox & (const Point3 &)v2))
+                  continue;
+                BBox3 triBox((const Point3 &)v0, (const Point3 &)v0);
+                triBox += (const Point3 &)v1;
+                triBox += (const Point3 &)v2;
+                if (!levelExcludeBox.isempty() && (levelExcludeBox & triBox))
+                  continue;
+                uint32_t bv = (uint32_t)mergedVerts.size();
+                mergedVerts.push_back(v0);
+                mergedVerts.push_back(v1);
+                mergedVerts.push_back(v2);
+                mergedIndices.push_back(bv + 0);
+                mergedIndices.push_back(bv + 1);
+                mergedIndices.push_back(bv + 2);
+              }
+            }
+          }
+        }
+
+        if (mergedIndices.size() >= 3)
+        {
+          CollisionResourceBuilder combinedBuilder;
+          const uint16_t classFlags[1] = {
+            uint16_t(CollisionNode::TRACEABLE | CollisionNode::PHYS_COLLIDABLE | CollisionNode::SOLID)};
+          combinedBuilder.addSplitMeshNodes(dag::ConstSpan<uint16_t>(classFlags, 1), mergedVerts, mergedIndices, {});
+          combinedBuilder.recomputeBounds();
+          combinedBuilder.collapse(cleanName);
+          combinedBuilder.collisionFlags |= COLLISION_RES_FLAG_BLAS_TWO_SIDED;
+          if (CollisionResource *mergedRes = combinedBuilder.build(cleanName))
+          {
+            dacoll::set_static_collision_resource(mergedRes);
+            mergedPrtgiCollision = true;
+            debug("PRTGI: Built unified static collision (%u verts, %u tris, bounds %@ .. %@)",
+              (unsigned)mergedVerts.size(), (unsigned)(mergedIndices.size() / 3),
+              mergedRes->boundingBox[0], mergedRes->boundingBox[1]);
+          }
+        }
+      }
+      prtGI->loadOrBakeScene(lvl);
+    }
     console::process_file("autoexec.txt");
   }
 
@@ -2951,7 +3219,8 @@ public:
     ENVI_PROBE = -1,
     ONLY_AO = 0,
     SIMPLE_COLORED = 1,
-    SCREEN_PROBES = 2
+    SCREEN_PROBES = 2,
+    PRT_GI = 3
   };
   IGameCamera *curCamera; // for console made publuc
   IFreeCameraDriver *freeCam;
@@ -3021,9 +3290,10 @@ protected:
       DECLARE_INT_COMBOBOX(gi_panel, reflections, REFLECTIONS_ALL, REFLECTIONS_OFF, REFLECTIONS_SSR, REFLECTIONS_ALL),
       // DECLARE_BOOL_CHECKBOX(gi_panel, fake_dynres, false),
       DECLARE_INT_COMBOBOX(gi_panel, onscreen_mode, RESULT, RESULT, LIGHTING, DIFFUSE_LIGHTING, DIRECT_LIGHTING, INDIRECT_LIGHTING),
-      DECLARE_INT_COMBOBOX(gi_panel, gi_mode, SCREEN_PROBES, ENVI_PROBE, ONLY_AO, SIMPLE_COLORED, SCREEN_PROBES),
+      DECLARE_INT_COMBOBOX(gi_panel, gi_mode, SCREEN_PROBES, ENVI_PROBE, ONLY_AO, SIMPLE_COLORED, SCREEN_PROBES, PRT_GI),
       DECLARE_FLOAT_SLIDER(gi_panel, dynamic_gi_quality, 0, 4., 1.0, 0.01), DECLARE_FLOAT_SLIDER(gi_panel, exposure, 0.1, 16, 1, 0.01),
       DECLARE_BOOL_CHECKBOX(gi_panel, update_radiance, true),
+      DECLARE_BOOL_CHECKBOX(gi_panel, debug_draw_probes, false),
 
       DECLARE_INT_SLIDER(sdf_panel, clips, 3, 8, 5), DECLARE_INT_SLIDER(sdf_panel, texWidth, 64, 256, 128),
       DECLARE_FLOAT_SLIDER(sdf_panel, voxel0Size, 0.1, 1., 0.15, 0.1), DECLARE_FLOAT_SLIDER(sdf_panel, yResScale, 0.5, 1., 0.5, 0.1),
@@ -3235,6 +3505,7 @@ protected:
     if (daSkies.currentGroundSunSkyColor(sunCos, moonCos, sun, amb, moon, moonamb))
     {
       ShaderGlobal::set_float4(get_shader_variable_id("sun_light_color"), color4(sun, 0));
+      ShaderGlobal::set_float4(get_shader_variable_id("sun_color_0", true), color4(sun / PI, 0));
       ShaderGlobal::set_float4(get_shader_variable_id("amb_light_color", true), color4(amb, 0));
     }
     else
@@ -3247,6 +3518,8 @@ protected:
     scheduleLevelBinLoad(dgs_get_settings()->getStr("level", NULL), dgs_get_settings()->getStr("heightmap", NULL),
       dgs_get_settings()->getReal("heightmap_cell_size", 0), dgs_get_settings()->getReal("heightmap_hMin", 0),
       dgs_get_settings()->getReal("heightmap_hMax", 1));
+    if (!dgs_get_settings()->getStr("level", NULL) && !dgs_get_settings()->getStr("heightmap", NULL))
+      onSceneLoaded();
     extern float hmap_water_level;
     water_panel.water_level = hmap_water_level = dgs_get_settings()->getReal("water_level", -10000.0f);
     ShaderGlobal::set_float(water_levelVarId, hmap_water_level);
@@ -3304,6 +3577,7 @@ protected:
     float exposure = 1;
     bool fake_dynres = false;
     bool update_radiance = true;
+    bool debug_draw_probes = false;
   } gi_panel;
   enum
   {

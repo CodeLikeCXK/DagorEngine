@@ -47,6 +47,7 @@
 
 #include <gui/dag_visualLog.h>
 #include <gui/dag_imgui.h>
+#include <imgui/imgui.h>
 #include <shaders/dag_shaderDbg.h>
 #include <util/dag_delayedAction.h>
 
@@ -861,3 +862,24 @@ static void prtgi_imgui_window()
     wr->getPRTGI()->drawImGuiWindow();
 }
 REGISTER_IMGUI_WINDOW("Render", "PRTGI Global Illumination", prtgi_imgui_window);
+
+static void gi_system_imgui_window()
+{
+  WorldRenderer *wr = (WorldRenderer *)get_world_renderer();
+  if (!wr)
+    return;
+
+  const bool compatibilityMode = !wr->hasFeature(FeatureRenderFlags::FULL_DEFERRED);
+  static const char *giSystemItems[] = {"daGI2 (Dynamic Voxel GI)", "PRTGI (Static Probe GI)"};
+  int selected = wr->activeGISystem == WorldRenderer::GISystem::PRTGI ? 1 : 0;
+
+  ImGui::Text("Active: %s", selected ? "PRTGI" : "daGI2");
+  if (compatibilityMode)
+    ImGui::TextDisabled("Mobile/Thin pipeline: only PRTGI is available");
+
+  ImGui::BeginDisabled(compatibilityMode);
+  if (ImGui::Combo("GI system", &selected, giSystemItems, IM_ARRAYSIZE(giSystemItems)))
+    wr->switchGISystem(selected ? WorldRenderer::GISystem::PRTGI : WorldRenderer::GISystem::DAGI2);
+  ImGui::EndDisabled();
+}
+REGISTER_IMGUI_WINDOW("Render", "GI System", gi_system_imgui_window);

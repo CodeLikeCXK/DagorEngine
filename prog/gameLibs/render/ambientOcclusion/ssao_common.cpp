@@ -33,14 +33,14 @@ static uint32_t combine_flags(uint32_t init_flags, uint32_t shader_flags, uint32
   uint32_t commonFlagsDeclared = shader_flags_assumed_bits & init_flags;
   if ((commonFlagsDeclared & shader_flags) != (commonFlagsDeclared & init_flags))
   {
-    logerr("SSAO: Bad shader assumes! They cannot support features requested. Fallback to what shader assumes allow.");
+    logwarn("SSAO: Bad shader assumes! They cannot support features requested. Fallback to what shader assumes allow.");
     init_flags = shader_flags | (~shader_flags_assumed_bits & init_flags);
   }
   else if ((commonFlagsDeclared & shader_flags) != shader_flags)
   {
     bool allowImplicitFlags = (init_flags & SSAO_ALLOW_IMPLICIT_FLAGS_FROM_SHADER_ASSUMES);
     if (!allowImplicitFlags)
-      logerr("SSAO: Shader assumes introduce more features than requested. Adding them...");
+      logwarn("SSAO: Shader assumes introduce more features than requested. Adding them...");
     init_flags = shader_flags | init_flags;
   }
   return init_flags;

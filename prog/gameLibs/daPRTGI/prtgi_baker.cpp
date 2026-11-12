@@ -30,13 +30,13 @@ static void evaluateSH9Basis(const Point3 &d, float sh[9])
   const float c4 = 0.5462742152960396f;  // 0.25 * sqrt(15/pi)
 
   sh[0] = c0;
-  sh[1] = -c1 * d.y;
+  sh[1] = c1 * d.y;
   sh[2] = c1 * d.z;
-  sh[3] = -c1 * d.x;
+  sh[3] = c1 * d.x;
   sh[4] = c2 * d.x * d.y;
-  sh[5] = -c2 * d.y * d.z;
+  sh[5] = c2 * d.y * d.z;
   sh[6] = c3 * (3.0f * d.z * d.z - 1.0f);
-  sh[7] = -c2 * d.x * d.z;
+  sh[7] = c2 * d.x * d.z;
   sh[8] = c4 * (d.x * d.x - d.y * d.y);
 }
 
@@ -54,6 +54,95 @@ static uint16_t floatToHalf(float val)
     return (uint16_t)(sign | 0x7C00);
 
   return (uint16_t)(sign | (exp << 10) | (mantissa >> 13));
+}
+
+static inline uint32_t encode_octahedral_normal(Point3 n)
+{
+  float invL1 = 1.0f / (fabsf(n.x) + fabsf(n.y) + fabsf(n.z) + 1e-6f);
+  float nx = n.x * invL1;
+  float ny = n.y * invL1;
+  if (n.z < 0.0f)
+  {
+    float ox = (1.0f - fabsf(ny)) * (nx >= 0.0f ? 1.0f : -1.0f);
+    float oy = (1.0f - fabsf(nx)) * (ny >= 0.0f ? 1.0f : -1.0f);
+    nx = ox;
+    ny = oy;
+  }
+  int ex = clamp((int)((nx * 0.5f + 0.5f) * 4095.0f + 0.5f), 0, 4095);
+  int ey = clamp((int)((ny * 0.5f + 0.5f) * 4095.0f + 0.5f), 0, 4095);
+  return (uint32_t)ex | ((uint32_t)ey << 12);
+}
+
+// Must match prt_oct_encode() in prtgi_common.hlsli.
+static inline Point3 oct_decode(float u, float v)
+{
+  float ex = u * 2.0f - 1.0f;
+  float ey = v * 2.0f - 1.0f;
+  Point3 n(ex, ey, 1.0f - fabsf(ex) - fabsf(ey));
+  float t = max(0.0f, -n.z);
+  n.x += (n.x >= 0.0f) ? -t : t;
+  n.y += (n.y >= 0.0f) ? -t : t;
+  return normalize(n);
+}
+
+// Pack 6-axis Ambient Cube sky visibility (+X, -X, +Y, -Y, +Z, -Z) into uint64_t (unorm8 per face).
+static inline uint64_t pack_sky_cube(float px, float nx, float py, float ny, float pz, float nz)
+{
+  auto q8 = [](float v) -> uint32_t { return (uint32_t)clamp((int)(saturate(v) * 255.0f + 0.5f), 0, 255); };
+  float mean = (px + nx + py + ny + pz + nz) * (1.0f / 6.0f);
+  uint32_t lo = q8(px) | (q8(nx) << 8) | (q8(py) << 16) | (q8(ny) << 24);
+  uint32_t hi = q8(pz) | (q8(nz) << 8) | (q8(mean) << 16);
+  return (uint64_t)lo | ((uint64_t)hi << 32);
+}
+
+// Pack validity bit + relocation offset (in grid-spacing units, [-0.5, 0.5] -> 3 x unorm10).
+static inline uint32_t pack_probe_validity(bool valid, const Point3 &offset_in_spacing)
+{
+  if (!valid)
+    return 0u;
+  uint32_t ox = (uint32_t)clamp((int)((offset_in_spacing.x + 0.5f) * 1023.0f + 0.5f), 0, 1023);
+  uint32_t oy = (uint32_t)clamp((int)((offset_in_spacing.y + 0.5f) * 1023.0f + 0.5f), 0, 1023);
+  uint32_t oz = (uint32_t)clamp((int)((offset_in_spacing.z + 0.5f) * 1023.0f + 0.5f), 0, 1023);
+  return PRT_PROBE_VALID_BIT | ox | (oy << 10) | (oz << 20);
+}
+
+// Build a PRT_DEPTH_RES x PRT_DEPTH_RES octahedral depth-moment map (unorm16 mean, unorm16 mean^2)
+// from the traced sample directions using a cosine lobe filter (DDGI p=6).
+static void build_probe_depth_map(const eastl::vector<Point3> &sample_dirs, const float *hit_dists, int sample_count,
+                                  float max_depth, uint32_t out_texels[PRT_DEPTH_TEXELS])
+{
+  float invMax = (max_depth > 1e-4f) ? (1.0f / max_depth) : 1.0f;
+  for (int ty = 0; ty < PRT_DEPTH_RES; ++ty)
+  {
+    for (int tx = 0; tx < PRT_DEPTH_RES; ++tx)
+    {
+      float u = ((float)tx + 0.5f) / (float)PRT_DEPTH_RES;
+      float v = ((float)ty + 0.5f) / (float)PRT_DEPTH_RES;
+      Point3 texDir = oct_decode(u, v);
+
+      float sumM1 = 0.0f;
+      float sumM2 = 0.0f;
+      float sumW = 0.0f;
+      for (int s = 0; s < sample_count; ++s)
+      {
+        float c = dot(texDir, sample_dirs[s]);
+        if (c > 0.0f)
+        {
+          float c2 = c * c;
+          float w = c2 * c2 * c2; // cos^6 lobe
+          float d = clamp(hit_dists[s] * invMax, 0.0f, 1.0f);
+          sumM1 += d * w;
+          sumM2 += (d * d) * w;
+          sumW += w;
+        }
+      }
+      float m1 = (sumW > 1e-5f) ? (sumM1 / sumW) : 1.0f;
+      float m2 = (sumW > 1e-5f) ? (sumM2 / sumW) : 1.0f;
+      uint32_t q1 = (uint32_t)clamp((int)(m1 * 65535.0f + 0.5f), 0, 65535);
+      uint32_t q2 = (uint32_t)clamp((int)(m2 * 65535.0f + 0.5f), 0, 65535);
+      out_texels[ty * PRT_DEPTH_RES + tx] = q1 | (q2 << 16);
+    }
+  }
 }
 
 void PRTBaker::generateSampleDirections(eastl::vector<Point3> &out_dirs, eastl::vector<float> &out_weights, int count)
@@ -170,8 +259,10 @@ bool PRTBaker::bakeCurrentScene(PRTAsset &out_asset, float spacing, int sector_s
       Point3 secMin = minPt + Point3((float)(sx * sector_size) * spacing, 0.0f, (float)(sz * sector_size) * spacing);
       Point3 secMax = secMin + Point3((float)sector_size * spacing, (float)gridCount.y * spacing, (float)sector_size * spacing);
       out_asset.sectors[secIdx].bounds = BBox3(secMin, secMax);
-      out_asset.sectors[secIdx].surfelBoundsMin = secMin;
-      out_asset.sectors[secIdx].surfelBoundsSize = max(Point3(1, 1, 1), secMax - secMin);
+      Point3 surfMin = minPt - Point3(32.0f, 32.0f, 32.0f);
+      Point3 surfMax = maxPt + Point3(32.0f, 32.0f, 32.0f);
+      out_asset.sectors[secIdx].surfelBoundsMin = surfMin;
+      out_asset.sectors[secIdx].surfelBoundsSize = max(Point3(1, 1, 1), surfMax - surfMin);
     }
   }
 
@@ -180,7 +271,32 @@ bool PRTBaker::bakeCurrentScene(PRTAsset &out_asset, float spacing, int sector_s
 
   eastl::vector<Point3> sampleDirs;
   eastl::vector<float> sampleWeights;
-  generateSampleDirections(sampleDirs, sampleWeights, 32);
+  constexpr int SAMPLE_RAY_COUNT = 64;
+  generateSampleDirections(sampleDirs, sampleWeights, SAMPLE_RAY_COUNT);
+  const float maxDepthRange = spacing * PRT_DEPTH_RANGE;
+  const uint64_t openSkyCube = pack_sky_cube(1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f);
+
+  // Unoccluded cosine weights per axis. +Y and the horizontal axes use the upper hemisphere;
+  // the -Y axis gets its own lower-hemisphere weight (see the sky cube accumulation below).
+  float maxSkyPosX = 0.0f, maxSkyNegX = 0.0f, maxSkyPosY = 0.0f, maxSkyPosZ = 0.0f, maxSkyNegZ = 0.0f, maxSkyNegY = 0.0f;
+  for (int s = 0; s < SAMPLE_RAY_COUNT; ++s)
+  {
+    const Point3 &d = sampleDirs[s];
+    if (d.y > -0.05f)
+    {
+      if (d.x > 0.0f) maxSkyPosX += d.x; else maxSkyNegX += -d.x;
+      if (d.y > 0.0f) maxSkyPosY += d.y;
+      if (d.z > 0.0f) maxSkyPosZ += d.z; else maxSkyNegZ += -d.z;
+    }
+    if (d.y < -0.05f)
+      maxSkyNegY += -d.y;
+  }
+  maxSkyPosX = max(maxSkyPosX, 1e-4f);
+  maxSkyNegX = max(maxSkyNegX, 1e-4f);
+  maxSkyPosY = max(maxSkyPosY, 1e-4f);
+  maxSkyPosZ = max(maxSkyPosZ, 1e-4f);
+  maxSkyNegZ = max(maxSkyNegZ, 1e-4f);
+  maxSkyNegY = max(maxSkyNegY, 1e-4f);
 
   if (progress_cb)
     progress_cb("Tracing probes (with intelligent pruning)...", 0.15f);
@@ -215,126 +331,316 @@ bool PRTBaker::bakeCurrentScene(PRTAsset &out_asset, float spacing, int sector_s
     out_asset.probeToSectorMap[pIdx] = secIdx;
 
     PRTSectorData &sector = out_asset.sectors[secIdx];
-    Point3 probePos = out_asset.grid.getProbeWorldPos(coord);
+    const Point3 gridPos = out_asset.grid.getProbeWorldPos(coord);
+    Point3 probePos = gridPos;
 
     PRTProbeData pData;
     memset(&pData, 0, sizeof(pData));
     pData.factorStart = (int32_t)sector.factors.size();
     pData.factorCount = 0;
     pData.captureOffset = Point3(0, 0, 0);
-    pData.validity = 0xFFFFFFFF; // fully valid
+    pData.validity = pack_probe_validity(true, Point3(0, 0, 0));
+    pData.globalProbeIndex = pIdx;
 
     // --- Fast Probe Classification & Pruning ---
+    constexpr int TRACE_FLAGS = dacoll::ETF_ALL | dacoll::ETF_RI_PHYS;
     real downDist = 20.0f;
     int floorPmid = -1;
     Point3 floorNorm(0, 1, 0);
-    bool hitDown = dacoll::traceray_normalized(probePos, Point3(0, -1, 0), downDist, &floorPmid, &floorNorm);
+    bool hitDown = dacoll::traceray_normalized(probePos, Point3(0, -1, 0), downDist, &floorPmid, &floorNorm, TRACE_FLAGS);
 
-    real upDist = 15.0f;
+    real upDist = 40.0f;
     int ceilPmid = -1;
     Point3 ceilNorm(0, -1, 0);
-    bool hitUp = dacoll::traceray_normalized(probePos, Point3(0, 1, 0), upDist, &ceilPmid, &ceilNorm);
+    bool hitUp = dacoll::traceray_normalized(probePos, Point3(0, 1, 0), upDist, &ceilPmid, &ceilNorm, TRACE_FLAGS);
 
-    // Case 1: Underground or buried inside solid geometry
-    if ((hitDown && downDist < 0.20f && floorNorm.y <= 0.0f) || (hitUp && upDist < 0.20f && ceilNorm.y >= 0.0f))
-    {
-      pData.validity = 0;
-      sector.probeIds.push_back(pIdx);
-      sector.probeData.push_back(pData);
-      sector.skyVisibility.push_back(0);
-      culledSolidProbes++;
-      continue;
-    }
-
-    // Case 2: High in empty sky (no floor within 20m, no ceiling within 15m, and no nearby walls)
+    // Case 2: High in empty sky (no floor within 20m, no ceiling within 40m, and no nearby geometry)
     if (!hitDown && !hitUp)
     {
       real horizDist = 12.0f;
-      bool nearMesh = dacoll::traceray_normalized(probePos, Point3(1, 0, 0), horizDist, nullptr, nullptr) ||
-                      dacoll::traceray_normalized(probePos, Point3(-1, 0, 0), horizDist, nullptr, nullptr) ||
-                      dacoll::traceray_normalized(probePos, Point3(0, 0, 1), horizDist, nullptr, nullptr) ||
-                      dacoll::traceray_normalized(probePos, Point3(0, 0, -1), horizDist, nullptr, nullptr);
+      bool nearMesh = dacoll::traceray_normalized(probePos, Point3(1, 0, 0), horizDist, nullptr, nullptr, TRACE_FLAGS) ||
+                      dacoll::traceray_normalized(probePos, Point3(-1, 0, 0), horizDist, nullptr, nullptr, TRACE_FLAGS) ||
+                      dacoll::traceray_normalized(probePos, Point3(0, 0, 1), horizDist, nullptr, nullptr, TRACE_FLAGS) ||
+                      dacoll::traceray_normalized(probePos, Point3(0, 0, -1), horizDist, nullptr, nullptr, TRACE_FLAGS) ||
+                      dacoll::traceray_normalized(probePos, Point3(0, 1, 0), horizDist, nullptr, nullptr, TRACE_FLAGS) ||
+                      dacoll::traceray_normalized(probePos, Point3(0, -1, 0), horizDist, nullptr, nullptr, TRACE_FLAGS);
       if (!nearMesh)
       {
-        pData.validity = 0xFFFFFFFF;
+        pData.validity = pack_probe_validity(true, Point3(0, 0, 0));
         pData.factorCount = 0;
         sector.probeIds.push_back(pIdx);
         sector.probeData.push_back(pData);
-        sector.skyVisibility.push_back(0xFFFFFFFF);
+        sector.skyVisibility.push_back(openSkyCube);
+        for (int ti = 0; ti < PRT_DEPTH_TEXELS; ++ti)
+          sector.probeDepth.push_back(0xFFFFFFFFu);
         culledSkyProbes++;
         continue;
       }
     }
 
-    // Case 3: Active gameplay probe near surfaces -> Trace 32 rays
-    activeTracedProbes++;
-    uint32_t skyVisWord = 0;
+    // --- DDGI-style Probe Relocation & Backface Classification ---
+    // Instead of immediately killing probes within 12cm of a wall (which created black holes on walls)
+    // or trusting single-sided hits from inside terrain/boxes (which leaked sky indoors), we trace the
+    // spherical directions, count backfaces, and iteratively push embedded/hugging probes into open space.
+    const float minFrontDist = spacing * 0.22f;
+    const float maxOffsetLen = spacing * 0.45f;
 
-    for (int s = 0; s < 32; ++s)
+    bool rayHit[SAMPLE_RAY_COUNT];
+    float rayDist[SAMPLE_RAY_COUNT];
+    Point3 rayNorm[SAMPLE_RAY_COUNT];
+    int backfaceCount = 0;
+
+    for (int iter = 0; iter < 3; ++iter)
     {
-      Point3 dir = sampleDirs[s];
-      real t = 100.0f; // max trace dist
-      int pmid = -1;
-      Point3 norm(0, 1, 0);
+      backfaceCount = 0;
+      float closestBackDist = 1e9f;
+      Point3 closestBackDir(0, 0, 0);
+      Point3 closestBackNorm(0, 1, 0);
+      float closestFrontDist = 1e9f;
+      Point3 closestFrontDir(0, 0, 0);
 
-      bool hit = dacoll::traceray_normalized(probePos, dir, t, &pmid, &norm);
-      if (hit && t > 0.05f)
+      for (int s = 0; s < SAMPLE_RAY_COUNT; ++s)
       {
-        Point3 hitPos = probePos + dir * t;
-        
-        // Add surfel
-        Surfel surfel;
-        Point3 d = hitPos - sector.surfelBoundsMin;
-        Point3 q = Point3(d.x / sector.surfelBoundsSize.x, d.y / sector.surfelBoundsSize.y, d.z / sector.surfelBoundsSize.z);
-        q = Point3(clamp(q.x, 0.0f, 1.0f), clamp(q.y, 0.0f, 1.0f), clamp(q.z, 0.0f, 1.0f));
-        uint16_t qx = (uint16_t)(q.x * 65535.0f);
-        uint16_t qy = (uint16_t)(q.y * 65535.0f);
-        uint16_t qz = (uint16_t)(q.z * 65535.0f);
-        surfel.positionXY = (uint32_t)qx | ((uint32_t)qy << 16);
-        surfel.positionZAlbedoRG = (uint32_t)qz | (200 << 16) | (200 << 24); // default 0.8 albedo
-        surfel.normalAlbedoB = (2048) | (2048 << 12) | (200 << 24);
-        surfel.nearestProbe = (int32_t)pIdx;
+        Point3 dir = sampleDirs[s];
+        real t = 100.0f;
+        int pmid = -1;
+        Point3 norm(0, 1, 0);
+        bool h = dacoll::traceray_normalized(probePos, dir, t, &pmid, &norm, TRACE_FLAGS);
+        rayHit[s] = h;
+        rayDist[s] = h ? (float)t : maxDepthRange;
+        rayNorm[s] = norm;
 
-        uint32_t surfelIdx = (uint32_t)sector.surfels.size();
-        sector.surfels.push_back(surfel);
-        totalSurfels++;
+        if (h)
+        {
+          if (dot(dir, norm) > 0.0f)
+          {
+            backfaceCount++;
+            if ((float)t < closestBackDist)
+            {
+              closestBackDist = (float)t;
+              closestBackDir = dir;
+              closestBackNorm = norm;
+            }
+          }
+          else if ((float)t < closestFrontDist)
+          {
+            closestFrontDist = (float)t;
+            closestFrontDir = dir;
+          }
+        }
+      }
 
-        // Group 1:1 or small clusters into brick
-        SurfelIndices brick;
-        brick.surfelStart = surfelIdx;
-        brick.surfelCount = 1;
-        brick.renderingLayerMask = 1;
-        brick.objectLayerMask = 1;
-        uint32_t brickIdx = (uint32_t)sector.brickInfo.size();
-        sector.brickInfo.push_back(brick);
-        totalBricks++;
+      if (iter == 2)
+        break;
 
-        // Evaluate SH9 for the sample direction
-        float sh[9];
-        evaluateSH9Basis(dir, sh);
-        float w = sampleWeights[s];
-
-        BrickFactor factor;
-        memset(&factor, 0, sizeof(factor));
-        factor.brickSh0 = (brickIdx & 0xFFFFu) | ((uint32_t)floatToHalf(sh[0] * w) << 16);
-        factor.sh12 = (uint32_t)floatToHalf(sh[1] * w) | ((uint32_t)floatToHalf(sh[2] * w) << 16);
-        factor.sh34 = (uint32_t)floatToHalf(sh[3] * w) | ((uint32_t)floatToHalf(sh[4] * w) << 16);
-        factor.sh56 = (uint32_t)floatToHalf(sh[5] * w) | ((uint32_t)floatToHalf(sh[6] * w) << 16);
-        factor.sh78 = (uint32_t)floatToHalf(sh[7] * w) | ((uint32_t)floatToHalf(sh[8] * w) << 16);
-
-        sector.factors.push_back(factor);
-        pData.factorCount++;
-        totalFactors++;
+      Point3 delta(0, 0, 0);
+      if (backfaceCount > SAMPLE_RAY_COUNT / 4 && closestBackDist < spacing * 0.75f)
+      {
+        // Inside geometry: step past the closest backface along the ray or normal.
+        Point3 outDir = (dot(closestBackDir, closestBackNorm) > 0.2f) ? closestBackDir : closestBackNorm;
+        delta = outDir * (closestBackDist + spacing * 0.12f);
+      }
+      else if (closestFrontDist < minFrontDist)
+      {
+        // Too close to a front face: push away so the self-shadow bias will not straddle the wall.
+        delta = -closestFrontDir * (minFrontDist - closestFrontDist + 0.02f);
       }
       else
       {
-        skyVisWord |= (1u << s);
+        break;
+      }
+
+      Point3 newOffset = (probePos + delta) - gridPos;
+      newOffset.x = clamp(newOffset.x, -maxOffsetLen, maxOffsetLen);
+      newOffset.y = clamp(newOffset.y, -maxOffsetLen, maxOffsetLen);
+      newOffset.z = clamp(newOffset.z, -maxOffsetLen, maxOffsetLen);
+      probePos = gridPos + newOffset;
+    }
+
+    // Re-check vertical ground/ceiling at the relocated position to catch probes under single-sided terrain.
+    real relDownDist = 20.0f;
+    int relFloorPmid = -1;
+    Point3 relFloorNorm(0, 1, 0);
+    bool relHitDown = dacoll::traceray_normalized(probePos, Point3(0, -1, 0), relDownDist, &relFloorPmid, &relFloorNorm, TRACE_FLAGS);
+    real relUpDist = 40.0f;
+    int relCeilPmid = -1;
+    Point3 relCeilNorm(0, -1, 0);
+    bool relHitUp = dacoll::traceray_normalized(probePos, Point3(0, 1, 0), relUpDist, &relCeilPmid, &relCeilNorm, TRACE_FLAGS);
+
+    bool underTerrain = (!relHitDown && relHitUp && relCeilNorm.y > 0.2f) ||
+                        (relHitDown && relDownDist < 0.25f && relFloorNorm.y <= 0.0f) ||
+                        (relHitUp && relUpDist < 0.25f && relCeilNorm.y >= 0.0f);
+
+    if (backfaceCount > SAMPLE_RAY_COUNT / 4 || underTerrain)
+    {
+      pData.captureOffset = probePos - gridPos;
+      pData.validity = 0u;
+      sector.probeIds.push_back(pIdx);
+      sector.probeData.push_back(pData);
+      sector.skyVisibility.push_back(0ull);
+      for (int ti = 0; ti < PRT_DEPTH_TEXELS; ++ti)
+        sector.probeDepth.push_back(0u);
+      culledSolidProbes++;
+      continue;
+    }
+
+    pData.captureOffset = probePos - gridPos;
+    pData.validity = pack_probe_validity(true, pData.captureOffset / spacing);
+
+    // Case 3: Active gameplay probe near surfaces -> accumulate 6-axis sky visibility cube, depth moments, and surfels
+    activeTracedProbes++;
+    float litSkyPosX = 0.0f, litSkyNegX = 0.0f;
+    float litSkyPosY = 0.0f, litSkyNegY = 0.0f;
+    float litSkyPosZ = 0.0f, litSkyNegZ = 0.0f;
+    float depthDists[SAMPLE_RAY_COUNT];
+
+    for (int s = 0; s < SAMPLE_RAY_COUNT; ++s)
+    {
+      if (!rayHit[s])
+      {
+        const Point3 &dir = sampleDirs[s];
+        // +Y and the four horizontal faces keep their upper-hemisphere normalization (exterior
+        // walls should not darken from the ground). The -Y face is measured on its own hemisphere.
+        if (dir.y > -0.05f)
+        {
+          litSkyPosX += max(0.0f,  dir.x);
+          litSkyNegX += max(0.0f, -dir.x);
+          litSkyPosY += max(0.0f,  dir.y);
+          litSkyPosZ += max(0.0f,  dir.z);
+          litSkyNegZ += max(0.0f, -dir.z);
+        }
+        if (dir.y < -0.05f)
+          litSkyNegY += -dir.y;
       }
     }
 
+    float skyPx = clamp(litSkyPosX / maxSkyPosX, 0.0f, 1.0f);
+    float skyNx = clamp(litSkyNegX / maxSkyNegX, 0.0f, 1.0f);
+    float skyPy = clamp(litSkyPosY / maxSkyPosY, 0.0f, 1.0f);
+    float skyPz = clamp(litSkyPosZ / maxSkyPosZ, 0.0f, 1.0f);
+    float skyNz = clamp(litSkyNegZ / maxSkyNegZ, 0.0f, 1.0f);
+    // Downward sky visibility is measured, not synthesized. It used to be derived from the upper
+    // hemisphere (0.5*+Y + 0.125*horizontal), which handed ~65% sky visibility to the *underside*
+    // of every ceiling and lit interior ceilings with outdoor sky.
+    float skyNy = clamp(litSkyNegY / maxSkyNegY, 0.0f, 1.0f);
+
+    for (int s = 0; s < SAMPLE_RAY_COUNT; ++s)
+    {
+      Point3 dir = sampleDirs[s];
+      bool hit = rayHit[s];
+      float t = rayDist[s];
+      Point3 norm = rayNorm[s];
+
+      if (hit)
+      {
+        // Backface hits mean the ray started slightly inside a thin sheet: clamp depth to 0 so
+        // Chebyshev rejects points on the far side of that sheet.
+        bool isBackface = dot(dir, norm) > 0.0f;
+        depthDists[s] = isBackface ? 0.0f : min(t, maxDepthRange);
+
+        if (!isBackface && t > 0.03f)
+        {
+          Point3 hitPos = probePos + dir * t;
+
+          // Add surfel
+          Surfel surfel;
+          Point3 d = hitPos - sector.surfelBoundsMin;
+          Point3 q = Point3(d.x / sector.surfelBoundsSize.x, d.y / sector.surfelBoundsSize.y, d.z / sector.surfelBoundsSize.z);
+          q = Point3(clamp(q.x, 0.0f, 1.0f), clamp(q.y, 0.0f, 1.0f), clamp(q.z, 0.0f, 1.0f));
+          uint16_t qx = (uint16_t)(q.x * 65535.0f);
+          uint16_t qy = (uint16_t)(q.y * 65535.0f);
+          uint16_t qz = (uint16_t)(q.z * 65535.0f);
+
+          // Upper-hemisphere sky exposure for the surfel (balanced 9-ray dome + normal-biased ray).
+          Point3 traceStart = hitPos + norm * 0.04f;
+          static const Point3 upTestDirs[9] = {
+            Point3( 0.0000f, 1.0000f,  0.0000f),
+            Point3( 0.3536f, 0.8660f,  0.3536f),
+            Point3(-0.3536f, 0.8660f,  0.3536f),
+            Point3( 0.3536f, 0.8660f, -0.3536f),
+            Point3(-0.3536f, 0.8660f, -0.3536f),
+            Point3( 0.6325f, 0.4472f,  0.6325f),
+            Point3(-0.6325f, 0.4472f,  0.6325f),
+            Point3( 0.6325f, 0.4472f, -0.6325f),
+            Point3(-0.6325f, 0.4472f, -0.6325f)
+          };
+          float skyW = 0.0f;
+          float skyLit = 0.0f;
+          for (int ui = 0; ui < 9; ++ui)
+          {
+            float c = max(0.15f, dot(norm, upTestDirs[ui]));
+            skyW += c;
+            real dist = 50.0f;
+            if (!dacoll::traceray_normalized(traceStart, upTestDirs[ui], dist, nullptr, nullptr, TRACE_FLAGS))
+              skyLit += c;
+          }
+          Point3 normUpDir = normalize(norm + Point3(0.0f, 0.65f, 0.0f));
+          if (normUpDir.y > 0.1f)
+          {
+            const float cNorm = 0.8f;
+            skyW += cNorm;
+            real dist = 50.0f;
+            if (!dacoll::traceray_normalized(traceStart, normUpDir, dist, nullptr, nullptr, TRACE_FLAGS))
+              skyLit += cNorm;
+          }
+          float coneSky = skyLit / max(skyW, 1e-4f);
+          // No "near probe" floor here: boosting nearby surfels to the probe's mean sky visibility
+          // handed outdoor sky light to surfaces just behind a wall and was a direct indoor leak.
+          uint32_t skyVisByte = (uint32_t)clamp((int)(coneSky * 255.0f + 0.5f), 0, 255);
+
+          surfel.positionXY = (uint32_t)qx | ((uint32_t)qy << 16);
+          surfel.positionZAlbedoRG = (uint32_t)qz | (140 << 16) | (140 << 24); // realistic 0.55 albedo
+          surfel.normalAlbedoB = encode_octahedral_normal(norm) | (140 << 24);
+          surfel.nearestProbe = (int32_t)((pIdx & 0xFFFFu) | (skyVisByte << 16));
+
+          uint32_t surfelIdx = (uint32_t)sector.surfels.size();
+          sector.surfels.push_back(surfel);
+          totalSurfels++;
+
+          // Group 1:1 or small clusters into brick
+          SurfelIndices brick;
+          brick.surfelStart = surfelIdx;
+          brick.surfelCount = 1;
+          brick.renderingLayerMask = 1;
+          brick.objectLayerMask = 1;
+          uint32_t brickIdx = (uint32_t)sector.brickInfo.size();
+          sector.brickInfo.push_back(brick);
+          totalBricks++;
+
+          // Evaluate SH9 for the sample direction with distance falloff
+          float sh[9];
+          evaluateSH9Basis(dir, sh);
+          float distAtten = 1.0f / (1.0f + 0.04f * t * t);
+          float w = sampleWeights[s] * distAtten;
+
+          BrickFactor factor;
+          memset(&factor, 0, sizeof(factor));
+          factor.brickIndex = brickIdx;
+          factor.sh01 = (uint32_t)floatToHalf(sh[0] * w) | ((uint32_t)floatToHalf(sh[1] * w) << 16);
+          factor.sh23 = (uint32_t)floatToHalf(sh[2] * w) | ((uint32_t)floatToHalf(sh[3] * w) << 16);
+          factor.sh45 = (uint32_t)floatToHalf(sh[4] * w) | ((uint32_t)floatToHalf(sh[5] * w) << 16);
+          factor.sh67 = (uint32_t)floatToHalf(sh[6] * w) | ((uint32_t)floatToHalf(sh[7] * w) << 16);
+          factor.sh8 = (uint32_t)floatToHalf(sh[8] * w);
+
+          sector.factors.push_back(factor);
+          pData.factorCount++;
+          totalFactors++;
+        }
+      }
+      else
+      {
+        depthDists[s] = maxDepthRange;
+      }
+    }
+
+    uint32_t depthTexels[PRT_DEPTH_TEXELS];
+    build_probe_depth_map(sampleDirs, depthDists, SAMPLE_RAY_COUNT, maxDepthRange, depthTexels);
+
     sector.probeIds.push_back(pIdx);
     sector.probeData.push_back(pData);
-    sector.skyVisibility.push_back(skyVisWord);
+    sector.skyVisibility.push_back(pack_sky_cube(skyPx, skyNx, skyPy, skyNy, skyPz, skyNz));
+    for (int ti = 0; ti < PRT_DEPTH_TEXELS; ++ti)
+      sector.probeDepth.push_back(depthTexels[ti]);
   }
 
   // Restore profiler and watchdog state
@@ -399,4 +705,3 @@ bool PRTBaker::bakeCurrentScene(PRTAsset &out_asset, float spacing, int sector_s
 }
 
 } // namespace daprtgi
-

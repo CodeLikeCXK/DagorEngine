@@ -16,6 +16,7 @@ include "fom_shadows.dshl"
 include "use_prefiltered_gf.dshl"
 include "contact_shadows.dshl"
 include "dagi_quality.dshl"
+include "prtgi_sample.dshl"
 include "depth_above.dshl"
 include "gi_demo.dshl"
 include "sparkles.dshl"
@@ -224,6 +225,8 @@ macro COMMON_RESOLVE_EXTENDED(code)
     }
   }
 
+  PRTGI_PROBE_VOLUME_SAMPLE(code)
+
   (code) {
     underwater_fade@f3 = underwater_fade;
     lightning_color@f3 = (lightning_scene_illumination_color);
@@ -267,6 +270,7 @@ macro USE_DEFERRED_SHADOW_PER_SAMPLE(code)
   ##endif
 
     #include "noise/Perlin3D.hlsl"
+    #include <dagi_specular_clamp.hlsl>
 
     half3 MultiBounce(half AO, half3 Albedo)
     {
@@ -452,7 +456,10 @@ macro USE_DEFERRED_SHADOW_PER_SAMPLE(code)
 
       float3 enviLightingNormal = normalize(getDiffuseDominantDir(gbuffer.normal, view, saturated_NdotV, ggx_alpha ));
       float fake_light_strength = 0.25;
-      half3 enviLight, giSpecular;
+      half3 enviLight = 0, giSpecular = 0;
+      // -1 means that this pass did not execute the PRT sample. A valid
+      // enclosed probe can legitimately produce sky visibility zero.
+      float prtDebugSky = -1.0f;
 
       float distToTankCockpitSq = dot(tank_cockpit__bsphere.xyz - worldPos.xyz, tank_cockpit__bsphere.xyz - worldPos.xyz);
       BRANCH
@@ -469,9 +476,43 @@ macro USE_DEFERRED_SHADOW_PER_SAMPLE(code)
           giSpecular = unpack_hdr(giSpecular);
         ##endif
         ##if (gi_quality == off)
-          enviLight = GetSkySHDiffuse(enviLightingNormal);
+          BRANCH
+          if (_prtVolumeEnabled != 0)
+          {
+            float skyVis = 1.0;
+            float3 bounceIrr = sample_prtgi_gi_normals(worldPos.xyz, gbuffer.normal, enviLightingNormal, skyVis);
+            prtDebugSky = skyVis;
+            enviLight = bounceIrr + GetSkySHDiffuse(enviLightingNormal) * skyVis;
+            giSpecular = 0;
+          }
+          else
+          {
+            enviLight = GetSkySHDiffuse(enviLightingNormal);
+          }
         ##endif
         enviLight *= enviAO;
+      }
+
+      // gi_quality is a compile-time selector for the normal GI path. PRTGI
+      // debug must not depend on that selector: when the PRT branch above is
+      // stripped, explicitly sample the published PRT volume here so magenta
+      // means a genuinely inactive volume rather than a skipped shader branch.
+      if (_prtDebugSkyVis != 0 && prtDebugSky < 0.0f && _prtVolumeEnabled != 0)
+      {
+        float debugSkyVis = 0.0f;
+        sample_prtgi_gi_normals(worldPos.xyz, gbuffer.normal, enviLightingNormal, debugSkyVis);
+        prtDebugSky = debugSkyVis;
+      }
+
+      // PRTGI is also consumed from this environment/shadow path when the
+      // PRT quality selects the compatibility/off GI variant. Return the raw
+      // visibility here so the debug checkbox cannot be bypassed by the
+      // compile-time gi_quality branch above.
+      if (_prtDebugSkyVis != 0)
+      {
+        float3 debugColor = prtDebugSky < 0.0f ? float3(1, 0, 1) :
+          float3(prtDebugSky, prtDebugSky, prtDebugSky);
+        return half4(pack_hdr(debugColor), 1);
       }
 
       ##if bvh_usable == yes
@@ -489,6 +530,9 @@ macro USE_DEFERRED_SHADOW_PER_SAMPLE(code)
 
       half3 environmentAmbientLighting =  enviLight * gbuffer.diffuseColor;
       //use albedo instead of diffuseColor, so fake light affects metal
+      ##if (gi_quality == off)
+      if (_prtVolumeEnabled == 0)
+      ##endif
       environmentAmbientLighting += enviAO * fakeNightLight(gbuffer.albedo, fake_light_strength*(1-gbuffer.metalness*(1-gbuffer.linearRoughness)), saturated_NdotV, distSq);
 
       //from GTAO paper. Result doesn't seem to be correct (too bright).
@@ -502,6 +546,22 @@ macro USE_DEFERRED_SHADOW_PER_SAMPLE(code)
         float3 roughR = getRoughReflectionVec(lightProbeReflectionVec.xyz, gbuffer.normal, ggx_alpha);
         float roughMip = ComputeReflectionCaptureMipFromRoughness(gbuffer.linearRoughness);
         half3 environmentAmbientReflection = sample_envi_probe(float4(roughR, roughMip)).rgb;
+        BRANCH
+        if (_prtVolumeEnabled != 0)
+        {
+          // Reuse the visibility already sampled above; sample again only if that pass was skipped.
+          float skyVis = prtDebugSky;
+          if (skyVis < 0.0f)
+          {
+            skyVis = 1.0f;
+            sample_prtgi_gi_normals(worldPos.xyz, gbuffer.normal, enviLightingNormal, skyVis);
+          }
+          float occ = smoothstep(0.05f, 0.50f, skyVis);
+          environmentAmbientReflection *= occ;
+          ssrReflections.rgb *= occ;
+          float maxSpecScale = dagi_max_specular_scale(gbuffer.linearRoughness, saturated_NdotV, 2.0, NUM_PROBE_MIPS);
+          environmentAmbientReflection = dagi_clamp_untrusted_specular(environmentAmbientReflection, enviLight, maxSpecScale);
+        }
         half3 totalReflection = (environmentAmbientReflection*enviSSR + ssrReflections.rgb)*enviBRDF;//enviBRDF
       ##endif
 
@@ -533,6 +593,13 @@ macro USE_DEFERRED_SHADOW_PER_SAMPLE(code)
         }
         half3 backAmbientLight = GetSkySHDiffuse(-gbuffer.normal);
         half3 giBackAmbient = backAmbientLight;
+        BRANCH
+        if (_prtVolumeEnabled != 0)
+        {
+          float backSkyVis = 1.0;
+          float3 backBounce = sample_prtgi_gi_normals(worldPos.xyz, -gbuffer.normal, -gbuffer.normal, backSkyVis);
+          giBackAmbient = backBounce + backAmbientLight * backSkyVis;
+        }
         ##if (gi_quality == screen_probes)
           sample_bilinear_irradiance_envi_normal(-gbuffer.normal, w, worldPos.xyz, gbuffer.normal, screenpos, giBackAmbient);
         ##elif (gi_quality == colored)

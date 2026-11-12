@@ -68,7 +68,12 @@ bool PRTAsset::serialize(IGenSave &writer) const
     uint32_t skyVisCnt = (uint32_t)sec.skyVisibility.size();
     writer.write(&skyVisCnt, sizeof(skyVisCnt));
     if (skyVisCnt > 0)
-      writer.write(sec.skyVisibility.data(), skyVisCnt * sizeof(uint32_t));
+      writer.write(sec.skyVisibility.data(), skyVisCnt * sizeof(uint64_t));
+
+    uint32_t depthCnt = (uint32_t)sec.probeDepth.size();
+    writer.write(&depthCnt, sizeof(depthCnt));
+    if (depthCnt > 0)
+      writer.write(sec.probeDepth.data(), depthCnt * sizeof(uint32_t));
 
     uint32_t brickCnt = (uint32_t)sec.brickInfo.size();
     writer.write(&brickCnt, sizeof(brickCnt));
@@ -138,6 +143,8 @@ bool PRTAsset::deserialize(IGenLoad &reader)
     {
       reader.read(sec.probeIds.data(), probeCnt * sizeof(uint32_t));
       reader.read(sec.probeData.data(), probeCnt * sizeof(PRTProbeData));
+      for (uint32_t i = 0; i < probeCnt; ++i)
+        sec.probeData[i].globalProbeIndex = sec.probeIds[i];
     }
 
     uint32_t factorCnt = 0;
@@ -150,7 +157,13 @@ bool PRTAsset::deserialize(IGenLoad &reader)
     reader.read(&skyVisCnt, sizeof(skyVisCnt));
     sec.skyVisibility.resize(skyVisCnt);
     if (skyVisCnt > 0)
-      reader.read(sec.skyVisibility.data(), skyVisCnt * sizeof(uint32_t));
+      reader.read(sec.skyVisibility.data(), skyVisCnt * sizeof(uint64_t));
+
+    uint32_t depthCnt = 0;
+    reader.read(&depthCnt, sizeof(depthCnt));
+    sec.probeDepth.resize(depthCnt);
+    if (depthCnt > 0)
+      reader.read(sec.probeDepth.data(), depthCnt * sizeof(uint32_t));
 
     uint32_t brickCnt = 0;
     reader.read(&brickCnt, sizeof(brickCnt));

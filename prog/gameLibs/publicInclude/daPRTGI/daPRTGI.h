@@ -33,10 +33,21 @@ enum class DebugVisualMode
   Irradiance
 };
 
+// "Baked GI Quality" levels.
+enum class PRTGIQuality
+{
+  // High: full runtime GI. L0+L1 probes relit per frame, per-corner Chebyshev depth occlusion.
+  High,
+  // Low: lightweight GI for low-end GPUs. Same L0+L1 directional irradiance, but occlusion comes
+  // from the baked per-probe ambient cube and the per-probe depth buffer is never allocated.
+  Low
+};
+
 struct PRTGISettings
 {
   bool enabled = true;
   bool debugOverlay = false;       // Show on-screen stats HUD & ImGui window
+  bool debugSkyVisibility = false; // Replace final GI output with per-pixel PRT sky visibility
   DebugVisualMode debugDraw = DebugVisualMode::None; // 3D world visualization
   
   float gridSpacing = 2.0f;        // Probe grid spacing in meters
@@ -45,6 +56,8 @@ struct PRTGISettings
   int updateBudget = 2;            // Number of sectors to relight per frame
   float skyIntensity = 1.0f;       // Sky environment intensity multiplier
   BakingMode bakingMode = BakingMode::Auto;
+  PRTGIQuality quality = PRTGIQuality::High;
+  bool qualityExplicit = false; // settings supplied a quality; pipeline default must not override it
   eastl::string cacheFolder = "prtgi";
 };
 
@@ -60,7 +73,8 @@ struct PRTGIStats
   uint32_t updatedSectorsThisFrame = 0;
   uint32_t totalSurfels = 0;
   uint32_t totalBricks = 0;
-  size_t factorsMemoryBytes = 0;
+  size_t factorsMemoryBytes = 0;   // baked form-factor data (CPU asset)
+  size_t runtimeVramBytes = 0;     // GPU: coefficient volume + depth + masks + resident sector buffers
   
   float lastRelightDurationMs = 0.0f;
   float lastBakeDurationSec = 0.0f;
@@ -84,6 +98,7 @@ public:
   virtual void setSettings(const PRTGISettings &s) = 0;
   virtual const PRTGISettings &getSettings() const = 0;
   virtual const PRTGIStats &getStats() const = 0;
+  virtual void setPipelineType(const char *name) = 0;
 
   // Scene bake / load / save lifecycle
   virtual bool loadOrBakeScene(const char *scene_name, bool force_bake = false) = 0;
@@ -107,4 +122,3 @@ public:
 IDaPRTGI *create_prtgi();
 
 } // namespace daprtgi
-

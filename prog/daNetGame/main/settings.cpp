@@ -903,6 +903,23 @@ REGISTER_IMGUI_WINDOW_EX("Settings", "Settings explorer", nullptr, 100, ImGuiWin
 REGISTER_IMGUI_WINDOW_EX("Settings", "GameParams explorer", nullptr, 100, ImGuiWindowFlags_MenuBar, gameparams_explorer_window);
 
 
+// Explicit user graphics/fullDeferred, looked up in the config being patched first and then in the user's main config.
+// A console preset must not override it: the dev-only "config.blk" pass is patched with no graphics block of its own.
+static bool find_user_full_deferred(const DataBlock &config_blk, bool &out_value)
+{
+  const DataBlock *sources[] = {config_blk.getBlockByName("graphics"),
+    settings_override_blk ? settings_override_blk->getBlockByName("graphics") : nullptr};
+  for (const DataBlock *graphics : sources)
+  {
+    if (graphics && graphics->findParam("fullDeferred") >= 0)
+    {
+      out_value = graphics->getBool("fullDeferred", true);
+      return true;
+    }
+  }
+  return false;
+}
+
 void dgs_apply_changes_to_config(DataBlock &config_blk, bool need_merge_cmd, const OverrideFilter *override_filter)
 {
   DataBlock cmdBlk;
@@ -920,7 +937,15 @@ void dgs_apply_changes_to_config(DataBlock &config_blk, bool need_merge_cmd, con
 
   // first apply graphic preset settings
   if (presetName != nullptr)
+  {
+    bool userFullDeferredVal = false;
+    const bool hasUserFullDeferred = find_user_full_deferred(config_blk, userFullDeferredVal);
+
     dgs_apply_console_preset_params(config_blk, presetName);
+
+    if (hasUserFullDeferred)
+      config_blk.addBlock("graphics")->setBool("fullDeferred", userFullDeferredVal);
+  }
 
   if (need_merge_cmd)
     merge_data_block(config_blk, cmdBlk);

@@ -23,6 +23,7 @@ include "dagi_irrad_grid_sample.dshl"
 include "dagi_rad_grid_common.dshl"
 include "dagi_quality.dshl"
 include "reproject_gi.dshl"
+include "prtgi_sample.dshl"
 
 int gi_debug_froxels;
 interval gi_debug_froxels: off<1, on;
@@ -64,6 +65,10 @@ shader render_ambient
   INIT_READ_GBUFFER()
   USE_READ_GBUFFER_NORMAL()
   USE_ROUGH_TO_MIP()
+  PRTGI_PROBE_VOLUME_SAMPLE(ps)
+  hlsl(ps) {
+    #include <dagi_specular_clamp.hlsl>
+  }
   //SAMPLE_IRRADIANCE_GRID(ps)
   //SAMPLE_RADIANCE_GRID(ps)
 
@@ -188,6 +193,21 @@ shader render_ambient
       half3 specular = texCUBElod(envi_probe_specular, float4(specularDir, ComputeReflectionCaptureMipFromRoughness(linearRoughness))).rgb;
       half3 giSpecular = specular;
 
+      BRANCH
+      if (_prtVolumeEnabled != 0)
+      {
+        float skyVis = 1.0;
+        float3 bounceIrr = sample_prtgi_gi(worldPos, normal, skyVis);
+        ambient = bounceIrr + GetSkySHDiffuse(normal) * skyVis;
+
+        // Scheme 4: Treyarch harmonic specular occlusion to eliminate flat cubemap specular indoors / under arches:
+        float specOcc = smoothstep(0.05f, 0.50f, skyVis);
+        specular *= specOcc;
+        float maxSpecScale = dagi_max_specular_scale(linearRoughness, NdotV, 2.0, NUM_PROBE_MIPS);
+        specular = dagi_clamp_untrusted_specular(specular, ambient, maxSpecScale);
+        giSpecular = specular;
+      }
+
       ##if (gi_quality != off)
         ##if gi_debug_froxels == on && gi_quality != only_ao
           ambient = volumetric_gi_calc_diffuse_uvw(input.texcoord.xy, 0.97*w, enviLightingNormal);
@@ -267,7 +287,12 @@ shader render_ambient
       output.age = age;
       ##endif
 
+      ##if (gi_quality == off)
+      output.ambient = ambient;
+      output.specular = specular;
+      ##else
       encode_gi_colors(output.ambient, output.specular, ambient, specular);
+      ##endif
       return output;
     }
   }

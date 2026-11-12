@@ -37,7 +37,7 @@ entity{
   bloom__threshold:r=0.1
   bloom__radius:r=10
   bloom__upSample:r=0.8
-  bloom__mul:r=0.05
+  bloom__mul:r=0
 }
 
 entity{
@@ -55,33 +55,22 @@ entity{
 
 entity{
   _template:t="local_tone_mapping_setting"
-  local_tone_mapping_setting__hq_shadows_multiplier:r=1.5
-  local_tone_mapping_setting__hq_highlights_multiplier:r=1.5
-  local_tone_mapping_setting__lq_shadows_multiplier:r=1.5
-  local_tone_mapping_setting__lq_highlights_multiplier:r=1.5
+  local_tone_mapping_setting__hq_shadows_multiplier:r=1.0
+  local_tone_mapping_setting__hq_highlights_multiplier:r=1.0
+  local_tone_mapping_setting__lq_shadows_multiplier:r=1.0
+  local_tone_mapping_setting__lq_highlights_multiplier:r=1.0
 }
 
 entity{
-  _template:t="adaptation_level_settings" //overrided
-
+  _template:t="adaptation_level_settings"
   "adaptation_level_settings:object"{
-    adaptation__on:b=yes
-    adaptation__autoExposureScale:r=1
-    adaptation__maxExposure:r=20
-    adaptation__minExposure:r=0.25
-    adaptation__adaptDownSpeed:r=3.5
-    adaptation__adaptUpSpeed:r=3.5
-    adaptation__brightnessPerceptionLinear:r=0.99
-    adaptation__brightnessPerceptionPower:r=0.6
-    adaptation__highPart:r=0
-    adaptation__lowPart:r=0
-    adaptation__fixedExposure:r=-1
-    adaptation__centerWeight:r=1
+    adaptation__on:b=no           // 关闭动态人眼适应，避免镜头转向暗处时画面自动忽亮忽暗
+    adaptation__fixedExposure:r=1.0 // 锁定固定曝光值为 1.0
   }
 }
 
 entity{
-  _template:t="settings_override_manager+settings_override_settings"
+  _template:t="postfx_color_grading_tonemap"
   settings_override__useCustomSettings:b=yes
 
   "settings_override__graphicsSettings:object"{

@@ -1,4 +1,9 @@
 include "shader_global.dshl"
+include "skyLightBase.dshl"
+include "static_shadow.dshl"
+
+float4 from_sun_direction;
+float4 sun_color_0;
 
 int _brickCount;
 float4 _surfelBoundsMin;
@@ -11,11 +16,21 @@ buffer _brickRadiance;
 shader prt_brick_relight_cs
 {
   supports global_frame;
+  hlsl(cs) {
+    #define FASTEST_STATIC_SHADOW_PCF 1
+    #define HAS_STATIC_SHADOW 1
+  }
+  INIT_STATIC_SHADOW_BASE(cs)
+  USE_STATIC_SHADOW_BASE(cs)
+  INIT_SKY_DIFFUSE_BASE(cs)
+  USE_SKY_DIFFUSE_BASE(cs)
 
   (cs) {
     _brickCount@i1 = _brickCount;
     _surfelBoundsMin@f3 = _surfelBoundsMin;
     _surfelBoundsSize@f3 = _surfelBoundsSize;
+    prt_from_sun_direction@f3 = from_sun_direction;
+    prt_sun_color_0@f3 = sun_color_0;
     _brickInfo@buf = _brickInfo hlsl {
       #include "prtgi_common.hlsli"
       StructuredBuffer<SurfelIndices> _brickInfo@buf;
@@ -27,16 +42,18 @@ shader prt_brick_relight_cs
   hlsl(cs) {
     #define BRICK_THREADS 32
     groupshared float3 _brickSums[BRICK_THREADS];
+    groupshared float _brickSkyVis[BRICK_THREADS];
 
     [numthreads(BRICK_THREADS, 1, 1)]
     void cs_main(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
     {
-      uint brick = group.x;
+      uint brick = group.y * 65535u + group.x;
       if (brick >= (uint)_brickCount)
         return;
 
       SurfelIndices range = _brickInfo[brick];
       float3 radiance = 0;
+      float skyVisSum = 0;
 
       for (uint offset = thread; offset < range.surfelCount; offset += BRICK_THREADS)
       {
@@ -45,31 +62,48 @@ shader prt_brick_relight_cs
         float3 normal = prt_surfel_normal(surfel);
         float3 position = prt_surfel_position(surfel, _surfelBoundsMin.xyz, _surfelBoundsSize.xyz);
 
-        // Simple direct directional sun evaluation
-        float3 sunDir = -from_sun_direction.xyz;
+        // Direct directional sun evaluation with physical cosine law and static shadow
+        float3 sunDir = -prt_from_sun_direction.xyz;
         float NdotL = max(0.0f, dot(normal, sunDir));
-        float3 direct = sun_color_0.rgb * NdotL;
+        float skyVis = prt_surfel_sky_vis(surfel);
+        skyVisSum += skyVis;
 
-        // Ambient sky contribution
-        float3 ambient = float3(0.08, 0.1, 0.14);
+        // Sample static cascaded shadow from the sun (use 0.04m offset to avoid leaking through thin walls/roofs).
+        // Outside the static shadow cascades (mask -> 0), fall back to the baked surfel sky/sun visibility
+        // rather than getStaticShadow()'s default 1.0 (which would illuminate distant indoor surfels).
+        uint shadowCascadeId = 0;
+        half shadowMask = 0.0h;
+        half shadowSample = getStaticShadowMask(position + normal * 0.04f, normal, prt_from_sun_direction.xyz,
+          0.0f, shadowCascadeId, shadowMask, 1.0f, float2(0.0f, 0.0f), float2(0.0f, 0.0f));
+        float sunVis = lerp(skyVis, float(shadowSample), float(shadowMask));
+
+        // In Dagor Engine, sun_color_0 is already (E_sun / PI) and GetSkySHDiffuse is already (E_sky / PI),
+        // so outgoing Lambertian surfel radiance L_o = albedo * (direct + ambient).
+        float3 direct = prt_sun_color_0.rgb * (NdotL * sunVis);
+        float3 ambient = max(float3(0, 0, 0), float3(GetSkySHDiffuse(half3(normal)))) * skyVis;
 
         radiance += prt_surfel_albedo(surfel) * (direct + ambient);
       }
 
       _brickSums[thread] = radiance;
+      _brickSkyVis[thread] = skyVisSum;
       GroupMemoryBarrierWithGroupSync();
 
       [unroll]
       for (uint stride = BRICK_THREADS / 2; stride > 0; stride >>= 1)
       {
         if (thread < stride)
+        {
           _brickSums[thread] += _brickSums[thread + stride];
+          _brickSkyVis[thread] += _brickSkyVis[thread + stride];
+        }
         GroupMemoryBarrierWithGroupSync();
       }
 
       if (thread == 0)
       {
-        _brickRadiance[brick] = float4(range.surfelCount > 0 ? _brickSums[0] / float(range.surfelCount) : 0, 0);
+        float cnt = float(max(1u, range.surfelCount));
+        _brickRadiance[brick] = float4(_brickSums[0] / cnt, _brickSkyVis[0] / cnt);
       }
     }
   }

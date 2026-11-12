@@ -12,6 +12,8 @@
   file:t = "./source/heightmap.dshl"
   file:t = "./source/deferred_shadow.dshl"
   file:t = "./source/ambient.dshl"
+  file:t = "../../../../prog/gameLibs/daPRTGI/shaders/prtgi_brick_relight.dshl"
+  file:t = "../../../../prog/gameLibs/daPRTGI/shaders/prtgi_probe_relight.dshl"
   file:t = "./source/taa.dshl"
   file:t = "./source/copy_hmap_depth.dshl"
   file:t = "heightmap_shadows.dshl"

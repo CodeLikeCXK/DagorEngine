@@ -318,7 +318,12 @@ shader deferred_shadow_to_buffer
       half2 AB = getEnviBRDF_AB_LinearRoughness(gbuffer.linearRoughness, NoV).xy;
       half3 enviBRDF = gbuffer.specularColor * AB.x + saturate( INV_MIN_IOR * gbuffer.specularColor.g ) * AB.y;
       half3 giSpecular, giAmbient;
+      ##if (gi_quality == off)
+      giAmbient = screen_ambient[int2(screenpos)].rgb;
+      giSpecular = screen_specular[int2(screenpos)].rgb;
+      ##else
       decode_gi_colors(screen_ambient[int2(screenpos)], screen_specular[int2(screenpos)], giAmbient, giSpecular);
+      ##endif
 ##if ssao_tex != NULL
       half3 localIndirect = MultiBounce(ssao.x, gbuffer.diffuseColor);
 ##else
@@ -350,7 +355,7 @@ shader deferred_shadow_to_buffer
       //half3 reflection = totalReflection+environmentAmbientLighting;//correct
       result += reflection;
       result = result*(1-gbuffer.emission_part) + gbuffer.emissionColor;
-      ##if (dynamic_lights_count != lights_off)
+      ##if (dynamic_lights_count != lights_off && deferred_lighting_mode != indirect_light)
       result += get_dynamic_lighting(gbuffer, worldPos.xyz, -input.viewVect, w, screenpos, NoV, specularColor, input.texcoord.xy, enviAO);
       ##endif
 

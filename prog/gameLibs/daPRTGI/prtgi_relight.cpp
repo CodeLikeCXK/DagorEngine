@@ -16,7 +16,6 @@ void PRTRelightPass::init()
 {
   brickRelightCS = new_compute_shader("prt_brick_relight_cs", true);
   probeRelightCS = new_compute_shader("prt_probe_relight_cs", true);
-  pyramidCS = new_compute_shader("prt_pyramid_downsample_cs", true);
   publishCS = new_compute_shader("prt_publish_cs", true);
 
   prtGridOriginVarId = get_shader_variable_id("_prtGridOrigin", true);
@@ -27,14 +26,39 @@ void PRTRelightPass::init()
   prtCascadeCountVarId = get_shader_variable_id("_prtCascadeCount", true);
   prtVolumeEnabledVarId = get_shader_variable_id("_prtVolumeEnabled", true);
   prtCoefficientVoxel3DVarId = get_shader_variable_id("_coefficientVoxel3D", true);
+
+  debug("PRTGI Relight Init: brickRelightCS=%p, probeRelightCS=%p, volEnabledId=%d, voxel3DId=%d",
+    brickRelightCS, probeRelightCS, prtVolumeEnabledVarId, prtCoefficientVoxel3DVarId);
 }
 
 void PRTRelightPass::close()
 {
   del_it(brickRelightCS);
   del_it(probeRelightCS);
-  del_it(pyramidCS);
   del_it(publishCS);
+}
+
+void PRTRelightPass::unbindShaderResources()
+{
+  static const char *const bufferVars[] = {"_prtProbeInfo", "_prtProbeDepth", "_prtProbeData", "_factors",
+    "_prtSkyVisibility", "_brickInfo", "_surfels", "_brickRadiance", "_prtCommittedSH"};
+  for (const char *name : bufferVars)
+  {
+    const int varId = get_shader_variable_id(name, true);
+    if (varId >= 0)
+      ShaderGlobal::set_buffer_unsafe(varId, nullptr);
+  }
+
+  static const char *const textureVars[] = {"_coefficientVoxel3D", "_coefficientVoxel3DRW"};
+  for (const char *name : textureVars)
+  {
+    const int varId = get_shader_variable_id(name, true);
+    if (varId >= 0)
+      ShaderGlobal::set_texture(varId, BAD_TEXTUREID);
+  }
+
+  if (prtVolumeEnabledVarId >= 0)
+    ShaderGlobal::set_int(prtVolumeEnabledVarId, 0);
 }
 
 void PRTRelightPass::relightSectors(const eastl::vector<int> &selected_sectors, PRTAsset &asset,
@@ -50,6 +74,19 @@ void PRTRelightPass::relightSectors(const eastl::vector<int> &selected_sectors, 
   static int prtSkyIntensityVarId = get_shader_variable_id("_prtEnvironmentIntensity", true);
   if (prtSkyIntensityVarId >= 0)
     ShaderGlobal::set_float(prtSkyIntensityVarId, sky_intensity);
+
+  if (prtGridMinVarId >= 0)
+    ShaderGlobal::set_int4(prtGridMinVarId, IPoint4(asset.grid.minCoord.x, asset.grid.minCoord.y, asset.grid.minCoord.z, 0));
+  if (prtGridCountVarId >= 0)
+    ShaderGlobal::set_int4(prtGridCountVarId, IPoint4(asset.grid.count.x, asset.grid.count.y, asset.grid.count.z, 0));
+  if (prtSlotCountVarId >= 0)
+    ShaderGlobal::set_int4(prtSlotCountVarId, IPoint4(residency.getSlotCount().x, residency.getSlotCount().y, residency.getSlotCount().z, 0));
+
+  static int coefficientVoxel3DRWVarId = get_shader_variable_id("_coefficientVoxel3DRW", true);
+  if (coefficientVoxel3DRWVarId >= 0 && residency.getCoefficientVoxel3D())
+    ShaderGlobal::set_texture(coefficientVoxel3DRWVarId, residency.getCoefficientVoxel3DId());
+
+  static int brickRadianceVarId = get_shader_variable_id("_brickRadiance", true);
 
   for (int secIdx : selected_sectors)
   {
@@ -74,13 +111,14 @@ void PRTRelightPass::relightSectors(const eastl::vector<int> &selected_sectors, 
 
       static int brickInfoVarId = get_shader_variable_id("_brickInfo", true);
       static int surfelsVarId = get_shader_variable_id("_surfels", true);
-      static int brickRadianceVarId = get_shader_variable_id("_brickRadiance", true);
 
       if (brickInfoVarId >= 0) ShaderGlobal::set_buffer_unsafe(brickInfoVarId, gpuData->brickInfoBuf);
       if (surfelsVarId >= 0) ShaderGlobal::set_buffer_unsafe(surfelsVarId, gpuData->surfelsBuf);
       if (brickRadianceVarId >= 0) ShaderGlobal::set_buffer_unsafe(brickRadianceVarId, gpuData->brickRadianceBuf);
 
-      brickRelightCS->dispatchThreads(gpuData->brickCount, 1, 1);
+      uint32_t gx = min<uint32_t>(gpuData->brickCount, 65535u);
+      uint32_t gy = (gpuData->brickCount + 65534u) / 65535u;
+      brickRelightCS->dispatch(gx, gy, 1);
       if (brickRadianceVarId >= 0) ShaderGlobal::set_buffer_unsafe(brickRadianceVarId, nullptr);
     }
 
@@ -98,26 +136,18 @@ void PRTRelightPass::relightSectors(const eastl::vector<int> &selected_sectors, 
       if (prtProbeDataVarId >= 0) ShaderGlobal::set_buffer_unsafe(prtProbeDataVarId, gpuData->probeDataBuf);
       if (factorsVarId >= 0) ShaderGlobal::set_buffer_unsafe(factorsVarId, gpuData->factorsBuf);
       if (prtSkyVisibilityVarId >= 0) ShaderGlobal::set_buffer_unsafe(prtSkyVisibilityVarId, gpuData->skyVisBuf);
+      if (brickRadianceVarId >= 0) ShaderGlobal::set_buffer_unsafe(brickRadianceVarId, gpuData->brickRadianceBuf);
       if (prtCommittedSHVarId >= 0) ShaderGlobal::set_buffer_unsafe(prtCommittedSHVarId, gpuData->probeSHBuf);
 
       probeRelightCS->dispatchThreads(gpuData->probeCount, 1, 1);
       if (prtCommittedSHVarId >= 0) ShaderGlobal::set_buffer_unsafe(prtCommittedSHVarId, nullptr);
+      if (brickRadianceVarId >= 0) ShaderGlobal::set_buffer_unsafe(brickRadianceVarId, nullptr);
     }
   }
 
-  // 3. Publish to 3D volume texture cascade
-  if (publishCS && residency.getCoefficientVoxel3D())
-  {
-    static int coefficientVoxel3DRWVarId = get_shader_variable_id("_coefficientVoxel3DRW", true);
-    if (coefficientVoxel3DRWVarId >= 0)
-      ShaderGlobal::set_texture(coefficientVoxel3DRWVarId, residency.getCoefficientVoxel3DId());
-
-    publishCS->dispatchThreads(residency.getSlotCount().x, residency.getSlotCount().y, residency.getSlotCount().z);
-
-    // Unbind UAV to prevent D3D11 runtime hazard resolution and pipeline flush
-    if (coefficientVoxel3DRWVarId >= 0)
-      ShaderGlobal::set_texture(coefficientVoxel3DRWVarId, BAD_TEXTUREID);
-  }
+  // Unbind UAV to prevent D3D11 runtime hazard resolution and pipeline flush
+  if (coefficientVoxel3DRWVarId >= 0)
+    ShaderGlobal::set_texture(coefficientVoxel3DRWVarId, BAD_TEXTUREID);
 }
 
 void PRTRelightPass::updateGlobalShaderConstants(const PRTGridDesc &grid, const PRTSectorResidency &residency,
@@ -147,7 +177,14 @@ void PRTRelightPass::updateGlobalShaderConstants(const PRTGridDesc &grid, const 
 
   if (prtCoefficientVoxel3DVarId >= 0)
     ShaderGlobal::set_texture(prtCoefficientVoxel3DVarId, residency.getCoefficientVoxel3DId());
+
+  static int prtProbeInfoVarId = get_shader_variable_id("_prtProbeInfo", true);
+  if (prtProbeInfoVarId >= 0)
+    ShaderGlobal::set_buffer_unsafe(prtProbeInfoVarId, residency.getProbeInfoBuf());
+
+  static int prtProbeDepthVarId = get_shader_variable_id("_prtProbeDepth", true);
+  if (prtProbeDepthVarId >= 0)
+    ShaderGlobal::set_buffer_unsafe(prtProbeDepthVarId, residency.getProbeDepthBuf());
 }
 
 } // namespace daprtgi
-

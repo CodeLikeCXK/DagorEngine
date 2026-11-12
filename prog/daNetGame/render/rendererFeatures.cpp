@@ -52,12 +52,15 @@ FeatureRenderFlagMask load_render_features(const DataBlock *blk)
 {
   const String platformBlockName = get_platform_block_name();
   const DataBlock *platformFeaturesBlk = blk->getBlockByNameEx(platformBlockName.c_str());
+  const DataBlock *graphicsBlk = ::dgs_get_settings()->getBlockByNameEx("graphics");
 
   FeatureRenderFlagMask featuresMask;
   for (auto &i : feature_render_flags_str_table)
   {
     bool hasFeature = blk->getBool(i.second, is_render_feature_enabled_by_default(i.first));
     hasFeature = platformFeaturesBlk->getBool(i.second, hasFeature);
+    if (graphicsBlk && graphicsBlk->findParam(i.second) >= 0)
+      hasFeature = graphicsBlk->getBool(i.second, hasFeature);
 
     if (hasFeature)
       featuresMask.set(i.first);

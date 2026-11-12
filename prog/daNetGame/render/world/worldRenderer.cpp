@@ -2137,8 +2137,16 @@ void WorldRenderer::setAntialiasing()
     default: prepareForPostfxNoAANode = makePrepareForPostfxNoAANode(); break;
   }
 
+  if (isThinGBuffer() && antiAliasing && antiAliasing->needMotionVectors())
+  {
+    antiAliasing.reset();
+    render::antialiasing::set_method(render::antialiasing::AntialiasingMethod::None);
+    currentAntiAliasingMode = AntiAliasingMode::OFF;
+    prepareForPostfxNoAANode = makePrepareForPostfxNoAANode();
+    ShaderGlobal::set_int(antialiasing_typeVarId, AntiAliasingType::NON_TEMPORAL);
+  }
   // if for some reason selected AA mode fails to init, use TSR as fallback and no AA if TSR fails too
-  if (antiAliasing && !antiAliasing->isAvailable())
+  else if (antiAliasing && !antiAliasing->isAvailable())
   {
     if (currentAntiAliasingMode != AntiAliasingMode::TSR)
     {
@@ -2444,7 +2452,9 @@ bool WorldRenderer::forceEnableMotionVectors() const
 
 bool WorldRenderer::needMotionVectors() const
 {
-  return (antiAliasing && antiAliasing->needMotionVectors()) || (!isThinGBuffer() && forceEnableMotionVectors());
+  if (isThinGBuffer())
+    return false;
+  return (antiAliasing && antiAliasing->needMotionVectors()) || forceEnableMotionVectors();
 }
 
 bool WorldRenderer::needSeparatedUI() const { return antiAliasing && antiAliasing->isFrameGenerationEnabled(); }
@@ -2791,17 +2801,25 @@ void WorldRenderer::ctorDeferred()
 
     if (hasFeature(FeatureRenderFlags::WATER_PERLIN))
     {
-      const char *perlinName = "water_perlin";
-      TEXTUREID perlinTexId = ::get_tex_gameres(perlinName); // mem leak
-      G_ASSERTF(perlinTexId != BAD_TEXTUREID, "water perlin noise texture '%s' not found.", perlinName);
-      ShaderGlobal::set_texture(get_shader_variable_id("perlin_noise"), perlinTexId);
+      int perlinVarId = get_shader_variable_id("perlin_noise", true);
+      int perlinSamplerVarId = get_shader_variable_id("perlin_noise_samplerstate", true);
+      if (perlinVarId >= 0)
       {
-        d3d::SamplerInfo smpInfo;
-        smpInfo.mip_map_mode = d3d::MipMapMode::Linear;
-        smpInfo.filter_mode = d3d::FilterMode::Linear;
-        ShaderGlobal::set_sampler(get_shader_variable_id("perlin_noise_samplerstate"), d3d::request_sampler(smpInfo));
+        const char *perlinName = "water_perlin";
+        TEXTUREID perlinTexId = ::get_tex_gameres(perlinName);
+        if (perlinTexId != BAD_TEXTUREID)
+        {
+          ShaderGlobal::set_texture(perlinVarId, perlinTexId);
+          if (perlinSamplerVarId >= 0)
+          {
+            d3d::SamplerInfo smpInfo;
+            smpInfo.mip_map_mode = d3d::MipMapMode::Linear;
+            smpInfo.filter_mode = d3d::FilterMode::Linear;
+            ShaderGlobal::set_sampler(perlinSamplerVarId, d3d::request_sampler(smpInfo));
+          }
+          release_managed_tex(perlinTexId);
+        }
       }
-      release_managed_tex(perlinTexId);
     }
   }
 
@@ -3287,12 +3305,13 @@ void WorldRenderer::close()
   enviProbe = nullptr;
 
 
+  // GI must release its shader bindings before the global textures are reset.
+  closeGI(/*request_fg_recreation*/ false);
   ShaderGlobal::reset_textures();
   refined_block::clear();
 
   del_it(debug_tex_overlay);
   target.reset();
-  closeGI();
   giBlk.reset();
   lights.close();
 
@@ -6747,10 +6766,13 @@ void WorldRenderer::toggleFeatures(const FeatureRenderFlagMask &f, bool turn_on)
 
 void WorldRenderer::validateFeatures(FeatureRenderFlagMask &features, const FeatureRenderFlagMask &)
 {
-  if (features.test(FeatureRenderFlags::SSR) && !features.test(FeatureRenderFlags::FULL_DEFERRED))
+  if (!features.test(FeatureRenderFlags::FULL_DEFERRED))
   {
-    logerr("SSR currently not implemented for thinGBuffer");
-    features.flip(FeatureRenderFlags::SSR);
+    features.reset(FeatureRenderFlags::DEFERRED_LIGHT);
+    features.reset(FeatureRenderFlags::SSR);
+    features.reset(FeatureRenderFlags::WATER_PERLIN);
+    features.reset(FeatureRenderFlags::WATER_REFLECTION);
+    features.reset(FeatureRenderFlags::DOWNSAMPLED_NORMALS);
   }
   // normal repacking in downsample depth and blood puddles load and store gbuf_1 through one UAV
   if (features.test(FeatureRenderFlags::GBUFFER_PACKED_NORMALS) &&
@@ -6803,6 +6825,8 @@ void WorldRenderer::changeFeatures(const FeatureRenderFlagMask &f)
     rebuild_shaders_stateblocks();
     load_shaders_bindump_with_fence(sh_bindump_prefix, 5.0_sm);
     rendinst::render::reinitOnShadersReload();
+    if (VariableMap::isGlobVariablePresent(compatibility_modeVarId))
+      ShaderGlobal::set_int(compatibility_modeVarId, hasFeature(FeatureRenderFlags::FULL_DEFERRED) ? 0 : 1);
     recreateResettable |= true;
     reapplySettings |= true;
   }
@@ -6885,6 +6909,11 @@ void WorldRenderer::changeFeatures(const FeatureRenderFlagMask &f)
 
   if (changedFeatures.test(FeatureRenderFlags::UPSCALE_SAMPLING_TEX) || changedFeatures.test(FeatureRenderFlags::TAA))
     requestFgRecreation("changeFeatures: UPSCALE_SAMPLING_TEX or TAA");
+
+  // gbuffer / deferred light / resolve nodes are chosen from FULL_DEFERRED when the framegraph is built,
+  // so switching the pipeline at runtime must rebuild it (reapplySettings above would skip recreateFramegraph).
+  if (changedFeatures.test(FeatureRenderFlags::FULL_DEFERRED))
+    requestFgRecreation("changeFeatures: FULL_DEFERRED");
 
   if (changedFeatures.test(FeatureRenderFlags::FOM_SHADOWS))
     changeStateFOMShadows();
