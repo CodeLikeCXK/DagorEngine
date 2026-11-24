@@ -157,8 +157,9 @@ struct RootSignatureGeneratorCallback
 {
   drv3d_dx12::RaytracePipelineSignature *signature = nullptr;
   D3D12_DESCRIPTOR_RANGE ranges[dxil::MAX_T_REGISTERS + dxil::MAX_S_REGISTERS + dxil::MAX_U_REGISTERS + dxil::MAX_B_REGISTERS] = {};
-  // cbuffer each one param, then srv, uav and sampler each one and one for each bindless sampler and srv globally
-  D3D12_ROOT_PARAMETER params[dxil::MAX_B_REGISTERS + 1 + 1 + 1 + 2] = {};
+  // cbuffer each one param, then srv, uav and sampler each one and one for each bindless sampler and srv globally,
+  // plus root constants and special constants
+  D3D12_ROOT_PARAMETER params[dxil::MAX_B_REGISTERS + 1 + 1 + 1 + 2 + 2] = {};
   D3D12_ROOT_SIGNATURE_DESC desc = {};
   D3D12_DESCRIPTOR_RANGE *rangePosition = &ranges[0];
   D3D12_ROOT_PARAMETER *unboundedSamplersRootParam = nullptr;
