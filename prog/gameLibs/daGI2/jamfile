@@ -10,11 +10,18 @@ Target      = gameLibs/daGI2.lib ;
 AddIncludes =
   $(Root)/prog/gameLibs/publicInclude
   $(Root)/$(Location)
+  $(Root)/$(Location)/bake
   $(Root)/$(Location)/shaders
 ;
 
 local AllSources = [ GLOB $(Root)/$(Location) : *.cpp ] ;
-Sources = $(AllSources:D=) ;
+Sources =
+  $(AllSources:D=)
+  bake/daGIBakeCache.cpp
+  bake/daGIBakeRuntime.cpp
+;
+
+CPPopt += -EHsc ;
 
 UseProgLibs +=
   engine/lib3d

@@ -1,4 +1,5 @@
 include "skyLight.dshl"
+include "dagi_bake_common.dshl"
 int4 dagi_irrad_grid_clipmap_sizei;
 int4 dagi_irrad_grid_clipmap_sizei_np2;
 int4 dagi_irrad_grid_clipmap_lt_coord_0;
@@ -21,8 +22,6 @@ float4 dagi_irrad_grid_inv_size;
 float dagi_irrad_grid_normal_bias = 0.5;
 float dagi_irrad_grid_to_camera_bias = 1.0;
 
-texture dagi_irradiance_grid_sph0;
-texture dagi_irradiance_grid_sph1;
 hlsl {
   #define DAGI_IRRADIANCE_GRID_TYPE_AUTO 0
   #define DAGI_IRRADIANCE_GRID_TYPE_SKYVIS 1
@@ -30,15 +29,19 @@ hlsl {
 }
 
 macro DAGI_IRRAD_GRID_CLIPMAP_MATH_INIT(code)
+  BEGIN_ONCE_STAGE(dagi_irrad_grid_clipmap_math_init, code)
   (code) {
     dagi_irrad_grid_clipmap_sizei@i4 = dagi_irrad_grid_clipmap_sizei;
     dagi_irrad_grid_clipmap_sizei_np2@i4 = dagi_irrad_grid_clipmap_sizei_np2;
     dagi_irrad_grid_clipmap_lt_coord@i4[] = {dagi_irrad_grid_clipmap_lt_coord_0, dagi_irrad_grid_clipmap_lt_coord_1, dagi_irrad_grid_clipmap_lt_coord_2, dagi_irrad_grid_clipmap_lt_coord_3, dagi_irrad_grid_clipmap_lt_coord_4, dagi_irrad_grid_clipmap_lt_coord_5, dagi_irrad_grid_clipmap_lt_coord_6, dagi_irrad_grid_clipmap_lt_coord_7, dagi_irrad_grid_clipmap_lt_invalid};
   }
+  END_ONCE()
 endmacro
 
 macro DAGI_IRRAD_GRID_CLIPMAP_MATH_USE(code)
   hlsl (code) {
+    #ifndef DAGI_IRRAD_GRID_CLIPMAP_MATH_INCLUDED
+    #define DAGI_IRRAD_GRID_CLIPMAP_MATH_INCLUDED 1
     #include "dagi_irrad_grid.hlsli"
     uint2 dagi_irrad_grid_get_clip_size() {return uint2(dagi_irrad_grid_clipmap_sizei.xy);}
     uint dagi_irrad_grid_get_clip_count() {return dagi_irrad_grid_clipmap_sizei.z;}
@@ -108,6 +111,7 @@ macro DAGI_IRRAD_GRID_CLIPMAP_MATH_USE(code)
       int4 lt;
       return dagi_irrad_grid_get_best_enclosing_clip(worldPos, coordF, lt, start, 0.5);
     }
+    #endif
   }
 endmacro
 
@@ -117,6 +121,7 @@ macro DAGI_IRRAD_GRID_CLIPMAP_MATH(code)
 endmacro
 
 macro DAGI_IRRAD_GRID_ATLAS_INIT(code)
+  BEGIN_ONCE_STAGE(dagi_irrad_grid_atlas_init, code)
   (code) {
     dagi_irrad_grid_atlas_decode@f4 = dagi_irrad_grid_atlas_decode;
     dagi_irrad_grid_inv_size@f2 = dagi_irrad_grid_inv_size;
@@ -126,10 +131,13 @@ macro DAGI_IRRAD_GRID_ATLAS_INIT(code)
     skyVis_enviSPH1 @f4 = enviSPH1;
     skyVis_enviSPH2 @f4 = enviSPH2;
   }
+  END_ONCE()
 endmacro
 
 macro DAGI_IRRAD_GRID_ATLAS_USE(code)
   hlsl(code) {
+    #ifndef DAGI_IRRAD_GRID_ATLAS_USE_INCLUDED
+    #define DAGI_IRRAD_GRID_ATLAS_USE_INCLUDED 1
     bool dagi_irrad_is_sky_vis() {return dagi_irrad_grid_atlas_decode.w == 2;}
     float3 dagi_irrad_grid_clip_tc_to_atlas_tc(uint cascade, float3 tc)
     {
@@ -141,6 +149,7 @@ macro DAGI_IRRAD_GRID_ATLAS_USE(code)
       float3 clipTC = abs_coordf * dagi_irrad_grid_inv_size.xxy;
       return dagi_irrad_grid_clip_tc_to_atlas_tc(cascade, clipTC);
     }
+    #endif
   }
 endmacro
 macro DAGI_IRRAD_GRID_ATLAS(code)
@@ -149,16 +158,19 @@ macro DAGI_IRRAD_GRID_ATLAS(code)
 endmacro
 
 macro DAGI_IRRAD_GRID_SRV(code)
+  BEGIN_ONCE_STAGE(dagi_irrad_grid_srv_init, code)
   (code) {
     dagi_irradiance_grid_sph0@tex3d = dagi_irradiance_grid_sph0;
     dagi_irradiance_grid_sph1@tex3d = dagi_irradiance_grid_sph1;
   }
+  END_ONCE()
 endmacro
 
 macro DAGI_IRRADIANCE_GRID_SAMPLE_INIT(code)
   DAGI_IRRAD_GRID_SRV(code)
   DAGI_IRRAD_GRID_CLIPMAP_MATH_INIT(code)
   DAGI_IRRAD_GRID_ATLAS_INIT(code)
+  DAGI_BAKED_SAMPLE_CONSTS_INIT(code)
 endmacro
 
 macro DAGI_IRRADIANCE_GRID_SAMPLE_USE(code)
@@ -174,6 +186,11 @@ macro DAGI_IRRADIANCE_GRID_SAMPLE_USE(code)
 
     #include "sh3_function.hlsl"
     #include "dagi_irradiance_encode.hlsl"
+  }
+  DAGI_BAKED_SAMPLE_USE(code)
+  hlsl(code) {
+    #ifndef DAGI_IRRAD_GRID_SAMPLE_FUNCS_INCLUDED
+    #define DAGI_IRRAD_GRID_SAMPLE_FUNCS_INCLUDED 1
 
     SH1 dagi_irrad_grid_get_irradiance_sh1(float3 uvw)
     {
@@ -232,6 +249,9 @@ macro DAGI_IRRADIANCE_GRID_SAMPLE_USE(code)
     }
     bool dagi_irrad_grid_diffuse(float3 worldPos, float3 worldDir, inout float3 ambient)
     {
+      BRANCH
+      if (dagi_baked_is_active())
+        return dagi_baked_diffuse(worldPos, worldDir, ambient);
       float3 coordF;
       uint cascade = dagi_irrad_grid_get_best_enclosing_clip(worldPos, coordF, 0);
       if (cascade == DAGI_MAX_IRRAD_GRID_CLIPS)
@@ -241,6 +261,9 @@ macro DAGI_IRRADIANCE_GRID_SAMPLE_USE(code)
     }
     bool dagi_irrad_grid_diffuse_undirectional(float3 worldPos, float3 worldDir, inout float3 ambient)
     {
+      BRANCH
+      if (dagi_baked_is_active())
+        return dagi_baked_diffuse_undirectional(worldPos, ambient);
       float3 coordF;
       uint cascade = dagi_irrad_grid_get_best_enclosing_clip(worldPos, coordF, 0);
       if (cascade == DAGI_MAX_IRRAD_GRID_CLIPS)
@@ -250,6 +273,9 @@ macro DAGI_IRRADIANCE_GRID_SAMPLE_USE(code)
     }
     bool dagi_irrad_grid_diffuse_both_dir(float3 worldPos, float3 worldDir, inout float3 ambient, inout float3 back_ambient)
     {
+      BRANCH
+      if (dagi_baked_is_active())
+        return dagi_baked_diffuse_both_dir(worldPos, worldDir, ambient, back_ambient);
       float3 coordF;
       uint cascade = dagi_irrad_grid_get_best_enclosing_clip(worldPos, coordF, 0);
       if (cascade == DAGI_MAX_IRRAD_GRID_CLIPS)
@@ -275,6 +301,9 @@ macro DAGI_IRRADIANCE_GRID_SAMPLE_USE(code)
     }
     bool dagi_irrad_grid_diffuse_biased(float3 worldPos, float3 worldDir, float3 toCameraDir, float maxCameraDist, float3 bias_normal, inout float3 ambient)
     {
+      BRANCH
+      if (dagi_baked_is_active())
+        return dagi_baked_diffuse_biased(worldPos, worldDir, toCameraDir, maxCameraDist, bias_normal, ambient);
       float3 coordF;
       uint cascade;
       if (!dagi_irrad_grid_bias(worldPos, toCameraDir, maxCameraDist, bias_normal, coordF, cascade))
@@ -284,6 +313,9 @@ macro DAGI_IRRADIANCE_GRID_SAMPLE_USE(code)
     }
     bool dagi_irrad_grid_diffuse_biased_both_dir(float3 worldPos, float3 worldDir, float3 toCameraDir, float maxCameraDist, float3 bias_normal, inout float3 ambient, inout float3 back_ambient)
     {
+      BRANCH
+      if (dagi_baked_is_active())
+        return dagi_baked_diffuse_biased_both_dir(worldPos, worldDir, toCameraDir, maxCameraDist, bias_normal, ambient, back_ambient);
       float3 coordF;
       uint cascade;
       if (!dagi_irrad_grid_bias(worldPos, toCameraDir, maxCameraDist, bias_normal, coordF, cascade))
@@ -294,18 +326,11 @@ macro DAGI_IRRADIANCE_GRID_SAMPLE_USE(code)
     bool dagi_irrad_grid_diffuse_biased_smooth_cascade(float3 worldViewPos, float3 worldPos, float3 toCameraDir, float maxCameraDist, float3 bias_normal, float dither, inout uint cascade, inout float3 coordF, inout float vignette)
     {
       int4 lt;
-      // absolutely safe border would be 0.5 + sqrt(3) (0.5 for trilinear filtering) + normal offsetting = sqrt(3)
-      // as normal offsetting can move up to 0.5*sqrt(3) * offsetProbeSize which is probeSize*(1+vignette), vignette < 1,
-      // so, altogether no more than 0.5*sqrt(3)*2 = sqrt(3)
-      // second offsetting, moving towards camera, CAN NOT move out of cascade in normal circumstances
-      // now, normal offsetting will typically move INSIDE of cascade (towards camera), as usually normals are not facing in the opposite direction!
-      // ofc, we can be delayed with updating cascade, and so causing some of discrepancies (which is safe due to clamping ofc)
       float border = 0.5;
       cascade = dagi_irrad_grid_get_best_enclosing_clip(worldPos, coordF, lt, 0, border);
       if (cascade == DAGI_MAX_IRRAD_GRID_CLIPS)
         return false;
       float probeSize = asfloat(lt.w);
-      //float3 fromC = abs((worldPos.xzy-worldViewPos.xzy)*rcp(0.5*dagi_irrad_grid_get_clip_size().xxy*probeSize));
       float3 fromC = abs((coordF - worldViewPos.xzy/probeSize)*rcp(0.5*dagi_irrad_grid_get_clip_size().xxy - (DAGI_IRRAD_GRID_MOVE_THRESHOLD + 1 + border)));
       bool lastCascade = cascade + 1 == dagi_irrad_grid_get_clip_count();
       FLATTEN
@@ -337,6 +362,9 @@ macro DAGI_IRRADIANCE_GRID_SAMPLE_USE(code)
 
     bool dagi_irrad_grid_diffuse_biased_smooth(float3 worldViewPos, float3 worldPos, float3 worldDir, float3 toCameraDir, float maxCameraDist, float3 bias_normal, float dither, inout float3 ambient)
     {
+      BRANCH
+      if (dagi_baked_is_active())
+        return dagi_baked_diffuse_biased(worldPos, worldDir, toCameraDir, maxCameraDist, bias_normal, ambient);
       uint cascade; float3 coordF; float vignette;
       if (!dagi_irrad_grid_diffuse_biased_smooth_cascade(worldViewPos, worldPos, toCameraDir, maxCameraDist, bias_normal, dither, cascade, coordF, vignette))
         return false;
@@ -357,6 +385,9 @@ macro DAGI_IRRADIANCE_GRID_SAMPLE_USE(code)
 
     bool dagi_irrad_grid_diffuse_undirectional_biased_smooth(float3 worldViewPos, float3 worldPos, float3 toCameraDir, float maxCameraDist, float3 bias_normal, float dither, inout float3 ambient)
     {
+      BRANCH
+      if (dagi_baked_is_active())
+        return dagi_baked_diffuse_undirectional_biased(worldPos, toCameraDir, maxCameraDist, bias_normal, ambient);
       uint cascade; float3 coordF; float vignette;
       if (!dagi_irrad_grid_diffuse_biased_smooth_cascade(worldViewPos, worldPos, toCameraDir, maxCameraDist, bias_normal, dither, cascade, coordF, vignette))
         return false;
@@ -372,10 +403,29 @@ macro DAGI_IRRADIANCE_GRID_SAMPLE_USE(code)
       ambient = lerp(ambientBase, ambient, vignette);
       return true;
     }
+    #endif
   }
 endmacro
 
 macro DAGI_IRRADIANCE_GRID_SAMPLE(code)
   DAGI_IRRADIANCE_GRID_SAMPLE_INIT(code)
   DAGI_IRRADIANCE_GRID_SAMPLE_USE(code)
+endmacro
+
+// Lightweight baked-only sampler for Thin GBuffer / CompatPC (0 clipmap cbuffer registers)
+macro DAGI_BAKED_STANDALONE_SAMPLE(code)
+  DAGI_IRRAD_GRID_SRV(code)
+  DAGI_BAKED_SAMPLE_CONSTS_INIT(code)
+  INIT_GLOBAL_LINEAR_WRAP_SAMPLER(code)
+  hlsl(code) {
+    #ifndef dagi_irradiance_grid_sph0_samplerstate
+      #define dagi_irradiance_grid_sph0_samplerstate global_linear_wrap_sampler
+    #endif
+    #ifndef dagi_irradiance_grid_sph1_samplerstate
+      #define dagi_irradiance_grid_sph1_samplerstate global_linear_wrap_sampler
+    #endif
+    #include "sh3_function.hlsl"
+    #include "dagi_irradiance_encode.hlsl"
+  }
+  DAGI_BAKED_SAMPLE_USE(code)
 endmacro

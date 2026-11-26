@@ -273,7 +273,11 @@ void makeDebugVisualizationNodes(eastl::vector<dafg::NodeHandle> &fg_node_handle
     registry.requestState().setFrameBlock("global_frame");
 
     auto prevNs = registry.root();
-    auto cameraHndl = prevNs.readBlob<CameraParams>("current_camera").handle();
+    auto cameraHndl = prevNs.readBlob<CameraParams>("current_camera")
+                        .bindAsView<&CameraParams::viewTm>()
+                        .bindAsProj<&CameraParams::jitterProjTm>()
+                        .handle();
+    prevNs.readBlob<Point4>("world_view_pos").bindToShaderVar("world_view_pos");
 
     return [cameraHndl] {
       auto wr = static_cast<WorldRenderer *>(get_world_renderer());
@@ -422,7 +426,11 @@ void makeDebugVisualizationNodes(eastl::vector<dafg::NodeHandle> &fg_node_handle
     registry.orderMeAfter("static_shadow_debug_node");
 
     auto prevNs = registry.root();
-    auto cameraHndl = prevNs.readBlob<CameraParams>("current_camera").handle();
+    auto cameraHndl = prevNs.readBlob<CameraParams>("current_camera")
+                        .bindAsView<&CameraParams::viewTm>()
+                        .bindAsProj<&CameraParams::jitterProjTm>()
+                        .handle();
+    prevNs.readBlob<Point4>("world_view_pos").bindToShaderVar("world_view_pos");
     registry.createTexture2d("wireframe_tex", {TEXFMT_R8 | TEXCF_RTARGET, registry.getResolution<2>("main_view")})
       .clear(make_clear_value(1.0f, 1.0f, 1.0f, 1.0f));
     registry.requestRenderPass().color({"wireframe_tex"}).depthReadTestOnly("depth_for_postfx");

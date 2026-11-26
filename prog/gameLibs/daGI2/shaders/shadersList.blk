@@ -1,4 +1,5 @@
 file:t = "dagi_world_scene_debug.dshl"
+file:t = "dagi_bake.dshl"
 include "./screenProbes/screenProbes.blk"
 include "./volumetricGI/volumetricGI.blk"
 include "./albedoScene/albedoScene.blk"

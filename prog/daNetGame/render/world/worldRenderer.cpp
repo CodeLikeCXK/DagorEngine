@@ -40,6 +40,8 @@
 
 #include <osApiWrappers/dag_messageBox.h>
 #include <osApiWrappers/dag_direct.h>
+#include <perfMon/dag_cpuFreq.h>
+#include <util/dag_stlqsort.h>
 
 #include <3d/dag_lowLatency.h>
 #include <3d/dag_texMgr.h>
@@ -1496,8 +1498,11 @@ void WorldRenderer::onSettingsChanged(const FastNameMap &changed_fields, bool ap
   if (changed_fields.getNameId("graphics/aoQuality") >= 0)
     resetSSAOImpl();
 
-  if (changed_fields.getNameId("graphics/giAlgorithm") >= 0 || changed_fields.getNameId("graphics/giAlgorithmQuality") >= 0)
+  if (changed_fields.getNameId("graphics/giAlgorithm") >= 0 || changed_fields.getNameId("graphics/giAlgorithmQuality") >= 0 ||
+      changed_fields.getNameId("graphics/giBakeTier") >= 0 || changed_fields.getNameId("graphics/giSource") >= 0)
+  {
     setGIQualityFromSettings();
+  }
 
   if (changed_fields.getNameId("graphics/cloudsQuality") >= 0)
     setupSkyPanoramaAndReflectionFromSetting();
@@ -1814,7 +1819,7 @@ void WorldRenderer::resetSSAOImpl()
   uint32_t creationFlags = SSAO_NONE;
   if (hasFeature(CONTACT_SHADOWS))
     creationFlags |= SSAO_USE_CONTACT_SHADOWS;
-  if (getGiQuality().algorithm == GiAlgorithm::LOW && bareMinimumPreset)
+  if (!isBakedGIActive() && getGiQuality().algorithm == GiAlgorithm::LOW && bareMinimumPreset)
     creationFlags |= SSAO_USE_WSAO;
   if (getGiQuality().algorithm == GiAlgorithm::LOW && hasFeature(CONTACT_SHADOWS))
     creationFlags |= SSAO_USE_CONTACT_SHADOWS_SIMPLIFIED;
@@ -2089,6 +2094,13 @@ void WorldRenderer::setAntialiasing()
 
   const auto antialiasingMethod = render::antialiasing::get_method();
   currentAntiAliasingMode = convertAntialiasingMethod(antialiasingMethod);
+  if (isThinGBuffer() && (currentAntiAliasingMode == AntiAliasingMode::TSR || currentAntiAliasingMode == AntiAliasingMode::DLSS ||
+                           currentAntiAliasingMode == AntiAliasingMode::XESS || currentAntiAliasingMode == AntiAliasingMode::FSR ||
+                           currentAntiAliasingMode == AntiAliasingMode::SGSR2))
+  {
+    logwarn("Temporal AA mode requires motion vectors which are unavailable on thinGBuffer; switching to FXAA");
+    currentAntiAliasingMode = AntiAliasingMode::FXAA;
+  }
 
   IPoint2 postFxResolution;
   getPostFxInternalResolution(postFxResolution.x, postFxResolution.y);
@@ -2683,6 +2695,7 @@ void WorldRenderer::ctorCommon()
     d3d::get_driver_desc().caps.hasShaderFloat16Support ? 1 : 0);
 
   FeatureRenderFlagMask featureRenderFlags = getPresetFeatures();
+  validateFeatures(featureRenderFlags, FeatureRenderFlagMask().set());
   defaultFeatureRenderFlags = featureRenderFlags;
   set_current_render_features(featureRenderFlags);
 
@@ -3435,6 +3448,51 @@ void WorldRenderer::debugLogFrameTiming()
 }
 
 
+#if DAGOR_DBGLEVEL > 0
+// M0 baseline, dev builds only: CPU frame interval and GI state, appended to gi_m0_frames.txt every WINDOW frames.
+// The first WARMUP frames (level load, shader compiles) are not sampled.
+static void gi_m0_frame_stats(const char *mode, bool pause_sampling = false)
+{
+  constexpr uint32_t WINDOW = 300;
+  constexpr uint32_t WARMUP = 300;
+  static uint32_t lastMs = 0, total = 0, frames = 0;
+  static uint32_t samples[WINDOW];
+  const uint32_t nowMs = uint32_t(get_time_msec());
+  if (pause_sampling)
+  {
+    lastMs = 0;
+    total = 0;
+    frames = 0;
+    return;
+  }
+  if (lastMs)
+  {
+    ++total;
+    if (total > WARMUP)
+    {
+      samples[frames % WINDOW] = nowMs - lastMs;
+      ++frames;
+    }
+  }
+  lastMs = nowMs;
+  if (!frames || frames % WINDOW)
+    return;
+
+  uint32_t sorted[WINDOW];
+  memcpy(sorted, samples, sizeof(sorted));
+  stlsort::sort(sorted, sorted + WINDOW, [](uint32_t a, uint32_t b) { return a < b; });
+  uint64_t sum = 0;
+  for (uint32_t s : samples)
+    sum += s;
+  if (FILE *f = fopen("gi_m0_frames.txt", "at"))
+  {
+    fprintf(f, "frames=%u avg_ms=%.2f p50_ms=%u p99_ms=%u max_ms=%u %s\n", frames, double(sum) / WINDOW, sorted[WINDOW / 2],
+      sorted[WINDOW * 99 / 100], sorted[WINDOW - 1], mode);
+    fclose(f);
+  }
+}
+#endif
+
 void WorldRenderer::update(float dt, float, const TMatrix &itm)
 {
   profiler_tracker::start_frame();
@@ -3461,6 +3519,19 @@ void WorldRenderer::update(float dt, float, const TMatrix &itm)
 
   if (isDebugLogFrameTiming)
     debugLogFrameTiming();
+
+#if DAGOR_DBGLEVEL > 0
+  {
+    int rw = 0, rh = 0;
+    getRenderingResolution(rw, rh);
+    const GiQuality gq = getGiQuality();
+    char mode[224];
+    snprintf(mode, sizeof(mode), "mode=%s algo=%d algo_q=%.2f only_low=%d baked=%d bricks=%u res=%dx%d",
+      isThinGBuffer() ? "thin" : "full", int(gq.algorithm), gq.algorithmQuality, int(is_only_low_gi_supported()),
+      int(isBakedGIActive()), bakedGIVolume.getBrickCount(), rw, rh);
+    gi_m0_frame_stats(mode, isBakedGIBaking());
+  }
+#endif
 
   generatePaintingTexture(); // in update because needed textures is loading after level loaded
   update_and_prefetch_fx_textures_used();
@@ -4270,10 +4341,13 @@ void WorldRenderer::draw(uint32_t frame_id, float realDt)
   }
 
   giBeforeRender();
-  if (requiresGroundDetails || isTimeDynamic() || requiresGIUpdate())
-    updateGIPos(giPos, itm, hmin, hmax);
-  if (daGI2)
-    daGI2->updateConstants();
+  if (!isBakedGIBaking() && !isBakedGIActive())
+  {
+    if (requiresGroundDetails || isTimeDynamic() || requiresGIUpdate())
+      updateGIPos(giPos, itm, hmin, hmax);
+    if (daGI2)
+      daGI2->updateConstants();
+  }
 
   BBox3 riBox;
   if (rendinst::render::notRenderedStaticShadowsBBox(riBox))
@@ -6784,10 +6858,32 @@ void WorldRenderer::toggleFeatures(const FeatureRenderFlagMask &f, bool turn_on)
 
 void WorldRenderer::validateFeatures(FeatureRenderFlagMask &features, const FeatureRenderFlagMask &)
 {
-  if (features.test(FeatureRenderFlags::SSR) && !features.test(FeatureRenderFlags::FULL_DEFERRED))
+  if (!features.test(FeatureRenderFlags::FULL_DEFERRED))
   {
-    logerr("SSR currently not implemented for thinGBuffer");
-    features.flip(FeatureRenderFlags::SSR);
+    auto disableForThin = [&](FeatureRenderFlags flag, const char *name) {
+      if (features.test(flag))
+      {
+        logwarn("%s currently not implemented for thinGBuffer, disabled", name);
+        features.reset(flag);
+      }
+    };
+    disableForThin(FeatureRenderFlags::SSR, "SSR");
+    disableForThin(FeatureRenderFlags::DEFERRED_LIGHT, "DEFERRED_LIGHT");
+    disableForThin(FeatureRenderFlags::COMBINED_SHADOWS, "COMBINED_SHADOWS");
+    disableForThin(FeatureRenderFlags::TAA, "TAA");
+    disableForThin(FeatureRenderFlags::DOWNSAMPLED_NORMALS, "DOWNSAMPLED_NORMALS");
+    disableForThin(FeatureRenderFlags::GBUFFER_PACKED_NORMALS, "GBUFFER_PACKED_NORMALS");
+    disableForThin(FeatureRenderFlags::CONTACT_SHADOWS, "CONTACT_SHADOWS");
+    disableForThin(FeatureRenderFlags::SPECULAR_CUBES, "SPECULAR_CUBES");
+    disableForThin(FeatureRenderFlags::WATER_PERLIN, "WATER_PERLIN");
+    disableForThin(FeatureRenderFlags::WATER_REFLECTION, "WATER_REFLECTION");
+    disableForThin(FeatureRenderFlags::RIPPLES, "RIPPLES");
+    disableForThin(FeatureRenderFlags::BLOOM, "BLOOM");
+    disableForThin(FeatureRenderFlags::MICRODETAILS, "MICRODETAILS");
+    disableForThin(FeatureRenderFlags::FOM_SHADOWS, "FOM_SHADOWS");
+    disableForThin(FeatureRenderFlags::DOWNSAMPLED_SHADOWS, "DOWNSAMPLED_SHADOWS");
+    disableForThin(FeatureRenderFlags::UPSCALE_SAMPLING_TEX, "UPSCALE_SAMPLING_TEX");
+    disableForThin(FeatureRenderFlags::VOLUME_LIGHTS_PER_PIXEL_FX_APPLY, "VOLUME_LIGHTS_PER_PIXEL_FX_APPLY");
   }
   // normal repacking in downsample depth and blood puddles load and store gbuf_1 through one UAV
   if (features.test(FeatureRenderFlags::GBUFFER_PACKED_NORMALS) &&

@@ -9,6 +9,65 @@ macro WRITE_GBUFFER_THIN()
   hlsl(ps) {
     #include "pbr/pbr.hlsl"
     #include <sh3_function.hlsl>
+##if compatibility_mode == compatibility_mode_on
+    #include <sh1.hlsl>
+    #include <dagi_irradiance_encode.hlsl>
+    #define gbuffer_dagi_baked_sph1_samplerstate gbuffer_envi_probe_specular_samplerstate
+    float gbuffer_thin_geomerics_channel(float r0, float3 r1_premul, float3 dir)
+    {
+      float safeR0 = max(r0, 0.0);
+      if (safeR0 <= 1e-6)
+        return 0.0;
+      float3 r1 = 0.5 * r1_premul;
+      float lenR1 = length(r1);
+      float q = 0.5 * (1.0 + dot(lenR1 > 1e-6 ? (r1 / lenR1) : float3(0, 1, 0), dir));
+      float r1Ratio = min(lenR1 / safeR0, 0.995);
+      float p = 1.0 + 2.0 * r1Ratio;
+      float a = (1.0 - r1Ratio) / (1.0 + r1Ratio);
+      return safeR0 * (a + (1.0 - a) * (p + 1.0) * pow(max(q, 1e-4), p));
+    }
+    bool gbuffer_thin_sample_baked_gi(float3 worldPos, float3 worldDir, out float3 ambient, out SH1 sh1)
+    {
+      ambient = 0;
+      sh1 = (SH1)0;
+      if (gbuffer_dagi_baked_active == 0)
+        return false;
+      int4 gridDim = int4(loadBuffer4(gbuffer_dagi_baked_indirection, 0u));
+      if (gridDim.w <= 0)
+        return false;
+      float4 gridOrigin = asfloat(loadBuffer4(gbuffer_dagi_baked_indirection, 16u));
+      float4 atlasInv = asfloat(loadBuffer4(gbuffer_dagi_baked_indirection, 32u));
+      float probeSize = atlasInv.w;
+      float3 biasedPos = worldPos + worldDir * min(0.45 * probeSize, 0.45);
+
+      float3 gridCoord = (biasedPos - gridOrigin.xyz) * gridOrigin.w;
+      float3 maxGrid = float3(gridDim.xyz * 8);
+      if (any(gridCoord < 0.0) || any(gridCoord >= maxGrid))
+        return false;
+
+      int3 brickCoord = clamp(int3(floor(gridCoord * 0.125)), int3(0, 0, 0), gridDim.xyz - 1);
+      uint linearBrick = uint(brickCoord.x + gridDim.x * (brickCoord.y + gridDim.y * brickCoord.z));
+      uint packedPair = loadBuffer(gbuffer_dagi_baked_indirection, 48u + (linearBrick >> 1u) * 4u);
+      uint brickIdx = (packedPair >> ((linearBrick & 1u) * 16u)) & 0xFFFFu;
+      if (brickIdx == 0xFFFFu)
+        return false;
+
+      uint side = uint(gridDim.w);
+      uint3 atlasBrick = uint3(brickIdx % side, (brickIdx / side) % side, brickIdx / (side * side));
+      float3 localTexel = clamp(gridCoord - float3(brickCoord * 8), 0.0, 8.0) + 1.0;
+      float3 uvw = (float3(atlasBrick * 10u) + localTexel) * atlasInv.xyz;
+
+      SH1Encoded sh1e;
+      sh1e.s0 = tex3Dlod(gbuffer_dagi_baked_sph1, float4(uvw.xy, uvw.z * 0.5, 0));
+      sh1e.s1 = tex3Dlod(gbuffer_dagi_baked_sph1, float4(uvw.xy, uvw.z * 0.5 + 0.5, 0));
+      sh1 = dagi_irrad_decode_sh1(sh1e);
+      ambient = float3(
+        gbuffer_thin_geomerics_channel(sh1.R.x, sh1.R.wyz, worldDir),
+        gbuffer_thin_geomerics_channel(sh1.G.x, sh1.G.wyz, worldDir),
+        gbuffer_thin_geomerics_channel(sh1.B.x, sh1.B.wyz, worldDir));
+      return true;
+    }
+##endif
     struct GBUFFER_OUTPUT
     {
       float4 sunLight : SV_Target0;
@@ -55,8 +114,6 @@ macro WRITE_GBUFFER_THIN()
 
 ##if shader == dynamic_masked_chrome_bump
       #define BARE_MINIMUM_AMBIENT_MULTIPLIER 0.02
-      // Here we make a very strong assumption that position of the camera inside tank cockpit is typically not too far away from cockpit's
-      // center due to not having world position to compare to. It holds true from what I've checked
       float fragmentInTankCockpit = float(distSq < tank_cockpit__bsphere.w);
 ##endif
 
@@ -79,13 +136,11 @@ macro WRITE_GBUFFER_THIN()
         float NoV = abs( NdotV ) + 1e-5;
         float ggx_alpha = gbuffer.ggx_alpha;
 
-        half specularAOcclusion = 1.0;//computeSpecOcclusion(NoV, gbuffer.ao, gbuffer.ggx_alpha);// dice spec occlusion
+        half specularAOcclusion = 1.0;
         half3 specularColor = gbuffer.specularColor * (specularAOcclusion * gbuffer.extracted_albedo_ao);
         #if ROUGHNESS_BASED_LIGHT
           specularColor *= saturate(10*(ROUGHNESS_TRESHOLD - gbuffer.linearRoughness));
         #endif
-        //SUN
-
         //SUN
         sunLight = standardBRDF( NoV, saturate(NoL), gbuffer.diffuseColor, ggx_alpha, gbuffer.linearRoughness, specularColor, gbuffer.extracted_albedo_ao, -sunLightDir, view, gbuffer.normal)*shadow;
 
@@ -102,8 +157,37 @@ macro WRITE_GBUFFER_THIN()
         }
       #endif
       //envi+
-      //half3 environmentAmbientUnoccludedLighting = GetSHFunctionValue(gbuffer.normal, gbuffer_enviSPH0, gbuffer_enviSPH1, gbuffer_enviSPH2, gbuffer_enviSPH3, gbuffer_enviSPH4, gbuffer_enviSPH5, gbuffer_enviSPH6);
       half3 environmentAmbientUnoccludedLighting = GetSHFunctionValueSimple(gbuffer.normal, sph0, sph1, sph2);
+##if compatibility_mode == compatibility_mode_on
+      BRANCH
+      if (gbuffer_dagi_baked_active != 0)
+      {
+        float3 thinWorldPos = world_view_pos.xyz - pointToEye;
+        float3 bakedAmb = environmentAmbientUnoccludedLighting;
+        SH1 bakedSh1;
+        if (gbuffer_thin_sample_baked_gi(thinWorldPos, gbuffer.normal, bakedAmb, bakedSh1))
+        {
+          environmentAmbientUnoccludedLighting = half3(bakedAmb);
+          // Bakery SH1 specular occlusion + L1 dominant-direction fallback removes outdoor cubemap leak indoors
+          if (dot(environmentAmbientReflection, 1.0) > 1e-6)
+          {
+            half3 skyRef = GetSHFunctionValueSimple(float3(0, 1, 0), sph0, sph1, sph2);
+            float sh1Lum = max(max(bakedSh1.R.x, bakedSh1.G.x), max(bakedSh1.B.x, 0.0));
+            float skyLum = max(max(skyRef.r, skyRef.g), max(skyRef.b, 0.08));
+            float bakedSpecVis = saturate(sh1Lum / skyLum);
+            bakedSpecVis = saturate(bakedSpecVis * bakedSpecVis * (3.0 - 2.0 * bakedSpecVis));
+            float3 specReflDir = reflect(-view, gbuffer.normal);
+            float3 sh1L1Dom = (bakedSh1.R.wyz * 0.299 + bakedSh1.G.wyz * 0.587 + bakedSh1.B.wyz * 0.114) * 0.5;
+            float sh1L1Len = length(sh1L1Dom);
+            float3 sh1DomAmb = float3(bakedSh1.R.x, bakedSh1.G.x, bakedSh1.B.x);
+            if (sh1L1Len > 1e-4)
+              sh1DomAmb *= (1.0 + 1.5 * saturate(dot(specReflDir, sh1L1Dom / sh1L1Len)));
+            half3 bakedSpecFallback = half3(sh1DomAmb) * gbuffer.specularColor * gbuffer.extracted_albedo_ao * saturate(0.25 + 0.75 * (1.0 - gbuffer.linearRoughness));
+            environmentAmbientReflection = lerp(bakedSpecFallback, environmentAmbientReflection, bakedSpecVis);
+          }
+        }
+      }
+##endif
 ##if shader == dynamic_masked_chrome_bump
       environmentAmbientUnoccludedLighting *= (1.0 - fragmentInTankCockpit);
       environmentAmbientUnoccludedLighting += tank_cockpit_fake_ambient_light_strength * BARE_MINIMUM_AMBIENT_MULTIPLIER * fragmentInTankCockpit;
@@ -111,13 +195,11 @@ macro WRITE_GBUFFER_THIN()
       half3 ambientLight = enviAO * environmentAmbientUnoccludedLighting * gbuffer.diffuseColor;
 
       #if USE_SSS_THIN
-        // @TODO: unlock
         if (isSubSurfaceShader(gbuffer.material) && isTranslucentProfileValid(gbuffer.sss_profile))
           ambientLight *= (1.0f + gbuffer.translucency);
       #endif
 
       sunLight *= sunLightColor;
-
 
       //envi-
       ambientLight += gbuffer.emissionColor + environmentAmbientReflection;
@@ -152,7 +234,6 @@ macro WRITE_GBUFFER_THIN()
     GBUFFER_OUTPUT encode_gbuffer_alpha(UnpackedGbuffer gbuffer, half alpha, float3 pointToEye, float4 screenPos)
     {
       GBUFFER_OUTPUT ret = encode_gbuffer(gbuffer, pointToEye, screenPos);
-      //thin gbuffer does not have W component by default, but writing it affects blending
       ret.sunLight.w = ret.ambientLight.w = alpha;
       return ret;
     }
@@ -160,9 +241,6 @@ macro WRITE_GBUFFER_THIN()
     GBUFFER_OUTPUT encode_gbuffer_alpha3(UnpackedGbuffer gbuffer, half3 alpha, float3 pointToEye, float4 screenPos)
     {
       GBUFFER_OUTPUT ret = encode_gbuffer(gbuffer, pointToEye, screenPos);
-      //as original intention to use different alphas per Gbuffer
-      //can't be ported directly (as gbuffers are not compatible with each other)
-      //use albedo gbuffer alhpa everywhere as workaround
       ret.sunLight.w = ret.ambientLight.w = alpha.x;
       return ret;
     }

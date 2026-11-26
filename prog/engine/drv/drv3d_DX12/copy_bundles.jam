@@ -35,11 +35,13 @@ if $(Platform) in windows && $(PlatformArch) in x86_64 arm64 arm64ec && ( $(UseD
         @$(FidelityFXSDKDir)/signedbin/amd_fidelityfx_upscaler_dx12.dll amd_fidelityfx_upscaler_dx12.dll
       ;
     } else if $(PlatformArch) = arm64 {
-      BundleCopy +=
-        @$(FidelityFXSDKDir)/signedbin/arm64/amd_fidelityfx_loader_dx12.dll amd_fidelityfx_loader_dx12.dll
-        @$(FidelityFXSDKDir)/signedbin/arm64/amd_fidelityfx_upscaler_dx12.dll amd_fidelityfx_upscaler_dx12.dll
-        @$(FidelityFXSDKDir)/signedbin/arm64/amd_fidelityfx_dx12.dll amd_fidelityfx_dx12.dll
-      ;
+      # the FidelityFX SDK 2.1.1 release ships no arm64 binaries; copy the ones a package provides,
+      # the FSR loader reports itself unavailable when they are missing
+      for _ffxDll in amd_fidelityfx_loader_dx12.dll amd_fidelityfx_upscaler_dx12.dll amd_fidelityfx_dx12.dll {
+        if [ GLOB $(FidelityFXSDKDir)/signedbin/arm64 : $(_ffxDll) ] {
+          BundleCopy += @$(FidelityFXSDKDir)/signedbin/arm64/$(_ffxDll) $(_ffxDll) ;
+        }
+      }
     }
   }
 }

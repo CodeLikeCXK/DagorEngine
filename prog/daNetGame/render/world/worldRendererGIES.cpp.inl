@@ -15,6 +15,7 @@
 #include <util/dag_convar.h>
 #include "private_worldRenderer.h"
 #include <ioSys/dag_dataBlock.h>
+#include <osApiWrappers/dag_direct.h>
 #include <render/voxelization_target.h>
 #include <daGI2/daGI2.h>
 #include <daSDF/worldSDF.h>
@@ -38,6 +39,8 @@
 #include <math/dag_vecMathCompatibility.h>
 #include <rendInst/rendInstExtra.h>
 #include <rendInst/rendInstGenRender.h>
+#include "main/level.h"
+#include "main/gameLoad.h"
 
 #include "frameGraphNodes/frameGraphNodes.h"
 #include "render/world/gbufferConsts.h"
@@ -49,6 +52,12 @@
 #include <drv/3d/dag_matricesAndPerspective.h>
 #include <GIWindows/GIWindows.h>
 #include <render/world/bvh.h>
+#include <render/renderEvent.h>
+#include <ecs/render/updateStageRender.h>
+#include <gui/dag_stdGuiRender.h>
+#include <gui/dag_imgui.h>
+#include <imgui/imgui.h>
+#include <cstdio>
 
 
 CONSOLE_FLOAT_VAL_MINMAX("render", world_sdf_from_collision_rasterize_below, 3, -1, 16);
@@ -71,6 +80,10 @@ CONSOLE_BOOL_VAL("render", gi_update_scene, true);
 CONSOLE_BOOL_VAL("render", gi_enabled, true);
 CONSOLE_BOOL_VAL("render", gi_show_resticted_update_box, false);
 CONSOLE_INT_VAL("render", gi_surface_cache_entries_k, 384, 0, 16384); // in 1024 entries
+CONSOLE_BOOL_VAL("render", gi_baked_debug_hud, false);
+CONSOLE_INT_VAL("render", gi_baked_debug_vis, 0, 0, 3); // 0=Off, 1=Probes, 2=Bricks, 3=Probes+Bricks
+CONSOLE_FLOAT_VAL_MINMAX("render", gi_baked_debug_radius, 32.f, 4.f, 192.f);
+CONSOLE_FLOAT_VAL_MINMAX("render", gi_baked_debug_sphere_scale, 0.08f, 0.02f, 0.40f);
 
 static ShaderVariableInfo ssr_alternate_reflectionsVarId("ssr_alternate_reflections", true);
 static ShaderVariableInfo gi_enable_lights_at_radiance_traceVarId("gi_enable_lights_at_radiance_trace", true);
@@ -108,6 +121,59 @@ static void update_gi_datablock_cache()
     graphicsGI->getInt("surfaceCacheVoxelRemeanFrames", giDatablockCache.surfaceCacheVoxelRemeanFrames);
 }
 
+static bool gi_bake_console_handler(const char *argv[], int argc)
+{
+  int found = 0;
+  CONSOLE_CHECK_NAME("gi", "bake", 1, 2)
+  {
+    auto *wr = static_cast<WorldRenderer *>(get_world_renderer());
+    if (!wr)
+      return found;
+    dagi_bake_runtime::Tier t = dagi_bake_runtime::Tier::Normal;
+    if (argc > 1 && !dagi_bake_runtime::parse_tier(argv[1], t))
+    {
+      console::print_d("Usage: gi.bake [normal|high]");
+      return found;
+    }
+    wr->triggerBakedGIRebuild(argc > 1 ? t : dagi_bake_runtime::Tier::None);
+  }
+  CONSOLE_CHECK_NAME("gi", "bake_status", 1, 1)
+  {
+    auto *wr = static_cast<WorldRenderer *>(get_world_renderer());
+    if (wr)
+      wr->logBakedGIStatus();
+  }
+  CONSOLE_CHECK_NAME("gi", "bake_delete", 1, 2)
+  {
+    auto *wr = static_cast<WorldRenderer *>(get_world_renderer());
+    if (wr)
+      wr->deleteBakedGICache(argc > 1 ? argv[1] : "all");
+  }
+  CONSOLE_CHECK_NAME("gi", "debug_hud", 1, 2)
+  {
+    const bool next = (argc > 1) ? (atoi(argv[1]) != 0) : !gi_baked_debug_hud.get();
+    gi_baked_debug_hud.set(next);
+    console::print_d("[daGIBake] debug HUD: %s", next ? "ON" : "OFF");
+  }
+  CONSOLE_CHECK_NAME("gi", "debug_vis", 1, 3)
+  {
+    const int mode = (argc > 1) ? clamp(atoi(argv[1]), 0, 3) : ((gi_baked_debug_vis.get() + 1) % 4);
+    gi_baked_debug_vis.set(mode);
+    if (argc > 2)
+      gi_baked_debug_radius.set(clamp(float(atof(argv[2])), 4.f, 192.f));
+    static const char *names[4] = {"OFF", "3D SH1 Probe Spheres", "Active Brick Wireframes", "Probes + Bricks"};
+    console::print_d("[daGIBake] 3D debug vis: %d (%s), radius=%.1fm", mode, names[mode], gi_baked_debug_radius.get());
+  }
+  CONSOLE_CHECK_NAME("gi", "baked_ab", 1, 2)
+  {
+    auto *wr = static_cast<WorldRenderer *>(get_world_renderer());
+    if (wr)
+      wr->setBakedGISamplingEnabled(argc > 1 ? (atoi(argv[1]) != 0 ? 1 : 0) : -1);
+  }
+  return found;
+}
+REGISTER_CONSOLE_HANDLER(gi_bake_console_handler);
+
 static void set_voxelization_transform(int max_res, IPoint3 res, const BBox3 &box)
 {
   const Point3 voxelize_box_sz = max(Point3(1e-6f, 1e-6f, 1e-6f), box.width());
@@ -126,8 +192,6 @@ void WorldRenderer::processGIInvalidationRequests()
   if (enviProbeState != EnviProbeState::Ready)
     return;
 
-  // drain under the lock, invalidate outside it: a box pushed after the drain keeps to the
-  // next frame instead of being wiped by the reset
   BBox3 boxes[MAX_GI_INVALIDATE_BOXES];
   uint32_t count = 0;
   bool fullInvalidate = false;
@@ -141,9 +205,9 @@ void WorldRenderer::processGIInvalidationRequests()
     pendingFullGiInvalidation = false;
   }
   if (fullInvalidate)
-    doInvalidateGI(); // covers the drained boxes too
+    doInvalidateGI();
   else if (daGI2)
-    for (uint32_t i = 0; i < count; ++i) // the blocks in the box refill on the normal budget
+    for (uint32_t i = 0; i < count; ++i)
       daGI2->invalidateBox(boxes[i]);
 }
 
@@ -185,7 +249,7 @@ void WorldRenderer::processHeroTeleportation()
 void WorldRenderer::doInvalidateGI()
 {
   if (daGI2)
-    daGI2->invalidateAll(); // not a device reset: the baked media volume bricks stay, resetGI rebakes them
+    daGI2->invalidateAll();
 }
 
 void WorldRenderer::invalidateRiCollision()
@@ -207,8 +271,6 @@ void WorldRenderer::invalidateGI(const BBox3 &world_box)
     pendingGiInvalidateBoxes[pendingGiInvalidateCount++] = world_box;
     return;
   }
-  // past the cap, merge into the box that grows the least: a burst of nearby events (a shell
-  // in a grove, a tank through grass) stays local instead of stretching one box across them
   auto growth = [&](int i) {
     BBox3 merged = pendingGiInvalidateBoxes[i];
     merged += world_box;
@@ -231,26 +293,250 @@ void WorldRenderer::invalidateGI(const BBox3 &world_box)
 void WorldRenderer::drawGIDebug(const Frustum &camera_frustum)
 {
   G_UNUSED(camera_frustum);
+  if ((gi_baked_debug_vis.get() & 1) != 0 && bakedGIVolume.isLoaded())
+    bakedGIVolume.drawDebugProbes(currentFrameCamera.viewItm.getcol(3), gi_baked_debug_radius.get(), gi_baked_debug_sphere_scale.get());
   if (daGI2)
   {
     daGI2->debugRenderTrans();
-    mediaVolumes.debugRender(); // the debug pass view vars are set by debugRenderTrans above
+    mediaVolumes.debugRender();
   }
 }
 
-// static const int DEFERRED_FRAMES_TO_INVALIDATE_GI = 9;
 static const int MAX_GI_FRAMES_TO_INVALIDATE_POS = 32;
 static ShaderVariableInfo use_hw_rt_giVarId("use_hw_rt_gi", true);
 static ShaderVariableInfo dagi_force_opaque_traceVarId("dagi_force_opaque_trace", true);
 
+eastl::string WorldRenderer::resolveBakeLevelId() const
+{
+  char nameBuf[DAGOR_MAX_PATH] = {};
+  const char *levelBin = originalLevelBlk.getStr("levelBin", nullptr);
+  if (!levelBin || !*levelBin)
+  {
+    const char *blkPath = g_entity_mgr ? g_entity_mgr->getOr(get_current_level_eid(), ECS_HASH("level__blk"), "") : "";
+    DataBlock lblk;
+    if (blkPath && *blkPath && dblk::load(lblk, blkPath, dblk::ReadFlag::ROBUST))
+    {
+      const char *lb = lblk.getStr("levelBin", "");
+      if (lb && *lb)
+        dd_get_fname_without_path_and_ext(nameBuf, sizeof(nameBuf), lb);
+    }
+  }
+  else
+  {
+    dd_get_fname_without_path_and_ext(nameBuf, sizeof(nameBuf), levelBin);
+  }
+
+  if (!nameBuf[0])
+  {
+    const char *scn = sceneload::get_current_game().sceneName.c_str();
+    if (scn && *scn)
+    {
+      dd_get_fname_without_path_and_ext(nameBuf, sizeof(nameBuf), scn);
+      const size_t len = strlen(nameBuf);
+      if (len > 5 && strcmp(nameBuf + len - 5, "_demo") == 0)
+        nameBuf[len - 5] = '\0';
+    }
+  }
+  return nameBuf[0] ? eastl::string(nameBuf) : eastl::string("level");
+}
+
+eastl::string WorldRenderer::resolveBakeCacheDir() const
+{
+  const DataBlock *graphicsBlk = ::dgs_get_settings()->getBlockByNameEx("graphics");
+  const char *dir = graphicsBlk->getStr("giBakeDir", "baked_gi");
+  return eastl::string(dir ? dir : "baked_gi");
+}
+
+BBox3 WorldRenderer::computeBakeWorldBox() const
+{
+  const DataBlock *graphicsGI = ::dgs_get_settings()->getBlockByNameEx("graphics")->getBlockByNameEx("gi");
+  const float halfExtentXZ = clamp(graphicsGI->getReal("bakeHalfExtentXZ", 120.f), 32.f, 2048.f);
+  const float halfExtentY = clamp(graphicsGI->getReal("bakeHalfExtentY", 16.f), 8.f, 256.f);
+
+  Point3 center = currentFrameCamera.viewItm.getcol(3);
+  BBox3 rawBox;
+  if (staticSceneCollisionResource && !staticSceneCollisionResource->boundingBox.isempty())
+    rawBox = staticSceneCollisionResource->boundingBox;
+  else if (!binSceneBbox.isempty())
+    rawBox = binSceneBbox;
+  else
+    rawBox = getWorldBBox3();
+
+  if (!rawBox.isempty())
+  {
+    const Point3 rawW = rawBox.width();
+    if (rawW.x <= halfExtentXZ * 2.f && rawW.z <= halfExtentXZ * 2.f)
+      center = rawBox.center();
+  }
+
+  BBox3 clampedBox(center - Point3(halfExtentXZ, halfExtentY * 0.5f, halfExtentXZ),
+    center + Point3(halfExtentXZ, halfExtentY * 1.5f, halfExtentXZ));
+  if (!rawBox.isempty())
+  {
+    clampedBox[0].x = max(clampedBox[0].x, rawBox[0].x);
+    clampedBox[0].y = max(clampedBox[0].y, rawBox[0].y - 2.f);
+    clampedBox[0].z = max(clampedBox[0].z, rawBox[0].z);
+    clampedBox[1].x = min(clampedBox[1].x, rawBox[1].x);
+    clampedBox[1].y = min(clampedBox[1].y, rawBox[1].y + 8.f);
+    clampedBox[1].z = min(clampedBox[1].z, rawBox[1].z);
+    if (clampedBox.isempty() || clampedBox.width().x < 8.f || clampedBox.width().z < 8.f)
+      clampedBox = BBox3(center - Point3(halfExtentXZ, 16.f, halfExtentXZ), center + Point3(halfExtentXZ, 48.f, halfExtentXZ));
+  }
+  return clampedBox;
+}
+
+void WorldRenderer::triggerBakedGIRebuild(dagi_bake_runtime::Tier tier)
+{
+  bakedGIForceRebuild = true;
+  bakedGIExplicitTier = tier;
+  setGIQualityFromSettings();
+}
+
+void WorldRenderer::logBakedGIStatus() const
+{
+  const eastl::string levelId = resolveBakeLevelId();
+  const eastl::string dir = resolveBakeCacheDir();
+  const eastl::string nPath = dagi_bake_runtime::make_cache_path(dir.c_str(), levelId.c_str(), dagi_bake_runtime::Tier::Normal);
+  const eastl::string hPath = dagi_bake_runtime::make_cache_path(dir.c_str(), levelId.c_str(), dagi_bake_runtime::Tier::High);
+  console::print_d("[daGIBake] level='%s' pipeline=%s bakedLoaded=%d tier=%s bricks=%u probe=%.2fm baking=%d(%.0f%%) promptHigh=%d\n"
+                   "  normal='%s' (valid=%d)\n  high='%s' (valid=%d)",
+    levelId.c_str(), isThinGBuffer() ? "thin" : "full", int(bakedGIVolume.isLoaded()),
+    dagi_bake_runtime::tier_name(bakedGIVolume.getLoadedTier()), bakedGIVolume.getBrickCount(), bakedGIVolume.getProbeSize(),
+    int(bakedGISession.isActive()), bakedGISession.getProgress() * 100.f, int(bakedGIPromptRebuildHigh), nPath.c_str(),
+    int(dagi_bake_runtime::probe_cache_valid(nPath.c_str(), 0, 0)), hPath.c_str(),
+    int(dagi_bake_runtime::probe_cache_valid(hPath.c_str(), 0, 0)));
+}
+
+void WorldRenderer::deleteBakedGICache(const char *which)
+{
+  const eastl::string levelId = resolveBakeLevelId();
+  const eastl::string dir = resolveBakeCacheDir();
+  if (!which || strcmp(which, "normal") == 0 || strcmp(which, "all") == 0)
+  {
+    const eastl::string p = dagi_bake_runtime::make_cache_path(dir.c_str(), levelId.c_str(), dagi_bake_runtime::Tier::Normal);
+    std::remove(p.c_str());
+    debug("[daGIBake] Deleted '%s'", p.c_str());
+  }
+  if (!which || strcmp(which, "high") == 0 || strcmp(which, "all") == 0)
+  {
+    const eastl::string p = dagi_bake_runtime::make_cache_path(dir.c_str(), levelId.c_str(), dagi_bake_runtime::Tier::High);
+    std::remove(p.c_str());
+    debug("[daGIBake] Deleted '%s'", p.c_str());
+  }
+  bakedGISession.cancel();
+  bakedGIVolume.unload();
+  setGIQualityFromSettings();
+}
+
 void WorldRenderer::setGIQualityFromSettings()
 {
+  bakedGISession.cancel();
+  bakedGIPendingStart = false;
+  bakedGIPromptRebuildHigh = false;
+  bakedGIVolume.ensureFallbackBound();
+
+  update_gi_datablock_cache();
+
+  const DataBlock *graphicsBlk = ::dgs_get_settings()->getBlockByNameEx("graphics");
+  const DataBlock *graphicsGI = graphicsBlk->getBlockByNameEx("gi");
+
+  dagi_bake_runtime::Tier configuredTier = dagi_bake_runtime::Tier::Normal;
+  const char *tierStr = graphicsBlk->getStr("giBakeTier", graphicsGI->getStr("bakeTier", "normal"));
+  if (!dagi_bake_runtime::parse_tier(tierStr, configuredTier))
+  {
+    logwarn("Invalid graphics/giBakeTier '%s', defaulting to 'normal'", tierStr ? tierStr : "");
+    configuredTier = dagi_bake_runtime::Tier::Normal;
+  }
+
+  dagi_bake_runtime::SourceMode sourceMode = dagi_bake_runtime::SourceMode::Auto;
+  const char *srcStr = graphicsBlk->getStr("giSource", graphicsGI->getStr("source", "auto"));
+  if (!dagi_bake_runtime::parse_source_mode(srcStr, sourceMode))
+  {
+    logwarn("Invalid graphics/giSource '%s', defaulting to 'auto'", srcStr ? srcStr : "");
+    sourceMode = dagi_bake_runtime::SourceMode::Auto;
+  }
+
+  const bool forceRebuildCfg = graphicsBlk->getBool("giForceRebuild", false) || bakedGIForceRebuild;
+  if (bakedGIForceRebuild && bakedGIExplicitTier != dagi_bake_runtime::Tier::None)
+    configuredTier = bakedGIExplicitTier;
+  bakedGIForceRebuild = false;
+  bakedGIExplicitTier = dagi_bake_runtime::Tier::None;
+
+  GiQuality quality = getGiQuality();
+  if (quality.algorithm == GiAlgorithm::OFF)
+  {
+    bakedGIVolume.unload();
+    bakedGIEnabled = false;
+    closeGI();
+    gi_enabled.set(false);
+    return;
+  }
+
+  const eastl::string levelId = resolveBakeLevelId();
+  const eastl::string cacheDir = resolveBakeCacheDir();
+  const eastl::string normalPath = dagi_bake_runtime::make_cache_path(cacheDir.c_str(), levelId.c_str(), dagi_bake_runtime::Tier::Normal);
+  const eastl::string highPath = dagi_bake_runtime::make_cache_path(cacheDir.c_str(), levelId.c_str(), dagi_bake_runtime::Tier::High);
+
+  const bool normalValid = dagi_bake_runtime::probe_cache_valid(normalPath.c_str(), 0, 0);
+  const bool highValid = dagi_bake_runtime::probe_cache_valid(highPath.c_str(), 0, 0);
+  const bool canUseDynamic = !isThinGBuffer() && !is_only_low_gi_supported();
+
+  const dagi_bake_runtime::Selection sel =
+    dagi_bake_runtime::select_mode(configuredTier, sourceMode, canUseDynamic, normalValid, highValid, forceRebuildCfg);
+  bakedGIPromptRebuildHigh = sel.promptRebuildHigh;
+  if (sel.promptRebuildHigh)
+    debug("[daGIBake] Option A: high tier cache '%s' missing; using normal tier (high tier can be rebuilt via gi.bake high)",
+      highPath.c_str());
+
+  // Path 1: Static Baked GI cache already valid on disk -> load into GPU 3D brick atlas & turn off live daGI2!
+  if (!sel.useDynamic && !sel.rebuildFirst)
+  {
+    const eastl::string &loadPath = (sel.loadTier == dagi_bake_runtime::Tier::High) ? highPath : normalPath;
+    if (bakedGIVolume.loadFromFile(loadPath.c_str(), 0, 0, false))
+    {
+      bakedGIEnabled = true;
+      closeGI(); // zero live daGI2 GPU/CPU overhead during gameplay!
+      bakedGIVolume.ensureFallbackBound();
+
+      if (isThinGBuffer())
+      {
+        gi_quality.setMinMax(GI_ONLY_AO, GI_ONLY_AO);
+        gi_quality.set(GI_ONLY_AO);
+      }
+      else
+      {
+        gi_quality.setMinMax(GI_ONLY_AO, GI_SCREEN_PROBES);
+        gi_quality.set(GI_COLORED);
+      }
+      ShaderGlobal::set_int(gi_qualityVarId, gi_quality);
+      ShaderGlobal::set_int(use_hw_rt_giVarId, 0);
+      gi_enabled.set(true);
+      requestFgRecreation("baked gi loaded");
+      return;
+    }
+    logwarn("[daGIBake] Failed to load '%s'; falling back", loadPath.c_str());
+  }
+
+  // Path 2: Runtime bake required (Thin GBuffer missing cache, giSource=baked missing cache, or explicit rebuild)
+  if (!sel.useDynamic && sel.rebuildFirst)
+  {
+    bakedGIVolume.unload();
+    bakedGIEnabled = false;
+    bakedGIPendingStart = true;
+    bakedGITargetTier = sel.rebuildTier;
+  }
+  else
+  {
+    // Path 3: Dynamic daGI2 mode (Full Deferred when giSource=dynamic or when .dgibake was deleted in giSource=auto)
+    bakedGIVolume.unload();
+    bakedGIEnabled = false;
+  }
+
   if (isThinGBuffer() || is_only_low_gi_supported())
     gi_quality.setMinMax(GI_ONLY_AO, GI_ONLY_AO);
   else
     gi_quality.setMinMax(GI_ONLY_AO, GI_SCREEN_PROBES);
 
-  GiQuality quality = getGiQuality();
   switch (quality.algorithm)
   {
     case GiAlgorithm::OFF:
@@ -265,7 +551,7 @@ void WorldRenderer::setGIQualityFromSettings()
       gi_quality.set(GI_ONLY_AO);
       break;
   }
-  if (is_rtgi_enabled())
+  if (is_rtgi_enabled() && !bakedGIPendingStart)
   {
     gi_quality.set(GI_SCREEN_PROBES);
     int rtgiMode = dgs_get_settings()->getBlockByNameEx("graphics")->getBool("giForceInlineTrace", true) ? 1 : 2;
@@ -274,7 +560,7 @@ void WorldRenderer::setGIQualityFromSettings()
   else
   {
     ShaderGlobal::set_int(use_hw_rt_giVarId, 0);
-    if (is_ptgi_enabled())
+    if (is_ptgi_enabled() && !bakedGIPendingStart)
       gi_quality.set(GI_COLORED);
   }
   gi_algorithm_quality.set(quality.algorithmQuality);
@@ -286,17 +572,15 @@ void WorldRenderer::setGIQualityFromSettings()
 
   gi_enabled.set(true);
   giUpdatePosFrameCounter = 0;
-
-  update_gi_datablock_cache();
 }
 
 bool WorldRenderer::giNeedsReprojection()
 {
-  return hasFeature(FeatureRenderFlags::DEFERRED_LIGHT) && daGI2 && gi_quality == GI_SCREEN_PROBES &&
+  return hasFeature(FeatureRenderFlags::DEFERRED_LIGHT) && daGI2 && !bakedGIEnabled && gi_quality == GI_SCREEN_PROBES &&
          daGI2->getNextSettings().screenProbes.tileSize > 8;
 }
 
-uint32_t WorldRenderer::getGIHistoryFrames() const { return daGI2 ? daGI2->getHistoryFrames() : 0; }
+uint32_t WorldRenderer::getGIHistoryFrames() const { return bakedGIEnabled ? 1024u : (daGI2 ? daGI2->getHistoryFrames() : 0); }
 
 void WorldRenderer::setGILightsToShader(bool allow_frustum_lights)
 {
@@ -304,8 +588,7 @@ void WorldRenderer::setGILightsToShader(bool allow_frustum_lights)
     return;
 
   if (giGlobalLightsPrepared)
-    lights.setOutOfFrustumLightsToShader(*giLights); // Relying on out-of-frustum culling result being unchanged after
-                                                     // WorldRenderer::giBeforeRender().
+    lights.setOutOfFrustumLightsToShader(*giLights);
   else if (allow_frustum_lights)
     lights.setInsideOfFrustumLightsToShader();
   else
@@ -316,7 +599,7 @@ uint32_t get_gi_history_frames() { return static_cast<WorldRenderer *>(get_world
 
 WorldRenderer::GIConvergenceState WorldRenderer::logGIConvergence()
 {
-  const GIConvergenceState state{daGI2 && daGI2->requiresUpdate(), daGI2 ? daGI2->getHistoryFrames() : 0,
+  const GIConvergenceState state{daGI2 && daGI2->requiresUpdate(), getGIHistoryFrames(),
     (uint32_t)::dgs_get_settings()->getBlockByNameEx("debug")->getInt("giConvergedHistoryFrames", 600)};
   const bool gi = !daGI2 || (!state.requiresUpdate && state.historyFrames >= state.historyFramesNeed);
   if (gi && !giConvergenceLogged)
@@ -352,7 +635,20 @@ DaGISettings WorldRenderer::getGISettings() const
   s.surfaceCache.feedGroups = giDatablockCache.surfaceCacheFeedGroups;
   s.surfaceCache.relightThreads = giDatablockCache.surfaceCacheRelightThreads;
   s.surfaceCache.voxelRemeanFrames = giDatablockCache.surfaceCacheVoxelRemeanFrames;
-  if (gi_quality == GI_ONLY_AO)
+  if (bakedGIPendingStart || bakedGISession.isActive())
+  {
+    // During runtime baking (including on Thin GBuffer where gi_quality is GI_ONLY_AO), allocate full AlbedoScene + SurfaceCache + RadianceGrid!
+    s.skyVisibility.clipW = 0;
+    s.albedoScene.clips = giDatablockCache.albedoClips;
+    s.radianceGrid.w = giDatablockCache.radianceGridClipW;
+    s.radianceGrid.clips = giDatablockCache.radianceGridClips;
+    s.radianceGrid.irradianceProbeDetail = 2.f;
+    s.radianceGrid.additionalIrradianceClips = 2;
+    s.screenProbes.tileSize = 0;
+    s.volumetricGI.tileSize = 0;
+    s.radianceGrid.temporalSpeed = 1.0f;
+  }
+  else if (gi_quality == GI_ONLY_AO)
   {
     s.skyVisibility.clipW = bareMinimumPreset ? 64 : 56;
     s.skyVisibility.clips = bareMinimumPreset ? 5 : 6;
@@ -387,7 +683,6 @@ DaGISettings WorldRenderer::getGISettings() const
 
     s.screenProbes.temporality = giDynamicQuality;
 
-    // minimum s.screenProbes.tileSize is 20 at 1080p, 24 at 1440p, 32 at 4k
     int w, h;
     getPostFxInternalResolution(w, h);
     float minTileSize = cvt_ex(h, 1080, 1080 * 2, 16, 32);
@@ -407,6 +702,30 @@ DaGISettings WorldRenderer::getGISettings() const
 
 void WorldRenderer::giUpdateSettings()
 {
+  if (bakedGIEnabled && bakedGIVolume.isLoaded())
+  {
+    if (!gi_enabled.get())
+    {
+      bakedGIVolume.unload();
+      bakedGIEnabled = false;
+      ShaderGlobal::set_int(gi_qualityVarId, -1);
+      requestFgRecreation("baked gi disabled");
+      return;
+    }
+    bakedGIVolume.ensureFallbackBound();
+    const int targetQuality = isThinGBuffer() ? GI_ONLY_AO : GI_COLORED;
+    ShaderGlobal::set_int(gi_qualityVarId, targetQuality);
+    gi_quality.pullValueChange();
+    gi_algorithm_quality.pullValueChange();
+    return;
+  }
+
+  if (bakedGISession.isActive())
+  {
+    ShaderGlobal::set_int(gi_qualityVarId, isThinGBuffer() ? GI_ONLY_AO : int(gi_quality));
+    return;
+  }
+
   if (daGI2 && !gi_enabled.get())
     closeGI();
 
@@ -426,16 +745,111 @@ void WorldRenderer::giUpdateSettings()
   const bool giNeededReprojection = giNeedsReprojection();
   daGI2->setSettings(getGISettings());
 
-  // pull both flags: a short circuit leaves one set and recreates the FG again in the next frame
   const bool qualityChanged = gi_quality.pullValueChange();
   const bool algorithmQualityChanged = gi_algorithm_quality.pullValueChange();
   if (qualityChanged || algorithmQualityChanged || giNeededReprojection != giNeedsReprojection())
     requestFgRecreation("gi shvars");
 }
 
+void WorldRenderer::tickBakedGISession()
+{
+  if (bakedGIPendingStart && daGI2)
+  {
+    const Point3 camPos = currentFrameCamera.viewItm.getcol(3);
+    const bool skyReady = (enviProbeState == EnviProbeState::Ready);
+    const bool shadowsReady = ignoreStaticShadowsForGI || !hasFeature(FeatureRenderFlags::STATIC_SHADOWS) ||
+                              shadowsManager.validStaticShadows(camPos, 100.f) || renderedFrames > 30;
+    const BBox3 bakeBox = computeBakeWorldBox();
+    if (skyReady && shadowsReady && !bakeBox.isempty())
+    {
+      bakedGIPendingStart = false;
+      const DataBlock *graphicsGI = ::dgs_get_settings()->getBlockByNameEx("graphics")->getBlockByNameEx("gi");
+      dagi_bake_runtime::BakeParams bp;
+      bp.tier = bakedGITargetTier;
+      bp.levelId = resolveBakeLevelId();
+      bp.outputPath = dagi_bake_runtime::make_cache_path(resolveBakeCacheDir().c_str(), bp.levelId.c_str(), bp.tier);
+      bp.worldBox = bakeBox;
+      bp.probeSizeOverride =
+        graphicsGI->getReal(bp.tier == dagi_bake_runtime::Tier::High ? "bakeProbeSizeHigh" : "bakeProbeSizeNormal", 0.f);
+      if (const scene::TiledScene *probeBoxes = getEnviProbeBoxesScene())
+      {
+        bbox3f queryBox;
+        queryBox.bmin = v_ldu(&bakeBox[0].x);
+        queryBox.bmax = v_ldu(&bakeBox[1].x);
+        probeBoxes->boxCull<false, false>(queryBox, 0, 0, [&](scene::node_index, mat44f_cref m) {
+          mat44f invMat;
+          v_mat44_inverse43(invMat, m);
+          TMatrix invTm;
+          v_mat_43cu_from_mat44(invTm.m[0], invMat);
+          bp.indoorInvTms.push_back(invTm);
+        });
+      }
+      if (!staticSceneCollisionResource)
+        staticSceneCollisionResource = dacoll::get_static_collision_resource();
+      bakedGISession.start(bp, *daGI2);
+    }
+  }
+
+  if (!bakedGISession.isActive() || !daGI2)
+    return;
+
+  int w, h, maxW, maxH;
+  getRenderingResolution(w, h);
+  getMaxPossibleRenderingResolution(maxW, maxH);
+
+  auto rasterizeTileCb = [&](DaGI &dagi, const Point3 &tileCenter) {
+    TMatrix tileItm = TMatrix::IDENT;
+    tileItm.setcol(3, tileCenter);
+    const DaGISettings s = dagi.getNextSettings();
+    if (lights.initialized())
+    {
+      alignas(16) TMatrix4 globtm = dagi_lights_globtm(s.sdf, tileCenter);
+      lights.cullOutOfFrustumLights(*giLights, (mat44f_cref)globtm, SpotLightMaskType::SPOT_LIGHT_MASK_GI,
+        OmniLightMaskType::OMNI_LIGHT_MASK_GI);
+      giGlobalLightsPrepared = true;
+    }
+    if (!ShaderGlobal::is_var_assumed(gi_enable_lights_at_radiance_traceVarId))
+      ShaderGlobal::set_int(gi_enable_lights_at_radiance_traceVarId, lights.initialized() ? 1 : 0);
+
+    dagi.beforeRender(w, h, maxW, maxH, tileItm, currentFrameCamera.jitterProjTm, 0.1f, 500.f, DaGI::RadianceUpdate::On);
+    updateGIPosInternal(tileCenter, tileItm, tileCenter.y - 64.f, tileCenter.y + 64.f);
+  };
+
+  if (giGlobalLightsPrepared && lights.initialized())
+    lights.setOutOfFrustumLightsToShader(*giLights);
+
+  const Color4 savedWorldViewPos = ShaderGlobal::get_float4(world_view_posVarId);
+  const bool stillRunning = bakedGISession.tick(*daGI2, rasterizeTileCb, bakedGIVolume);
+  ShaderGlobal::set_float4(world_view_posVarId, savedWorldViewPos);
+
+  if (giGlobalLightsPrepared && lights.initialized())
+    lights.setInsideOfFrustumLightsToShader();
+
+  if (!stillRunning && bakedGISession.succeeded() && bakedGIVolume.isLoaded())
+  {
+    bakedGIEnabled = true;
+    closeGI(); // free temporary WorldSDF / SurfaceCache / LRUCollision immediately!
+    bakedGIVolume.ensureFallbackBound();
+    const int targetQuality = isThinGBuffer() ? GI_ONLY_AO : GI_COLORED;
+    gi_quality.set(targetQuality);
+    ShaderGlobal::set_int(gi_qualityVarId, targetQuality);
+    requestFgRecreation("baked gi session completed");
+  }
+}
+
 void WorldRenderer::giBeforeRender()
 {
   giGlobalLightsPrepared = false;
+
+  if (bakedGIPendingStart || bakedGISession.isActive())
+  {
+    tickBakedGISession();
+    if (bakedGISession.isActive() || bakedGIEnabled)
+      return;
+  }
+
+  if (bakedGIEnabled && bakedGIVolume.isLoaded())
+    return;
 
   if (!daGI2)
     return;
@@ -448,7 +862,6 @@ void WorldRenderer::giBeforeRender()
   const DaGISettings s = daGI2->getNextSettings();
 
   const bool useGiGlobalLights = s.surfaceCache.entries > 0;
-  // each frame: relights run without updateGIPos
   if (useGiGlobalLights && lights.initialized())
   {
     TIME_PROFILE(cull_global_lights)
@@ -461,18 +874,11 @@ void WorldRenderer::giBeforeRender()
     ShaderGlobal::set_int(gi_enable_lights_at_radiance_traceVarId, useGiGlobalLights ? 1 : 0);
 
   ShaderGlobal::set_int(ssr_alternate_reflectionsVarId, ssrWantsAlternateReflections && gi_quality > 0 ? 1 : 0);
-  // if InitGI called only on level load it can cause GI artifacts, for some reason.
-  // Calling it a bit later, or invalidating GI fixes the issue once and for all.
-  // if (++giInvalidateDeferred == DEFERRED_FRAMES_TO_INVALIDATE_GI)
-  //  daGI2->invalidateDeferred();
-  // we check if static shadows are valid in the pos where we moved to
-  const float giUpdateDist = 100.f; // fixme:
+  const float giUpdateDist = 100.f;
   DaGI::RadianceUpdate ru = DaGI::RadianceUpdate::On;
-  // todo: check teleportation and set giUpdatePosFrameCounter = 0 on teleportation
-  if (!ignoreStaticShadowsForGI && ++giUpdatePosFrameCounter <= MAX_GI_FRAMES_TO_INVALIDATE_POS) // if frames passed < threshold
+  if (!ignoreStaticShadowsForGI && ++giUpdatePosFrameCounter <= MAX_GI_FRAMES_TO_INVALIDATE_POS)
   {
     const Point3 &cameraPos = currentFrameCamera.viewItm.getcol(3);
-    // if static shadows are fully updated, render immediately, otherwise try to wait for one frame
     if (!shadowsManager.validStaticShadows(cameraPos, giUpdateDist) ||
         (giUpdatePosFrameCounter == 1 && !shadowsManager.fullyUpdatedStaticShadows(cameraPos, giUpdateDist)))
       ru = DaGI::RadianceUpdate::Off;
@@ -487,7 +893,6 @@ void WorldRenderer::renderGiCollision(const TMatrix &view_itm, const Frustum &)
   if (!debug_rasterize_lru_collision || !voxelizeCollision || !voxelizeCollision->renderCollisionElem)
     return;
   DA_PROFILE_GPU;
-  // fixme: add frustum gather
   rendinst::riex_collidable_t handles;
   BBox3 sceneBox(view_itm.getcol(3) - Point3(30, 30, 30), view_itm.getcol(3) + Point3(30, 30, 30));
   rendinst::gatherRIGenExtraCollidableMin(handles, v_ldu_bbox3(sceneBox), 0);
@@ -501,12 +906,21 @@ void WorldRenderer::renderGiCollision(const TMatrix &view_itm, const Frustum &)
 
 bool WorldRenderer::requiresGIUpdate() const
 {
+  if (bakedGIEnabled || bakedGISession.isActive())
+    return false;
   if (!daGI2)
     return false;
   return daGI2->requiresUpdate();
 }
 
 void WorldRenderer::updateGIPos(const Point3 &pos, const TMatrix &view_itm, float hmin, float hmax)
+{
+  if (bakedGIEnabled || bakedGISession.isActive())
+    return;
+  updateGIPosInternal(pos, view_itm, hmin, hmax);
+}
+
+void WorldRenderer::updateGIPosInternal(const Point3 &pos, const TMatrix &view_itm, float hmin, float hmax)
 {
   if (!daGI2)
     return;
@@ -529,9 +943,7 @@ void WorldRenderer::updateGIPos(const Point3 &pos, const TMatrix &view_itm, floa
     ShaderGlobal::set_float4(voxelize_box0VarId, box[0].x, box[0].y, box[0].z, 0);
     ShaderGlobal::set_float4(voxelize_box1VarId, 1. / box.width().x, 1 / box.width().y, 1 / box.width().z, 0);
     bool ret = false;
-    // rendinst::prepareRIGenExtraVisibility(globtm, box.center(), *rendinst_voxelize_visibility, false, NULL);
     bbox3f boxCull = v_ldu_bbox3(box);
-    // box visibility, skip small ri
     bbox3f actualBox;
     v_bbox3_init_empty(actualBox);
     rendinst::prepareRIGenExtraVisibilityBox(boxCull, 3, voxelSize.x * 0.5, 71, *rendinst_voxelize_visibility, &actualBox);
@@ -576,12 +988,11 @@ void WorldRenderer::updateGIPos(const Point3 &pos, const TMatrix &view_itm, floa
     bvh_bind_resources(rw);
   }
   mediaVolumes.updateTypes();
-  if (mediaVolumes.bakePending(globalFrameBlockId)) // the bake wave settled
+  if (mediaVolumes.bakePending(globalFrameBlockId))
     daGI2->invalidateInitialMedia();
   daGI2->updatePosition(
     [&](int, const BBox3 &box, float voxelSize, uintptr_t &) {
       BBox3 sceneBox = box;
-      // we increase by maximum written + 1 where we rounding due to rasterization
       sceneBox[0] -= Point3(voxelSize, voxelSize, voxelSize);
       sceneBox[1] += Point3(voxelSize, voxelSize, voxelSize);
 
@@ -599,7 +1010,6 @@ void WorldRenderer::updateGIPos(const Point3 &pos, const TMatrix &view_itm, floa
           [](auto a, auto b) { return rendinst::handle_to_ri_type(a) < rendinst::handle_to_ri_type(b); });
       }
       IPoint3 res = ipoint3(floor(sceneBox.width() / voxelSize + Point3(0.5, 0.5, 0.5)));
-      // Point3 voxelize_box1 = Point3(1./sceneBox.width().x, 1./sceneBox.width().y, 1./sceneBox.width().z);
       const int maxRes = max(max(res.x, res.y), max(res.z, 1));
 
       SCOPE_RENDER_TARGET;
@@ -636,7 +1046,6 @@ void WorldRenderer::updateGIPos(const Point3 &pos, const TMatrix &view_itm, floa
     },
     [&](const BBox3 &region, float voxelSize) { mediaVolumes.setRegionInstances(region, voxelSize); });
   bvh_unbind_resources();
-  // gather the closest source instances for the media volume debug trace (gi_media_vols_debug)
   mediaVolumes.debugPrepare(view_itm.getcol(3));
 
   if (giGlobalLightsPrepared)
@@ -678,8 +1087,6 @@ void WorldRenderer::initGI()
   init_voxelization();
   voxelizeCollision = new LRUCollisionVoxelization;
   voxelizeCollision->init();
-  // const DataBlock *graphics = dgs_get_settings()->getBlockByNameEx("graphics");
-  // const DataBlock *graphicsGI = graphics->getBlockByNameEx("gi");
 
   lruCollision.reset();
   lruCollision = LRURendinstCollision::acquire();
@@ -694,11 +1101,12 @@ void WorldRenderer::initGI()
 
 void WorldRenderer::resetGI()
 {
+  bakedGIVolume.afterReset();
   if (lruCollision)
     lruCollision->reset();
   if (daGI2)
     daGI2->afterReset();
-  mediaVolumes.afterReset(); // the atlas content did not survive the device reset, rebake all types
+  mediaVolumes.afterReset();
   if (giWindows)
     giWindows->afterReset();
   giUpdatePosFrameCounter = 0;
@@ -728,10 +1136,9 @@ const scene::TiledScene *WorldRenderer::getWindowsScene() const { return giWindo
 
 void WorldRenderer::createGiNodes()
 {
-  if (!daGI2)
+  if (!daGI2 || bakedGIEnabled || bakedGISession.isActive() || bakedGIPendingStart)
   {
     giRenderFGNode = {};
-
     giCalcFGNode = {};
     giFeedbackFGNode = {};
     giScreenDebugFGNode = {};
@@ -747,3 +1154,231 @@ void WorldRenderer::createGiNodes()
 }
 
 DaGI *WorldRenderer::getGI() { return daGI2; }
+
+void WorldRenderer::setBakedGISamplingEnabled(int mode)
+{
+  const bool next = (mode < 0) ? !bakedGIVolume.isSamplingEnabled() : (mode != 0);
+  bakedGIVolume.setSamplingEnabled(next);
+  console::print_d("[daGIBake] Baked GI shader sampling: %s (A/B compare)", next ? "ON (Baked SH1)" : "OFF (Sky Ambient)");
+}
+
+void WorldRenderer::renderBakedGIDebugBricks() const
+{
+  if ((gi_baked_debug_vis.get() & 2) != 0 && bakedGIVolume.isLoaded())
+    bakedGIVolume.drawDebugBricks(currentFrameCamera.viewItm.getcol(3), gi_baked_debug_radius.get());
+}
+
+void WorldRenderer::renderBakedGIDebugHUD() const
+{
+  const bool cfgHud = ::dgs_get_settings()->getBlockByNameEx("graphics")->getBool("giDebugOverlay", false);
+  const bool isBaking = isBakedGIBaking();
+  if (!isBaking && !gi_baked_debug_hud.get() && !cfgHud)
+    return;
+
+  StdGuiRender::ScopeStarterOptional strt;
+  StdGuiRender::set_ablend(true);
+  StdGuiRender::reset_textures();
+
+  const float x0 = 18.f;
+  const float y0 = 18.f;
+  const float boxW = 540.f;
+  const float boxH = isBaking ? 142.f : 128.f;
+
+  StdGuiRender::solid_frame(x0, y0, x0 + boxW, y0 + boxH, 1.5f, E3DCOLOR(14, 18, 26, 215),
+    isBaking ? E3DCOLOR(255, 190, 50, 240) : E3DCOLOR(70, 210, 140, 220));
+
+  StdGuiRender::set_font(0);
+  float cy = y0 + 22.f;
+  char line[256];
+
+  auto drawLine = [&](E3DCOLOR col, const char *txt) {
+    StdGuiRender::set_color(col);
+    StdGuiRender::goto_xy(x0 + 12.f, cy);
+    StdGuiRender::draw_str(txt);
+    cy += 19.f;
+  };
+
+  snprintf(line, sizeof(line), "[daGI2 Static GI]  Pipeline: %s  |  API: %s",
+    isThinGBuffer() ? "THIN GBUFFER (compatPC)" : "FULL DEFERRED", d3d::get_driver_name());
+  drawLine(E3DCOLOR(130, 220, 255, 255), line);
+
+  if (isBaking)
+  {
+    const float prog = clamp(bakedGISession.getProgress(), 0.f, 1.f);
+    snprintf(line, sizeof(line), "STATUS: BAKING (%s)  %.1f%%  [%.1fs]",
+      dagi_bake_runtime::tier_name(bakedGISession.isActive() ? bakedGISession.getTargetTier() : bakedGITargetTier),
+      prog * 100.f, bakedGISession.getElapsedSeconds());
+    drawLine(E3DCOLOR(255, 215, 70, 255), line);
+
+    snprintf(line, sizeof(line), "Stage: %s  |  Tile %u / %u  |  Active Bricks: %u",
+      bakedGISession.getStageName(), bakedGISession.getCurrentTile() + 1u, bakedGISession.getTotalTiles(),
+      bakedGISession.getBakedBrickCount());
+    drawLine(E3DCOLOR(230, 235, 240, 255), line);
+
+    snprintf(line, sizeof(line), "Output: %s", bakedGISession.getOutputPath());
+    drawLine(E3DCOLOR(180, 195, 210, 255), line);
+
+    StdGuiRender::reset_textures();
+    const float barX0 = x0 + 12.f;
+    const float barX1 = x0 + boxW - 12.f;
+    const float barY0 = cy - 6.f;
+    const float barY1 = barY0 + 14.f;
+    StdGuiRender::solid_frame(barX0, barY0, barX1, barY1, 1.f, E3DCOLOR(35, 42, 55, 240), E3DCOLOR(120, 140, 165, 240));
+    const float fillW = (barX1 - barX0 - 4.f) * prog;
+    if (fillW > 1.f)
+    {
+      StdGuiRender::set_color(E3DCOLOR(80, 220, 120, 255));
+      StdGuiRender::render_box(barX0 + 2.f, barY0 + 2.f, barX0 + 2.f + fillW, barY1 - 2.f);
+    }
+  }
+  else if (bakedGIVolume.isLoaded())
+  {
+    const bool smpOn = bakedGIVolume.isSamplingEnabled();
+    snprintf(line, sizeof(line), "Mode: BAKED STATIC (%s)  |  Sampling: %s",
+      dagi_bake_runtime::tier_name(bakedGIVolume.getLoadedTier()), smpOn ? "ON" : "PAUSED (Sky SH A/B)");
+    drawLine(smpOn ? E3DCOLOR(90, 240, 130, 255) : E3DCOLOR(255, 140, 90, 255), line);
+
+    const uint32_t nBricks = bakedGIVolume.getBrickCount();
+    const uint32_t totBricks = max(bakedGIVolume.getTotalGridBricks(), 1u);
+    const uint32_t at = bakedGIVolume.getAtlasTexels();
+    const double vramMb = double(uint64_t(at) * at * (at * 2ull) * 8ull) / (1024.0 * 1024.0);
+    snprintf(line, sizeof(line), "Bricks: %u / %u (%.1f%%)  |  Probe: %.2fm  |  Atlas: %ux%ux%u (%.1f MB)",
+      nBricks, totBricks, 100.0 * double(nBricks) / double(totBricks), bakedGIVolume.getProbeSize(), at, at, at * 2u, vramMb);
+    drawLine(E3DCOLOR(225, 230, 238, 255), line);
+
+    int bx = -1, by = -1, bz = -1;
+    uint16_t bIdx = 0xFFFFu;
+    const Point3 camPos = currentFrameCamera.viewItm.getcol(3);
+    const bool inGrid = bakedGIVolume.queryBrickAt(camPos, bx, by, bz, bIdx);
+    if (!inGrid)
+      snprintf(line, sizeof(line), "Cam (%.1f, %.1f, %.1f): OUTSIDE BAKED VOLUME  |  3D Vis: %d", camPos.x, camPos.y, camPos.z,
+        gi_baked_debug_vis.get());
+    else if (bIdx == 0xFFFFu)
+      snprintf(line, sizeof(line), "Cam Brick (%d,%d,%d): EMPTY (Sky Fallback)  |  3D Vis: %d", bx, by, bz, gi_baked_debug_vis.get());
+    else
+      snprintf(line, sizeof(line), "Cam Brick (%d,%d,%d): ACTIVE #%u  |  3D Vis: %d ('gi.debug_vis 1/2')", bx, by, bz, unsigned(bIdx),
+        gi_baked_debug_vis.get());
+    drawLine(E3DCOLOR(200, 215, 230, 255), line);
+
+    if (bakedGIPromptRebuildHigh)
+      drawLine(E3DCOLOR(255, 200, 90, 255), "Notice: High tier missing; loaded Normal tier (run 'gi.bake high')");
+    else
+      drawLine(E3DCOLOR(150, 165, 185, 255), "Cmds: gi.debug_vis [0..3] | gi.baked_ab | gi.bake [normal|high]");
+  }
+  else
+  {
+    snprintf(line, sizeof(line), "Mode: LIVE DYNAMIC daGI2 (%s)", daGI2 ? "ACTIVE" : "OFF");
+    drawLine(E3DCOLOR(255, 205, 95, 255), line);
+    snprintf(line, sizeof(line), "Level: '%s'  |  History frames: %u", resolveBakeLevelId().c_str(), getGIHistoryFrames());
+    drawLine(E3DCOLOR(220, 225, 235, 255), line);
+    drawLine(E3DCOLOR(150, 165, 185, 255), "Cmds: gi.bake [normal|high] | gi.bake_status | gi.debug_hud 0");
+  }
+}
+
+void WorldRenderer::renderBakedGIImGui()
+{
+  const eastl::string levelId = resolveBakeLevelId();
+  const eastl::string dir = resolveBakeCacheDir();
+  const eastl::string nPath = dagi_bake_runtime::make_cache_path(dir.c_str(), levelId.c_str(), dagi_bake_runtime::Tier::Normal);
+  const eastl::string hPath = dagi_bake_runtime::make_cache_path(dir.c_str(), levelId.c_str(), dagi_bake_runtime::Tier::High);
+  const bool nValid = dagi_bake_runtime::probe_cache_valid(nPath.c_str(), 0, 0);
+  const bool hValid = dagi_bake_runtime::probe_cache_valid(hPath.c_str(), 0, 0);
+
+  ImGui::Text("Pipeline: %s  |  Driver: %s", isThinGBuffer() ? "Thin GBuffer (compatPC)" : "Full Deferred", d3d::get_driver_name());
+  ImGui::Text("Level: %s", levelId.c_str());
+  ImGui::Separator();
+
+  bool hudOn = gi_baked_debug_hud.get();
+  if (ImGui::Checkbox("Show On-Screen HUD Overlay (gi.debug_hud)", &hudOn))
+    gi_baked_debug_hud.set(hudOn);
+
+  if (bakedGIVolume.isLoaded())
+  {
+    bool smpOn = bakedGIVolume.isSamplingEnabled();
+    if (ImGui::Checkbox("Enable Baked GI Sampling (A/B Compare vs Sky SH)", &smpOn))
+      bakedGIVolume.setSamplingEnabled(smpOn);
+
+    uint32_t gx = 0, gy = 0, gz = 0;
+    bakedGIVolume.getGridDim(gx, gy, gz);
+    const uint32_t at = bakedGIVolume.getAtlasTexels();
+    const double vramMb = double(uint64_t(at) * at * (at * 2ull) * 8ull) / (1024.0 * 1024.0);
+    ImGui::TextColored(ImVec4(0.4f, 0.95f, 0.55f, 1.f), "Active Mode: BAKED STATIC (tier=%s)",
+      dagi_bake_runtime::tier_name(bakedGIVolume.getLoadedTier()));
+    ImGui::Text("Grid Bricks: %u x %u x %u (%u active / %u total)", gx, gy, gz, bakedGIVolume.getBrickCount(),
+      bakedGIVolume.getTotalGridBricks());
+    ImGui::Text("Probe Spacing: %.2f m  |  Atlas: %ux%ux%u (%.2f MB)", bakedGIVolume.getProbeSize(), at, at, at * 2u, vramMb);
+  }
+  else if (isBakedGIBaking())
+  {
+    ImGui::TextColored(ImVec4(1.f, 0.85f, 0.3f, 1.f), "BAKING: %s (Tile %u/%u, %.1fs)",
+      bakedGISession.getStageName(), bakedGISession.getCurrentTile() + 1u, bakedGISession.getTotalTiles(),
+      bakedGISession.getElapsedSeconds());
+    ImGui::ProgressBar(bakedGISession.getProgress());
+    if (ImGui::Button("Cancel Bake"))
+    {
+      bakedGISession.cancel();
+      bakedGIPendingStart = false;
+      setGIQualityFromSettings();
+    }
+  }
+  else
+  {
+    ImGui::TextColored(ImVec4(1.f, 0.8f, 0.4f, 1.f), "Active Mode: LIVE DYNAMIC daGI2 (%s)", daGI2 ? "ON" : "OFF");
+  }
+
+  ImGui::Separator();
+  ImGui::Text("3D In-World Debug Visualization:");
+  int visMode = gi_baked_debug_vis.get();
+  const char *visItems[] = {"Off", "3D SH1 Probe Spheres", "Active Sparse Brick Wireframes", "Probes + Brick Wireframes"};
+  if (ImGui::Combo("Debug Mode (gi.debug_vis)", &visMode, visItems, IM_ARRAYSIZE(visItems)))
+    gi_baked_debug_vis.set(visMode);
+  float visRad = gi_baked_debug_radius.get();
+  if (ImGui::SliderFloat("Debug Radius (m)", &visRad, 6.f, 128.f, "%.1f"))
+    gi_baked_debug_radius.set(visRad);
+  float sphScale = gi_baked_debug_sphere_scale.get();
+  if (ImGui::SliderFloat("Probe Sphere Scale", &sphScale, 0.02f, 0.35f, "%.2f"))
+    gi_baked_debug_sphere_scale.set(sphScale);
+
+  ImGui::Separator();
+  ImGui::Text("Cache Files:");
+  ImGui::BulletText("Normal: %s [%s]", nPath.c_str(), nValid ? "VALID" : "MISSING");
+  ImGui::BulletText("High:   %s [%s]", hPath.c_str(), hValid ? "VALID" : "MISSING");
+
+  if (!isBakedGIBaking())
+  {
+    if (ImGui::Button("Bake Normal (64 rays)"))
+      triggerBakedGIRebuild(dagi_bake_runtime::Tier::Normal);
+    ImGui::SameLine();
+    if (ImGui::Button("Bake High (128 rays)"))
+      triggerBakedGIRebuild(dagi_bake_runtime::Tier::High);
+    if (ImGui::Button("Delete Normal Cache"))
+      deleteBakedGICache("normal");
+    ImGui::SameLine();
+    if (ImGui::Button("Delete High Cache"))
+      deleteBakedGICache("high");
+  }
+}
+
+ECS_TAG(render)
+ECS_NO_ORDER
+static void baked_gi_hud_es(const RenderEventUI &)
+{
+  if (auto *wr = static_cast<WorldRenderer *>(get_world_renderer()))
+    wr->renderBakedGIDebugHUD();
+}
+
+ECS_TAG(render, dev)
+ECS_NO_ORDER
+static void baked_gi_render_debug_es(const UpdateStageInfoRenderDebug &)
+{
+  if (auto *wr = static_cast<WorldRenderer *>(get_world_renderer()))
+    wr->renderBakedGIDebugBricks();
+}
+
+static void baked_gi_imgui_window()
+{
+  if (auto *wr = static_cast<WorldRenderer *>(get_world_renderer()))
+    wr->renderBakedGIImGui();
+}
+
+REGISTER_IMGUI_WINDOW("Render", "daGI2 Baked GI", baked_gi_imgui_window);

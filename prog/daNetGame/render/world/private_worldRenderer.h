@@ -43,6 +43,7 @@
 #include <render/world/frameGraphNodes/motionBlurNode.h>
 #include <render/world/cameraViewVisibilityManager.h>
 #include <render/deferredRenderer.h>
+#include <daGI2/daGIBake.h>
 #include <render/antialiasing.h>
 #include <render/antiAliasing_legacy.h>
 #include <render/resourceSlot/nodeHandleWithSlotsAccess.h>
@@ -1161,6 +1162,32 @@ private:
   bool legacyGPUObjectsVisibilityInitialized = false;
   void clearLegacyGPUObjectsVisibility();
   DaGI *daGI2 = 0;
+  dagi_bake_runtime::BakedGIVolume bakedGIVolume;
+  dagi_bake_runtime::BakedGISession bakedGISession;
+  bool bakedGIEnabled = false;
+  bool bakedGIPendingStart = false;
+  bool bakedGIForceRebuild = false;
+  bool bakedGIPromptRebuildHigh = false;
+  dagi_bake_runtime::Tier bakedGITargetTier = dagi_bake_runtime::Tier::Normal;
+  dagi_bake_runtime::Tier bakedGIExplicitTier = dagi_bake_runtime::Tier::None;
+  void tickBakedGISession();
+  void updateGIPosInternal(const Point3 &pos, const TMatrix &view_itm, float hmin, float hmax);
+  eastl::string resolveBakeLevelId() const;
+  eastl::string resolveBakeCacheDir() const;
+  BBox3 computeBakeWorldBox() const;
+
+public:
+  bool isBakedGIActive() const { return bakedGIEnabled && bakedGIVolume.isLoaded(); }
+  bool isBakedGIBaking() const { return bakedGIPendingStart || bakedGISession.isActive(); }
+  void triggerBakedGIRebuild(dagi_bake_runtime::Tier tier);
+  void logBakedGIStatus() const;
+  void deleteBakedGICache(const char *which);
+  void renderBakedGIDebugHUD() const;
+  void renderBakedGIDebugBricks() const;
+  void renderBakedGIImGui();
+  void setBakedGISamplingEnabled(int mode);
+
+private:
   RendInstMediaVolumes mediaVolumes;
   eastl::unique_ptr<GIWindows> giWindows;
   float giDynamicQuality = 1;

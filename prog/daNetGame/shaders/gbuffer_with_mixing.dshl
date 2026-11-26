@@ -69,7 +69,7 @@ macro WRITE_GBUFFER_WITH_MIXING(blending, normal_blend, declare_mixing_uav)
         #define UAV_5th_TARGET 1
         #if SUPPORTS_VRS
           #define MATERIAL_UAV_VRS_PS_INPUT HW_USE_READ_SHADING_RATE , uint coverage : SV_Coverage
-          #define MATERIAL_UAV_VRS_ARGS shading_rate, coverage
+          #define MATERIAL_UAV_VRS_ARGS 0, coverage
         #endif
       }
     }

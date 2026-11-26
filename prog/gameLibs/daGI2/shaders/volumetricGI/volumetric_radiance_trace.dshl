@@ -304,6 +304,24 @@ macro DIFFUSE_SH1(code)
     }
     bool dagi_irrad_grid_diffuse_biased_sh1(float3 worldViewPos, float3 worldPos, float3 toCameraDir, float maxCameraDist, inout SH1LumEncoded sh1)
     {
+      BRANCH
+      if (dagi_baked_is_active())
+      {
+        SH1 bakedSh1;
+        if (!dagi_baked_sample_sh1_biased(worldPos, toCameraDir, maxCameraDist, float3(0, 0, 0), bakedSh1))
+          return false;
+        sh1 = encode_sh1_luminance(bakedSh1);
+        return true;
+      }
+      BRANCH
+      if (dagi_baked_is_active())
+      {
+        SH1 bsh1;
+        if (!dagi_baked_sample_sh1_biased(worldPos, toCameraDir, maxCameraDist, float3(0, 0, 0), bsh1))
+          return false;
+        sh1 = encode_sh1_luminance(bsh1);
+        return true;
+      }
       #if 0
       //we blur result anyway, so no point in accurate between cascade filtering
       uint cascade; float3 coordF; float vignette;

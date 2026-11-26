@@ -1,0 +1,564 @@
+// Copyright (C) Gaijin Games KFT.  All rights reserved.
+include "shader_global.dshl"
+include "sky_shader_global.dshl"
+include "sq_clouds_shadow.dshl"
+include "world_sdf.dshl"
+include "dagi_surface_cache_common.dshl"
+include "dagi_albedo_scene_common.dshl"
+include "dagi_lit_scene_helper.dshl"
+include "project_light_point.dshl"
+include "project_base_hmap.dshl"
+include "dagi_irrad_grid_uav.dshl"
+include "dagi_bake_common.dshl"
+include "frustum.dshl"
+include "tonemapHelpers/debug_draw_hdr_inc.dshl"
+
+int4 dagi_bake_seed_params = (0, 1, 0, 0);   // x = sdfClip, y = stride, z = phase, w = totalVoxels
+int4 dagi_bake_trace_params = (0, 64, 64, 0); // x = batchBricks, y = numRays, z = maxTraceMeters, w = atlasBricksSide
+int4 dagi_baked_debug_box_min = (0, 0, 0, 0); // xyz = min global probe coord, w = probeStride
+int4 dagi_baked_debug_box_dim = (0, 0, 0, 0); // xyz = count of sampled probes per axis
+float4 dagi_baked_debug_params = (0.08, 0, 0, 0); // x = sphereRadiusMul
+
+buffer dagi_bake_brick_coords;
+buffer dagi_bake_brick_flags;
+buffer dagi_bake_brick_probes;
+
+// Enumerates WorldSDF surface voxels within the narrow band to generate SurfaceCache relight requests
+// without needing screen-space GBuffer feedback.
+shader dagi_bake_seed_requests_cs
+{
+  READ_WORLD_SDF(cs)
+  DAGI_SURFACE_CACHE_REQUESTS(cs)
+  (cs) {
+    dagi_surface_cache@buf = dagi_surface_cache hlsl {
+      ByteAddressBuffer dagi_surface_cache@buf;
+    }
+    dagi_bake_seed_params@i4 = dagi_bake_seed_params;
+  }
+  DAGI_SURFACE_CACHE_LOOKUP(cs)
+  hlsl(cs) {
+    [numthreads(64, 1, 1)]
+    void dagi_bake_seed_requests_cs(uint dtId : SV_DispatchThreadID)
+    {
+      uint clip = uint(dagi_bake_seed_params.x);
+      uint stride = max(uint(dagi_bake_seed_params.y), 1u);
+      uint phase = uint(dagi_bake_seed_params.z);
+      uint idx = dtId * stride + phase;
+      uint w = uint(world_sdf_res.x);
+      uint h = uint(world_sdf_res.y);
+      uint total = w * h * w;
+      if (idx >= total || clip >= world_sdf_num_cascades())
+        return;
+
+      uint vx = idx % w;
+      uint vy = (idx / w) % h;
+      uint vz = idx / (w * h);
+      if (vx < 1 || vx >= w - 1 || vy < 1 || vy >= h - 1 || vz < 1 || vz >= w - 1)
+        return;
+
+      float4 lt = sample_world_sdf_lt(clip);
+      float voxelSize = lt.w;
+      float3 worldPos = lt.xyz + (float3(vx, vy, vz) + 0.5) * voxelSize;
+      float dist = sample_world_sdf_distance(clip, worldPos);
+      if (abs(dist) > 1.25 * voxelSize)
+        return;
+
+      float3 grad = world_sdf_sample_gradient(clip, worldPos);
+      float gradLen = length(grad);
+      if (gradLen <= 1e-6)
+        return;
+
+      float3 normal = -grad.xzy / gradLen;
+      float3 surfPos = worldPos - normal * dist;
+      uint level = dagi_surface_cache_level(surfPos);
+      if (level >= dagi_surface_cache_levels())
+        return;
+
+      uint cellHash = dagi_surface_cache_key(surfPos, normal, level).x;
+      dagi_surface_cache_request(surfPos, normal, cellHash, false);
+    }
+  }
+  compile("target_cs", "dagi_bake_seed_requests_cs");
+}
+
+// Classifies candidate 8x8x8 bricks: keeps bricks near geometry/ground and skips empty sky or deep underground bricks.
+shader dagi_bake_classify_bricks_cs
+{
+  READ_WORLD_SDF(cs)
+  PROJECT_BASE_HEIGHTMAP(cs)
+  (cs) {
+    dagi_baked_grid_origin@f4 = dagi_baked_grid_origin;
+    dagi_baked_atlas_inv@f4 = dagi_baked_atlas_inv;
+    dagi_bake_trace_params@i4 = dagi_bake_trace_params;
+    dagi_bake_brick_coords@buf = dagi_bake_brick_coords hlsl {
+      ByteAddressBuffer dagi_bake_brick_coords@buf;
+    }
+    dagi_bake_brick_flags@uav = dagi_bake_brick_flags hlsl {
+      RWByteAddressBuffer dagi_bake_brick_flags@uav;
+    }
+  }
+  hlsl(cs) {
+    [numthreads(64, 1, 1)]
+    void dagi_bake_classify_bricks_cs(uint dtId : SV_DispatchThreadID)
+    {
+      uint count = uint(dagi_bake_trace_params.x);
+      if (dtId >= count)
+        return;
+
+      int3 bcoord = int3(loadBuffer4(dagi_bake_brick_coords, dtId * 16u).xyz);
+      float probeSize = dagi_baked_atlas_inv.w;
+      float brickSize = 8.0 * probeSize;
+      float3 bmin = dagi_baked_grid_origin.xyz + float3(bcoord) * brickSize;
+
+      bool hasNearSurface = false;
+      bool hasExteriorSpace = false;
+
+      #if PROJECT_DAGI_USE_HMAP
+      {
+        float3 bcenter = bmin + 0.5 * brickSize;
+        float hmapY = 0;
+        if (dagi_project_get_base_heightmap(bcenter, hmapY, probeSize))
+        {
+          if (bmin.y + brickSize >= hmapY - 2.0 * probeSize && bmin.y <= hmapY + 2.0 * brickSize)
+          {
+            hasNearSurface = true;
+            hasExteriorSpace = true;
+          }
+        }
+      }
+      #endif
+
+      float nearThresh = min(max(2.0 * probeSize, 1.5), 0.5 * brickSize);
+      uint coarseClip = world_sdf_num_cascades() > 0 ? (world_sdf_num_cascades() - 1u) : 0u;
+      UNROLL
+      for (uint sz = 0; sz < 3; ++sz)
+      {
+        UNROLL
+        for (uint sy = 0; sy < 3; ++sy)
+        {
+          UNROLL
+          for (uint sx = 0; sx < 3; ++sx)
+          {
+            float3 p = bmin + (float3(sx, sy, sz) * 0.35 + 0.15) * brickSize;
+            if (world_sdf_closer_to_nearest_surface_than_threshold(p, nearThresh))
+              hasNearSurface = true;
+            uint c = world_sdf_find_clip(p, 1.0, 0);
+            if (c < MAX_WORLD_SDF_CLIPS)
+            {
+              float d = sample_world_sdf_distance(c, p);
+              float maxBand = min(0.9 * MAX_WORLD_SDF_VOXELS_BAND * world_sdf_voxel_size(c), max(1.5 * probeSize, 0.25 * brickSize));
+              if (d < maxBand)
+                hasNearSurface = true;
+              if (d > -0.5 * probeSize)
+                hasExteriorSpace = true;
+            }
+            else if (coarseClip < world_sdf_num_cascades())
+            {
+              hasExteriorSpace = true;
+            }
+          }
+        }
+      }
+
+      uint active = (hasNearSurface && hasExteriorSpace) ? 1u : 0u;
+      storeBuffer(dagi_bake_brick_flags, dtId * 4u, active);
+    }
+  }
+  compile("target_cs", "dagi_bake_classify_bricks_cs");
+}
+
+// Traces spherical Fibonacci rays per probe in each active 8x8x8 brick and encodes SH1 irradiance.
+shader dagi_bake_trace_bricks_cs
+{
+  READ_WORLD_SDF(cs)
+  WORLD_SDF_STEP_OUT(cs)
+  DAGI_SURFACE_CACHE_READ(cs)
+  PROJECT_GET_SKY_RADIANCE_AT(cs)
+  DAGI_ALBEDO_SAMPLE(cs)
+  SUN_LIGHT_POINT_TRACE_HIT(cs)
+  INIT_SKY_DIFFUSE_BASE(cs)
+  USE_SKY_DIFFUSE_BASE(cs)
+  PROJECT_BASE_HEIGHTMAP(cs)
+  (cs) {
+    dagi_baked_grid_origin@f4 = dagi_baked_grid_origin;
+    dagi_baked_atlas_inv@f4 = dagi_baked_atlas_inv;
+    dagi_bake_trace_params@i4 = dagi_bake_trace_params;
+    dagi_bake_brick_coords@buf = dagi_bake_brick_coords hlsl {
+      ByteAddressBuffer dagi_bake_brick_coords@buf;
+    }
+    dagi_bake_brick_probes@uav = dagi_bake_brick_probes hlsl {
+      RWByteAddressBuffer dagi_bake_brick_probes@uav;
+    }
+  }
+  hlsl(cs) {
+    #include <fibonacci_sphere.hlsl>
+    #include <monteCarlo.hlsl>
+    #include <pcg_hash.hlsl>
+    #include <sh1.hlsl>
+    #include <dagi_irradiance_encode.hlsl>
+
+    groupshared float4 gs_shR[64];
+    groupshared float4 gs_shG[64];
+    groupshared float4 gs_shB[64];
+    groupshared uint gs_upperRays;
+    groupshared uint gs_skyHits;
+    groupshared uint gs_backfaceHits;
+
+    float3 bake_trace_probe_ray(uint sdfStart, float3 worldPos, float3 rayDir, float maxT, out bool hitBackface, out bool hitSky)
+    {
+      hitBackface = false;
+      hitSky = false;
+      float t = 0;
+      float distAtStart = 0;
+      uint hitClip = sdfStart;
+      if (sdfStart < MAX_WORLD_SDF_CLIPS &&
+          world_sdf_trace_start(sdfStart, worldPos, rayDir, maxT, t, distAtStart, hitClip, 0.5))
+      {
+        float3 hitPos = worldPos + rayDir * t;
+        float3 grad = world_sdf_sample_gradient(hitClip, hitPos);
+        float gradLen = length(grad);
+        float3 hitNormal = gradLen > 1e-6 ? -grad.xzy / gradLen : -rayDir;
+        // Bakery Backface GI = 0: hitting back/interior side of SDF surface contributes 0 energy & flags invalid probes
+        if (gradLen > 1e-6 && dot(hitNormal, rayDir) > 0.15)
+        {
+          hitBackface = true;
+          return float3(0, 0, 0);
+        }
+        if (dot(hitNormal, rayDir) > 0)
+          hitNormal = -rayDir;
+
+        float3 rad = 0;
+        if (!dagi_surface_cache_get(hitPos, hitNormal, rad))
+        {
+          if (!dagi_surface_cache_voxel_get(hitPos, rad))
+          {
+            float3 albedo = DAGI_MISSED_ALBEDO;
+            dagi_sample_albedo_best(hitPos, albedo);
+            float3 sunLighting = dagi_get_sun_color(hitPos, hitNormal);
+            rad = sunLighting * albedo;
+          }
+        }
+        return max(rad, 0);
+      }
+      hitSky = true;
+      return max(dagi_get_sky_radiance_at(worldPos + rayDir * maxT, rayDir), 0);
+    }
+
+    [numthreads(64, 1, 1)]
+    void dagi_bake_trace_bricks_cs(uint tid : SV_GroupIndex, uint3 gId : SV_GroupID)
+    {
+      uint groupLinear = gId.x;
+      uint brickInBatch = groupLinear >> 9u;
+      uint probeInBrick = groupLinear & 511u;
+      if (brickInBatch >= uint(dagi_bake_trace_params.x))
+        return;
+
+      if (tid == 0)
+      {
+        gs_upperRays = 0u;
+        gs_skyHits = 0u;
+        gs_backfaceHits = 0u;
+      }
+      GroupMemoryBarrierWithGroupSync();
+
+      uint4 binfo = loadBuffer4(dagi_bake_brick_coords, brickInBatch * 16u);
+      int3 bcoord = int3(binfo.xyz);
+      uint3 localProbe = uint3(probeInBrick & 7u, (probeInBrick >> 3u) & 7u, probeInBrick >> 6u);
+      int3 globalProbe = bcoord * 8 + int3(localProbe);
+
+      float probeSize = dagi_baked_atlas_inv.w;
+      float3 worldPos = dagi_baked_grid_origin.xyz + (float3(globalProbe) + 0.5) * probeSize;
+
+      #if PROJECT_DAGI_USE_HMAP
+      {
+        float hmapY = 0;
+        if (dagi_project_get_base_heightmap(worldPos, hmapY, probeSize))
+        {
+          if (worldPos.y > hmapY - probeSize)
+            worldPos.y = max(worldPos.y, hmapY + 0.1 * probeSize);
+        }
+      }
+      #endif
+
+      float3 origPos = worldPos;
+      uint initClip = world_sdf_find_clip(worldPos, 1.0, 0);
+      float initDist = initClip < MAX_WORLD_SDF_CLIPS ? sample_world_sdf_distance(initClip, worldPos) : 1.0;
+      bool deepSolidProbe = (initClip < MAX_WORLD_SDF_CLIPS) && (initDist < -min(0.65 * probeSize, 0.5));
+      if (!deepSolidProbe && initDist < min(0.15 * probeSize, 0.12))
+      {
+        float maxPush = min(0.3 * probeSize, 0.2);
+        int stepClip = 0;
+        world_sdf_collide_probe(worldPos, maxPush, 0);
+        world_sdf_step_out(worldPos, stepClip, max(0.08 * probeSize, 0.02), 0.35);
+        float3 delta = worldPos - origPos;
+        float deltaLen = length(delta);
+        if (deltaLen > maxPush)
+          worldPos = origPos + (delta / deltaLen) * maxPush;
+        // Reject push if midpoint crossed another solid slab (thin wall)
+        if (deltaLen > 0.01)
+        {
+          uint midClip = world_sdf_find_clip(0.5 * (origPos + worldPos), 1.0, 0);
+          if (midClip < MAX_WORLD_SDF_CLIPS && sample_world_sdf_distance(midClip, 0.5 * (origPos + worldPos)) < -0.05)
+            deepSolidProbe = true;
+        }
+      }
+      uint sdfStart = world_sdf_find_clip(worldPos, 1.0, 0);
+
+      uint numRays = max(uint(dagi_bake_trace_params.y), 64u);
+      uint raysPerThread = max(numRays / 64u, 1u);
+      uint actualRays = raysPerThread * 64u;
+      float maxT = max(float(dagi_bake_trace_params.z), 16.0);
+      uint2 rand = pcg3d_hash_16bit(uint3(globalProbe)).xy;
+
+      float4 norm = sh_basis1(1) * sh1_l0_l1_coef().xyyy;
+      float invWeight = 4.0 / float(actualRays);
+      SH1 accum = (SH1)0;
+
+      if (!deepSolidProbe)
+      {
+        LOOP
+        for (uint r = 0; r < raysPerThread; ++r)
+        {
+          uint rayIdx = tid * raysPerThread + r;
+          float3 rayDir = uniform_sample_sphere(fibonacci_sphere_randomized(rayIdx, actualRays, rand)).xyz;
+          bool hitBackface = false;
+          bool hitSky = false;
+          float3 rad = bake_trace_probe_ray(sdfStart, worldPos, rayDir, maxT, hitBackface, hitSky);
+          if (hitBackface)
+            InterlockedAdd(gs_backfaceHits, 1u);
+          if (rayDir.y > 0.1)
+          {
+            InterlockedAdd(gs_upperRays, 1u);
+            if (hitSky)
+              InterlockedAdd(gs_skyHits, 1u);
+          }
+          rad = select(isfinite(rad), rad, float3(0, 0, 0)) * invWeight;
+          SH1 s = mul_sh1(sh_basis1(rayDir), rad);
+          accum.R += s.R * norm;
+          accum.G += s.G * norm;
+          accum.B += s.B * norm;
+        }
+      }
+
+      gs_shR[tid] = accum.R;
+      gs_shG[tid] = accum.G;
+      gs_shB[tid] = accum.B;
+
+      UNROLL
+      for (uint s = 32u; s > 0u; s >>= 1u)
+      {
+        GroupMemoryBarrierWithGroupSync();
+        if (tid < s)
+        {
+          gs_shR[tid] += gs_shR[tid + s];
+          gs_shG[tid] += gs_shG[tid + s];
+          gs_shB[tid] += gs_shB[tid + s];
+        }
+      }
+
+      if (tid == 0)
+      {
+        uint state = 1u;
+        SH1 totalSh1;
+        if (deepSolidProbe || gs_backfaceHits * 4u > actualRays * 3u)
+        {
+          totalSh1 = (SH1)0;
+          state = 0u; // invalid probe embedded in geometry
+        }
+        else
+        {
+          totalSh1.R = gs_shR[0];
+          totalSh1.G = gs_shG[0];
+          totalSh1.B = gs_shB[0];
+          if (gs_skyHits * 10u < max(gs_upperRays, 1u) * 3u)
+            state = 2u; // enclosed indoor probe (<30% upper-hemisphere sky hits)
+        }
+        uint3 packed = dagi_irrad_pack_encoded_sh1(dagi_irrad_encode_sh1(totalSh1));
+        uint outOffset = (brickInBatch * 512u + probeInBrick) * 16u;
+        storeBuffer4(dagi_bake_brick_probes, outOffset, uint4(packed, state));
+      }
+    }
+  }
+  compile("target_cs", "dagi_bake_trace_bricks_cs");
+}
+
+// Uploads packed 8x8x8 bricks into the 10x10x10 padded 3D atlas (dagi_irradiance_grid_sph0/1)
+// copying 1-texel borders from neighboring bricks for hardware trilinear continuity.
+shader dagi_bake_upload_atlas_cs
+{
+  DAGI_IRRADIANCE_GRID_UAV(cs)
+  DAGI_BAKED_SAMPLE_CONSTS_INIT(cs)
+  (cs) {
+    dagi_bake_trace_params@i4 = dagi_bake_trace_params;
+    dagi_bake_brick_coords@buf = dagi_bake_brick_coords hlsl {
+      ByteAddressBuffer dagi_bake_brick_coords@buf;
+    }
+    dagi_bake_brick_probes@buf = dagi_bake_brick_probes hlsl {
+      ByteAddressBuffer dagi_bake_brick_probes@buf;
+    }
+  }
+  hlsl(cs) {
+    #include <dagi_irradiance_encode.hlsl>
+
+    uint load_indirection_brick(int3 bc, int3 gridDim)
+    {
+      if (any(bc < 0) || any(bc >= gridDim))
+        return 0xFFFFu;
+      uint linearBrick = uint(bc.x + gridDim.x * (bc.y + gridDim.y * bc.z));
+      uint pairVal = loadBuffer(dagi_baked_indirection, 48u + (linearBrick >> 1u) * 4u);
+      return (pairVal >> ((linearBrick & 1u) * 16u)) & 0xFFFFu;
+    }
+
+    [numthreads(64, 1, 1)]
+    void dagi_bake_upload_atlas_cs(uint dtId : SV_DispatchThreadID)
+    {
+      uint brickCount = uint(dagi_bake_trace_params.x);
+      uint totalTexels = brickCount * 1000u;
+      if (dtId >= totalTexels)
+        return;
+
+      int4 gridDim = int4(loadBuffer4(dagi_baked_indirection, 0u));
+      uint brickIdx = dtId / 1000u;
+      uint rem = dtId - brickIdx * 1000u;
+      uint tx = rem % 10u;
+      uint ty = (rem / 10u) % 10u;
+      uint tz = rem / 100u;
+
+      int3 myBrickCoord = int3(loadBuffer4(dagi_bake_brick_coords, brickIdx * 16u).xyz);
+      int3 rel = int3(int(tx) - 1, int(ty) - 1, int(tz) - 1);
+      int3 dBrick = int3(rel.x < 0 ? -1 : (rel.x >= 8 ? 1 : 0),
+                         rel.y < 0 ? -1 : (rel.y >= 8 ? 1 : 0),
+                         rel.z < 0 ? -1 : (rel.z >= 8 ? 1 : 0));
+
+      uint srcBrick = brickIdx;
+      uint3 srcProbe = uint3(clamp(rel, int3(0, 0, 0), int3(7, 7, 7)));
+
+      if (any(dBrick != 0))
+      {
+        uint nb = load_indirection_brick(myBrickCoord + dBrick, gridDim.xyz);
+        if (nb != 0xFFFFu)
+        {
+          srcBrick = nb;
+          srcProbe = uint3(rel - dBrick * 8);
+        }
+      }
+
+      uint probeLinear = srcProbe.x + 8u * (srcProbe.y + 8u * srcProbe.z);
+      uint4 packed = loadBuffer4(dagi_bake_brick_probes, (srcBrick * 512u + probeLinear) * 16u);
+      SH1Encoded sh1e = dagi_irrad_unpack_encoded_sh1(packed.xyz);
+
+      uint side = max(uint(gridDim.w), 1u);
+      uint atlasTexels = side * 10u;
+      uint3 atlasBrick = uint3(brickIdx % side, (brickIdx / side) % side, brickIdx / (side * side));
+      uint3 dstCoord = atlasBrick * 10u + uint3(tx, ty, tz);
+
+      texture3DAt(dagi_irradiance_grid_sph1, dstCoord) = sh1e.s0;
+      texture3DAt(dagi_irradiance_grid_sph1, dstCoord + uint3(0u, 0u, atlasTexels)) = sh1e.s1;
+    }
+  }
+  compile("target_cs", "dagi_bake_upload_atlas_cs");
+}
+
+// 3D instanced debug sphere visualizer for active baked SH1 probes (works in Full Deferred & Thin GBuffer, DX11 & DX12).
+shader dagi_baked_probes_debug
+{
+  supports global_frame;
+  supports none;
+  color_write = rgb;
+
+  (vs) {
+    globtm@f44 = globtm;
+    dagi_baked_debug_box_min@i4 = dagi_baked_debug_box_min;
+    dagi_baked_debug_box_dim@i4 = dagi_baked_debug_box_dim;
+    dagi_baked_debug_params@f4 = dagi_baked_debug_params;
+  }
+  DAGI_BAKED_SAMPLE_CONSTS_INIT(vs)
+  INIT_AND_USE_DEBUG_DRAW_HDR()
+
+  (ps) {
+    dagi_irradiance_grid_sph1@tex3d = dagi_irradiance_grid_sph1;
+  }
+  DAGI_BAKED_SAMPLE_CONSTS_INIT(ps)
+  INIT_GLOBAL_LINEAR_WRAP_SAMPLER(ps)
+
+  hlsl {
+    #include "spheres_vertices.hlsl"
+    struct VsOutput
+    {
+      VS_OUT_POSITION(pos)
+      float3 norm : TEXCOORD1;
+      float3 worldCenter : TEXCOORD2;
+    };
+  }
+
+  hlsl(vs) {
+    VsOutput baked_debug_vs(uint iId : SV_InstanceID, uint vertId : SV_VertexID)
+    {
+      VsOutput output = (VsOutput)0;
+      output.pos = NaN;
+
+      uint dx = max(uint(dagi_baked_debug_box_dim.x), 1u);
+      uint dy = max(uint(dagi_baked_debug_box_dim.y), 1u);
+      uint dz = max(uint(dagi_baked_debug_box_dim.z), 1u);
+      if (iId >= dx * dy * dz)
+        return output;
+
+      uint ix = iId % dx;
+      uint iy = (iId / dx) % dy;
+      uint iz = iId / (dx * dy);
+      int stride = max(dagi_baked_debug_box_min.w, 1);
+      int3 globalProbe = dagi_baked_debug_box_min.xyz + int3(int(ix), int(iy), int(iz)) * stride;
+
+      int4 gridDim = int4(loadBuffer4(dagi_baked_indirection, 0u));
+      if (gridDim.w <= 0)
+        return output;
+      int3 maxProbe = gridDim.xyz * 8;
+      if (any(globalProbe < 0) || any(globalProbe >= maxProbe))
+        return output;
+
+      int3 brickCoord = globalProbe >> 3;
+      uint linearBrick = uint(brickCoord.x + gridDim.x * (brickCoord.y + gridDim.y * brickCoord.z));
+      uint packedPair = loadBuffer(dagi_baked_indirection, 48u + (linearBrick >> 1u) * 4u);
+      uint brickIdx = (packedPair >> ((linearBrick & 1u) * 16u)) & 0xFFFFu;
+      if (brickIdx == 0xFFFFu)
+        return output;
+
+      float4 gridOrigin = asfloat(loadBuffer4(dagi_baked_indirection, 16u));
+      float4 atlasInv = asfloat(loadBuffer4(dagi_baked_indirection, 32u));
+      float probeSize = atlasInv.w;
+      float3 center = gridOrigin.xyz + (float3(globalProbe) + 0.5) * probeSize;
+      float radius = max(dagi_baked_debug_params.x, 0.02) * probeSize;
+
+      float3 unitPos = get_sphere_vertex_pos_low(vertId);
+      float3 worldPos = center + unitPos * radius;
+      float4 clipPos = mul(float4(worldPos, 1.0), globtm);
+      if (clipPos.w <= 0.001)
+        return output;
+      output.worldCenter = center;
+      output.norm = unitPos;
+      output.pos = clipPos;
+      return output;
+    }
+  }
+
+  hlsl(ps) {
+    #ifndef dagi_irradiance_grid_sph1_samplerstate
+      #define dagi_irradiance_grid_sph1_samplerstate global_linear_wrap_sampler
+    #endif
+    #include <sh1.hlsl>
+    #include <dagi_irradiance_encode.hlsl>
+  }
+  DAGI_BAKED_SAMPLE_USE(ps)
+  hlsl(ps) {
+    half3 baked_debug_ps(VsOutput input HW_USE_SCREEN_POS) : SV_Target0
+    {
+      float3 dir = normalize(input.norm);
+      SH1 sh1;
+      if (!dagi_baked_sample_sh1_raw(input.worldCenter, sh1))
+        return half3(1, 0, 1);
+      return pack_debug_draw_hdr(dagi_geomerics_sh1_diffuse(sh1, dir));
+    }
+  }
+  compile("target_vs", "baked_debug_vs");
+  compile("target_ps", "baked_debug_ps");
+}

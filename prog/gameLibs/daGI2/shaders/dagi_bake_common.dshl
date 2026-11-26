@@ -1,0 +1,180 @@
+// Copyright (C) Gaijin Games KFT.  All rights reserved.
+texture dagi_irradiance_grid_sph0;
+texture dagi_irradiance_grid_sph1;
+buffer dagi_baked_indirection;
+int dagi_baked_active = 0;
+int4 dagi_baked_grid_dim = (0, 0, 0, 0);      // xyz = brick grid dims, w = atlasBricksSide (used by bake CS)
+float4 dagi_baked_grid_origin = (0, 0, 0, 0); // xyz = worldMin, w = invProbeSize (used by bake CS)
+float4 dagi_baked_atlas_inv = (0, 0, 0, 1);   // xyz = 1.0 / atlasTexels, w = probeSize (used by bake CS)
+
+macro DAGI_BAKED_SAMPLE_CONSTS_INIT(code)
+  BEGIN_ONCE_STAGE(dagi_baked_consts_init, code)
+  (code) {
+    dagi_baked_indirection@buf = dagi_baked_indirection hlsl {
+      ByteAddressBuffer dagi_baked_indirection@buf;
+    }
+    dagi_baked_active@i1 = dagi_baked_active;
+  }
+  END_ONCE()
+endmacro
+
+macro DAGI_BAKED_SAMPLE_USE(code)
+  hlsl(code) {
+    #ifndef DAGI_BAKED_SAMPLE_INCLUDED
+    #define DAGI_BAKED_SAMPLE_INCLUDED 1
+    bool dagi_baked_is_active() { return dagi_baked_active != 0; }
+
+    uint dagi_baked_load_brick_index(int3 brickCoord, int3 gridDim)
+    {
+      if (any(brickCoord < 0) || any(brickCoord >= gridDim))
+        return 0xFFFFu;
+      uint linearBrick = uint(brickCoord.x + gridDim.x * (brickCoord.y + gridDim.y * brickCoord.z));
+      uint packedPair = loadBuffer(dagi_baked_indirection, 48u + (linearBrick >> 1u) * 4u);
+      return (packedPair >> ((linearBrick & 1u) * 16u)) & 0xFFFFu;
+    }
+
+    SH1 dagi_irrad_decode_sh1_unclamped(SH1Encoded enc)
+    {
+      half3 ambNorm = dagi_irrad_decode_color_lrg(float3(1.0, enc.s0.xy));
+      half3 amb = ambNorm * enc.s1.x;
+      half3 dir = enc.s1.yzw;
+      half2 upTint = enc.s0.zw;
+
+      float d_1 = dir.x * 3.0;
+      float r_0 = amb.r;
+      float g_0 = amb.g;
+      float b_0 = amb.b;
+      float r_1 = upTint.r;
+      float g_1 = upTint.g;
+      float Ry = r_1 * (b_0 + d_1 + g_0) + r_0 * (r_1 - 1);
+      float Gy = g_1 * (b_0 + d_1 + r_0) + g_0 * (g_1 - 1);
+      float By = -b_0 * g_1 - b_0 * r_1 - d_1 * (g_1 + r_1 - 1) - g_1 * r_0 - g_0 * (g_1 + r_1 - 1) + r_0 - r_0 * r_1;
+
+      SH1 sh1;
+      sh1.R = float4(amb.r, float3(Ry, dir.yz * ambNorm.r));
+      sh1.G = float4(amb.g, float3(Gy, dir.yz * ambNorm.g));
+      sh1.B = float4(amb.b, float3(By, dir.yz * ambNorm.b));
+      return sh1;
+    }
+
+    // Bakery/Geomerics non-linear L1 SH irradiance: preserves full contrast without negative ringing.
+    float dagi_geomerics_sh1_channel(float r0, float3 r1_premul, float3 dir)
+    {
+      float safeR0 = max(r0, 0.0);
+      if (safeR0 <= 1e-6)
+        return 0.0;
+      float3 r1 = 0.5 * r1_premul;
+      float lenR1 = length(r1);
+      float q = 0.5 * (1.0 + dot(lenR1 > 1e-6 ? (r1 / lenR1) : float3(0, 1, 0), dir));
+      float r1Ratio = min(lenR1 / safeR0, 0.995);
+      float p = 1.0 + 2.0 * r1Ratio;
+      float a = (1.0 - r1Ratio) / (1.0 + r1Ratio);
+      return safeR0 * (a + (1.0 - a) * (p + 1.0) * pow(max(q, 1e-4), p));
+    }
+
+    float3 dagi_geomerics_sh1_diffuse(SH1 sh1, float3 dir)
+    {
+      return float3(
+        dagi_geomerics_sh1_channel(sh1.R.x, sh1.R.wyz, dir),
+        dagi_geomerics_sh1_channel(sh1.G.x, sh1.G.wyz, dir),
+        dagi_geomerics_sh1_channel(sh1.B.x, sh1.B.wyz, dir));
+    }
+
+    bool dagi_baked_sample_sh1_raw(float3 biasedPos, out SH1 sh1)
+    {
+      sh1 = (SH1)0;
+      int4 gridDim = int4(loadBuffer4(dagi_baked_indirection, 0u));
+      if (gridDim.w <= 0)
+        return false;
+      float4 gridOrigin = asfloat(loadBuffer4(dagi_baked_indirection, 16u));
+      float4 atlasInv = asfloat(loadBuffer4(dagi_baked_indirection, 32u));
+
+      float3 gridCoord = (biasedPos - gridOrigin.xyz) * gridOrigin.w;
+      float3 maxGrid = float3(gridDim.xyz * 8);
+      if (any(gridCoord < 0.0) || any(gridCoord >= maxGrid))
+        return false;
+
+      int3 brickCoord = clamp(int3(floor(gridCoord * 0.125)), int3(0, 0, 0), gridDim.xyz - 1);
+      uint brickIdx = dagi_baked_load_brick_index(brickCoord, gridDim.xyz);
+      if (brickIdx == 0xFFFFu)
+        return false;
+
+      uint side = uint(gridDim.w);
+      uint3 atlasBrick = uint3(brickIdx % side, (brickIdx / side) % side, brickIdx / (side * side));
+      float3 localTexel = clamp(gridCoord - float3(brickCoord * 8), 0.0, 8.0) + 1.0;
+      float3 uvw = (float3(atlasBrick * 10u) + localTexel) * atlasInv.xyz;
+
+      SH1Encoded sh1e;
+      sh1e.s0 = tex3Dlod(dagi_irradiance_grid_sph1, float4(uvw.xy, uvw.z * 0.5, 0));
+      sh1e.s1 = tex3Dlod(dagi_irradiance_grid_sph1, float4(uvw.xy, uvw.z * 0.5 + 0.5, 0));
+      sh1 = dagi_irrad_decode_sh1_unclamped(sh1e);
+      return true;
+    }
+
+    bool dagi_baked_sample_sh1_biased(float3 worldPos, float3 toCameraDir, float maxCameraDist, float3 biasNormal, out SH1 sh1)
+    {
+      float4 atlasInv = asfloat(loadBuffer4(dagi_baked_indirection, 32u));
+      float probeSize = atlasInv.w;
+      // Bounded normal-only offset avoids pushing indoor pixels outward through thin walls/roofs along camera ray.
+      float3 biasedPos = worldPos + biasNormal * min(0.45 * probeSize, 0.45);
+      return dagi_baked_sample_sh1_raw(biasedPos, sh1);
+    }
+
+    bool dagi_baked_diffuse(float3 worldPos, float3 worldDir, inout float3 ambient)
+    {
+      SH1 sh1;
+      if (!dagi_baked_sample_sh1_raw(worldPos, sh1))
+        return false;
+      ambient = dagi_geomerics_sh1_diffuse(sh1, worldDir);
+      return true;
+    }
+
+    bool dagi_baked_diffuse_undirectional(float3 worldPos, inout float3 ambient)
+    {
+      SH1 sh1;
+      if (!dagi_baked_sample_sh1_raw(worldPos, sh1))
+        return false;
+      ambient = sh1_premul_exp1_ambient(sh1);
+      return true;
+    }
+
+    bool dagi_baked_diffuse_both_dir(float3 worldPos, float3 worldDir, inout float3 ambient, inout float3 back_ambient)
+    {
+      SH1 sh1;
+      if (!dagi_baked_sample_sh1_raw(worldPos, sh1))
+        return false;
+      ambient = dagi_geomerics_sh1_diffuse(sh1, worldDir);
+      back_ambient = dagi_geomerics_sh1_diffuse(sh1, -worldDir);
+      return true;
+    }
+
+    bool dagi_baked_diffuse_biased(float3 worldPos, float3 worldDir, float3 toCameraDir, float maxCameraDist, float3 biasNormal, inout float3 ambient)
+    {
+      SH1 sh1;
+      if (!dagi_baked_sample_sh1_biased(worldPos, toCameraDir, maxCameraDist, biasNormal, sh1))
+        return false;
+      ambient = dagi_geomerics_sh1_diffuse(sh1, worldDir);
+      return true;
+    }
+
+    bool dagi_baked_diffuse_undirectional_biased(float3 worldPos, float3 toCameraDir, float maxCameraDist, float3 biasNormal, inout float3 ambient)
+    {
+      SH1 sh1;
+      if (!dagi_baked_sample_sh1_biased(worldPos, toCameraDir, maxCameraDist, biasNormal, sh1))
+        return false;
+      ambient = sh1_premul_exp1_ambient(sh1);
+      return true;
+    }
+
+    bool dagi_baked_diffuse_biased_both_dir(float3 worldPos, float3 worldDir, float3 toCameraDir, float maxCameraDist, float3 biasNormal, inout float3 ambient, inout float3 back_ambient)
+    {
+      SH1 sh1;
+      if (!dagi_baked_sample_sh1_biased(worldPos, toCameraDir, maxCameraDist, biasNormal, sh1))
+        return false;
+      ambient = dagi_geomerics_sh1_diffuse(sh1, worldDir);
+      back_ambient = dagi_geomerics_sh1_diffuse(sh1, -worldDir);
+      return true;
+    }
+    #endif
+  }
+endmacro
