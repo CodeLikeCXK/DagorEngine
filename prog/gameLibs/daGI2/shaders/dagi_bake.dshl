@@ -1,4 +1,12 @@
 // Copyright (C) Gaijin Games KFT.  All rights reserved.
+//
+// Static Baked daGI2 GPU Compute Baker & 3D Probe Debug Visualizer:
+//   - dagi_bake_seed_requests_cs    : Seeds SurfaceCache requests across WorldSDF surface band.
+//   - dagi_bake_classify_bricks_cs  : Culls empty sky / deep-solid 8x8x8 bricks before tracing.
+//   - dagi_bake_trace_bricks_cs     : Traces Fibonacci rays per probe with Bakery Backface GI = 0
+//                                     and classifies probe state (0=invalid, 1=outdoor, 2=indoor).
+//   - dagi_bake_upload_atlas_cs     : Packs 8x8x8 bricks into 10x10x10 neighbor-padded Dual-Z atlas.
+//   - dagi_baked_probes_debug       : Instanced 3D SH1 probe spheres shaded via Geomerics L1.
 include "shader_global.dshl"
 include "sky_shader_global.dshl"
 include "sq_clouds_shadow.dshl"
@@ -409,17 +417,18 @@ shader dagi_bake_upload_atlas_cs
       return (pairVal >> ((linearBrick & 1u) * 16u)) & 0xFFFFu;
     }
 
+    // 2D dispatch (x = 0..999 texel inside 10x10x10 padded brick, y = brickIdx) keeps thread_group_x = 16
+    // and thread_group_y = brickCount <= 65534, avoiding D3D11/12 65535 group-per-dimension overflow on High tier.
     [numthreads(64, 1, 1)]
-    void dagi_bake_upload_atlas_cs(uint dtId : SV_DispatchThreadID)
+    void dagi_bake_upload_atlas_cs(uint3 dtId : SV_DispatchThreadID)
     {
       uint brickCount = uint(dagi_bake_trace_params.x);
-      uint totalTexels = brickCount * 1000u;
-      if (dtId >= totalTexels)
+      if (dtId.x >= 1000u || dtId.y >= brickCount)
         return;
 
       int4 gridDim = int4(loadBuffer4(dagi_baked_indirection, 0u));
-      uint brickIdx = dtId / 1000u;
-      uint rem = dtId - brickIdx * 1000u;
+      uint brickIdx = dtId.y;
+      uint rem = dtId.x;
       uint tx = rem % 10u;
       uint ty = (rem / 10u) % 10u;
       uint tz = rem / 100u;
@@ -529,6 +538,8 @@ shader dagi_baked_probes_debug
       float3 center = gridOrigin.xyz + (float3(globalProbe) + 0.5) * probeSize;
       float radius = max(dagi_baked_debug_params.x, 0.02) * probeSize;
 
+      // Avoid testSphereB() here: global frustumPlanes are not populated when dynamic daGI2 is off.
+      // Clip behind-camera vertices via clipPos.w and ensure /debug/gi_node binds viewTm + jitterProjTm.
       float3 unitPos = get_sphere_vertex_pos_low(vertId);
       float3 worldPos = center + unitPos * radius;
       float4 clipPos = mul(float4(worldPos, 1.0), globtm);

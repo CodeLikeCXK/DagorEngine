@@ -1,4 +1,12 @@
 // Copyright (C) Gaijin Games KFT.  All rights reserved.
+//
+// Shared runtime sampling helpers for Static Baked daGI2.
+// IMPORTANT REGISTER CONSTRAINT:
+//   Do NOT add new global cbuffer vectors or samplers to `global_frame` or
+//   `DAGI_BAKED_SAMPLE_CONSTS_INIT` — complex shaders (e.g. water_3d, land_aces,
+//   downsample_depth_hzb) are already at DX12/CompatPC register & SRV limits.
+//   Volume metadata (gridDim, origin, atlasInv, probeSize) is embedded inside the
+//   first 48 bytes (12 dwords) of `dagi_baked_indirection`.
 texture dagi_irradiance_grid_sph0;
 texture dagi_irradiance_grid_sph1;
 buffer dagi_baked_indirection;
@@ -33,6 +41,8 @@ macro DAGI_BAKED_SAMPLE_USE(code)
       return (packedPair >> ((linearBrick & 1u) * 16u)) & 0xFFFFu;
     }
 
+    // Decodes packed SH1 without DAGI_IRRADIANCE_SH1_MIN_THRESHOLD_AMBIENT_MUL clamping
+    // (deferred_light_common.dshl sets that macro to 0.5 for dynamic GI, which washes out indoor contrast).
     SH1 dagi_irrad_decode_sh1_unclamped(SH1Encoded enc)
     {
       half3 ambNorm = dagi_irrad_decode_color_lrg(float3(1.0, enc.s0.xy));
@@ -58,6 +68,8 @@ macro DAGI_BAKED_SAMPLE_USE(code)
     }
 
     // Bakery/Geomerics non-linear L1 SH irradiance: preserves full contrast without negative ringing.
+    // Dagor sh1_premul_exp1_irradiance() contracts against half4(1, dir.yzx), so world XYZ dipole
+    // components map to c.wyz and physical dipole vector r1 = 0.5 * c.wyz (length / r0 in [0, 1]).
     float dagi_geomerics_sh1_channel(float r0, float3 r1_premul, float3 dir)
     {
       float safeR0 = max(r0, 0.0);
@@ -104,6 +116,7 @@ macro DAGI_BAKED_SAMPLE_USE(code)
       float3 localTexel = clamp(gridCoord - float3(brickCoord * 8), 0.0, 8.0) + 1.0;
       float3 uvw = (float3(atlasBrick * 10u) + localTexel) * atlasInv.xyz;
 
+      // Dual-Z single-texture lookup: bottom Z [0, 0.5) = s0 (RGBA8 chrominance), top Z [0.5, 1.0) = s1 (sum + dir).
       SH1Encoded sh1e;
       sh1e.s0 = tex3Dlod(dagi_irradiance_grid_sph1, float4(uvw.xy, uvw.z * 0.5, 0));
       sh1e.s1 = tex3Dlod(dagi_irradiance_grid_sph1, float4(uvw.xy, uvw.z * 0.5 + 0.5, 0));

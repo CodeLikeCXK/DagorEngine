@@ -8,6 +8,17 @@
 
 // Baked GI cache file: naming, header format, sparse brick payload and tier/source selection.
 // Engine independent on purpose, so the rules can be tested without the renderer.
+//
+// Binary layout (little-endian .dgibake):
+//   [Prefix]   "DGIBAKE\0" (8B) + headerSize (u32)
+//   [Header]   formatVersion (u32), producerVersion (u32), tier (u8), pad (3B),
+//              levelIdLen (u16) + levelId[], contentHash (u64), lightingSignature (u64),
+//              stateCount (u32), brickSize (u32 = 8), brickCount (u32),
+//              payloadSize (u64), payloadChecksum (FNV-1a u64)
+//   [Payload]  32B meta (origin[3], probeSize, gridDim[3], brickCount)
+//            + brickCount * 8B BrickCoord {x, y, z, flags}
+//            + brickCount * 512 * 4B sph0 (RGBA8)
+//            + brickCount * 512 * 8B sph1 (RGBA16F)
 namespace dagi_bake
 {
 enum class Tier : uint8_t

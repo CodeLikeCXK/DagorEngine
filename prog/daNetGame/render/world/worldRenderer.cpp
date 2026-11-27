@@ -2695,6 +2695,7 @@ void WorldRenderer::ctorCommon()
     d3d::get_driver_desc().caps.hasShaderFloat16Support ? 1 : 0);
 
   FeatureRenderFlagMask featureRenderFlags = getPresetFeatures();
+  // Prune features unsupported by Thin GBuffer at startup (not only on subsequent toggle/changeFeatures calls).
   validateFeatures(featureRenderFlags, FeatureRenderFlagMask().set());
   defaultFeatureRenderFlags = featureRenderFlags;
   set_current_render_features(featureRenderFlags);
@@ -6867,6 +6868,7 @@ void WorldRenderer::validateFeatures(FeatureRenderFlagMask &features, const Feat
         features.reset(flag);
       }
     };
+    // Thin GBuffer (compatPC) disables Full-Deferred-only passes/textures to avoid missing shader/resource logerrs.
     disableForThin(FeatureRenderFlags::SSR, "SSR");
     disableForThin(FeatureRenderFlags::DEFERRED_LIGHT, "DEFERRED_LIGHT");
     disableForThin(FeatureRenderFlags::COMBINED_SHADOWS, "COMBINED_SHADOWS");

@@ -1266,6 +1266,7 @@ APISupport check_device_features(D3DDevice *device)
   }
 
 #if defined(_M_ARM64) || defined(__aarch64__)
+  // Windows-on-ARM64 GPUs (e.g. Snapdragon 8cx Gen 3) typically top out at SM 6.0-6.2; allow SM 6.0 by default.
   const auto minSmValue = ::dgs_get_settings()->getBlockByNameEx("dx12")->getInt("minShaderModel", D3D_SHADER_MODEL_6_0);
 #else
   const auto minSmValue = ::dgs_get_settings()->getBlockByNameEx("dx12")->getInt("minShaderModel", D3D_SHADER_MODEL_6_5);

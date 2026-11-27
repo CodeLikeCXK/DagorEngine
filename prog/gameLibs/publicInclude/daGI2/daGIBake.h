@@ -1,6 +1,14 @@
 // Copyright (C) Gaijin Games KFT.  All rights reserved.
 #pragma once
 
+// Static Baked daGI2 Runtime & Non-Blocking Baker API
+// ==================================================
+// Provides disk cache selection, sparse 3D SH1 brick atlas management (BakedGIVolume),
+// and a frame-sliced GPU baker (BakedGISession) that populates WorldSDF + SurfaceCache
+// without triggering Windows WDDM 2s TDR timeouts. When a baked volume is active, live
+// dynamic daGI2 structures can be completely freed while both Full Deferred and Thin
+// GBuffer (compatPC) sample the baked SH1 atlas in O(1) via dagi_baked_indirection.
+
 #include <cstdint>
 #include <EASTL/string.h>
 #include <EASTL/unique_ptr.h>
@@ -47,6 +55,8 @@ Selection select_mode(Tier configured, SourceMode source_mode, bool can_use_dyna
   bool force_rebuild = false);
 
 // Holds the GPU 3D sparse brick atlas + indirection buffer and binds shader globals for static GI sampling.
+// Note: Reuses dagi_irradiance_grid_sph1 (Dual-Z W x W x 2W RGBA16F) and packs grid headers into
+// dagi_baked_indirection to avoid adding extra global cbuffer registers or SRV slots.
 class BakedGIVolume
 {
 public:

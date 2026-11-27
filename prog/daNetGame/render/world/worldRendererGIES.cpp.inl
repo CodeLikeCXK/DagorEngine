@@ -481,6 +481,10 @@ void WorldRenderer::setGIQualityFromSettings()
   const bool highValid = dagi_bake_runtime::probe_cache_valid(highPath.c_str(), 0, 0);
   const bool canUseDynamic = !isThinGBuffer() && !is_only_low_gi_supported();
 
+  // Mode dispatch across 3 paths:
+  //   Path 1: Valid .dgibake cache on disk -> load BakedGIVolume and call closeGI() (zero runtime GI cost).
+  //   Path 2: Cache missing in Baked mode or Thin GBuffer -> schedule frame-driven GPU bake (BakedGISession).
+  //   Path 3: Dynamic mode or deleted cache in Full Deferred Auto mode -> run live dynamic daGI2.
   const dagi_bake_runtime::Selection sel =
     dagi_bake_runtime::select_mode(configuredTier, sourceMode, canUseDynamic, normalValid, highValid, forceRebuildCfg);
   bakedGIPromptRebuildHigh = sel.promptRebuildHigh;
@@ -771,6 +775,8 @@ void WorldRenderer::tickBakedGISession()
       bp.worldBox = bakeBox;
       bp.probeSizeOverride =
         graphicsGI->getReal(bp.tier == dagi_bake_runtime::Tier::High ? "bakeProbeSizeHigh" : "bakeProbeSizeNormal", 0.f);
+      // Collect artist-placed indoor envi_probe_box OBBs (unit [-0.5, 0.5]^3 local space) inside the bake bounds
+      // so interior probes are guaranteed isolated from outdoor probes during CPU hole-filling dilation.
       if (const scene::TiledScene *probeBoxes = getEnviProbeBoxesScene())
       {
         bbox3f queryBox;
@@ -818,6 +824,8 @@ void WorldRenderer::tickBakedGISession()
   if (giGlobalLightsPrepared && lights.initialized())
     lights.setOutOfFrustumLightsToShader(*giLights);
 
+  // Preserve world_view_pos across baking tile rasterization so FrameGraph debug nodes (which bind
+  // world_view_pos) do not flag spurious global shader variable mutations during gameplay frames.
   const Color4 savedWorldViewPos = ShaderGlobal::get_float4(world_view_posVarId);
   const bool stillRunning = bakedGISession.tick(*daGI2, rasterizeTileCb, bakedGIVolume);
   ShaderGlobal::set_float4(world_view_posVarId, savedWorldViewPos);

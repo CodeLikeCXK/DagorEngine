@@ -656,6 +656,7 @@ macro GLOBAL_FRAME_CONTENT()
       gbuffer_enviSPH2 @f4 = (enviSPH2*skylight_params.y);
       gbuffer_envi_probe_specular@texCube = envi_probe_specular;
       gbuffer_envi_probe_specular_samplerstate@sampler = global_linear_wrap_sampler;
+      // Thin GBuffer (compatPC) aliases reusing the static baked GI atlas, indirection buffer, and active flag.
       gbuffer_dagi_baked_sph1@tex3d = dagi_irradiance_grid_sph1;
       gbuffer_dagi_baked_indirection@buf = dagi_baked_indirection hlsl {
         ByteAddressBuffer gbuffer_dagi_baked_indirection@buf;

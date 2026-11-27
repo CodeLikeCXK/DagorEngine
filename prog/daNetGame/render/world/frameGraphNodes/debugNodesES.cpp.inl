@@ -272,6 +272,7 @@ void makeDebugVisualizationNodes(eastl::vector<dafg::NodeHandle> &fg_node_handle
     registry.requestRenderPass().color({"target_for_debug"}).depthReadTestAndSample(depthTexNameForDebug(), {"depth_gbuf"});
     registry.requestState().setFrameBlock("global_frame");
 
+    // Bind viewTm, jitterProjTm, and world_view_pos so globtm is populated for baked GI 3D probe spheres.
     auto prevNs = registry.root();
     auto cameraHndl = prevNs.readBlob<CameraParams>("current_camera")
                         .bindAsView<&CameraParams::viewTm>()

@@ -26,6 +26,8 @@ macro WRITE_GBUFFER_THIN()
       float a = (1.0 - r1Ratio) / (1.0 + r1Ratio);
       return safeR0 * (a + (1.0 - a) * (p + 1.0) * pow(max(q, 1e-4), p));
     }
+    // Samples the Dual-Z Static Baked daGI2 atlas directly inside Thin GBuffer (compatPC) without clipmap cbuffers.
+    // Uses bounded normal-only bias + Geomerics L1 SH reconstruction to avoid light leaks through thin walls/roofs.
     bool gbuffer_thin_sample_baked_gi(float3 worldPos, float3 worldDir, out float3 ambient, out SH1 sh1)
     {
       ambient = 0;

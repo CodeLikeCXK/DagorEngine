@@ -1,4 +1,17 @@
 // Copyright (C) Gaijin Games KFT.  All rights reserved.
+//
+// Runtime & Frame-Driven GPU Baker for Static Baked daGI2
+// -------------------------------------------------------
+// Key design invariants for maintainers:
+// 1. CURRENT_BAKE_PRODUCER_VERSION (currently 2): bump whenever probe encoding, SDF tracing,
+//    or dilation semantics change so stale .dgibake caches are automatically invalidated/rebuilt.
+// 2. Zero extra global registers: all volume dims/origin/inv-atlas scalars live in the 48-byte
+//    header of ByteAddressBuffer `dagi_baked_indirection`, and s0/s1 halves share a single
+//    Dual-Z 3D RGBA16F texture `dagi_irradiance_grid_sph1` (z in [0, 0.5) = s0, [0.5, 1.0) = s1).
+// 3. DX11 SRV/UAV binding order in uploadVolumeToGpu(): `bindStandInTexturesWhenDaGIOff()` MUST
+//    run BEFORE binding the real `indirectionBuf`/`atlasSph1`, `atlasSph1` must be bound as
+//    `dagi_irradiance_grid_sph1VarId` for `dagi_bake_upload_atlas_cs` UAV output, and
+//    ShaderGlobal::LAYER_FRAME is temporarily unbound during the upload dispatch.
 #include <daGI2/daGIBake.h>
 #include "daGIBakeCache.h"
 
@@ -396,7 +409,8 @@ struct BakedGIVolume::Impl
 
       d3d::GpuAutoLock gpuLock;
       d3d::resource_barrier({atlasSph1.getVolTex(), RB_RW_UAV | RB_STAGE_COMPUTE, 0, 0});
-      uploadAtlasCs->dispatchThreads(nBricks * 1000u, 1, 1);
+      // 2D dispatch keeps thread_group_x=16 & thread_group_y=nBricks (<=65534) below D3D11/12 65535 group limit
+      uploadAtlasCs->dispatchThreads(1000u, nBricks, 1u);
 
       const auto stageAll = RB_STAGE_COMPUTE | RB_STAGE_PIXEL | RB_STAGE_VERTEX;
       d3d::resource_barrier({atlasSph1.getVolTex(), RB_RO_SRV | RB_SOURCE_STAGE_COMPUTE | stageAll, 0, 0});
@@ -697,6 +711,10 @@ struct BakedGISession::Impl
   DaGISettings savedSettings;
   bool hasSavedSettings = false;
 
+  // Probe state tracking for Bakery-inspired 3-pass hole-filling dilation during Finalize:
+  //   0 = invalid probe embedded inside geometry (will be dilated from valid neighbors)
+  //   1 = valid outdoor probe (sky visibility >= 30%)
+  //   2 = valid enclosed indoor probe (sky visibility < 30% or inside envi_probe_box OBB)
   dagi_bake::VolumeData outVol;
   std::vector<uint8_t> outProbeStates; // 0 = invalid inside wall, 1 = outdoor valid, 2 = indoor valid
 
@@ -903,6 +921,8 @@ bool BakedGISession::tick(DaGI &dagi, const RasterizeTileFn &rasterize_tile_cb, 
     impl->outVol.origin[1] + 0.5f * float(by0 + byEnd) * brickWorld,
     impl->outVol.origin[2] + 0.5f * float(bz0 + bzEnd) * brickWorld);
 
+  // Stage 1: Populate WorldSDF (128^3, yResScale=1.0) & AlbedoScene around each 3D 3x3x3-brick tile.
+  // Keeping each tile within fine SDF Clip 0/1 prevents ground-floor interiors from falling into coarse cascades.
   if (impl->stage == Impl::Stage::TileRasterize)
   {
     d3d::GpuAutoLock gpuLock;
@@ -924,6 +944,8 @@ bool BakedGISession::tick(DaGI &dagi, const RasterizeTileFn &rasterize_tile_cb, 
     return true;
   }
 
+  // Stage 2: Seed SurfaceCache requests along WorldSDF surface voxels and run multi-bounce relighting
+  // in bounded per-frame batches (~8-15 ms) so WDDM never triggers a 2s TDR driver reset.
   if (impl->stage == Impl::Stage::TileRelight)
   {
     d3d::GpuAutoLock gpuLock;
@@ -956,6 +978,8 @@ bool BakedGISession::tick(DaGI &dagi, const RasterizeTileFn &rasterize_tile_cb, 
     return true;
   }
 
+  // Stage 3: Classify active surface bricks and ray-trace Fibonacci sphere SH1 probes in bounded <=64-brick batches.
+  // GPU records probe state (0=invalid, 1=outdoor, 2=indoor); CPU refines indoor state against envi_probe_box OBBs.
   if (impl->stage == Impl::Stage::TileTraceAndExport)
   {
     d3d::GpuAutoLock gpuLock;

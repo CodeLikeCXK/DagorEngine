@@ -46,6 +46,7 @@ void init_shaders()
   if (strcmp(::dgs_get_settings()->getBlockByNameEx("graphics")->getStr("consolePreset", "HighFPS"), "bareMinimum") == 0)
     sh_bindump_prefix = "compiledShaders/compatPC/game";
 #elif _TARGET_PC || _TARGET_APPLE
+  // Route to compatPC shader dump whenever bareMinimum preset is chosen or fullDeferred is disabled (Thin GBuffer).
   if (strcmp(::dgs_get_settings()->getBlockByNameEx("graphics")->getStr("preset", "medium"), "bareMinimum") == 0 ||
       !::dgs_get_settings()->getBlockByNameEx("renderFeatures")->getBool("fullDeferred", true))
     sh_bindump_prefix = ::dgs_get_settings()->getStr("compatShaders", "compiledShaders/compatPC/game");

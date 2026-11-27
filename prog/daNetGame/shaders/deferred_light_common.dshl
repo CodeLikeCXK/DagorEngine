@@ -41,6 +41,7 @@ macro INIT_DAGI_IRRADIANCE_GRID(code)
     bool sample_dagi_irradiance_grid(float dist, float3 worldPos, float3 enviLightingNormal, float3 view,
       float3 normal, float2 viewPixcoord, float3 roughR, inout half3 ambient, inout half3 giSpecular)
     {
+      // Skip camera-ray pull when baked GI is active: pulling up to 3m along view ray pushes indoor walls/roofs outdoors.
       float ofs = dagi_baked_is_active() ? 0.0 : max(dist*0.04, 0.25*dagi_irrad_grid_probe_size(0));
       float3 filteredWorldPos = worldPos + view*ofs;
       dagi_irrad_grid_diffuse_biased_smooth(world_view_pos.xyz, filteredWorldPos, enviLightingNormal, view, max(0, dist-ofs), normal, interleavedGradientNoise( viewPixcoord.xy ), ambient);
