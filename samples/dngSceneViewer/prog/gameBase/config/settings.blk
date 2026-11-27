@@ -219,7 +219,9 @@ __allowedConfigOverrides{
   screenshots{
     __allow_all_params:b=yes
   }
-
+  renderFeatures{ 
+    fullDeferred:b=yes 
+  }
   quickMatch{
     __allow_all_params:b=yes
   }
